@@ -23,7 +23,8 @@ This file captures the essential implementation directives. Keep it in sync with
 - `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
 
 ## Near-term implementation focus
-- Replace verifier scaffold with real OIDC4VP validation and key management; keep QR/deep-link UX.
-- Harden persistence via a pluggable store abstraction (JSON now, DB later) and add basic migrations.
-- Schedule federation: signed inbox/outbox, gossip of uniqueness ledger, and peer compliance audits.
-- Extend modules toward petitions → discussion → vote, keeping delegation and accountability visible in the UI (see ROADMAP.md).
+- Ship the operative social network first: bind verified citizen sessions to handles/profiles, model privileges (author/mod/delegate) and Circle policy enforcement for posting/petition/vote.
+- Model and validate data exchanges end-to-end: persisted discussions/petitions/votes with author-session binding, rate limits, quorum/ban checks, delegation edges, and audit trails that surface in the UI.
+- Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
+- Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
+- Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
