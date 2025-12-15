@@ -1,18 +1,37 @@
 import { POLICIES } from '../config.js';
 
-export function getCirclePolicyState(state) {
+export function getEffectivePolicy(state) {
+  const settings = state.settings || {};
   return {
-    id: POLICIES.id,
-    version: POLICIES.version,
-    enforcement: POLICIES.enforceCircle ? 'strict' : 'observing',
-    requireVerification: POLICIES.requireVerification,
-    peersKnown: state.peers.size,
-    ledgerEntries: state.uniquenessLedger.size,
+    ...POLICIES,
+    id: settings.policyId || POLICIES.id,
+    circleName: settings.circleName || 'Party Circle',
+    enforceCircle: settings.enforceCircle ?? POLICIES.enforceCircle,
+    requireVerification: settings.requireVerification ?? POLICIES.requireVerification,
+    adminContact: settings.adminContact || '',
+    preferredPeer: settings.preferredPeer || '',
+    initialized: Boolean(settings.initialized),
+    notes: settings.notes || '',
   };
 }
 
-export function evaluateDiscussionPermission(citizen) {
-  if (POLICIES.requireVerification && !citizen) {
+export function getCirclePolicyState(state) {
+  const effective = getEffectivePolicy(state);
+  return {
+    id: effective.id,
+    version: effective.version,
+    enforcement: effective.enforceCircle ? 'strict' : 'observing',
+    requireVerification: effective.requireVerification,
+    peersKnown: state.peers.size,
+    ledgerEntries: state.uniquenessLedger.size,
+    circleName: effective.circleName,
+    initialized: effective.initialized,
+  };
+}
+
+export function evaluateDiscussionPermission(state, citizen) {
+  const policy = getEffectivePolicy(state);
+  if (policy.requireVerification && !citizen) {
     return {
       allowed: false,
       reason: 'verification_required',

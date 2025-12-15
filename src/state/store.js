@@ -18,6 +18,7 @@ class JsonStateStore {
       peers: await this.readJson(FILES.peers, []),
       discussions: await this.readJson(FILES.discussions, []),
       actors: await this.readJson(FILES.actors, []),
+      settings: await this.readJson(FILES.settings, { initialized: false }),
     };
   }
 
@@ -31,6 +32,7 @@ class JsonStateStore {
     await this.writeJson(FILES.peers, data.peers || []);
     await this.writeJson(FILES.discussions, data.discussions || []);
     await this.writeJson(FILES.actors, data.actors || []);
+    await this.writeJson(FILES.settings, data.settings || { initialized: false });
   }
 
   async saveMeta(meta) {
@@ -55,6 +57,10 @@ class JsonStateStore {
 
   async saveActors(entries) {
     await this.writeJson(FILES.actors, entries);
+  }
+
+  async saveSettings(settings) {
+    await this.writeJson(FILES.settings, settings);
   }
 
   async readJson(filePath, fallback) {

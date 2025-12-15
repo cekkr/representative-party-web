@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 
-import { POLICIES } from '../config.js';
 import { getCitizen } from '../services/citizen.js';
 import { evaluateDiscussionPermission, getCirclePolicyState } from '../services/policy.js';
 import { persistDiscussions } from '../state/storage.js';
@@ -22,10 +21,11 @@ export async function renderDiscussion({ req, res, state, wantsPartial }) {
         ? 'Posting as verified citizen bound to a blinded PID hash.'
         : 'Start the wallet flow to post with accountability.',
       discussionList: renderDiscussionList(state.discussions),
-      verificationPolicy: POLICIES.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
+      verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
       circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
       policyId: policy.id,
       policyVersion: policy.version,
+      circleName: policy.circleName,
       hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
     },
     { wantsPartial, title: 'Deliberation Sandbox' },
@@ -35,7 +35,7 @@ export async function renderDiscussion({ req, res, state, wantsPartial }) {
 
 export async function postDiscussion({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
-  const permission = evaluateDiscussionPermission(citizen);
+  const permission = evaluateDiscussionPermission(state, citizen);
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message });
   }
@@ -71,13 +71,14 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
           ? 'Posting as verified citizen bound to a blinded PID hash.'
           : 'Start the wallet flow to post with accountability.',
         discussionList: renderDiscussionList(state.discussions),
-        verificationPolicy: POLICIES.requireVerification
+        verificationPolicy: policy.requireVerification
           ? 'Wallet verification required to post.'
           : 'Open posting allowed (demo mode).',
         circlePolicy:
           policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
         policyId: policy.id,
         policyVersion: policy.version,
+        circleName: policy.circleName,
         hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
       },
       { wantsPartial, title: 'Deliberation Sandbox' },

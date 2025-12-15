@@ -40,6 +40,10 @@ export async function persistActors(state) {
   await state.store.saveActors([...state.actors.values()]);
 }
 
+export async function persistSettings(state) {
+  await state.store.saveSettings(state.settings);
+}
+
 function hydrateState(data) {
   return {
     uniquenessLedger: new Set(data.ledger),
@@ -47,5 +51,6 @@ function hydrateState(data) {
     peers: new Set(data.peers),
     discussions: data.discussions,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
+    settings: data.settings || { initialized: false },
   };
 }

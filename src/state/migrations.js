@@ -1,4 +1,4 @@
-export const LATEST_SCHEMA_VERSION = 1;
+export const LATEST_SCHEMA_VERSION = 2;
 
 const MIGRATIONS = [
   {
@@ -23,6 +23,25 @@ const MIGRATIONS = [
         peers: uniqueStrings(data.peers),
         discussions: normalizedDiscussions,
         actors: normalizedActors,
+      };
+    },
+  },
+  {
+    version: 2,
+    description: 'Add admin settings scaffold with defaults.',
+    up: (data) => {
+      return {
+        ...data,
+        settings: {
+          initialized: Boolean(data.settings?.initialized),
+          circleName: data.settings?.circleName || 'Party Circle',
+          policyId: data.settings?.policyId || 'party-circle-alpha',
+          enforceCircle: data.settings?.enforceCircle ?? null,
+          requireVerification: data.settings?.requireVerification ?? null,
+          adminContact: data.settings?.adminContact || '',
+          preferredPeer: data.settings?.preferredPeer || '',
+          notes: data.settings?.notes || '',
+        },
       };
     },
   },

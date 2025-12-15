@@ -27,6 +27,8 @@ npm start
 - Discussion sandbox tied to verified citizens:
   - `GET /discussion` renders the thread list; `POST /discussion` appends a post using the verified session cookie when policies enforce it.
 - Health endpoint (`GET /health`) reports ledger/sessions/actors/peers counts and active policies.
+- Admin and first-install UI:
+  - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
 - Static assets and templates live in `src/public`:
   - `app.css`, `app.js`
   - HTML templates under `src/public/templates` (layout + pages, including the discussion view)

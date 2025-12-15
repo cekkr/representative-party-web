@@ -1,12 +1,12 @@
-import { POLICIES } from '../config.js';
 import { getCitizen } from '../services/citizen.js';
-import { getCirclePolicyState } from '../services/policy.js';
+import { getCirclePolicyState, getEffectivePolicy } from '../services/policy.js';
 import { sendHtml } from '../utils/http.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
   const policy = getCirclePolicyState(state);
+  const effective = getEffectivePolicy(state);
   const html = await renderPage(
     'home',
     {
@@ -15,7 +15,9 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       discussionCount: state.discussions.length,
       citizenHandle: citizen?.handle,
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',
-      policyDetail: `Policy ${POLICIES.id} v${POLICIES.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,
+      policyDetail: `Policy ${effective.id} v${effective.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,
+      circleName: effective.circleName,
+      firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to configure and persist Circle policies.',
     },
     { wantsPartial, title: 'Representative Party' },
   );

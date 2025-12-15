@@ -1,0 +1,65 @@
+<section class="panel">
+  <p class="eyebrow">Admin</p>
+  <h2>Circle settings and policy</h2>
+  <p>Configure how this node enforces wallet verification, circle alignment, and peer aggregation.</p>
+  <div class="callout">
+    <p class="muted small">Circle name: {{circleName}}</p>
+    <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
+    <p class="muted small">Posting gate: {{postingGate}}</p>
+    <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
+    <p class="muted small">Initialized: {{initialized}}</p>
+    <p class="muted small">{{notes}}</p>
+    <p class="muted small">{{firstRunNote}}</p>
+  </div>
+  <p class="muted small">{{flash}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <div class="form-grid">
+      <label class="field">
+        <span>Circle name</span>
+        <input name="circleName" value="{{circleName}}" placeholder="Party Circle" />
+      </label>
+      <label class="field">
+        <span>Policy ID</span>
+        <input name="policyId" value="{{policyId}}" placeholder="party-circle-alpha" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="enforceCircle" {{enforceCircleChecked}} />
+        <span>Enforce Circle (verification before posting/voting)</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="requireVerification" {{requireVerificationChecked}} />
+        <span>Require wallet verification for posting</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Admin contact</span>
+        <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
+      </label>
+      <label class="field">
+        <span>Preferred peer (Circle anchor)</span>
+        <input name="preferredPeer" value="{{preferredPeer}}" placeholder="https://peer.party" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Notes</span>
+      <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Add peer and aggregate</span>
+        <input name="peerJoin" placeholder="https://peer.party" />
+      </label>
+      <div class="stack">
+        <p class="muted small">Add a trusted peer to sync ledger/policies. This will persist to the peer registry.</p>
+      </div>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save settings</button>
+      <a class="ghost" href="/" data-partial>Back home</a>
+    </div>
+    <p class="muted small">First installation hint: toggle enforcement + add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>
+  </form>
+</section>

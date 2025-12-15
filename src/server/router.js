@@ -7,6 +7,7 @@ import { renderDiscussion, postDiscussion } from '../routes/discussion.js';
 import { renderHealth } from '../routes/health.js';
 import { renderHome } from '../routes/home.js';
 import { servePublic } from '../routes/static.js';
+import { renderAdmin, updateAdmin } from '../routes/admin.js';
 import { sendNotFound } from '../utils/http.js';
 
 export async function routeRequest(req, res, state) {
@@ -51,6 +52,14 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/circle/peers') {
     return registerPeer({ req, res, state });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/admin') {
+    return renderAdmin({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/admin') {
+    return updateAdmin({ req, res, state, wantsPartial });
   }
 
   if (req.method === 'GET' && url.pathname.startsWith('/ap/actors/')) {

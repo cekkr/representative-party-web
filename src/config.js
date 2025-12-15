@@ -38,6 +38,7 @@ export const FILES = {
   discussions: join(PATHS.DATA_ROOT, 'discussions.json'),
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
   meta: join(PATHS.DATA_ROOT, 'meta.json'),
+  settings: join(PATHS.DATA_ROOT, 'settings.json'),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';
