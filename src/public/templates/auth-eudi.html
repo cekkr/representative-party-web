@@ -1,14 +1,27 @@
 <section class="panel">
   <p class="eyebrow">Verifier</p>
   <h2>EUDI Wallet handshake</h2>
-  <p>This demo issues a credential offer with a blinded session token. Use the link to simulate a wallet responding with a PID hash.</p>
-  <div class="callout">
-    <p class="muted">Session ID</p>
-    <code>{{sessionId}}</code>
+  <p>This verifier issues a credential offer with a blinded session token. Scan the QR on desktop or open the deep link on mobile to return a PID hash.</p>
+  <div class="grid two">
+    <div>
+      <div class="callout">
+        <p class="muted">Session ID</p>
+        <code>{{sessionId}}</code>
+      </div>
+      <div class="cta-row">
+        <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
+        <a class="ghost" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Simulate callback</a>
+      </div>
+      <p class="muted small">If your browser blocks the deep link, copy and paste it: <span data-deep-link-fallback>{{deepLink}}</span></p>
+    </div>
+    <div class="qr">
+      <p class="eyebrow">Desktop QR</p>
+      <img src="{{qrUrl}}" alt="Scan to open wallet" />
+      <p class="muted small">Scan with an EUDI wallet to accept the credential offer.</p>
+    </div>
   </div>
-  <div class="cta-row">
-    <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
-    <a class="ghost" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Simulate callback</a>
-  </div>
-  <p class="muted small">If your browser blocks the deep link, copy and paste it: <span data-deep-link-fallback>{{deepLink}}</span></p>
+  <details class="note">
+    <summary>Credential offer payload</summary>
+    <pre>{{offerPreview}}</pre>
+  </details>
 </section>

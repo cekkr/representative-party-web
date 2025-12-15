@@ -22,6 +22,35 @@
     }
   });
 
+  document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('form[data-enhance]');
+    if (!form) return;
+    event.preventDefault();
+    try {
+      const formData = new FormData(form);
+      const response = await fetch(form.action, {
+        method: form.method || 'POST',
+        headers: { 'X-Requested-With': 'partial' },
+        body: new URLSearchParams(formData),
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          alert('Verification required before posting. Complete the wallet flow.');
+          return;
+        }
+        throw new Error('Submit failed');
+      }
+      const html = await response.text();
+      root.innerHTML = html;
+      window.history.pushState({}, '', form.action);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      triggerDeepLink();
+    } catch (error) {
+      console.error(error);
+      form.submit();
+    }
+  });
+
   window.addEventListener('popstate', () => window.location.reload());
 })();
 

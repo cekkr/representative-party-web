@@ -1,0 +1,44 @@
+<section class="panel">
+  <p class="eyebrow">Deliberation</p>
+  <h2>Discussion sandbox</h2>
+  <p>Prototype debate module wired to verified sessions. Every post inherits the blinded PID hash of the citizen.</p>
+  <div class="callout">
+    <p class="muted">Your handle</p>
+    <code>{{citizenHandle}}</code>
+    <p class="muted small">{{citizenStatus}}</p>
+    <p class="muted small">{{verificationPolicy}}</p>
+    <p class="muted small">Ledger size: {{ledgerSize}}</p>
+  </div>
+  <form class="stack" method="post" action="/discussion" data-enhance="discussion">
+    <div class="form-grid">
+      <label class="field">
+        <span>Topic</span>
+        <input name="topic" placeholder="Energy transition" required />
+      </label>
+      <label class="field">
+        <span>Stance</span>
+        <select name="stance">
+          <option value="proposal">Proposal</option>
+          <option value="support">Support</option>
+          <option value="concern">Concern</option>
+          <option value="neutral" selected>Neutral</option>
+        </select>
+      </label>
+    </div>
+    <label class="field">
+      <span>Comment</span>
+      <textarea name="content" rows="4" placeholder="Add a concise, accountable thought." required></textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Post to discussion</button>
+      <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Latest contributions</p>
+  <div class="discussion-list">
+    {{discussionList}}
+  </div>
+</section>

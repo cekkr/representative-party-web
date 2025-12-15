@@ -127,6 +127,10 @@ main {
   gap: 1rem;
 }
 
+.grid.two {
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .cta-row {
   display: flex;
   align-items: center;
@@ -197,6 +201,124 @@ ul.plain li {
 
 ul.plain li:last-child {
   border-bottom: none;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.qr {
+  background: rgba(11, 92, 255, 0.08);
+  border: 1px solid var(--border);
+  padding: 1rem;
+  border-radius: 1rem;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.qr img {
+  width: 100%;
+  max-width: 240px;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.discussion-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.discussion {
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  padding: 1rem 1.1rem;
+  background: rgba(15, 22, 39, 0.6);
+}
+
+.discussion__meta {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field input,
+.field select,
+.field textarea {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 0.65rem;
+  padding: 0.65rem 0.75rem;
+  font-size: 1rem;
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+details.note {
+  background: rgba(12, 19, 32, 0.8);
+  border: 1px solid var(--border);
+  padding: 0.9rem;
+  border-radius: 0.9rem;
+  margin-top: 0.8rem;
+}
+
+details.note summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+
+details.note pre {
+  background: #0c1320;
+  border: 1px solid var(--border);
+  padding: 0.9rem;
+  border-radius: 0.65rem;
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.stats .stat__value {
+  font-size: 2rem;
+}
+
+button.cta {
+  border: none;
+  cursor: pointer;
+}
+
+.ghost.pill {
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .muted {

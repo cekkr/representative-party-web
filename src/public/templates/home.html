@@ -1,46 +1,60 @@
 <section class="panel">
   <div>
     <p class="eyebrow">Phase 1 — Party Circle foundation</p>
-    <h2>Verifier-first onboarding for unique citizens</h2>
-    <p>The server issues an OIDC4VP credential offer, receives a blinded PID hash, and seeds the Uniqueness Ledger. Everything here is server-rendered and progressively enhanced with vanilla JS.</p>
+    <h2>Verifier-first onboarding with QR + ActivityPub hooks</h2>
+    <p>The server now issues a QR-friendly credential offer, receives a blinded PID hash, persists it to the Uniqueness Ledger, and emits an ActivityPub actor for federation.</p>
+    <p class="muted small">{{policyFlag}}</p>
     <div class="cta-row">
-      <a class="cta" href="/auth/eudi" data-partial>Login with EU Wallet (demo)</a>
-      <a class="ghost" href="/health" target="_blank" rel="noreferrer">Health endpoint</a>
+      <a class="cta" href="/auth/eudi" data-partial>Start wallet flow</a>
+      <a class="ghost" href="/discussion" data-partial>Open discussion sandbox</a>
+      <a class="ghost" href="/circle/ledger" target="_blank" rel="noreferrer">Ledger feed</a>
     </div>
   </div>
-  <div class="stat">
-    <p class="eyebrow">Uniqueness ledger</p>
-    <p class="stat__value">{{ledgerSize}}</p>
-    <p class="muted">Hashed citizen identities tracked in-memory.</p>
+  <div class="grid stats">
+    <div class="stat">
+      <p class="eyebrow">Uniqueness ledger</p>
+      <p class="stat__value">{{ledgerSize}}</p>
+      <p class="muted">Persisted blinded hashes across the Circle.</p>
+    </div>
+    <div class="stat">
+      <p class="eyebrow">Actors minted</p>
+      <p class="stat__value">{{actorCount}}</p>
+      <p class="muted">ActivityPub personas per verified hash.</p>
+    </div>
+    <div class="stat">
+      <p class="eyebrow">Discussions</p>
+      <p class="stat__value">{{discussionCount}}</p>
+      <p class="muted">Prototype debates bound to verified citizens.</p>
+    </div>
   </div>
 </section>
 
 <section class="panel grid">
   <div>
-    <p class="eyebrow">Kernel</p>
-    <h3>Party Circle</h3>
+    <p class="eyebrow">Verifier</p>
+    <h3>OIDC4VP handshake</h3>
     <ul class="plain">
-      <li>OIDC4VP verifier entry point with blinded PID hashing</li>
-      <li>Ledger to prevent duplicate registrations across peers</li>
-      <li>Trusted peers placeholder ready for ActivityPub gossip</li>
+      <li>Credential offer + deep link compatible with wallet handoff</li>
+      <li>QR generation for desktop scans and mobile handover</li>
+      <li>Blinded PID hashing with salted sessions</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Frontend</p>
-    <h3>SSR + Vanilla router</h3>
+    <p class="eyebrow">Federation</p>
+    <h3>ActivityPub + Gossip</h3>
     <ul class="plain">
-      <li>Server-rendered shell with partial fetch navigation</li>
-      <li>Deep-link trigger for wallet handoff (desktop/mobile)</li>
-      <li>SEO-friendly HTML first, JS only for enhancements</li>
+      <li>Actors emitted per verified citizen hash</li>
+      <li>Gossip endpoint ready to sync uniqueness ledger with peers</li>
+      <li>Peer registry persisted for Circle coordination</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Next</p>
-    <h3>Roadmap targets</h3>
+    <p class="eyebrow">Deliberation</p>
+    <h3>Discussion sandbox</h3>
     <ul class="plain">
-      <li>Plug real OIDC4VP verifier and QR generation</li>
-      <li>ActivityPub actors for each verified hash</li>
-      <li>Gossip protocol to sync uniqueness ledger</li>
+      <li>Persistent thread list linked to verified sessions</li>
+      <li>SSR-first UI with partial navigation</li>
+      <li>Future-ready for petitions and petitions-to-vote flow</li>
     </ul>
   </div>
 </section>
