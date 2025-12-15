@@ -90,6 +90,7 @@ function normalizeSession(session) {
     salt: session.salt || session.nonce || '',
     offer: session.offer || session.credentialOffer || null,
     actorId: session.actorId || null,
+    role: session.role || 'citizen',
   };
 }
 

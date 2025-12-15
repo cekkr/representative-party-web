@@ -1,4 +1,4 @@
-This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) and keeps EUDI/OIDC4VP at the core while leaving enforcement policy-driven per Circle.
+This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) and keeps EUDI/OIDC4VP at the core while leaving enforcement policy-driven per Circle. Near-term priority is an operative social network with verified citizens, privileges, and durable data flows; deep protocol polish follows once users can actually interact.
 
 ## Anchoring Principles (from Representative Parties)
 - **One Citizen, One Voice** backed by blinded identity; federation guards against double representation and toxic providers.
@@ -22,11 +22,12 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Implementation Roadmap
 
-### Phase 1 — Party Circle Foundation (Months 1-4)
-- Harden the OIDC4VP verifier: validate VP tokens, manage keys, and support offline QR generation; keep blinded hash semantics.
-- Formalize the **Circle policy** switch: flag-driven enforcement for posting/voting, with observability exposed in `/health`.
-- Extract persistence behind an interface (JSON today, pluggable DB tomorrow) and add basic migrations for ledger/sessions.
-- UX: polish wallet flow copy, add retry/resume states, and surface “why hash-only” messaging in auth and discussion views.
+### Phase 1 — Operative Social Network & Circle Policy (Months 1-4)
+- Bind verified sessions to handles/profiles and roles (citizen/moderator/delegate), and enforce Circle policy for posting/petition/vote with visible status in the UI and `/health`.
+- Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs.
+- Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
+- Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
+- Federation stays stubbed (ActivityPub actor/inbox/outbox + ledger gossip placeholders) to avoid blocking local UX; hardening is a later phase.
 
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
@@ -50,7 +51,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 # General roadmap
 
-This version places the **"Party Circle"** and **European Digital Identity (EUDI)** integration at the very core of the system. The architecture is designed to be modular: while the *capability* to verify EU Digital Identities via **OIDC4VP** is mandatory code in the framework, its *enforcement* is a policy setting configurable per "Circle" (mandatory for EU regions, optional for others).
+This version places the **"Party Circle"** and **European Digital Identity (EUDI)** integration at the very core of the system. The architecture is designed to be modular: while the *capability* to verify EU Digital Identities via **OIDC4VP** is mandatory code in the framework, its *enforcement* is a policy setting configurable per "Circle" (mandatory for EU regions, optional for others). The first milestone is an operative network: verified citizens with handles, role-aware privileges, and end-to-end validated data flows; protocol depth and federation details harden afterward.
 
 ### **Technical Philosophy & Stack Overview**
 

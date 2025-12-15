@@ -1,4 +1,5 @@
 import { POLICIES } from '../config.js';
+import { getPrivilegesForCitizen } from './privileges.js';
 
 export function getEffectivePolicy(state) {
   const settings = state.settings || {};
@@ -31,6 +32,11 @@ export function getCirclePolicyState(state) {
 
 export function evaluateDiscussionPermission(state, citizen) {
   const policy = getEffectivePolicy(state);
+
+  if (!citizen && !policy.requireVerification) {
+    return { allowed: true, reason: 'open_circle_guest', role: 'guest' };
+  }
+
   if (policy.requireVerification && !citizen) {
     return {
       allowed: false,
@@ -38,5 +44,23 @@ export function evaluateDiscussionPermission(state, citizen) {
       message: 'Wallet verification required to post in this Circle.',
     };
   }
-  return { allowed: true, reason: 'ok' };
+
+  const privileges = getPrivilegesForCitizen(citizen, state);
+  if (privileges.banned) {
+    return {
+      allowed: false,
+      reason: 'banned',
+      message: 'Posting blocked: this handle is banned in the Circle.',
+    };
+  }
+
+  if (!privileges.canPost) {
+    return {
+      allowed: false,
+      reason: 'insufficient_privileges',
+      message: 'Posting blocked: insufficient privileges for this action.',
+    };
+  }
+
+  return { allowed: true, reason: 'ok', role: privileges.role };
 }
