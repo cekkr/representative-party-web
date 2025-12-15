@@ -2,18 +2,47 @@ import { randomUUID } from 'node:crypto';
 
 import { createActor } from '../services/activitypub.js';
 import { buildCredentialOffer, buildSessionCookie, blindHash } from '../services/auth.js';
+import { getCitizen } from '../services/citizen.js';
+import { getCirclePolicyState } from '../services/policy.js';
 import { deriveBaseUrl } from '../utils/request.js';
 import { sendHtml } from '../utils/http.js';
 import { persistActors, persistLedger, persistSessions } from '../state/storage.js';
 import { renderPage } from '../views/templates.js';
 
 export async function startAuth({ req, res, state, wantsPartial }) {
-  const sessionId = randomUUID();
   const baseUrl = deriveBaseUrl(req);
-  const salt = randomUUID().replace(/-/g, '');
+  const url = new URL(req.url, baseUrl);
+  const resumeId = url.searchParams.get('session');
+  const existing = resumeId ? state.sessions.get(resumeId) : null;
+  const citizen = getCitizen(req, state);
+  const policy = getCirclePolicyState(state);
+
+  if (existing && existing.status === 'verified') {
+    const html = await renderPage(
+      'verification-complete',
+      {
+        pidHashShort: existing.pidHash?.slice(0, 8) || 'verified',
+        ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
+        actorId: existing.actorId || 'actor-resumed',
+      },
+      { wantsPartial, title: 'Citizen Verified' },
+    );
+    const cookie = buildSessionCookie(existing.id);
+    return sendHtml(res, html, { 'Set-Cookie': cookie });
+  }
+
+  const shouldResume = Boolean(existing && existing.status === 'pending');
+  const sessionId = shouldResume ? existing.id : randomUUID();
+  const salt = shouldResume ? existing.salt : randomUUID().replace(/-/g, '');
   const offer = buildCredentialOffer({ sessionId, baseUrl });
 
-  state.sessions.set(sessionId, { id: sessionId, status: 'pending', issuedAt: Date.now(), salt, offer });
+  state.sessions.set(sessionId, {
+    id: sessionId,
+    status: 'pending',
+    issuedAt: shouldResume ? existing.issuedAt : Date.now(),
+    salt,
+    offer,
+  });
   await persistSessions(state);
 
   const html = await renderPage(
@@ -24,6 +53,15 @@ export async function startAuth({ req, res, state, wantsPartial }) {
       qrUrl: offer.qrUrl,
       demoHash: `demo-${sessionId.slice(0, 6)}`,
       offerPreview: offer.preview,
+      hashOnlyMessage: 'Hash-only guarantee: we persist only a blinded PID hash tied to a session salt.',
+      resumeHint: shouldResume
+        ? 'Resuming pending session; QR and deep link refreshed for the same blinded hash.'
+        : 'New session issued; use QR or deep link to finish wallet handoff.',
+      policyNote:
+        policy.enforcement === 'strict'
+          ? 'Circle enforcement active: verification required to post or vote.'
+          : 'Circle observing mode: verification encouraged for accountability.',
+      citizenHandle: citizen?.handle,
     },
     { wantsPartial, title: 'EUDI Wallet Handshake' },
   );

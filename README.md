@@ -30,6 +30,9 @@ npm start
 - Static assets and templates live in `src/public`:
   - `app.css`, `app.js`
   - HTML templates under `src/public/templates` (layout + pages, including the discussion view)
+- Persistence now flows through a JSON-backed store with schema migrations (`src/state/migrations.js`, meta saved to `src/data/meta.json`) to keep ledger/sessions/peers/discussions/actors ready for future DB adapters.
+- Circle policy cues surface in `/health`, home, and discussion views; ledger export returns a signed envelope when `CIRCLE_PRIVATE_KEY` is provided for gossip signing.
+- Auth UX highlights the hash-only guarantee and supports resuming a pending session via `?session={id}` without issuing a new blinded hash.
 
 ## Next steps
 

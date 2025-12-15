@@ -17,8 +17,11 @@ export const MIME_TYPES = {
 };
 
 export const POLICIES = {
+  id: process.env.CIRCLE_POLICY_ID || 'party-circle-alpha',
+  version: 1,
   requireVerification: true,
   enforceCircle: process.env.ENFORCE_CIRCLE === 'true',
+  gossipIntervalSeconds: Number(process.env.GOSSIP_INTERVAL_SECONDS || 300),
 };
 
 export const PATHS = {
@@ -34,6 +37,7 @@ export const FILES = {
   peers: join(PATHS.DATA_ROOT, 'peers.json'),
   discussions: join(PATHS.DATA_ROOT, 'discussions.json'),
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
+  meta: join(PATHS.DATA_ROOT, 'meta.json'),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';

@@ -1,51 +1,51 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-
-import { FILES, PATHS } from '../config.js';
+import { runMigrations } from './migrations.js';
+import { createStateStore } from './store.js';
 
 export async function initState() {
-  await mkdir(PATHS.DATA_ROOT, { recursive: true });
-  return loadState();
-}
+  const store = createStateStore();
+  await store.prepare();
 
-async function loadState() {
-  const uniquenessLedger = new Set(await readJson(FILES.ledger, []));
-  const sessions = new Map((await readJson(FILES.sessions, [])).map((session) => [session.id, session]));
-  const peers = new Set(await readJson(FILES.peers, []));
-  const discussions = await readJson(FILES.discussions, []);
-  const actors = new Map((await readJson(FILES.actors, [])).map((actor) => [actor.hash, actor]));
-  return { uniquenessLedger, sessions, peers, discussions, actors };
+  const rawData = await store.loadData();
+  const meta = await store.loadMeta();
+  const { data: migratedData, meta: migratedMeta, didMigrate } = runMigrations({ data: rawData, meta });
+
+  if (didMigrate) {
+    await store.saveData(migratedData);
+    await store.saveMeta(migratedMeta);
+  }
+
+  const state = hydrateState(migratedData);
+  state.meta = migratedMeta;
+  state.store = store;
+  return state;
 }
 
 export async function persistLedger(state) {
-  await writeJson(FILES.ledger, [...state.uniquenessLedger]);
+  await state.store.saveLedger([...state.uniquenessLedger]);
 }
 
 export async function persistSessions(state) {
-  await writeJson(FILES.sessions, [...state.sessions.values()]);
+  await state.store.saveSessions([...state.sessions.values()]);
 }
 
 export async function persistPeers(state) {
-  await writeJson(FILES.peers, [...state.peers]);
+  await state.store.savePeers([...state.peers]);
 }
 
 export async function persistDiscussions(state) {
-  await writeJson(FILES.discussions, state.discussions);
+  await state.store.saveDiscussions(state.discussions);
 }
 
 export async function persistActors(state) {
-  await writeJson(FILES.actors, [...state.actors.values()]);
+  await state.store.saveActors([...state.actors.values()]);
 }
 
-async function readJson(filePath, fallback) {
-  try {
-    const content = await readFile(filePath, 'utf-8');
-    return JSON.parse(content);
-  } catch (error) {
-    if (error.code === 'ENOENT') return fallback;
-    throw error;
-  }
-}
-
-async function writeJson(filePath, value) {
-  await writeFile(filePath, JSON.stringify(value, null, 2));
+function hydrateState(data) {
+  return {
+    uniquenessLedger: new Set(data.ledger),
+    sessions: new Map(data.sessions.map((session) => [session.id, session])),
+    peers: new Set(data.peers),
+    discussions: data.discussions,
+    actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
+  };
 }

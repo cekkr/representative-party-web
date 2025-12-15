@@ -1,4 +1,5 @@
 import { POLICIES } from '../config.js';
+import { getCirclePolicyState } from '../services/policy.js';
 import { sendJson } from '../utils/http.js';
 
 export function renderHealth({ res, state }) {
@@ -9,7 +10,9 @@ export function renderHealth({ res, state }) {
     peers: state.peers.size,
     actors: state.actors.size,
     discussions: state.discussions.length,
+    policy: getCirclePolicyState(state),
     policies: POLICIES,
+    schemaVersion: state.meta?.schemaVersion || 0,
     now: new Date().toISOString(),
   });
 }

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { POLICIES } from '../config.js';
 import { getCitizen } from '../services/citizen.js';
+import { evaluateDiscussionPermission, getCirclePolicyState } from '../services/policy.js';
 import { persistDiscussions } from '../state/storage.js';
 import { sendHtml, sendJson, sendRedirect } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
@@ -11,6 +12,7 @@ import { renderPage } from '../views/templates.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
+  const policy = getCirclePolicyState(state);
   const html = await renderPage(
     'discussion',
     {
@@ -21,6 +23,10 @@ export async function renderDiscussion({ req, res, state, wantsPartial }) {
         : 'Start the wallet flow to post with accountability.',
       discussionList: renderDiscussionList(state.discussions),
       verificationPolicy: POLICIES.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
+      circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
+      policyId: policy.id,
+      policyVersion: policy.version,
+      hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
     },
     { wantsPartial, title: 'Deliberation Sandbox' },
   );
@@ -29,8 +35,9 @@ export async function renderDiscussion({ req, res, state, wantsPartial }) {
 
 export async function postDiscussion({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
-  if (POLICIES.requireVerification && !citizen) {
-    return sendJson(res, 401, { error: 'verification_required' });
+  const permission = evaluateDiscussionPermission(citizen);
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message });
   }
 
   const body = await readRequestBody(req);
@@ -54,6 +61,7 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
   await persistDiscussions(state);
 
   if (wantsPartial) {
+    const policy = getCirclePolicyState(state);
     const html = await renderPage(
       'discussion',
       {
@@ -66,6 +74,11 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
         verificationPolicy: POLICIES.requireVerification
           ? 'Wallet verification required to post.'
           : 'Open posting allowed (demo mode).',
+        circlePolicy:
+          policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
+        policyId: policy.id,
+        policyVersion: policy.version,
+        hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
       },
       { wantsPartial, title: 'Deliberation Sandbox' },
     );
