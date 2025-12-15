@@ -1,0 +1,24 @@
+{
+  "name": "representative-party-web",
+  "version": "0.1.0",
+  "description": "Representative Party web framework implementation",
+  "keywords": [
+    "digital",
+    "democracy"
+  ],
+  "homepage": "https://github.com/cekkr/representative-party-web#readme",
+  "bugs": {
+    "url": "https://github.com/cekkr/representative-party-web/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cekkr/representative-party-web.git"
+  },
+  "license": "GPL-3.0-or-later",
+  "author": "Riccardo Cecchini",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
