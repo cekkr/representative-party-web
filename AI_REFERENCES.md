@@ -4,12 +4,15 @@ This file captures the essential implementation directives. Keep it in sync with
 - Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
 - Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable.
 - Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers.
+- Session handles/roles: verified sessions persist a handle + role (citizen/moderator/delegate) and a banned flag so policy gates can block actions transparently.
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
 - **Route handlers**: `src/routes/` (`home`, `health`, `auth`, `discussion`, `circle`, `activitypub`, `static`).
 - **Services**: `src/services/` (`auth` for credential offers/blinded hash + cookie, `activitypub` actor factory, `citizen` session lookup).
+- **Policy gates**: `src/services/policy.js` resolves effective Circle policy and gates post/petition/vote/moderation per role, surfaced in `/health` and UI.
 - **State/persistence**: `src/state/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface).
+- **Migrations**: `src/state/migrations.js` (schema v3 adds session handles/roles/banned flags to bind privileges to persistent sessions).
 - **Views/helpers**: `src/views/templates.js` (SSR + partials), `src/views/discussionView.js` (render posts), `src/utils/` (http helpers, request parsing, text sanitization/escaping).
 - **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
 
@@ -28,3 +31,4 @@ This file captures the essential implementation directives. Keep it in sync with
 - Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
 - Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
+- Testing: node built-in tests cover hashing, migration normalization, and Circle policy gates so regressions in critical flows surface quickly.

@@ -1,6 +1,15 @@
 import { POLICIES } from '../config.js';
 import { getPrivilegesForCitizen } from './privileges.js';
 
+const ROLE_ORDER = ['guest', 'citizen', 'delegate', 'moderator', 'admin'];
+
+const ACTION_RULES = {
+  post: { capability: 'canPost', minRole: 'citizen', requireVerification: undefined, allowGuestWhenOpen: true },
+  petition: { capability: 'canPetition', minRole: 'citizen', requireVerification: true },
+  vote: { capability: 'canVote', minRole: 'citizen', requireVerification: true },
+  moderate: { capability: 'canModerate', allowedRoles: ['moderator', 'admin'], requireVerification: true },
+};
+
 export function getEffectivePolicy(state) {
   const settings = state.settings || {};
   return {
@@ -30,18 +39,28 @@ export function getCirclePolicyState(state) {
   };
 }
 
-export function evaluateDiscussionPermission(state, citizen) {
+export function evaluateAction(state, citizen, action = 'post') {
   const policy = getEffectivePolicy(state);
+  const rule = ACTION_RULES[action] || ACTION_RULES.post;
+  const enforcement = policy.enforceCircle ? 'strict' : 'observing';
+  const verificationRequired = rule.requireVerification ?? policy.requireVerification;
 
-  if (!citizen && !policy.requireVerification) {
-    return { allowed: true, reason: 'open_circle_guest', role: 'guest' };
-  }
-
-  if (policy.requireVerification && !citizen) {
+  if (!citizen && verificationRequired) {
     return {
       allowed: false,
       reason: 'verification_required',
-      message: 'Wallet verification required to post in this Circle.',
+      message: 'Wallet verification required for this action.',
+      role: 'guest',
+      enforcement,
+    };
+  }
+
+  if (!citizen && !verificationRequired && rule.allowGuestWhenOpen) {
+    return {
+      allowed: true,
+      reason: 'open_circle_guest',
+      role: 'guest',
+      enforcement,
     };
   }
 
@@ -50,17 +69,65 @@ export function evaluateDiscussionPermission(state, citizen) {
     return {
       allowed: false,
       reason: 'banned',
-      message: 'Posting blocked: this handle is banned in the Circle.',
+      message: 'Action blocked: this handle is banned in the Circle.',
+      enforcement,
     };
   }
 
-  if (!privileges.canPost) {
+  if (rule.allowedRoles && !rule.allowedRoles.includes(privileges.role)) {
     return {
       allowed: false,
       reason: 'insufficient_privileges',
-      message: 'Posting blocked: insufficient privileges for this action.',
+      message: 'Action blocked: insufficient role for this action.',
+      role: privileges.role,
+      enforcement,
     };
   }
 
-  return { allowed: true, reason: 'ok', role: privileges.role };
+  if (rule.minRole && rankRole(privileges.role) < rankRole(rule.minRole)) {
+    return {
+      allowed: false,
+      reason: 'insufficient_privileges',
+      message: 'Action blocked: insufficient privileges for this action.',
+      role: privileges.role,
+      enforcement,
+    };
+  }
+
+  if (rule.capability && !privileges[rule.capability]) {
+    return {
+      allowed: false,
+      reason: 'insufficient_privileges',
+      message: 'Action blocked: insufficient privileges for this action.',
+      role: privileges.role,
+      enforcement,
+    };
+  }
+
+  return { allowed: true, reason: 'ok', role: privileges.role, enforcement };
+}
+
+export function evaluateDiscussionPermission(state, citizen) {
+  return evaluateAction(state, citizen, 'post');
+}
+
+export function summarizeGates(state, citizen) {
+  return {
+    post: evaluateAction(state, citizen, 'post'),
+    petition: evaluateAction(state, citizen, 'petition'),
+    vote: evaluateAction(state, citizen, 'vote'),
+  };
+}
+
+export function buildPolicyGates(state) {
+  return {
+    guest: summarizeGates(state, null),
+    citizen: summarizeGates(state, { role: 'citizen', sessionId: 'sample', pidHash: 'sample' }),
+    delegate: summarizeGates(state, { role: 'delegate', sessionId: 'sample', pidHash: 'sample' }),
+  };
+}
+
+function rankRole(role) {
+  const idx = ROLE_ORDER.indexOf(role);
+  return idx === -1 ? 0 : idx;
 }

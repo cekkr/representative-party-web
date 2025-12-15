@@ -1,6 +1,6 @@
 import { POLICIES } from '../config.js';
 import { persistPeers, persistSettings } from '../state/storage.js';
-import { evaluateDiscussionPermission, getCirclePolicyState, getEffectivePolicy } from '../services/policy.js';
+import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../services/policy.js';
 import { sendHtml } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
@@ -9,6 +9,7 @@ import { renderPage } from '../views/templates.js';
 export async function renderAdmin({ req, res, state, wantsPartial }) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
+  const postingGate = evaluateAction(state, null, 'post');
   const html = await renderPage(
     'admin',
     {
@@ -25,7 +26,7 @@ export async function renderAdmin({ req, res, state, wantsPartial }) {
       notes: effective.notes,
       firstRunNote: effective.initialized ? '' : 'First installation mode: configure policy and save to persist.',
       flash: null,
-      postingGate: evaluateDiscussionPermission(state, null).allowed ? 'Open posting allowed (demo).' : 'Verification required before posting.',
+      postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     },
     { wantsPartial, title: 'Admin · Circle Settings' },
   );
@@ -68,6 +69,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
 
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
+  const postingGate = evaluateAction(state, null, 'post');
   const flashParts = ['Settings saved'];
   if (peersAdded > 0) {
     flashParts.push(`Added peer(s) "${peersToAdd.join(', ')}" to Circle registry.`);
@@ -95,7 +97,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       notes: effective.notes,
       firstRunNote: effective.initialized ? '' : 'First installation mode: configure policy and save to persist.',
       flash: flashParts.join(' '),
-      postingGate: evaluateDiscussionPermission(state, null).allowed ? 'Open posting allowed (demo).' : 'Verification required before posting.',
+      postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     },
     { wantsPartial, title: 'Admin · Circle Settings' },
   );

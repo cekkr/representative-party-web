@@ -42,6 +42,8 @@ export async function startAuth({ req, res, state, wantsPartial }) {
     issuedAt: shouldResume ? existing.issuedAt : Date.now(),
     salt,
     offer,
+    role: existing?.role || 'citizen',
+    banned: existing?.banned || false,
   });
   await persistSessions(state);
 
@@ -103,7 +105,20 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   state.actors.set(pidHash, actor);
   await persistActors(state);
 
-  state.sessions.set(sessionId, { ...session, status: 'verified', pidHash, verifiedAt: Date.now(), actorId: actor.id });
+  const handle = session.handle || `citizen-${pidHash.slice(0, 8)}`;
+  const role = session.role || 'citizen';
+  const banned = Boolean(session.banned);
+
+  state.sessions.set(sessionId, {
+    ...session,
+    status: 'verified',
+    pidHash,
+    verifiedAt: Date.now(),
+    actorId: actor.id,
+    handle,
+    role,
+    banned,
+  });
   await persistSessions(state);
 
   const ledgerNote = alreadyKnown ? 'Ledger entry already present (peer sync).' : 'New entry added to the Uniqueness Ledger.';

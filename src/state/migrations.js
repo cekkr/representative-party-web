@@ -1,4 +1,4 @@
-export const LATEST_SCHEMA_VERSION = 2;
+export const LATEST_SCHEMA_VERSION = 3;
 
 const MIGRATIONS = [
   {
@@ -45,6 +45,22 @@ const MIGRATIONS = [
       };
     },
   },
+  {
+    version: 3,
+    description: 'Add session handles/roles for Circle policy gates.',
+    up: (data) => {
+      const sessions = (data.sessions || []).map((session) => {
+        const pidHash = session.pidHash || session.hash || null;
+        return {
+          ...session,
+          role: session.role || 'citizen',
+          handle: session.handle || deriveHandleFromPid(pidHash, session.id || session.sessionId || session.sid),
+          banned: Boolean(session.banned),
+        };
+      });
+      return { ...data, sessions };
+    },
+  },
 ];
 
 export function runMigrations({ data, meta }) {
@@ -81,16 +97,19 @@ function normalizeSession(session) {
   const id = session.id || session.sessionId || session.sid;
   if (!id) return null;
   const status = session.status || (session.pidHash ? 'verified' : 'pending');
+  const pidHash = session.pidHash || session.hash || null;
   return {
     id,
     status,
     issuedAt: session.issuedAt || Date.now(),
     verifiedAt: session.verifiedAt || session.confirmedAt || null,
-    pidHash: session.pidHash || session.hash || null,
+    pidHash,
     salt: session.salt || session.nonce || '',
     offer: session.offer || session.credentialOffer || null,
     actorId: session.actorId || null,
     role: session.role || 'citizen',
+    handle: session.handle || deriveHandleFromPid(pidHash, id),
+    banned: Boolean(session.banned),
   };
 }
 
@@ -126,6 +145,16 @@ function deriveHashFromActorId(actorId) {
   if (!actorId) return '';
   const segments = String(actorId).split('/');
   return segments[segments.length - 1] || '';
+}
+
+function deriveHandleFromPid(pidHash, fallbackId) {
+  if (pidHash) {
+    return `citizen-${String(pidHash).slice(0, 8)}`;
+  }
+  if (fallbackId) {
+    return `session-${String(fallbackId).slice(0, 8)}`;
+  }
+  return 'citizen';
 }
 
 function stringOrEmpty(value) {

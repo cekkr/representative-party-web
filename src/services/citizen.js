@@ -6,5 +6,13 @@ export function getCitizen(req, state) {
   if (!sessionId) return null;
   const session = state.sessions.get(sessionId);
   if (!session || session.status !== 'verified' || !session.pidHash) return null;
-  return { ...session, sessionId, handle: `citizen-${session.pidHash.slice(0, 8)}` };
+  const handle = session.handle || (session.pidHash ? `citizen-${session.pidHash.slice(0, 8)}` : `session-${sessionId.slice(0, 8)}`);
+  const role = session.role || 'citizen';
+  return {
+    ...session,
+    sessionId,
+    role,
+    banned: Boolean(session.banned),
+    handle,
+  };
 }

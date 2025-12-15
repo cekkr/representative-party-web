@@ -6,6 +6,7 @@ Prototype implementation of the Representative Party "Party Circle" kernel. Phas
 
 ```bash
 npm install # no external deps today, keeps package-lock current
+npm test    # node --test suite (hashing, migrations, policy gates)
 npm start
 ```
 
@@ -27,6 +28,9 @@ npm start
 - Discussion sandbox tied to verified citizens:
   - `GET /discussion` renders the thread list; `POST /discussion` appends a post using the verified session cookie when policies enforce it.
 - Health endpoint (`GET /health`) reports ledger/sessions/actors/peers counts and active policies.
+- Role-aware policy gates:
+  - Sessions persist a handle + role (citizen/moderator/delegate) and banned flag via schema v3 migration.
+  - Policy gates evaluate post/petition/vote/moderation per role; surfaced in UI and `/health`.
 - Admin and first-install UI:
   - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
 - Static assets and templates live in `src/public`:

@@ -7,6 +7,8 @@ export function getPrivilegesForCitizen(citizen, _state) {
       canPost: false,
       canModerate: false,
       canDelegate: false,
+      canPetition: false,
+      canVote: false,
       banned: false,
     };
   }
@@ -14,13 +16,18 @@ export function getPrivilegesForCitizen(citizen, _state) {
   const role = citizen.role || 'citizen';
   const banned = Boolean(citizen.banned);
   const canModerate = role === 'admin' || role === 'moderator';
+  const canVote = !banned && role !== 'guest';
+  const canPetition = !banned && role !== 'guest';
+  const canPost = !banned && role !== 'guest';
 
   return {
     role,
     sessionId: citizen.sessionId || null,
     banned,
-    canPost: !banned,
+    canPost,
     canModerate,
     canDelegate: !banned,
+    canPetition,
+    canVote,
   };
 }
