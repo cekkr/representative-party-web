@@ -1,12 +1,14 @@
 import http from 'node:http';
 
 import { HOST, PORT } from '../config.js';
+import { loadExtensions } from '../extensions/registry.js';
 import { initState } from '../state/storage.js';
 import { sendJson } from '../utils/http.js';
 import { routeRequest } from './router.js';
 
 export async function startServer() {
   const state = await initState();
+  state.extensions = await loadExtensions();
 
   const server = http.createServer((req, res) => {
     routeRequest(req, res, state).catch((error) => {

@@ -12,6 +12,7 @@ export function renderHealth({ res, state }) {
     discussions: state.discussions.length,
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
+    extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
     schemaVersion: state.meta?.schemaVersion || 0,
     now: new Date().toISOString(),

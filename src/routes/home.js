@@ -8,6 +8,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
   const gateSummary = summarizeGateSnapshot(buildPolicyGates(state));
+  const extensionsSummary = summarizeExtensions(state);
   const html = await renderPage(
     'home',
     {
@@ -20,6 +21,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       circleName: effective.circleName,
       firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to configure and persist Circle policies.',
       gateSummary,
+      extensionsSummary,
     },
     { wantsPartial, title: 'Representative Party' },
   );
@@ -30,4 +32,10 @@ function summarizeGateSnapshot(gates) {
   const describe = (label, gate) =>
     `${label} post:${gate.post.allowed ? 'allow' : 'block'} petition:${gate.petition.allowed ? 'allow' : 'block'} vote:${gate.vote.allowed ? 'allow' : 'block'}`;
   return [describe('guest', gates.guest), describe('citizen', gates.citizen), describe('delegate', gates.delegate)].join(' | ');
+}
+
+function summarizeExtensions(state) {
+  const active = state.extensions?.active || [];
+  if (!active.length) return 'Extensions: none';
+  return `Extensions: ${active.map((ext) => ext.id).join(', ')}`;
 }

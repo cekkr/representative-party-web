@@ -5,6 +5,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable.
 - Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers.
 - Session handles/roles: verified sessions persist a handle + role (citizen/moderator/delegate) and a banned flag so policy gates can block actions transparently.
+- Extensions: optional modules under `src/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code.
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
@@ -13,6 +14,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - **Policy gates**: `src/services/policy.js` resolves effective Circle policy and gates post/petition/vote/moderation per role, surfaced in `/health` and UI.
 - **State/persistence**: `src/state/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface).
 - **Migrations**: `src/state/migrations.js` (schema v3 adds session handles/roles/banned flags to bind privileges to persistent sessions).
+- **Extensions**: `src/extensions/registry.js` loads optional modules from `src/extensions/*.js` so deployments can extend action rules; sample `sample-policy-tighten.js` demonstrates hook shape.
 - **Views/helpers**: `src/views/templates.js` (SSR + partials), `src/views/discussionView.js` (render posts), `src/utils/` (http helpers, request parsing, text sanitization/escaping).
 - **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
 
@@ -32,3 +34,4 @@ This file captures the essential implementation directives. Keep it in sync with
 - Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
 - Testing: node built-in tests cover hashing, migration normalization, and Circle policy gates so regressions in critical flows surface quickly.
+- Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.

@@ -7,6 +7,7 @@
     <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
     <p class="muted small">Posting gate: {{postingGate}}</p>
     <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
+    <p class="muted small">Extensions: {{extensionsSummary}}</p>
     <p class="muted small">Initialized: {{initialized}}</p>
     <p class="muted small">{{notes}}</p>
     <p class="muted small">{{firstRunNote}}</p>
@@ -61,5 +62,44 @@
       <a class="ghost" href="/" data-partial>Back home</a>
     </div>
     <p class="muted small">First installation hint: toggle enforcement + add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Session overrides</p>
+  <h2>Roles and bans</h2>
+  <p class="muted small">Update a session role/handle or ban a handle to exercise Circle gates without editing JSON manually.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="session" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Session ID</span>
+        <input name="sessionId" value="{{sessionIdValue}}" placeholder="copy from /health or logs" required />
+      </label>
+      <label class="field">
+        <span>Handle override (optional)</span>
+        <input name="sessionHandle" value="{{sessionHandleValue}}" placeholder="citizen-abcd1234" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Role</span>
+        <select name="sessionRole">
+          <option value="citizen" {{sessionRoleCitizen}}>citizen</option>
+          <option value="delegate" {{sessionRoleDelegate}}>delegate</option>
+          <option value="moderator" {{sessionRoleModerator}}>moderator</option>
+          <option value="admin" {{sessionRoleAdmin}}>admin</option>
+        </select>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="sessionBanned" {{sessionBannedChecked}} />
+        <span>Ban this handle/session</span>
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Update session</button>
+      <a class="ghost" href="/health" target="_blank" rel="noreferrer">Open /health to fetch session IDs</a>
+    </div>
+    <p class="muted small">Changes persist to <code>src/data/sessions.json</code> and are used by Circle gates immediately.</p>
   </form>
 </section>

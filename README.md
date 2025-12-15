@@ -12,6 +12,7 @@ npm start
 
 - Server defaults to `http://0.0.0.0:3000`.
 - Persisted state is stored under `src/data/` (ledger, sessions, discussions, peers, actors).
+- Optional extensions load from `src/extensions/*.js` when `CIRCLE_EXTENSIONS` is set (see sample below).
 
 ## What exists
 
@@ -31,6 +32,8 @@ npm start
 - Role-aware policy gates:
   - Sessions persist a handle + role (citizen/moderator/delegate) and banned flag via schema v3 migration.
   - Policy gates evaluate post/petition/vote/moderation per role; surfaced in UI and `/health`.
+  - `/admin` session overrides let operators change a session handle/role or ban it without editing JSON.
+  - Extensions: set `CIRCLE_EXTENSIONS=sample-policy-tighten` to load `src/extensions/sample-policy-tighten.js` and alter action rules (extensible hook pattern).
 - Admin and first-install UI:
   - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
 - Static assets and templates live in `src/public`:

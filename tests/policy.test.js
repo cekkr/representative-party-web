@@ -32,10 +32,28 @@ test('delegates may petition and vote once verified', () => {
   assert.equal(evaluateAction(state, delegate, 'vote').allowed, true);
 });
 
-function buildState(settings) {
+test('extensions can tighten action rules', () => {
+  const extension = {
+    id: 'tighten',
+    extendActionRules: (rules) => ({
+      ...rules,
+      petition: { ...rules.petition, minRole: 'delegate' },
+    }),
+  };
+  const state = buildState({ requireVerification: true }, { active: [extension] });
+  const citizen = { sessionId: 'sess-3', pidHash: 'hash-3', role: 'citizen', banned: false };
+  const delegate = { sessionId: 'sess-4', pidHash: 'hash-4', role: 'delegate', banned: false };
+  const decisionCitizen = evaluateAction(state, citizen, 'petition');
+  const decisionDelegate = evaluateAction(state, delegate, 'petition');
+  assert.equal(decisionCitizen.allowed, false);
+  assert.equal(decisionDelegate.allowed, true);
+});
+
+function buildState(settings, extensions = { active: [] }) {
   return {
     settings,
     peers: new Set(),
     uniquenessLedger: new Set(),
+    extensions,
   };
 }
