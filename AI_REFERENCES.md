@@ -1,46 +1,29 @@
-This file contains every essential directive of the project, its essential code references to allow fast representation of the code structure without doing researches every time and considered next steps to implement. Should be updated at every change with the human-readable README.md. The core philosophy of the project is contained at principle-docs/RepresentativeParties-Ita.pdf, but the project language is english. In ROADMAP.md is contained the essential development line.
+This file captures the essential implementation directives. Keep it in sync with README.md and ROADMAP.md. The core philosophy lives in principle-docs/RepresentativeParties.md (One Citizen = One Voice, soft-power accountability, liquid delegation, phygital inclusion).
 
-The code (server and public) has to be allocated in src/ folder.
+## Concept anchors
+- Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
+- Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable.
+- Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers.
 
-## Current implementation snapshot (Phase 1 kernel + UI)
+## Code map (Phase 1 kernel)
+- **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
+- **Route handlers**: `src/routes/` (`home`, `health`, `auth`, `discussion`, `circle`, `activitypub`, `static`).
+- **Services**: `src/services/` (`auth` for credential offers/blinded hash + cookie, `activitypub` actor factory, `citizen` session lookup).
+- **State/persistence**: `src/state/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface).
+- **Views/helpers**: `src/views/templates.js` (SSR + partials), `src/views/discussionView.js` (render posts), `src/utils/` (http helpers, request parsing, text sanitization/escaping).
+- **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
 
-- Server entrypoint: `src/index.js`
-  - SSR-first HTTP server with partial responses when `X-Requested-With: partial`.
-  - OIDC4VP verifier scaffold with QR deep-linking:
-    - `GET /auth/eudi` issues a credential offer (deep link + QR) and stores a salted pending session.
-    - `GET /auth/callback?session={id}&pidHash=...` (or `&pid=...`) blinds the PID (`sha256(pid:salt)`), marks the session verified, mints an ActivityPub actor, and persists to the ledger.
-  - Persistence: ledger, sessions, peers, actors, and discussions saved under `src/data/` (JSON). `.gitignore` excludes those JSON files; a `.gitkeep` pins the folder.
-  - Circle policies: `POLICIES` enforce verification-first posting; `ENFORCE_CIRCLE=true` flag is wired for future strict mode.
-  - Gossip + federation stubs:
-    - `POST /circle/gossip` to accept ledger hashes from peers.
-    - `GET/POST /circle/peers` to list/register peers; `GET /circle/ledger` exports the ledger.
-    - ActivityPub actor emission at `/ap/actors/{hash}`; placeholder inbox at `/ap/inbox`.
-- Frontend:
-  - SSR HTML shell (`layout.html`) with vanilla router interceptor (`src/public/app.js`), supporting partial navigation and enhanced form posting.
-  - Wallet handoff UI with deep-link trigger + QR preview, offer payload preview.
-  - Discussion sandbox (`/discussion`) with form-enhanced posting, rendering threads tied to verified sessions.
-- Templates: `src/public/templates` (layout, home, auth-eudi, verification-complete, error, discussion).
-- Styles: `src/public/app.css` updated with QR, discussion, and form styles.
+## UX contract (Phase 1)
+- SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.
+- Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
+- Layout must show Circle policy flag, verified handle when present, and ledger/actor/discussion counts for accountability cues.
+- Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash.
 
-## Endpoints (today)
+## Endpoints
+- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
 
-- `/` — landing page with stats (ledger, actors, discussions) and CTA links.
-- `/auth/eudi` — start credential offer (deep link + QR).
-- `/auth/callback` — mock verifier callback, records blinded PID hash, sets session cookie, emits ActivityPub actor.
-- `/discussion` — GET renders threads; POST appends a post (verified session enforced by policy).
-- `/circle/gossip` — ingest ledger hashes from peers.
-- `/circle/ledger` — export ledger entries (JSON).
-- `/circle/peers` — list or register peer hosts.
-- `/ap/actors/{hash}` — ActivityPub actor descriptor for each hash.
-- `/ap/inbox` — placeholder inbox (202 ACK).
-- `/health` — JSON health/metrics (ledger size, sessions, actors, peers, discussions).
-- `/public/*` — static assets.
-
-## Immediate next steps (per ROADMAP.md)
-
-1. Swap the scaffold with a real OIDC4VP implementation, validate VPs cryptographically, and manage verifier keys; keep QR generation but offer an offline/local generator.
-2. Upgrade ActivityPub: implement signed inbox/outbox deliveries, publish actors/ledger updates to peers, and add a gossip scheduler for uniqueness sync.
-3. Harden persistence (pluggable store beyond JSON), add policy toggles for Circle enforcement, and evolve the discussion sandbox toward petitions → debate → vote.
-
-## Essential future steps:
-- If every provider has its layout but adapts shared data, is needed also a "module signing" certification for essential operations, and a cohesive protocol to avoid mismanagement of sensitive shared operations (for example, vote counting, in this case random redundancies are essential for validation too)
+## Near-term implementation focus
+- Replace verifier scaffold with real OIDC4VP validation and key management; keep QR/deep-link UX.
+- Harden persistence via a pluggable store abstraction (JSON now, DB later) and add basic migrations.
+- Schedule federation: signed inbox/outbox, gossip of uniqueness ledger, and peer compliance audits.
+- Extend modules toward petitions → discussion → vote, keeping delegation and accountability visible in the UI (see ROADMAP.md).

@@ -1,4 +1,54 @@
-This is the completely rewritten roadmap for the **Representative Party Framework**.
+This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) and keeps EUDI/OIDC4VP at the core while leaving enforcement policy-driven per Circle.
+
+## Anchoring Principles (from Representative Parties)
+- **One Citizen, One Voice** backed by blinded identity; federation guards against double representation and toxic providers.
+- **Soft-power accountability**: transparency and auditable trails instead of hard imperative mandates.
+- **Liquid representation**: delegation is topic-scoped, revocable, and visible; citizens can migrate without losing history.
+- **Phygital inclusion**: the digital platform must remain accessible via desktop/mobile and be mirrored by physical “agorà” touchpoints.
+
+## Architecture Baseline (Phase 1 kernel)
+- **Modular NodeJS monolith**: http server under `src/` with route handlers in `src/routes/`, shared services in `src/services/`, storage in `src/state/`, and view helpers in `src/views/`.
+- **Identity & Sessions**: OIDC4VP verifier scaffold (EUDI wallet offer/callback) with blinded PID hashing and signed cookie session.
+- **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
+- **Federation seeds**: ActivityPub actor emitter, inbox placeholder, gossip endpoints for peer/ledger sync.
+- **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
+
+## UX Baseline (to harden during Phase 1)
+- Clear entry points: CTA for “Verify with EU Wallet” and “Start debating” with copy that explains privacy (hash-only, no PII stored).
+- Deep link / QR duality: desktop shows QR + copyable link; mobile prioritizes direct handoff.
+- Accountability cues: show verified handle, ledger count, and Circle policy status on every page frame.
+- Error/edge flows: graceful partial responses for session issues; offline-friendly offer preview and retry CTA.
+- Accessibility: keyboard-friendly forms, high-contrast defaults, and no client-side blocking for SSR-first paths.
+
+## Implementation Roadmap
+
+### Phase 1 — Party Circle Foundation (Months 1-4)
+- Harden the OIDC4VP verifier: validate VP tokens, manage keys, and support offline QR generation; keep blinded hash semantics.
+- Formalize the **Circle policy** switch: flag-driven enforcement for posting/voting, with observability exposed in `/health`.
+- Extract persistence behind an interface (JSON today, pluggable DB tomorrow) and add basic migrations for ledger/sessions.
+- UX: polish wallet flow copy, add retry/resume states, and surface “why hash-only” messaging in auth and discussion views.
+
+### Phase 2 — Deliberation & Structure (Months 5-7)
+- **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
+- **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; identity-rate-limiting instead of CAPTCHA.
+- UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
+
+### Phase 3 — Decision Engine (Months 8-11)
+- **Voting module**: implement Schulze/Condorcet; split authentication (hash) from anonymized ballot storage.
+- **Delegation graph**: revocable, topic-scoped delegation with decay/visibility rules; worker to compute power weights.
+- UX: ballot clarity (options, ranking helper), delegation previews, and “explain my influence” summaries.
+
+### Phase 4 — Federation Hardening & Migration (Months 12-14)
+- **Claim & Seize** protocol: signed migration requests to move history across providers when the same wallet re-verifies.
+- **Circle health**: scheduled peer audits for policy compliance; automatic quarantine of toxic peers.
+- UX: migration status banners and audit transparency dashboard.
+
+### Phase 5 — Launch Polish (Months 15+)
+- SEO metadata for petitions/proposals; schema.org generation server-side.
+- EUDI compliance audit against eIDAS 2.0/ARF.
+- Mobile-first refinements for app-switch flows and QR fallback, plus public trust dashboards for accountability.
+
+# General roadmap
 
 This version places the **"Party Circle"** and **European Digital Identity (EUDI)** integration at the very core of the system. The architecture is designed to be modular: while the *capability* to verify EU Digital Identities via **OIDC4VP** is mandatory code in the framework, its *enforcement* is a policy setting configurable per "Circle" (mandatory for EU regions, optional for others).
 
