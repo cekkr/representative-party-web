@@ -18,7 +18,9 @@ The server defaults to `http://0.0.0.0:3000`.
   - `GET /auth/eudi` issues a credential offer deep link and stores a pending session (salted).
   - `GET /auth/callback?session={id}&pidHash=...` or `&pid=...` finalizes verification and records a blinded PID hash.
 - In-memory "Uniqueness Ledger" to prevent duplicate citizens; health data available at `GET /health`.
-- Basic static assets served from `src/public`.
+- Static assets and templates live in `src/public`:
+  - `app.css`, `app.js`
+  - HTML templates under `src/public/templates` (layout + pages)
 
 ## Next steps
 

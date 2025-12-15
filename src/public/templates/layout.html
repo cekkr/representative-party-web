@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/public/app.css" />
+  <script src="/public/app.js" defer></script>
+</head>
+<body>
+  <header class="hero">
+    <div class="hero__brand">
+      <div class="orb"></div>
+      <div>
+        <p class="eyebrow">Representative Party Framework</p>
+        <h1>Party Circle</h1>
+        <p class="tagline">Phase 1 foundation: verifiable, federated, citizen-first access.</p>
+      </div>
+    </div>
+    <nav class="hero__nav">
+      <a href="/" data-partial>Home</a>
+      <a href="/auth/eudi" data-partial>Wallet Login (demo)</a>
+      <a href="/health" target="_blank" rel="noreferrer">Health</a>
+    </nav>
+  </header>
+  <main data-shell>
+    {{body}}
+  </main>
+  <footer class="footer">
+    <span>Vanilla SSR + Party Circle kernel prototype</span>
+  </footer>
+</body>
+</html>

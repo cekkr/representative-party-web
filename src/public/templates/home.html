@@ -1,0 +1,46 @@
+<section class="panel">
+  <div>
+    <p class="eyebrow">Phase 1 — Party Circle foundation</p>
+    <h2>Verifier-first onboarding for unique citizens</h2>
+    <p>The server issues an OIDC4VP credential offer, receives a blinded PID hash, and seeds the Uniqueness Ledger. Everything here is server-rendered and progressively enhanced with vanilla JS.</p>
+    <div class="cta-row">
+      <a class="cta" href="/auth/eudi" data-partial>Login with EU Wallet (demo)</a>
+      <a class="ghost" href="/health" target="_blank" rel="noreferrer">Health endpoint</a>
+    </div>
+  </div>
+  <div class="stat">
+    <p class="eyebrow">Uniqueness ledger</p>
+    <p class="stat__value">{{ledgerSize}}</p>
+    <p class="muted">Hashed citizen identities tracked in-memory.</p>
+  </div>
+</section>
+
+<section class="panel grid">
+  <div>
+    <p class="eyebrow">Kernel</p>
+    <h3>Party Circle</h3>
+    <ul class="plain">
+      <li>OIDC4VP verifier entry point with blinded PID hashing</li>
+      <li>Ledger to prevent duplicate registrations across peers</li>
+      <li>Trusted peers placeholder ready for ActivityPub gossip</li>
+    </ul>
+  </div>
+  <div>
+    <p class="eyebrow">Frontend</p>
+    <h3>SSR + Vanilla router</h3>
+    <ul class="plain">
+      <li>Server-rendered shell with partial fetch navigation</li>
+      <li>Deep-link trigger for wallet handoff (desktop/mobile)</li>
+      <li>SEO-friendly HTML first, JS only for enhancements</li>
+    </ul>
+  </div>
+  <div>
+    <p class="eyebrow">Next</p>
+    <h3>Roadmap targets</h3>
+    <ul class="plain">
+      <li>Plug real OIDC4VP verifier and QR generation</li>
+      <li>ActivityPub actors for each verified hash</li>
+      <li>Gossip protocol to sync uniqueness ledger</li>
+    </ul>
+  </div>
+</section>

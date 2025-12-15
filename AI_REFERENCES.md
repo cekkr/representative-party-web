@@ -11,7 +11,8 @@ The code (server and public) has to be allocated in src/ folder.
     - `GET /auth/callback?session={id}&pidHash=...` (or `&pid=...`) blinds the PID (`sha256(pid:salt)`), marks the session verified, and records the hash.
   - In-memory Uniqueness Ledger (`Set` of hashed PID values) plus future peer placeholder.
   - Static asset serving from `src/public`.
-- Frontend shell: SSR HTML with a vanilla router interceptor for app-like navigation and a deep-link trigger for wallet flows.
+- Frontend shell: SSR HTML with a vanilla router interceptor for app-like navigation and a deep-link trigger for wallet flows (client JS in `src/public/app.js`).
+- Templates: `src/public/templates` (layout + pages for home, auth, verification, error).
 - Styles: `src/public/app.css` hosts the initial visual system (gradient background, CTA styles, cards).
 
 ## Endpoints (today)
@@ -27,3 +28,7 @@ The code (server and public) has to be allocated in src/ folder.
 1. Swap mock verifier with a real OIDC4VP implementation and add QR generation for desktop.
 2. Emit ActivityPub actors per verified hash and prepare a gossip endpoint to sync the Uniqueness Ledger across peers.
 3. Persist the ledger/sessions to durable storage and add policy toggles for Circle enforcement.
+4. Create a basic usable interface with discussion module to allow practical testing
+
+## Essential future steps:
+- If every provider has its layout but adapts shared data, is needed also a "module signing" certification for essential operations, and a cohesive protocol to avoid mismanagement of sensitive shared operations (for example, vote counting, in this case random redundancies are essential for validation too)
