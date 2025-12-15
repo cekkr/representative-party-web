@@ -4,10 +4,12 @@ import { serveActor, inbox } from '../routes/activitypub.js';
 import { completeAuth, startAuth } from '../routes/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../routes/circle.js';
 import { renderDiscussion, postDiscussion } from '../routes/discussion.js';
+import { renderPetitions, submitPetition, castVote } from '../routes/petitions.js';
 import { renderHealth } from '../routes/health.js';
 import { renderHome } from '../routes/home.js';
 import { servePublic } from '../routes/static.js';
 import { renderAdmin, updateAdmin } from '../routes/admin.js';
+import { getExtensions, toggleExtension } from '../routes/extensions.js';
 import { sendNotFound } from '../utils/http.js';
 
 export async function routeRequest(req, res, state) {
@@ -38,6 +40,18 @@ export async function routeRequest(req, res, state) {
     return postDiscussion({ req, res, state, wantsPartial });
   }
 
+  if (req.method === 'GET' && url.pathname === '/petitions') {
+    return renderPetitions({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/petitions') {
+    return submitPetition({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/petitions/vote') {
+    return castVote({ req, res, state, wantsPartial });
+  }
+
   if (req.method === 'POST' && url.pathname === '/circle/gossip') {
     return handleGossip({ req, res, state });
   }
@@ -60,6 +74,14 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/admin') {
     return updateAdmin({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/extensions') {
+    return getExtensions({ res, state });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/extensions') {
+    return toggleExtension({ req, res, state });
   }
 
   if (req.method === 'GET' && url.pathname.startsWith('/ap/actors/')) {

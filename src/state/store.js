@@ -17,6 +17,8 @@ class JsonStateStore {
       sessions: await this.readJson(FILES.sessions, []),
       peers: await this.readJson(FILES.peers, []),
       discussions: await this.readJson(FILES.discussions, []),
+      petitions: await this.readJson(FILES.petitions, []),
+      votes: await this.readJson(FILES.votes, []),
       actors: await this.readJson(FILES.actors, []),
       settings: await this.readJson(FILES.settings, { initialized: false }),
     };
@@ -31,6 +33,8 @@ class JsonStateStore {
     await this.writeJson(FILES.sessions, data.sessions || []);
     await this.writeJson(FILES.peers, data.peers || []);
     await this.writeJson(FILES.discussions, data.discussions || []);
+    await this.writeJson(FILES.petitions, data.petitions || []);
+    await this.writeJson(FILES.votes, data.votes || []);
     await this.writeJson(FILES.actors, data.actors || []);
     await this.writeJson(FILES.settings, data.settings || { initialized: false });
   }
@@ -53,6 +57,14 @@ class JsonStateStore {
 
   async saveDiscussions(entries) {
     await this.writeJson(FILES.discussions, entries);
+  }
+
+  async savePetitions(entries) {
+    await this.writeJson(FILES.petitions, entries);
+  }
+
+  async saveVotes(entries) {
+    await this.writeJson(FILES.votes, entries);
   }
 
   async saveActors(entries) {

@@ -36,6 +36,14 @@ export async function persistDiscussions(state) {
   await state.store.saveDiscussions(state.discussions);
 }
 
+export async function persistPetitions(state) {
+  await state.store.savePetitions(state.petitions);
+}
+
+export async function persistVotes(state) {
+  await state.store.saveVotes(state.votes);
+}
+
 export async function persistActors(state) {
   await state.store.saveActors([...state.actors.values()]);
 }
@@ -50,6 +58,8 @@ function hydrateState(data) {
     sessions: new Map(data.sessions.map((session) => [session.id, session])),
     peers: new Set(data.peers),
     discussions: data.discussions,
+    petitions: data.petitions,
+    votes: data.votes,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     settings: data.settings || { initialized: false },
   };

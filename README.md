@@ -34,6 +34,11 @@ npm start
   - Policy gates evaluate post/petition/vote/moderation per role; surfaced in UI and `/health`.
   - `/admin` session overrides let operators change a session handle/role or ban it without editing JSON.
   - Extensions: set `CIRCLE_EXTENSIONS=sample-policy-tighten` to load `src/extensions/sample-policy-tighten.js` and alter action rules (extensible hook pattern).
+- Petition + vote scaffold:
+  - `GET/POST /petitions` drafts persisted petitions; per-role gates surface UI errors.
+  - `POST /petitions/vote` records a single vote per petitioner per petition; tallies rendered server-side.
+- Extension registry endpoint:
+  - `GET /extensions` lists available modules + metadata; `POST /extensions` enables/disables modules and persists settings (no env change required).
 - Admin and first-install UI:
   - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
 - Static assets and templates live in `src/public`:

@@ -35,7 +35,12 @@
       });
       if (!response.ok) {
         if (response.status === 401) {
-          alert('Verification required before posting. Complete the wallet flow.');
+          try {
+            const payload = await response.json();
+            alert(payload.message || payload.error || 'Not allowed for this role.');
+          } catch (_error) {
+            alert('Not allowed for this role.');
+          }
           return;
         }
         throw new Error('Submit failed');

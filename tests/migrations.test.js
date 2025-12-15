@@ -9,6 +9,8 @@ test('migrations normalize sessions and settings', () => {
     sessions: [{ sessionId: 'sess-123', pidHash: 'hash-a' }],
     peers: ['https://peer.example'],
     discussions: [],
+    petitions: [],
+    votes: [],
     actors: [],
     settings: {},
   };
@@ -24,4 +26,7 @@ test('migrations normalize sessions and settings', () => {
   assert.equal(session.banned, false);
   assert.ok(session.handle.startsWith('citizen-'));
   assert.equal(data.settings.circleName, 'Party Circle');
+  assert.ok(Array.isArray(data.petitions));
+  assert.ok(Array.isArray(data.votes));
+  assert.deepEqual(data.settings.extensions, []);
 });

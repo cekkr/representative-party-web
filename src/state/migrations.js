@@ -1,4 +1,4 @@
-export const LATEST_SCHEMA_VERSION = 3;
+export const LATEST_SCHEMA_VERSION = 4;
 
 const MIGRATIONS = [
   {
@@ -59,6 +59,21 @@ const MIGRATIONS = [
         };
       });
       return { ...data, sessions };
+    },
+  },
+  {
+    version: 4,
+    description: 'Add petitions/votes scaffolds and extension settings.',
+    up: (data) => {
+      return {
+        ...data,
+        petitions: data.petitions || [],
+        votes: data.votes || [],
+        settings: {
+          ...(data.settings || {}),
+          extensions: data.settings?.extensions || parseEnvExtensions(),
+        },
+      };
     },
   },
 ];
@@ -155,6 +170,14 @@ function deriveHandleFromPid(pidHash, fallbackId) {
     return `session-${String(fallbackId).slice(0, 8)}`;
   }
   return 'citizen';
+}
+
+function parseEnvExtensions() {
+  const raw = process.env.CIRCLE_EXTENSIONS || '';
+  return raw
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
 }
 
 function stringOrEmpty(value) {

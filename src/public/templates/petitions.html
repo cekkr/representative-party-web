@@ -1,0 +1,35 @@
+<section class="panel">
+  <p class="eyebrow">Petitions</p>
+  <h2>Petition drafting & voting scaffold</h2>
+  <div class="callout">
+    <p class="muted small">Role: {{roleLabel}}</p>
+    <p class="muted small">Petition gate: {{petitionStatus}}</p>
+    <p class="muted small">Vote gate: {{voteStatus}}</p>
+    <p class="muted small">{{petitionGateReason}}</p>
+    <p class="muted small">{{voteGateReason}}</p>
+    <p class="muted small">Handle: {{citizenHandle}}</p>
+  </div>
+  <form class="stack" method="post" action="/petitions" data-enhance="petitions">
+    <div class="form-grid">
+      <label class="field">
+        <span>Title</span>
+        <input name="title" placeholder="Energy transition plan" required />
+      </label>
+    </div>
+    <label class="field">
+      <span>Summary</span>
+      <textarea name="summary" rows="4" placeholder="Describe the petition goals" required></textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Draft petition</button>
+      <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Open petitions</p>
+  <div class="discussion-list">
+    {{petitionsList}}
+  </div>
+</section>

@@ -10,6 +10,8 @@ export function renderHealth({ res, state }) {
     peers: state.peers.size,
     actors: state.actors.size,
     discussions: state.discussions.length,
+    petitions: state.petitions.length,
+    votes: state.votes.length,
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),

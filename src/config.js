@@ -37,6 +37,8 @@ export const FILES = {
   sessions: join(PATHS.DATA_ROOT, 'sessions.json'),
   peers: join(PATHS.DATA_ROOT, 'peers.json'),
   discussions: join(PATHS.DATA_ROOT, 'discussions.json'),
+  petitions: join(PATHS.DATA_ROOT, 'petitions.json'),
+  votes: join(PATHS.DATA_ROOT, 'votes.json'),
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
   meta: join(PATHS.DATA_ROOT, 'meta.json'),
   settings: join(PATHS.DATA_ROOT, 'settings.json'),

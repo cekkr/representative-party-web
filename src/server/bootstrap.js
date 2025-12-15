@@ -8,7 +8,8 @@ import { routeRequest } from './router.js';
 
 export async function startServer() {
   const state = await initState();
-  state.extensions = await loadExtensions();
+  const extensionList = state.settings?.extensions;
+  state.extensions = await loadExtensions({ list: extensionList });
 
   const server = http.createServer((req, res) => {
     routeRequest(req, res, state).catch((error) => {
