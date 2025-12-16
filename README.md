@@ -1,6 +1,6 @@
 # Representative Party Framework
 
-A Node.js implementation of the Representative Party "Party Circle" kernel. Phase 1 ships an SSR-first web app, QR-friendly OIDC4VP verifier scaffold, blinded Uniqueness Ledger, ActivityPub actor emission, petitions/votes/delegation scaffolds, and a discussion/forum surface tied to verified sessions.
+A Node.js implementation of the Representative Party "Party Circle" (or party/social ring) kernel. Phase 1 ships an SSR-first web app, QR-friendly OIDC4VP verifier scaffold, blinded Uniqueness Ledger, ActivityPub actor emission, petitions/votes/delegation scaffolds, and a discussion/forum surface tied to verified sessions.
 
 ## What this project solves
 - One citizen = one voice via blinded PID hashes; no raw PII is stored.
