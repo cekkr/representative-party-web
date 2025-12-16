@@ -6,7 +6,7 @@ A Node.js implementation of the Representative Party "Party Circle" kernel. Phas
 - One citizen = one voice via blinded PID hashes; no raw PII is stored.
 - Soft-power accountability: auditable policy gates and traceable vote envelopes instead of imperative mandates.
 - Liquid representation: topic-scoped delegation, revocable at any time, surfaced in UI and vote resolution.
-- Federation resilience: peers gossip ledger/vote hashes and can quarantine toxic providers; ActivityPub actors expose public presence.
+- Federation resilience: peers gossip ledger/vote hashes and can quarantine toxic providers; ActivityPub actors expose public presence. Providers in the same social-party ring should prefer a shared or compatible client footprint so UX and enforcement stay aligned across the ring.
 - Extensible policy: optional modules under `src/modules/extensions` can harden gates without forking the core.
 
 ## System map
@@ -59,7 +59,7 @@ sequenceDiagram
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
 - **Petitions + votes:** `/petitions` draft/open/close petitions, signatures at `/petitions/sign`; `/petitions/vote` records one vote per citizen and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes.
 - **Delegation & groups:** `src/modules/delegation/delegation.js` stores per-topic delegates with auto-resolution; `/delegation/conflict` prompts when cachets clash. `src/modules/groups/*` publishes delegate preferences and runs elections; group policy (priority vs vote, conflict rules) is stored independently.
-- **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `helpers/topic-gardener/server.py`.
+- **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `src/infra/workers/topic-gardener/server.py`.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; backing store handled by `src/modules/messaging/notifications.js`.
 - **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, default group policy, topic gardener, and session overrides without editing JSON.
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors via `src/modules/federation/activitypub.js`; `/ap/inbox` placeholder for inbound federation payloads.
@@ -93,7 +93,7 @@ sequenceDiagram
 - Identity safety: only store blinded PID hashes; never persist wallet-provided PII. Keys used for envelope signing must be rotated carefully—publish `CIRCLE_PUBLIC_KEY` to peers before enabling signatures.
 - Gossip: peers are hints, not trust anchors. Use Circle policy flags + `/health` to monitor enforcement and quarantine toxic providers.
 - Data durability: JSON stores are append-heavy; schedule backups of `src/data/` and watch `meta.json` when migrations bump schema versions.
-- Topic gardener: Python/ML helpers are expected to live under `helpers/` (see `principle-docs/DynamicTopicCategorization.md`); Node callers should reconcile provider outputs to avoid conflicting labels.
+- Topic gardener: Python/ML helpers are expected to live under `src/infra/workers/` (see `principle-docs/DynamicTopicCategorization.md`); Node callers should reconcile provider outputs to avoid conflicting labels.
 
 ## Further reading
 - `AI_REFERENCES.md` — implementation directives kept in sync with this README.

@@ -10,8 +10,8 @@ Lightweight Python helper that mirrors the DynamicTopicCategorization notes. It 
 Run locally:
 
 ```bash
-cd helpers/topic-gardener
+cd src/infra/workers/topic-gardener
 python server.py --port 8070
 ```
 
-The Node side reads `topicGardenerUrl` and anchors/pins from `/admin` (persisted to `settings.json`) and calls this helper via `classifyWithGardener` in `src/services/topicGardenerClient.js`.
+The Node side reads `topicGardenerUrl` and anchors/pins from `/admin` (persisted to `settings.json`) and calls this helper via `classifyWithGardener` in `src/modules/topics/topicGardenerClient.js`.
