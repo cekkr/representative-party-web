@@ -47,7 +47,7 @@ sequenceDiagram
   ProviderB-->>ProviderA: Ack + peer hints
   ProviderA->>ProviderB: POST /votes/gossip {signedEnvelopes}
   ProviderB->>ProviderB: Verify signature (CIRCLE_PUBLIC_KEY) + policy id/version
-  ProviderB->>Store: Persist vote envelopes; reject duplicates/replays
+  ProviderB->>Store: Persist vote envelopes, reject duplicates/replays
   Note over ProviderA,ProviderB: Envelopes are signed with CIRCLE_PRIVATE_KEY (ISSUER tags source)
 ```
 
