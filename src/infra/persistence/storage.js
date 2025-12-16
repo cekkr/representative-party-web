@@ -3,7 +3,7 @@ import { runMigrations } from './migrations.js';
 import { createStateStore } from './store.js';
 
 export async function initState() {
-  const store = createStateStore({ adapter: DATA.adapter });
+  const store = createStateStore({ adapter: DATA.adapter, sqliteFile: DATA.sqliteFile, kvFile: DATA.kvFile });
   await store.prepare();
 
   const rawData = await store.loadData();

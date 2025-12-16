@@ -64,6 +64,8 @@ export const DATA = {
   adapter: normalizeDataAdapter(process.env.DATA_ADAPTER),
   validationLevel: normalizeValidationLevel(process.env.DATA_VALIDATION_LEVEL),
   allowPreviews: parseBooleanEnv(process.env.DATA_PREVIEW, DATA_DEFAULTS.allowPreviews),
+  sqliteFile: resolveSqliteFilename(),
+  kvFile: process.env.DATA_KV_FILE || PATHS.DATA_KV,
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';
@@ -92,4 +94,21 @@ function parseBooleanEnv(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
   const normalized = String(value).toLowerCase();
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+}
+
+function resolveSqliteFilename() {
+  const url = process.env.DATA_SQLITE_URL || '';
+  const file = process.env.DATA_SQLITE_FILE || '';
+  if (file) return file;
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.protocol === 'file:' || parsed.protocol === 'sqlite:') {
+        return parsed.pathname || PATHS.DATA_SQLITE;
+      }
+    } catch (error) {
+      // fall through to default
+    }
+  }
+  return PATHS.DATA_SQLITE;
 }

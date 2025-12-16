@@ -22,7 +22,7 @@ const KEYS = [
 ];
 
 export function createKeyValueAdapter(options = {}) {
-  const filename = options.filename || PATHS.DATA_KV;
+  const filename = options.kvFile || options.filename || PATHS.DATA_KV;
   return new KeyValueStateStore(filename);
 }
 

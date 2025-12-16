@@ -21,5 +21,8 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.7"
   }
 }

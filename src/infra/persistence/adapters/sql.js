@@ -22,7 +22,7 @@ const KEYS = [
 ];
 
 export function createSqlAdapter(options = {}) {
-  const filename = options.filename || PATHS.DATA_SQLITE;
+  const filename = resolveFilename(options);
   return new SqlStateStore(filename);
 }
 
@@ -173,4 +173,18 @@ function get(db, sql, params = []) {
       resolve(row);
     });
   });
+}
+
+function resolveFilename(options = {}) {
+  const value = options.sqliteFile || options.filename || PATHS.DATA_SQLITE;
+  if (!value) return PATHS.DATA_SQLITE;
+  if (value.startsWith('sqlite://') || value.startsWith('file://')) {
+    try {
+      const parsed = new URL(value);
+      return parsed.pathname || PATHS.DATA_SQLITE;
+    } catch (error) {
+      return value;
+    }
+  }
+  return value;
 }
