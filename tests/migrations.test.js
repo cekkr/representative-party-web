@@ -11,6 +11,8 @@ test('migrations normalize sessions and settings', () => {
     discussions: [],
     petitions: [],
     votes: [],
+    delegations: [],
+    notifications: [],
     actors: [],
     settings: {},
   };
@@ -28,5 +30,7 @@ test('migrations normalize sessions and settings', () => {
   assert.equal(data.settings.circleName, 'Party Circle');
   assert.ok(Array.isArray(data.petitions));
   assert.ok(Array.isArray(data.votes));
+  assert.ok(Array.isArray(data.delegations));
+  assert.ok(Array.isArray(data.notifications));
   assert.deepEqual(data.settings.extensions, []);
 });

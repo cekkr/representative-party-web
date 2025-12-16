@@ -19,6 +19,8 @@ class JsonStateStore {
       discussions: await this.readJson(FILES.discussions, []),
       petitions: await this.readJson(FILES.petitions, []),
       votes: await this.readJson(FILES.votes, []),
+      delegations: await this.readJson(FILES.delegations, []),
+      notifications: await this.readJson(FILES.notifications, []),
       actors: await this.readJson(FILES.actors, []),
       settings: await this.readJson(FILES.settings, { initialized: false }),
     };
@@ -35,6 +37,8 @@ class JsonStateStore {
     await this.writeJson(FILES.discussions, data.discussions || []);
     await this.writeJson(FILES.petitions, data.petitions || []);
     await this.writeJson(FILES.votes, data.votes || []);
+    await this.writeJson(FILES.delegations, data.delegations || []);
+    await this.writeJson(FILES.notifications, data.notifications || []);
     await this.writeJson(FILES.actors, data.actors || []);
     await this.writeJson(FILES.settings, data.settings || { initialized: false });
   }
@@ -65,6 +69,14 @@ class JsonStateStore {
 
   async saveVotes(entries) {
     await this.writeJson(FILES.votes, entries);
+  }
+
+  async saveDelegations(entries) {
+    await this.writeJson(FILES.delegations, entries);
+  }
+
+  async saveNotifications(entries) {
+    await this.writeJson(FILES.notifications, entries);
   }
 
   async saveActors(entries) {

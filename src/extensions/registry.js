@@ -80,5 +80,7 @@ function normalizeExtension(name, mod) {
     meta: mod.meta || {},
     extendActionRules: mod.extendActionRules,
     decorateDecision: mod.decorateDecision,
+    classifyTopic: mod.classifyTopic,
+    resolveDelegation: mod.resolveDelegation,
   };
 }

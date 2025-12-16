@@ -36,11 +36,18 @@ npm start
   - Extensions: set `CIRCLE_EXTENSIONS=sample-policy-tighten` to load `src/extensions/sample-policy-tighten.js` and alter action rules (extensible hook pattern).
 - Petition + vote scaffold:
   - `GET/POST /petitions` drafts persisted petitions; per-role gates surface UI errors.
-  - `POST /petitions/vote` records a single vote per petitioner per petition; tallies rendered server-side.
+  - Petition lifecycle with statuses (draft/open/closed), quorum field, topic classification hook, moderator-only status updates.
+  - `POST /petitions/vote` records a single vote per petitioner per petition; tallies rendered server-side; strict circles block anonymous votes; auto-delegation option uses stored delegates when provided.
 - Extension registry endpoint:
   - `GET /extensions` lists available modules + metadata; `POST /extensions` enables/disables modules and persists settings (no env change required).
+- Topic classification + delegation prep:
+  - `src/services/classification.js` consults extensions for topic categorization; default falls back to "general".
+  - `src/services/delegation.js` persists per-topic delegates (provider-aware) and can auto-resolve votes; voters can override manually.
+- Notifications:
+  - Internal notification registry persisted to JSON; `/notifications` lists current user notifications, `/notifications/read` marks them read.
 - Admin and first-install UI:
   - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
+  - Session overrides + extension toggles live in the Admin page (calls `/extensions` under the hood).
 - Static assets and templates live in `src/public`:
   - `app.css`, `app.js`
   - HTML templates under `src/public/templates` (layout + pages, including the discussion view)

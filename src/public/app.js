@@ -26,6 +26,10 @@
     const form = event.target.closest('form[data-enhance]');
     if (!form) return;
     event.preventDefault();
+    if (form.dataset.enhance === 'extensions') {
+      await submitExtensionsForm(form);
+      return;
+    }
     try {
       const formData = new FormData(form);
       const response = await fetch(form.action, {
@@ -71,3 +75,21 @@ function triggerDeepLink() {
 }
 
 triggerDeepLink();
+
+async function submitExtensionsForm(form) {
+  const checkboxes = Array.from(form.querySelectorAll('input[name="extensions"]'));
+  const enabled = checkboxes.filter((box) => box.checked).map((box) => box.value);
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ extensions: enabled }),
+    });
+    if (!response.ok) throw new Error('Extensions update failed');
+    alert('Extensions updated. Reloading to apply.');
+    window.location.reload();
+  } catch (error) {
+    console.error(error);
+    alert('Failed to update extensions.');
+  }
+}

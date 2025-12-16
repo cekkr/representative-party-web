@@ -1,13 +1,19 @@
 import { POLICIES } from '../config.js';
 import { persistPeers, persistSessions, persistSettings } from '../state/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../services/policy.js';
+import { listAvailableExtensions } from '../extensions/registry.js';
 import { sendHtml } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
-  const html = await renderPage('admin', buildAdminViewModel(state, { flash: null }), { wantsPartial, title: 'Admin · Circle Settings' });
+  const availableExtensions = await listAvailableExtensions(state);
+  const html = await renderPage(
+    'admin',
+    buildAdminViewModel(state, { flash: null, availableExtensions }),
+    { wantsPartial, title: 'Admin · Circle Settings' },
+  );
   return sendHtml(res, html);
 }
 
@@ -16,7 +22,12 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const intent = body.intent || 'settings';
   if (intent === 'session') {
     const result = await updateSession(state, body);
-    const html = await renderPage('admin', buildAdminViewModel(state, result), { wantsPartial, title: 'Admin · Circle Settings' });
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings' },
+    );
     return sendHtml(res, html);
   }
 
@@ -63,7 +74,8 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     flashParts.push('Wallet verification required for posting.');
   }
 
-  const html = await renderPage('admin', buildAdminViewModel(state, { flash: flashParts.join(' ') }), {
+  const availableExtensions = await listAvailableExtensions(state);
+  const html = await renderPage('admin', buildAdminViewModel(state, { flash: flashParts.join(' '), availableExtensions }), {
     wantsPartial,
     title: 'Admin · Circle Settings',
   });
@@ -106,12 +118,13 @@ async function updateSession(state, body) {
   };
 }
 
-function buildAdminViewModel(state, { flash, sessionForm = {} }) {
+function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensions = [] }) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
   const postingGate = evaluateAction(state, null, 'post');
   const extensions = state.extensions?.active || [];
   const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'citizen');
+  const extensionsList = renderExtensions(availableExtensions);
 
   return {
     circleName: effective.circleName,
@@ -129,6 +142,7 @@ function buildAdminViewModel(state, { flash, sessionForm = {} }) {
     flash,
     postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
+    extensionsList,
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',
     sessionBannedChecked: sessionForm.banned ? 'checked' : '',
@@ -146,4 +160,20 @@ function roleSelectFlags(role) {
     moderator: role === 'moderator' ? 'selected' : '',
     admin: role === 'admin' ? 'selected' : '',
   };
+}
+
+function renderExtensions(list) {
+  if (!list || !list.length) return '<p class="muted small">No extensions discovered.</p>';
+  return list
+    .map((ext) => {
+      const meta = ext.meta || {};
+      const description = meta.description || '';
+      return `
+        <label class="field checkbox">
+          <input type="checkbox" name="extensions" value="${ext.id}" ${ext.enabled ? 'checked' : ''} />
+          <span>${ext.id} — ${description}</span>
+        </label>
+      `;
+    })
+    .join('\n');
 }

@@ -7,11 +7,11 @@
     <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
     <p class="muted small">Posting gate: {{postingGate}}</p>
     <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
-    <p class="muted small">Extensions: {{extensionsSummary}}</p>
-    <p class="muted small">Initialized: {{initialized}}</p>
-    <p class="muted small">{{notes}}</p>
-    <p class="muted small">{{firstRunNote}}</p>
-  </div>
+  <p class="muted small">Extensions: {{extensionsSummary}}</p>
+  <p class="muted small">Initialized: {{initialized}}</p>
+  <p class="muted small">{{notes}}</p>
+  <p class="muted small">{{firstRunNote}}</p>
+</div>
   <p class="muted small">{{flash}}</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">
     <div class="form-grid">
@@ -62,6 +62,19 @@
       <a class="ghost" href="/" data-partial>Back home</a>
     </div>
     <p class="muted small">First installation hint: toggle enforcement + add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Extensions</p>
+  <h2>Toggle modules</h2>
+  <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>
+  <form class="stack" method="post" action="/extensions" data-enhance="extensions">
+    <div class="form-grid">{{extensionsList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Apply extensions</button>
+    </div>
+    <p class="muted small">POSTs to /extensions; reload applies hooks immediately.</p>
   </form>
 </section>
 

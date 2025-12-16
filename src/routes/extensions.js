@@ -13,16 +13,12 @@ export async function getExtensions({ res, state }) {
 
 export async function toggleExtension({ req, res, state }) {
   const body = await readRequestBody(req);
-  const id = sanitizeText(body.id || '', 128);
-  const enable = parseBoolean(body.enable, true);
-  if (!id) {
-    return sendJson(res, 400, { error: 'missing_id' });
+  const list = normalizeList(body);
+  if (!list) {
+    return sendJson(res, 400, { error: 'missing_extensions' });
   }
 
-  const current = new Set(state.settings?.extensions || []);
-  if (enable) current.add(id);
-  else current.delete(id);
-  const nextList = [...current];
+  const nextList = list;
 
   state.settings = { ...(state.settings || {}), extensions: nextList };
   await persistSettings(state);
@@ -40,4 +36,18 @@ function parseBoolean(value, fallback) {
   if (typeof value === 'boolean') return value;
   const normalized = String(value).toLowerCase();
   return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
+}
+
+function normalizeList(body) {
+  if (!body) return null;
+  if (Array.isArray(body.extensions)) {
+    return body.extensions.map((value) => sanitizeText(value, 128)).filter(Boolean);
+  }
+  if (body.id) {
+    const enable = parseBoolean(body.enable, true);
+    const id = sanitizeText(body.id, 128);
+    if (!id) return null;
+    return enable ? [id] : [];
+  }
+  return null;
 }

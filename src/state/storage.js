@@ -44,6 +44,14 @@ export async function persistVotes(state) {
   await state.store.saveVotes(state.votes);
 }
 
+export async function persistDelegations(state) {
+  await state.store.saveDelegations(state.delegations);
+}
+
+export async function persistNotifications(state) {
+  await state.store.saveNotifications(state.notifications);
+}
+
 export async function persistActors(state) {
   await state.store.saveActors([...state.actors.values()]);
 }
@@ -60,6 +68,8 @@ function hydrateState(data) {
     discussions: data.discussions,
     petitions: data.petitions,
     votes: data.votes,
+    delegations: data.delegations,
+    notifications: data.notifications,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     settings: data.settings || { initialized: false },
   };

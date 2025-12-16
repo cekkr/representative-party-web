@@ -1,4 +1,4 @@
-export const LATEST_SCHEMA_VERSION = 4;
+export const LATEST_SCHEMA_VERSION = 5;
 
 const MIGRATIONS = [
   {
@@ -73,6 +73,35 @@ const MIGRATIONS = [
           ...(data.settings || {}),
           extensions: data.settings?.extensions || parseEnvExtensions(),
         },
+      };
+    },
+  },
+  {
+    version: 5,
+    description: 'Add delegations/notifications scaffolds and petition lifecycle defaults.',
+    up: (data) => {
+      const petitions = (data.petitions || []).map((petition, index) => ({
+        id: petition.id || `legacy-petition-${index}`,
+        title: petition.title || 'Untitled petition',
+        summary: petition.summary || '',
+        authorHash: petition.authorHash || 'anonymous',
+        createdAt: petition.createdAt || new Date().toISOString(),
+        status: petition.status || 'draft',
+        quorum: petition.quorum || 0,
+        topic: petition.topic || 'general',
+      }));
+      const votes = (data.votes || []).map((vote) => ({
+        petitionId: vote.petitionId || '',
+        authorHash: vote.authorHash || 'anonymous',
+        choice: vote.choice || 'abstain',
+        createdAt: vote.createdAt || new Date().toISOString(),
+      }));
+      return {
+        ...data,
+        petitions,
+        votes,
+        delegations: data.delegations || [],
+        notifications: data.notifications || [],
       };
     },
   },

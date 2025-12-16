@@ -12,6 +12,8 @@ export function renderHealth({ res, state }) {
     discussions: state.discussions.length,
     petitions: state.petitions.length,
     votes: state.votes.length,
+    delegations: state.delegations.length,
+    notifications: state.notifications.length,
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
