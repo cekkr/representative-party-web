@@ -1,0 +1,1 @@
+- Even if in a political context "citizen" appears a related definition, the "user" definition is more correct for the general purpose base of the framework. Then, using the "citizen" definition create an implicit "exclusion principle" about who can use the platform (people).
