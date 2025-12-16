@@ -19,6 +19,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const voteGate = evaluateAction(state, citizen, 'vote');
   const moderateGate = evaluateAction(state, citizen, 'moderate');
   const signatures = state.signatures || [];
+  const conflicts = state.delegations?.filter((d) => d.conflict) || [];
   const html = await renderPage(
     'petitions',
     {
@@ -29,6 +30,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       voteGateReason: voteGate.message || '',
       roleLabel: citizen?.role || 'guest',
       petitionsList: renderPetitionList(state.petitions, state.votes, signatures, citizen, moderateGate.allowed),
+      conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
     },
     { wantsPartial, title: 'Petitions & Votes' },
   );

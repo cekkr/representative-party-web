@@ -7,12 +7,14 @@ import { renderDiscussion, postDiscussion } from '../routes/discussion.js';
 import { renderPetitions, submitPetition, castVote, updatePetitionStatus, signPetitionRoute } from '../routes/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../routes/forum.js';
 import { renderGroups, createOrJoinGroup, setGroupDelegateRoute } from '../routes/groups.js';
+import { updateGroupPolicyRoute } from '../routes/groups.js';
 import { renderHealth } from '../routes/health.js';
 import { renderHome } from '../routes/home.js';
 import { servePublic } from '../routes/static.js';
 import { renderAdmin, updateAdmin } from '../routes/admin.js';
 import { getExtensions, toggleExtension } from '../routes/extensions.js';
 import { renderNotifications, markNotificationsRead } from '../routes/notifications.js';
+import { resolveConflict } from '../routes/delegation.js';
 import { sendNotFound } from '../utils/http.js';
 
 export async function routeRequest(req, res, state) {
@@ -86,6 +88,9 @@ export async function routeRequest(req, res, state) {
     return setGroupDelegateRoute({ req, res, state, wantsPartial });
   }
 
+  if (req.method === 'POST' && url.pathname === '/groups/policy') {
+    return updateGroupPolicyRoute({ req, res, state, wantsPartial });
+  }
   if (req.method === 'POST' && url.pathname === '/circle/gossip') {
     return handleGossip({ req, res, state });
   }
@@ -116,6 +121,10 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/notifications/read') {
     return markNotificationsRead({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/delegation/conflict') {
+    return resolveConflict({ req, res, state });
   }
 
   if (req.method === 'GET' && url.pathname === '/extensions') {

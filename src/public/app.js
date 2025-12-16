@@ -30,6 +30,10 @@
       await submitExtensionsForm(form);
       return;
     }
+    if (form.dataset.enhance === 'delegation-conflict') {
+      await submitDelegationChoice(form);
+      return;
+    }
     try {
       const formData = new FormData(form);
       const response = await fetch(form.action, {
@@ -91,5 +95,21 @@ async function submitExtensionsForm(form) {
   } catch (error) {
     console.error(error);
     alert('Failed to update extensions.');
+  }
+}
+
+async function submitDelegationChoice(form) {
+  const formData = new FormData(form);
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ topic: formData.get('topic'), delegateHash: formData.get('delegateHash') }),
+    });
+    if (!response.ok) throw new Error('Delegation choice failed');
+    alert('Delegation updated. It will be used for auto votes.');
+  } catch (error) {
+    console.error(error);
+    alert('Failed to update delegation choice.');
   }
 }

@@ -104,6 +104,7 @@ const MIGRATIONS = [
         notifications: data.notifications || [],
         groups: data.groups || [],
         signatures: data.signatures || [],
+        groupPolicies: data.groupPolicies || [],
       };
     },
   },

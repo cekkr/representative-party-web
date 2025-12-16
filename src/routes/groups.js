@@ -2,6 +2,7 @@ import { getCitizen } from '../services/citizen.js';
 import { evaluateAction } from '../services/policy.js';
 import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../services/groups.js';
 import { createNotification } from '../services/notifications.js';
+import { getGroupPolicy, setGroupPolicy } from '../services/groupPolicy.js';
 import { sendHtml, sendJson } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
@@ -9,7 +10,10 @@ import { renderPage } from '../views/templates.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
-  const groups = listGroups(state);
+  const groups = listGroups(state).map((group) => ({
+    ...group,
+    policy: getGroupPolicy(state, group.id),
+  }));
   const html = await renderPage(
     'groups',
     {
@@ -77,11 +81,27 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
   return renderGroups({ req, res, state, wantsPartial });
 }
 
+export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) {
+  const citizen = getCitizen(req, state);
+  const permission = evaluateAction(state, citizen, 'moderate');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to set policies.' });
+  }
+  const body = await readRequestBody(req);
+  const groupId = sanitizeText(body.groupId || '', 80);
+  const electionMode = sanitizeText(body.electionMode || 'priority', 32);
+  const conflictRule = sanitizeText(body.conflictRule || 'highest_priority', 32);
+  const categoryWeighted = Boolean(body.categoryWeighted);
+  await setGroupPolicy(state, { groupId, electionMode, conflictRule, categoryWeighted });
+  return renderGroups({ req, res, state, wantsPartial });
+}
+
 function renderGroupList(groups, citizen) {
   if (!groups.length) return '<p class="muted">No groups yet.</p>';
   return groups
     .map((group) => {
       const member = citizen?.pidHash ? group.members?.includes(citizen.pidHash) : false;
+      const policy = group.policy || {};
       const delegates = (group.delegates || [])
         .map((d) => `<li>${d.topic} → ${d.delegateHash} (prio ${d.priority})</li>`)
         .join('');
@@ -100,6 +120,29 @@ function renderGroupList(groups, citizen) {
             <input type="hidden" name="action" value="${member ? 'leave' : 'join'}" />
             <button type="submit" class="ghost">${member ? 'Leave' : 'Join'}</button>
           </form>
+          <details class="note">
+            <summary>Group policy</summary>
+            <form class="form-inline" method="post" action="/groups/policy" data-enhance="groups">
+              <input type="hidden" name="groupId" value="${group.id}" />
+              <label>Election mode
+                <select name="electionMode">
+                  <option value="priority" ${policy.electionMode === 'priority' ? 'selected' : ''}>Priority</option>
+                  <option value="vote" ${policy.electionMode === 'vote' ? 'selected' : ''}>Vote</option>
+                </select>
+              </label>
+              <label>Conflict rule
+                <select name="conflictRule">
+                  <option value="highest_priority" ${policy.conflictRule === 'highest_priority' ? 'selected' : ''}>Highest priority</option>
+                  <option value="prompt_user" ${policy.conflictRule === 'prompt_user' ? 'selected' : ''}>Prompt user</option>
+                </select>
+              </label>
+              <label class="field checkbox">
+                <input type="checkbox" name="categoryWeighted" ${policy.categoryWeighted ? 'checked' : ''} />
+                <span>Weight by category</span>
+              </label>
+              <button type="submit" class="ghost">Save policy</button>
+            </form>
+          </details>
           <details class="note">
             <summary>Set preferred delegate</summary>
             <form class="form-inline" method="post" action="/groups/delegate" data-enhance="groups">

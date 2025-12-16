@@ -13,6 +13,7 @@ export async function createGroup({ name, description, topics, creatorHash, stat
     description,
     topics: topics || [],
     members: creatorHash ? [creatorHash] : [],
+    roles: creatorHash ? [{ hash: creatorHash, role: 'admin', joinedAt: new Date().toISOString() }] : [],
     delegates: [],
     createdAt: new Date().toISOString(),
   };
@@ -26,6 +27,8 @@ export async function joinGroup({ groupId, citizen, state }) {
   if (!group || !citizen?.pidHash) return null;
   if (!group.members.includes(citizen.pidHash)) {
     group.members.push(citizen.pidHash);
+    group.roles = group.roles || [];
+    group.roles.push({ hash: citizen.pidHash, role: 'member', joinedAt: new Date().toISOString() });
     await persistGroups(state);
   }
   return group;

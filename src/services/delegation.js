@@ -41,6 +41,11 @@ export function resolveDelegation(citizen, topic, state, { notify } = {}) {
   return null;
 }
 
+export async function chooseDelegation({ citizen, topic, delegateHash, state }) {
+  if (!citizen?.pidHash) return;
+  await setDelegation({ citizen, topic, delegateHash, provider: 'manual', state });
+}
+
 export async function setDelegation({ citizen, topic, delegateHash, provider, state }) {
   if (!citizen || !citizen.pidHash) return;
   const topicKey = normalizeTopic(topic);
