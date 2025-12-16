@@ -88,6 +88,7 @@ sequenceDiagram
   npm install
   npm test   # node:test: hashing, migrations, classification hooks, policy gates, extension registry
   npm start  # starts the SSR server
+  npm run db:check  # prints adapter/profile + record counts for the current DATA_ADAPTER
   ```
 - The app is SSR-first with a vanilla router interceptor: set `X-Requested-With: partial` to fetch partial HTML for app-like navigation.
 - Static assets/templates live in `src/public`; keep new templates under `src/public/templates`.
