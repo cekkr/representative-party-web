@@ -1,4 +1,6 @@
-export const LATEST_SCHEMA_VERSION = 6;
+import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
+
+export const LATEST_SCHEMA_VERSION = 7;
 
 const MIGRATIONS = [
   {
@@ -115,6 +117,24 @@ const MIGRATIONS = [
       return {
         ...data,
         groupElections: data.groupElections || [],
+      };
+    },
+  },
+  {
+    version: 7,
+    description: 'Add data topology and adapter settings.',
+    up: (data) => {
+      const settings = data.settings || {};
+      const stored = settings.data || {};
+      const dataConfig = {
+        mode: normalizeDataMode(stored.mode || DATA_DEFAULTS.mode),
+        adapter: normalizeDataAdapter(stored.adapter || DATA_DEFAULTS.adapter),
+        validationLevel: normalizeValidationLevel(stored.validationLevel || DATA_DEFAULTS.validationLevel),
+        allowPreviews: stored.allowPreviews ?? DATA_DEFAULTS.allowPreviews,
+      };
+      return {
+        ...data,
+        settings: { ...settings, data: dataConfig },
       };
     },
   },

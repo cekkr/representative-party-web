@@ -24,6 +24,13 @@ export const POLICIES = {
   gossipIntervalSeconds: Number(process.env.GOSSIP_INTERVAL_SECONDS || 300),
 };
 
+export const DATA_DEFAULTS = {
+  mode: 'centralized',
+  adapter: 'json',
+  validationLevel: 'strict',
+  allowPreviews: false,
+};
+
 export const PATHS = {
   ROOT: ROOT_DIR,
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
@@ -50,4 +57,37 @@ export const FILES = {
   settings: join(PATHS.DATA_ROOT, 'settings.json'),
 };
 
+export const DATA = {
+  mode: normalizeDataMode(process.env.DATA_MODE),
+  adapter: normalizeDataAdapter(process.env.DATA_ADAPTER),
+  validationLevel: normalizeValidationLevel(process.env.DATA_VALIDATION_LEVEL),
+  allowPreviews: parseBooleanEnv(process.env.DATA_PREVIEW, DATA_DEFAULTS.allowPreviews),
+};
+
 export const DEFAULT_PAGE_TITLE = 'Representative Party';
+
+export function normalizeDataMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'hybrid' || normalized === 'p2p') return normalized;
+  if (normalized === 'centralized') return 'centralized';
+  return DATA_DEFAULTS.mode;
+}
+
+export function normalizeValidationLevel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'strict') return 'strict';
+  if (normalized === 'observe' || normalized === 'observing' || normalized === 'lenient') return 'observe';
+  if (normalized === 'off') return 'off';
+  return DATA_DEFAULTS.validationLevel;
+}
+
+export function normalizeDataAdapter(value) {
+  if (!value) return DATA_DEFAULTS.adapter;
+  return String(value).trim().toLowerCase();
+}
+
+function parseBooleanEnv(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+}

@@ -1,8 +1,9 @@
+import { DATA, DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { runMigrations } from './migrations.js';
 import { createStateStore } from './store.js';
 
 export async function initState() {
-  const store = createStateStore();
+  const store = createStateStore({ adapter: DATA.adapter });
   await store.prepare();
 
   const rawData = await store.loadData();
@@ -17,6 +18,8 @@ export async function initState() {
   const state = hydrateState(migratedData);
   state.meta = migratedMeta;
   state.store = store;
+  state.dataConfig = deriveDataConfig(state.settings);
+  state.settings = { ...(state.settings || {}), data: state.dataConfig };
   return state;
 }
 
@@ -77,6 +80,7 @@ export async function persistSettings(state) {
 }
 
 function hydrateState(data) {
+  const settings = data.settings || { initialized: false };
   return {
     uniquenessLedger: new Set(data.ledger),
     sessions: new Map(data.sessions.map((session) => [session.id, session])),
@@ -91,6 +95,16 @@ function hydrateState(data) {
     groupPolicies: data.groupPolicies,
     groupElections: data.groupElections,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
-    settings: data.settings || { initialized: false },
+    settings,
+  };
+}
+
+function deriveDataConfig(settings = {}) {
+  const stored = settings.data || {};
+  return {
+    mode: normalizeDataMode(DATA.mode || stored.mode || DATA_DEFAULTS.mode),
+    adapter: normalizeDataAdapter(DATA.adapter || stored.adapter || DATA_DEFAULTS.adapter),
+    validationLevel: normalizeValidationLevel(DATA.validationLevel || stored.validationLevel || DATA_DEFAULTS.validationLevel),
+    allowPreviews: DATA.allowPreviews ?? stored.allowPreviews ?? DATA_DEFAULTS.allowPreviews,
   };
 }

@@ -2,14 +2,28 @@ import { persistLedger, persistPeers } from '../../infra/persistence/storage.js'
 import { sendJson } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { buildLedgerEnvelope, verifyLedgerEnvelope } from '../../modules/circle/federation.js';
+import { decideStatus, getReplicationProfile } from '../../modules/federation/replication.js';
 
 export async function handleGossip({ req, res, state }) {
   const body = await readRequestBody(req);
   const envelope = body.envelope;
+  const replicationProfile = getReplicationProfile(state);
+  const replicationStatus = decideStatus(replicationProfile, envelope?.status || body.status || 'validated');
   const verification = envelope ? verifyLedgerEnvelope(envelope) : null;
 
   if (verification && !verification.valid && !verification.skipped) {
     return sendJson(res, 400, { error: 'invalid_signature', detail: 'Ledger envelope signature rejected.' });
+  }
+
+  if (replicationStatus.status === 'rejected') {
+    return sendJson(res, 202, {
+      added: 0,
+      total: state.uniquenessLedger.size,
+      peers: [...state.peers],
+      replication: { status: replicationStatus, profile: replicationProfile },
+      verification: verification ? { skipped: verification.skipped, valid: verification.valid } : undefined,
+      detail: 'Incoming payload marked as preview and previews are disabled.',
+    });
   }
 
   const hashes = envelope ? (Array.isArray(envelope.entries) ? envelope.entries : []) : Array.isArray(body.hashes) ? body.hashes : [];
@@ -33,17 +47,18 @@ export async function handleGossip({ req, res, state }) {
     added,
     total: state.uniquenessLedger.size,
     peers: [...state.peers],
+    replication: { status: replicationStatus, profile: replicationProfile },
     verification: verification ? { skipped: verification.skipped, valid: verification.valid } : undefined,
   });
 }
 
 export function exportLedger({ res, state }) {
   const envelope = buildLedgerEnvelope(state);
-  return sendJson(res, 200, { entries: [...state.uniquenessLedger], envelope });
+  return sendJson(res, 200, { entries: [...state.uniquenessLedger], envelope, replication: getReplicationProfile(state) });
 }
 
 export function listPeers({ res, state }) {
-  return sendJson(res, 200, { peers: [...state.peers] });
+  return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });
 }
 
 export async function registerPeer({ req, res, state }) {
@@ -52,5 +67,5 @@ export async function registerPeer({ req, res, state }) {
     state.peers.add(String(body.peer));
     await persistPeers(state);
   }
-  return sendJson(res, 200, { peers: [...state.peers] });
+  return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });
 }

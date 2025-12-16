@@ -1,4 +1,5 @@
 import { POLICIES } from '../../config.js';
+import { getReplicationProfile } from '../../modules/federation/replication.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../modules/circle/policy.js';
 import { sendJson } from '../../shared/utils/http.js';
 
@@ -17,6 +18,7 @@ export function renderHealth({ res, state }) {
     groups: state.groups.length,
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
+    data: getReplicationProfile(state),
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
     schemaVersion: state.meta?.schemaVersion || 0,

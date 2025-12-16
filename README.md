@@ -13,7 +13,7 @@ A Node.js implementation of the Representative Party "Party Circle" kernel. Phas
 - **Entry/server:** `src/index.js`, `src/app/server.js`, `src/app/router.js` (table-driven HTTP dispatch).
 - **Interfaces (HTTP):** controllers in `src/interfaces/http/controllers/` (auth, discussion, forum, petitions, delegation, votes, groups, notifications, circle gossip, extensions, ActivityPub, static assets, admin, health, home); view helpers in `src/interfaces/http/views/`.
 - **Domain modules:** `src/modules/` for identity/auth, circle policy, messaging/notifications, topics/classification, petitions/signatures, votes/envelopes, delegation, groups/elections, federation (ActivityPub), and extensions.
-- **Infra:** persistence adapters + migrations in `src/infra/persistence/` (JSON store today) with worker hooks reserved under `src/infra/workers/`.
+- **Infra:** persistence adapters + migrations in `src/infra/persistence/` (`adapters/json.js` default, `adapters/memory.js` for ephemeral) with replication helpers in `src/modules/federation/replication.js` and worker hooks reserved under `src/infra/workers/`.
 - **Shared:** cross-cutting utilities in `src/shared/utils/`.
 - **Views/assets:** SSR templates in `src/public/templates`, styles/JS in `src/public/`.
 - **Extensions:** registry in `src/modules/extensions/registry.js` with sample `sample-policy-tighten.js`; enable via `CIRCLE_EXTENSIONS`.
@@ -64,10 +64,11 @@ sequenceDiagram
 - **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, default group policy, topic gardener, and session overrides without editing JSON.
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors via `src/modules/federation/activitypub.js`; `/ap/inbox` placeholder for inbound federation payloads.
 
-## Persistence and migrations
-- JSON stores under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `settings.json`, `meta.json`).
-- `src/infra/persistence/migrations.js` normalizes schema versions (adds handles/roles, petition lifecycle, delegation/notifications, extension list). Metadata lives in `meta.json`.
-- `src/infra/persistence/storage.js` and `store.js` provide the JSON adapter; swap here for future DB adapters. Back up `src/data/` before upgrades.
+## Persistence, adapters, and data modes
+- Default JSON stores live under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `settings.json`, `meta.json`). `adapters/memory.js` offers an in-memory option for ephemeral runs/tests.
+- `src/infra/persistence/migrations.js` normalizes schema versions (handles/roles, petition lifecycle, delegation/notifications, extensions, group elections, data topology). Metadata lives in `meta.json`.
+- `src/infra/persistence/storage.js` hydrates state and routes through `src/infra/persistence/store.js` which chooses an adapter (`DATA_ADAPTER`, default json). Back up `src/data/` before upgrades or switching adapters.
+- Data topology is controlled by settings/env: `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (allow preview writes), and `DATA_ADAPTER` (adapter driver). `src/modules/federation/replication.js` exposes the active profile and preview gating for gossip/ingest.
 
 ## Configuration
 - Runtime: Node.js ESM app; `npm install`, `npm start` (defaults to `http://0.0.0.0:3000`).
@@ -77,6 +78,7 @@ sequenceDiagram
   - `CIRCLE_EXTENSIONS` (comma-separated module names under `src/modules/extensions`, e.g. `sample-policy-tighten`)
   - `CIRCLE_ISSUER` (provider id on envelopes/federation exports)
   - `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` (PEM) to sign/verify vote envelopes and ledger exports
+  - `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_ADAPTER` (`json`|`memory`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (true/false for storing preview data before validation)
 - Persisted settings (name, policy toggles, extensions, peers) live in `src/data/settings.json`; admin UI edits them in place.
 
 ## Development and testing

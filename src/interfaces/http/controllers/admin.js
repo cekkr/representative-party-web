@@ -3,6 +3,7 @@ import { DEFAULT_TOPIC_ANCHORS } from '../../modules/topics/topicGardenerClient.
 import { persistPeers, persistSessions, persistSettings } from '../../infra/persistence/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
 import { listAvailableExtensions } from '../../modules/extensions/registry.js';
+import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -164,6 +165,7 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
   const topicConfig = state.settings?.topicGardener || {};
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
+  const replicationProfile = getReplicationProfile(state);
 
   return {
     circleName: effective.circleName,
@@ -196,6 +198,11 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
     topicGardenerUrl: topicConfig.url || '',
     topicAnchors,
     topicPinned,
+    dataProfile: describeProfile(replicationProfile),
+    dataMode: replicationProfile.mode,
+    dataAdapter: replicationProfile.adapter,
+    dataValidation: replicationProfile.validationLevel,
+    dataPreview: replicationProfile.allowPreviews ? 'on' : 'off',
   };
 }
 
