@@ -17,6 +17,8 @@ const KEYS = [
   'groupPolicies',
   'groupElections',
   'actors',
+  'socialFollows',
+  'socialPosts',
   'settings',
   'meta',
 ];
@@ -116,6 +118,14 @@ class KeyValueStateStore {
 
   async saveActors(entries) {
     await this.saveKey('actors', entries);
+  }
+
+  async saveSocialFollows(entries) {
+    await this.saveKey('socialFollows', entries);
+  }
+
+  async saveSocialPosts(entries) {
+    await this.saveKey('socialPosts', entries);
   }
 
   async saveSettings(settings) {

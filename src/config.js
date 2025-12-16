@@ -55,6 +55,8 @@ export const FILES = {
   groupPolicies: join(PATHS.DATA_ROOT, 'group-policies.json'),
   groupElections: join(PATHS.DATA_ROOT, 'group-elections.json'),
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
+  socialFollows: join(PATHS.DATA_ROOT, 'social-follows.json'),
+  socialPosts: join(PATHS.DATA_ROOT, 'social-posts.json'),
   meta: join(PATHS.DATA_ROOT, 'meta.json'),
   settings: join(PATHS.DATA_ROOT, 'settings.json'),
 };

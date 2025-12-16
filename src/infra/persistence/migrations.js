@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 9;
+export const LATEST_SCHEMA_VERSION = 10;
 
 const MIGRATIONS = [
   {
@@ -164,6 +164,47 @@ const MIGRATIONS = [
         groupElections: withValidation(data.groupElections),
         delegations: withValidation(data.delegations),
         notifications: withValidation(data.notifications),
+      };
+    },
+  },
+  {
+    version: 10,
+    description: 'Add social follows/posts scaffolds with validation status.',
+    up: (data) => {
+      const normalizeFollow = (edge = {}, index) => {
+        const followerHash = stringOrEmpty(edge.followerHash) || stringOrEmpty(edge.authorHash) || `legacy-follower-${index}`;
+        const targetHash = stringOrEmpty(edge.targetHash) || stringOrEmpty(edge.subjectHash) || `legacy-target-${index}`;
+        const followType = stringOrFallback(edge.type, 'circle');
+        return {
+          id: edge.id || `follow-${index}`,
+          followerHash,
+          targetHash,
+          targetHandle: stringOrEmpty(edge.targetHandle),
+          type: followType.slice(0, 32),
+          createdAt: edge.createdAt || new Date().toISOString(),
+          validationStatus: edge.validationStatus || 'validated',
+        };
+      };
+      const normalizePost = (post = {}, index) => {
+        const content = stringOrEmpty(post.content);
+        if (!content) return null;
+        return {
+          id: post.id || `post-${index}`,
+          authorHash: stringOrFallback(post.authorHash, 'anonymous'),
+          authorHandle: stringOrEmpty(post.authorHandle),
+          content: content.slice(0, 480),
+          createdAt: post.createdAt || new Date().toISOString(),
+          replyTo: post.replyTo || null,
+          visibility: post.visibility === 'direct' ? 'direct' : 'public',
+          targetHash: stringOrEmpty(post.targetHash),
+          targetHandle: stringOrEmpty(post.targetHandle),
+          validationStatus: post.validationStatus || 'validated',
+        };
+      };
+      return {
+        ...data,
+        socialFollows: (data.socialFollows || []).map(normalizeFollow),
+        socialPosts: (data.socialPosts || []).map(normalizePost).filter(Boolean),
       };
     },
   },

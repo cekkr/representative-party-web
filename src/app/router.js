@@ -21,6 +21,13 @@ import { getExtensions, toggleExtension } from '../interfaces/http/controllers/e
 import { renderNotifications, markNotificationsRead } from '../interfaces/http/controllers/notifications.js';
 import { resolveConflict } from '../interfaces/http/controllers/delegation.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
+import {
+  renderSocialFeed,
+  postSocialMessage,
+  followHandle,
+  unfollowHandle,
+  listRelationships,
+} from '../interfaces/http/controllers/social.js';
 import { sendNotFound } from '../shared/utils/http.js';
 
 const routes = [
@@ -46,6 +53,11 @@ const routes = [
   { method: 'GET', path: '/circle/ledger', action: exportLedger },
   { method: 'GET', path: '/circle/peers', action: listPeers },
   { method: 'POST', path: '/circle/peers', action: registerPeer },
+  { method: 'GET', path: '/social/feed', action: renderSocialFeed },
+  { method: 'POST', path: '/social/post', action: postSocialMessage },
+  { method: 'POST', path: '/social/follow', action: followHandle },
+  { method: 'POST', path: '/social/unfollow', action: unfollowHandle },
+  { method: 'GET', path: '/social/relationships', action: listRelationships },
   { method: 'GET', path: '/admin', action: renderAdmin },
   { method: 'POST', path: '/admin', action: updateAdmin },
   { method: 'GET', path: '/notifications', action: renderNotifications },

@@ -30,6 +30,8 @@ class JsonStateStore {
       groupPolicies: await this.readJson(FILES.groupPolicies, []),
       groupElections: await this.readJson(FILES.groupElections, []),
       actors: await this.readJson(FILES.actors, []),
+      socialFollows: await this.readJson(FILES.socialFollows, []),
+      socialPosts: await this.readJson(FILES.socialPosts, []),
       settings: await this.readJson(FILES.settings, { initialized: false }),
     };
   }
@@ -52,6 +54,8 @@ class JsonStateStore {
     await this.writeJson(FILES.groupPolicies, data.groupPolicies || []);
     await this.writeJson(FILES.groupElections, data.groupElections || []);
     await this.writeJson(FILES.actors, data.actors || []);
+    await this.writeJson(FILES.socialFollows, data.socialFollows || []);
+    await this.writeJson(FILES.socialPosts, data.socialPosts || []);
     await this.writeJson(FILES.settings, data.settings || { initialized: false });
   }
 
@@ -109,6 +113,14 @@ class JsonStateStore {
 
   async saveActors(entries) {
     await this.writeJson(FILES.actors, entries);
+  }
+
+  async saveSocialFollows(entries) {
+    await this.writeJson(FILES.socialFollows, entries);
+  }
+
+  async saveSocialPosts(entries) {
+    await this.writeJson(FILES.socialPosts, entries);
   }
 
   async saveSettings(settings) {

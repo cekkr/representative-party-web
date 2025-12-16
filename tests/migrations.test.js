@@ -18,6 +18,8 @@ test('migrations normalize sessions and settings', () => {
     groupElections: [],
     actors: [],
     settings: {},
+    socialFollows: [],
+    socialPosts: [],
   };
 
   const meta = { schemaVersion: 0, migrations: [] };
@@ -38,5 +40,7 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(Array.isArray(data.notifications));
   assert.ok(Array.isArray(data.groups));
   assert.ok(Array.isArray(data.groupElections));
+  assert.ok(Array.isArray(data.socialFollows));
+  assert.ok(Array.isArray(data.socialPosts));
   assert.deepEqual(data.settings.extensions, []);
 });

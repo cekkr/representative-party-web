@@ -1,0 +1,80 @@
+<section class="panel">
+  <p class="eyebrow">Social</p>
+  <h2>Small talk & info feed</h2>
+  <p>Typed follows (friends, politics, engineers, info, alerts) drive a Twitter-like lane for casual updates and lightweight replies. Direct posts act as minimal private messages between verified handles.</p>
+  <div class="callout">
+    <p class="muted small">Handle: {{citizenHandle}}</p>
+    <p class="muted small">Role: {{roleLabel}}</p>
+    <p class="muted small">{{postingStatus}}</p>
+    <p class="muted small">{{postingReason}}</p>
+    <p class="muted small">Following: {{followCount}} | Followers: {{followerCount}}</p>
+  </div>
+  <form class="stack" method="post" action="/social/post" data-enhance="social-post">
+    <label class="field">
+      <span>Message (short)</span>
+      <textarea name="content" rows="3" placeholder="Share a quick thought or update" required></textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Visibility</span>
+        <select name="visibility">
+          <option value="public" selected>Public to your follows</option>
+          <option value="direct">Direct (private) to handle</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Direct to (handle, optional unless direct)</span>
+        <input name="targetHandle" placeholder="@handle" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Post</button>
+      <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Follow graph</p>
+  <h3>Follow a handle</h3>
+  <form class="stack" method="post" action="/social/follow" data-enhance="social-follow">
+    <div class="form-grid">
+      <label class="field">
+        <span>Handle</span>
+        <input name="handle" placeholder="citizen-1234" required />
+      </label>
+      <label class="field">
+        <span>Follow type</span>
+        <input name="type" list="follow-types" placeholder="friends / politics / engineers" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Follow</button>
+    </div>
+  </form>
+  <form class="stack" method="post" action="/social/unfollow" data-enhance="social-unfollow">
+    <div class="form-grid">
+      <label class="field">
+        <span>Handle to unfollow</span>
+        <input name="handle" placeholder="citizen-1234" required />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Unfollow</button>
+    </div>
+  </form>
+  <datalist id="follow-types">
+    {{followTypeOptions}}
+  </datalist>
+  <div class="list-stack">
+    {{followList}}
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Feed</p>
+  <h3>Posts from the people you follow</h3>
+  <div class="list-stack">
+    {{feedList}}
+  </div>
+</section>

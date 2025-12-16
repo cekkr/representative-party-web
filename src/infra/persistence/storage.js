@@ -59,6 +59,14 @@ export async function persistNotifications(state) {
   await state.store.saveNotifications(state.notifications);
 }
 
+export async function persistSocialFollows(state) {
+  await state.store.saveSocialFollows(state.socialFollows);
+}
+
+export async function persistSocialPosts(state) {
+  await state.store.saveSocialPosts(state.socialPosts);
+}
+
 export async function persistGroups(state) {
   await state.store.saveGroups(state.groups);
 }
@@ -95,6 +103,8 @@ function hydrateState(data) {
     groupPolicies: data.groupPolicies,
     groupElections: data.groupElections,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
+    socialFollows: data.socialFollows || [],
+    socialPosts: data.socialPosts || [],
     settings,
   };
 }
