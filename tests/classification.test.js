@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { classifyTopic } from '../src/services/classification.js';
+import { getTopicConfig } from '../src/services/topicGardenerClient.js';
 import { resolveDelegation, setDelegation } from '../src/services/delegation.js';
 import { recommendDelegationForCitizen } from '../src/services/groups.js';
 
@@ -49,6 +50,23 @@ test('classifyTopic reconciles provider topics back to anchors', async () => {
   };
   const topic = await classifyTopic('Some post content', state);
   assert.equal(topic, 'climate');
+});
+
+test('topic gardener config falls back to environment when admin settings are absent', (t) => {
+  const prevUrl = process.env.TOPIC_GARDENER_URL;
+  const prevAnchors = process.env.TOPIC_GARDENER_ANCHORS;
+  process.env.TOPIC_GARDENER_URL = 'http://example.test/classify';
+  process.env.TOPIC_GARDENER_ANCHORS = 'alpha,beta';
+  process.env.TOPIC_GARDENER_PINNED = 'beta';
+  t.after(() => {
+    process.env.TOPIC_GARDENER_URL = prevUrl;
+    process.env.TOPIC_GARDENER_ANCHORS = prevAnchors;
+    delete process.env.TOPIC_GARDENER_PINNED;
+  });
+  const config = getTopicConfig({ settings: {} });
+  assert.equal(config.url, 'http://example.test/classify');
+  assert.deepEqual(config.anchors, ['alpha', 'beta']);
+  assert.deepEqual(config.pinned, ['beta']);
 });
 
 test('resolveDelegation uses stored entry', async () => {

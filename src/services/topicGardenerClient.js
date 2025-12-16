@@ -7,11 +7,14 @@ export const DEFAULT_TOPIC_ANCHORS = ['general', 'governance', 'economy', 'socie
 // Returns normalized topic gardener settings with safe defaults so callers can
 // rely on anchors without checking for undefined fields.
 export function getTopicConfig(state) {
+  const envUrl = process.env.TOPIC_GARDENER_URL || process.env.CIRCLE_TOPIC_GARDENER_URL || '';
+  const envAnchors = parseEnvList(process.env.TOPIC_GARDENER_ANCHORS, DEFAULT_TOPIC_ANCHORS);
+  const envPinned = parseEnvList(process.env.TOPIC_GARDENER_PINNED, []);
   const settings = state?.settings?.topicGardener || {};
-  const anchors = normalizeList(settings.anchors);
-  const pinned = normalizeList(settings.pinned);
+  const anchors = normalizeList(settings.anchors?.length ? settings.anchors : envAnchors);
+  const pinned = normalizeList(settings.pinned?.length ? settings.pinned : envPinned);
   return {
-    url: settings.url || '',
+    url: settings.url || envUrl,
     anchors: anchors.length ? anchors : DEFAULT_TOPIC_ANCHORS,
     pinned,
   };
@@ -68,6 +71,15 @@ function normalizeList(list) {
       .filter(Boolean),
   );
   return [...deduped];
+}
+
+function parseEnvList(value, fallback = []) {
+  if (!value) return fallback;
+  const parts = String(value)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+  return parts.length ? parts : fallback;
 }
 
 function postJson(urlString, payload) {
