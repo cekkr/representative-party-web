@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { blindHash } from '../src/services/auth.js';
+import { blindHash } from '../src/modules/identity/auth.js';
 
 test('blindHash is deterministic for the same input', () => {
   const hashA = blindHash('pid-123', 'salt-abc');

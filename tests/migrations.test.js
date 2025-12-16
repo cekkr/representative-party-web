@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { LATEST_SCHEMA_VERSION, runMigrations } from '../src/state/migrations.js';
+import { LATEST_SCHEMA_VERSION, runMigrations } from '../src/infra/persistence/migrations.js';
 
 test('migrations normalize sessions and settings', () => {
   const rawData = {

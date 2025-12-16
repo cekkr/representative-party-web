@@ -7,15 +7,16 @@ A Node.js implementation of the Representative Party "Party Circle" kernel. Phas
 - Soft-power accountability: auditable policy gates and traceable vote envelopes instead of imperative mandates.
 - Liquid representation: topic-scoped delegation, revocable at any time, surfaced in UI and vote resolution.
 - Federation resilience: peers gossip ledger/vote hashes and can quarantine toxic providers; ActivityPub actors expose public presence.
-- Extensible policy: optional modules under `src/extensions` can harden gates without forking the core.
+- Extensible policy: optional modules under `src/modules/extensions` can harden gates without forking the core.
 
 ## System map
-- **Entry/server:** `src/index.js`, `src/server/bootstrap.js`, `src/server/router.js`.
-- **Routes:** `src/routes/` covers auth, discussion, forum, petitions, delegation, votes, groups, notifications, circle gossip, extensions, ActivityPub, static assets, admin, health, and home.
-- **Services:** `src/services/` for auth (OIDC4VP scaffold + blinded PID), policy gates, classification hooks, delegation logic, group cachets/elections, notifications, activitypub actor factory, vote envelope signing/verification.
-- **Persistence:** JSON-backed store via `src/state/storage.js` with migrations in `src/state/migrations.js`; files live under `src/data/`.
+- **Entry/server:** `src/index.js`, `src/app/server.js`, `src/app/router.js` (table-driven HTTP dispatch).
+- **Interfaces (HTTP):** controllers in `src/interfaces/http/controllers/` (auth, discussion, forum, petitions, delegation, votes, groups, notifications, circle gossip, extensions, ActivityPub, static assets, admin, health, home); view helpers in `src/interfaces/http/views/`.
+- **Domain modules:** `src/modules/` for identity/auth, circle policy, messaging/notifications, topics/classification, petitions/signatures, votes/envelopes, delegation, groups/elections, federation (ActivityPub), and extensions.
+- **Infra:** persistence adapters + migrations in `src/infra/persistence/` (JSON store today) with worker hooks reserved under `src/infra/workers/`.
+- **Shared:** cross-cutting utilities in `src/shared/utils/`.
 - **Views/assets:** SSR templates in `src/public/templates`, styles/JS in `src/public/`.
-- **Extensions:** registry in `src/extensions/registry.js`; enable with `CIRCLE_EXTENSIONS`.
+- **Extensions:** registry in `src/modules/extensions/registry.js` with sample `sample-policy-tighten.js`; enable via `CIRCLE_EXTENSIONS`.
 - **Tests:** `npm test` runs the `node:test` suite in `tests/` (hashing, migrations, policy gates, classification, extensions).
 
 ## Identity + session flow (OIDC4VP scaffold)
@@ -52,28 +53,28 @@ sequenceDiagram
 ```
 
 ## Capabilities by module
-- **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes, writes blinded PID hash, mints an ActivityPub actor, sets the cookie. Pending sessions can be resumed with `?session={id}`.
-- **Uniqueness Ledger + circle sync:** Ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes, `/circle/ledger` exports, `/circle/peers` manages hints.
-- **Policy gates:** Role-aware checks (citizen/moderator/delegate + banned flag) for posting, petitions, votes, moderation; surfaced in `/health` and UI. Extensions can decorate/override decisions.
-- **Discussion + forum:** `/discussion` for threads tied to verified sessions; `/forum` for long-form articles with `/forum/comment` replies; topic classification hook runs per post.
-- **Petitions + votes:** `/petitions` draft/open/close petitions, signatures at `/petitions/sign`; `/petitions/vote` records one vote per citizen and emits a signed vote envelope (if signing keys set); `/votes/ledger` exports, `/votes/gossip` ingests envelopes.
-- **Delegation & groups:** `src/services/delegation.js` stores per-topic delegates with auto-resolution; `/delegation/conflict` prompts when cachets clash. Groups (`/groups`) publish delegate preferences and run elections; group policy (priority vs vote, conflict rules) is stored independently.
-- **Topics & classification:** `src/services/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `helpers/topic-gardener/server.py`.
-- **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; backing store in `src/data/notifications.json`.
-- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, default group policy, and session overrides without editing JSON.
-- **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors; `/ap/inbox` placeholder for inbound federation payloads.
+- **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/controllers/auth.js`. Pending sessions can be resumed with `?session={id}`.
+- **Uniqueness Ledger + circle sync:** Ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
+- **Policy gates:** Role-aware checks (citizen/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
+- **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
+- **Petitions + votes:** `/petitions` draft/open/close petitions, signatures at `/petitions/sign`; `/petitions/vote` records one vote per citizen and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes.
+- **Delegation & groups:** `src/modules/delegation/delegation.js` stores per-topic delegates with auto-resolution; `/delegation/conflict` prompts when cachets clash. `src/modules/groups/*` publishes delegate preferences and runs elections; group policy (priority vs vote, conflict rules) is stored independently.
+- **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `helpers/topic-gardener/server.py`.
+- **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; backing store handled by `src/modules/messaging/notifications.js`.
+- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, default group policy, topic gardener, and session overrides without editing JSON.
+- **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors via `src/modules/federation/activitypub.js`; `/ap/inbox` placeholder for inbound federation payloads.
 
 ## Persistence and migrations
 - JSON stores under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `settings.json`, `meta.json`).
-- `src/state/migrations.js` normalizes schema versions (adds handles/roles, petition lifecycle, delegation/notifications, extension list). Metadata lives in `meta.json`.
-- Pluggable store abstraction keeps a path to DB adapters while preserving current data; back up `src/data/` before upgrades.
+- `src/infra/persistence/migrations.js` normalizes schema versions (adds handles/roles, petition lifecycle, delegation/notifications, extension list). Metadata lives in `meta.json`.
+- `src/infra/persistence/storage.js` and `store.js` provide the JSON adapter; swap here for future DB adapters. Back up `src/data/` before upgrades.
 
 ## Configuration
 - Runtime: Node.js ESM app; `npm install`, `npm start` (defaults to `http://0.0.0.0:3000`).
 - Environment flags:
   - `HOST`, `PORT`
   - `CIRCLE_POLICY_ID`, `ENFORCE_CIRCLE`, `GOSSIP_INTERVAL_SECONDS`
-  - `CIRCLE_EXTENSIONS` (comma-separated module names under `src/extensions`, e.g. `sample-policy-tighten`)
+  - `CIRCLE_EXTENSIONS` (comma-separated module names under `src/modules/extensions`, e.g. `sample-policy-tighten`)
   - `CIRCLE_ISSUER` (provider id on envelopes/federation exports)
   - `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` (PEM) to sign/verify vote envelopes and ledger exports
 - Persisted settings (name, policy toggles, extensions, peers) live in `src/data/settings.json`; admin UI edits them in place.

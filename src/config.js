@@ -29,7 +29,7 @@ export const PATHS = {
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
-  EXTENSIONS_ROOT: join(ROOT_DIR, 'extensions'),
+  EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
 };
 
 export const FILES = {

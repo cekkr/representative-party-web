@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { loadExtensions, listAvailableExtensions } from '../src/extensions/registry.js';
+import { loadExtensions, listAvailableExtensions } from '../src/modules/extensions/registry.js';
 
 test('loads sample extension when enabled', async () => {
   const { active } = await loadExtensions({ list: ['sample-policy-tighten'] });

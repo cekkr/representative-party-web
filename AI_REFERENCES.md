@@ -7,7 +7,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable (providers can run solo messaging networks or join a Circle).
 - Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers.
 - Session handles/roles: verified sessions persist a handle + role (user/citizen/moderator/delegate) and a banned flag so policy gates can block actions transparently and keep non-people out.
-- Extensions: optional modules under `src/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code; use them to align with organizational policies instead of forking.
+- Extensions: optional modules under `src/modules/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code; use them to align with organizational policies instead of forking.
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
 - Topic stewardship & gardening: users (citizens in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling.
@@ -18,15 +18,12 @@ This file captures the essential implementation directives. Keep it in sync with
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
 ## Code map (Phase 1 kernel)
-- **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
-- **Route handlers**: `src/routes/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`).
-- **Services**: `src/services/` (`auth` for credential offers/blinded hash + cookie, `activitypub` actor factory, `citizen` session lookup (user session helper), `classification` topic hook, `delegation` auto vote routing + conflict choice, `notifications` registry, `groups` delegation cachets, `groupPolicy` per-group rules, `groupElections` ballots).
-- **Policy gates**: `src/services/policy.js` resolves effective Circle policy and gates post/petition/vote/moderation per role, surfaced in `/health` and UI.
-- **Helper services**: AI/ML workers live in `helpers/` (Python projects, e.g., topic gardener). Node code should call them via cohesive APIs to avoid conflicting provider outputs and duplicated computation across classification providers.
-- **State/persistence**: `src/state/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface).
-- **Migrations**: `src/state/migrations.js` (schema v3 adds session handles/roles/banned flags; v4 adds petitions/votes scaffolds and persisted extension list; v5 adds delegations/notifications and petition lifecycle defaults).
-- **Extensions**: `src/extensions/registry.js` loads optional modules from `src/extensions/*.js` so deployments can extend action rules; sample `sample-policy-tighten.js` demonstrates hook shape.
-- **Views/helpers**: `src/views/templates.js` (SSR + partials), `src/views/discussionView.js` (render posts), `src/utils/` (http helpers, request parsing, text sanitization/escaping).
+- **Entry & server**: `src/index.js` (bootstrap), `src/app/server.js` (HTTP), `src/app/router.js` (table-driven routes).
+- **Interfaces (HTTP)**: `src/interfaces/http/controllers/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`, `admin`, `votes`); view helpers in `src/interfaces/http/views/`.
+- **Domain modules**: `src/modules/identity/*` (auth scaffold + blinded hash, citizen session lookup, privileges), `src/modules/circle/*` (policy gates, ledger envelope signing/verification), `src/modules/messaging/notifications.js`, `src/modules/topics/*` (classification hook + topic gardener client), `src/modules/petitions/signatures.js`, `src/modules/votes/voteEnvelope.js`, `src/modules/delegation/delegation.js`, `src/modules/groups/*` (delegation cachets, per-group rules, elections), `src/modules/federation/activitypub.js`, `src/modules/extensions/registry.js` + `sample-policy-tighten.js`.
+- **State/persistence**: `src/infra/persistence/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface), `src/infra/persistence/migrations.js`, `src/infra/persistence/store.js`.
+- **Helper services**: AI/ML workers live in `helpers/` (Python projects, e.g., topic gardener). Node code should call them via `src/modules/topics/topicGardenerClient.js` to avoid conflicting provider outputs and duplicated computation across classification providers.
+- **Shared utilities**: `src/shared/utils/` (http helpers, request parsing, text sanitization/escaping).
 - **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
 
 ## UX contract (Phase 1)
@@ -58,7 +55,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
 - Notification base: notifications persisted to JSON, scoped to verified users (citizens in civic Circles), exposed via `/notifications`.
-- Topic gardener helper: build DynamicTopicCategorization as a Python helper in `helpers/` (online ingestion + scheduled refactor) with a stable API consumed by `src/services/classification`. Respect user/citizen-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. A stub HTTP helper sits in `helpers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`.
+- Topic gardener helper: build DynamicTopicCategorization as a Python helper in `helpers/` (online ingestion + scheduled refactor) with a stable API consumed by `src/modules/topics/classification.js`. Respect user/citizen-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. A stub HTTP helper sits in `helpers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`.
 - Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
 - Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules; provider policy remains about data/validation.
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/citizens pick delegates when suggestions clash.

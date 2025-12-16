@@ -9,7 +9,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Messaging-first adoption**: start with a simple messaging/social layer; petitions/votes/delegation/federation are modular so existing orgs can extend at their own pace.
 
 ## Architecture Baseline (Phase 1 kernel)
-- **Modular NodeJS monolith**: http server under `src/` with route handlers in `src/routes/`, shared services in `src/services/`, storage in `src/state/`, and view helpers in `src/views/`.
+- **Modular NodeJS monolith**: app entry under `src/app/` (server + table-driven router), HTTP controllers in `src/interfaces/http/controllers/`, domain logic in `src/modules/`, persistence in `src/infra/persistence/`, shared helpers in `src/shared/`, and view helpers in `src/interfaces/http/views/`.
 - **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “citizen” for civic Circles to enforce natural-person guarantees.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
 - **Federation seeds**: ActivityPub actor emitter, inbox placeholder, gossip endpoints for peer/ledger sync.
@@ -41,7 +41,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (citizens when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
-- **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `helpers/`, exposed via a stable API to `src/services/classification` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
+- **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `helpers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
 

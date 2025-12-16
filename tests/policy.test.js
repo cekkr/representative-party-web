@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { evaluateAction } from '../src/services/policy.js';
+import { evaluateAction } from '../src/modules/circle/policy.js';
 
 test('requires verification for posting when Circle policy demands it', () => {
   const state = buildState({ requireVerification: true });

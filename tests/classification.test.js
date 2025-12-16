@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { classifyTopic } from '../src/services/classification.js';
-import { getTopicConfig } from '../src/services/topicGardenerClient.js';
-import { resolveDelegation, setDelegation } from '../src/services/delegation.js';
-import { recommendDelegationForCitizen } from '../src/services/groups.js';
+import { classifyTopic } from '../src/modules/topics/classification.js';
+import { getTopicConfig } from '../src/modules/topics/topicGardenerClient.js';
+import { resolveDelegation, setDelegation } from '../src/modules/delegation/delegation.js';
+import { recommendDelegationForCitizen } from '../src/modules/groups/groups.js';
 
 test('classifyTopic falls back to general without extensions', async () => {
   const topic = await classifyTopic('Any text', { extensions: { active: [] }, settings: {} });
