@@ -1,24 +1,26 @@
-This file captures the essential implementation directives. Keep it in sync with README.md and ROADMAP.md. The core philosophy lives in principle-docs/RepresentativeParties.md (One Citizen = One Voice, soft-power accountability, liquid delegation, phygital inclusion).
+This file captures the essential implementation directives. Keep it in sync with README.md and ROADMAP.md. The core philosophy lives in principle-docs/RepresentativeParties.md (One Citizen = One Voice, soft-power accountability, liquid delegation, phygital inclusion). Use **user** as the default actor for general-purpose deployments; **citizen** is a contextual label for civic/party Circles and implies a verified natural person (the exclusion principle: no org/bot/service accounts can hold handles or act in flows).
 
 ## Concept anchors
+- User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “citizen” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
+- Messaging-first kernel: start as a simple threaded messaging surface (discussion/forum + notifications). Petitions, votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
 - Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
-- Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable.
+- Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable (providers can run solo messaging networks or join a Circle).
 - Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers.
-- Session handles/roles: verified sessions persist a handle + role (citizen/moderator/delegate) and a banned flag so policy gates can block actions transparently.
-- Extensions: optional modules under `src/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code.
+- Session handles/roles: verified sessions persist a handle + role (user/citizen/moderator/delegate) and a banned flag so policy gates can block actions transparently and keep non-people out.
+- Extensions: optional modules under `src/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code; use them to align with organizational policies instead of forking.
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
-- Topic stewardship & gardening: citizens pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
+- Topic stewardship & gardening: users (citizens in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
 - Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy.
-- Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; citizens can always override with their own choice per topic.
+- Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/citizens can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
 - **Route handlers**: `src/routes/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`).
-- **Services**: `src/services/` (`auth` for credential offers/blinded hash + cookie, `activitypub` actor factory, `citizen` session lookup, `classification` topic hook, `delegation` auto vote routing + conflict choice, `notifications` registry, `groups` delegation cachets, `groupPolicy` per-group rules, `groupElections` ballots).
+- **Services**: `src/services/` (`auth` for credential offers/blinded hash + cookie, `activitypub` actor factory, `citizen` session lookup (user session helper), `classification` topic hook, `delegation` auto vote routing + conflict choice, `notifications` registry, `groups` delegation cachets, `groupPolicy` per-group rules, `groupElections` ballots).
 - **Policy gates**: `src/services/policy.js` resolves effective Circle policy and gates post/petition/vote/moderation per role, surfaced in `/health` and UI.
 - **Helper services**: AI/ML workers live in `helpers/` (Python projects, e.g., topic gardener). Node code should call them via cohesive APIs to avoid conflicting provider outputs and duplicated computation across classification providers.
 - **State/persistence**: `src/state/storage.js` (load/persist ledger, sessions, peers, discussions, actors; JSON store with migration-ready interface).
@@ -44,7 +46,8 @@ This file captures the essential implementation directives. Keep it in sync with
 - `/groups` actions also start/close/vote delegate elections per topic.
 
 ## Near-term implementation focus
-- Ship the operative social network first: bind verified citizen sessions to handles/profiles, model privileges (author/mod/delegate) and Circle policy enforcement for posting/petition/vote.
+- Ship the messaging-first social network first: bind verified user sessions to handles/profiles (citizen is a Circle-specific, natural-person guarantee), model privileges (author/mod/delegate) and Circle policy enforcement for posting/petition/vote.
+- Adoption path: keep messaging + notifications usable alone; petitions/votes/delegation/federation/topic gardener stay optional so orgs can layer capabilities as staff and policy mature.
 - Model and validate data exchanges end-to-end: persisted discussions/petitions/votes with author-session binding, rate limits, quorum/ban checks, delegation edges, and audit trails that surface in the UI.
 - Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
 - Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
@@ -54,8 +57,8 @@ This file captures the essential implementation directives. Keep it in sync with
 - Petition/vote scaffold: petitions persisted to JSON with per-role gating and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
-- Notification base: notifications persisted to JSON, scoped to verified citizens, exposed via `/notifications`.
-- Topic gardener helper: build DynamicTopicCategorization as a Python helper in `helpers/` (online ingestion + scheduled refactor) with a stable API consumed by `src/services/classification`. Respect citizen-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing.
+- Notification base: notifications persisted to JSON, scoped to verified users (citizens in civic Circles), exposed via `/notifications`.
+- Topic gardener helper: build DynamicTopicCategorization as a Python helper in `helpers/` (online ingestion + scheduled refactor) with a stable API consumed by `src/services/classification`. Respect user/citizen-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing.
 - Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
 - Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules; provider policy remains about data/validation.
-- Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets citizens pick delegates when suggestions clash.
+- Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/citizens pick delegates when suggestions clash.
