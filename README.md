@@ -26,7 +26,6 @@ sequenceDiagram
   participant Server
   participant Wallet as EUDI Wallet
   participant Ledger
-
   Browser->>Server: GET /auth/eudi
   Server-->>Browser: Offer deep link + QR (sessionId + salt)
   Citizen->>Wallet: Open link / scan QR
@@ -34,7 +33,7 @@ sequenceDiagram
   Server->>Server: hash(pid + salt) -> blindedPid
   Server->>Ledger: Persist blindedPid in sessions + uniqueness ledger
   Server-->>Browser: Set session cookie (handle, role, banned flag)
-  Note over Server,Ledger: Only blinded hashes are stored; raw PID never leaves the wallet.
+  Note over Server,Ledger: Only blinded hashes are stored (no raw PID)
 ```
 
 ## Federation, vote envelopes, and redundancy
@@ -43,14 +42,13 @@ sequenceDiagram
   participant ProviderA as Provider A
   participant ProviderB as Provider B
   participant Store as Ledger/Vote store
-
   ProviderA->>ProviderB: POST /circle/gossip {ledgerHashes, peers}
   ProviderB->>Store: Validate + merge uniqueness entries
   ProviderB-->>ProviderA: Ack + peer hints
   ProviderA->>ProviderB: POST /votes/gossip {signedEnvelopes}
   ProviderB->>ProviderB: Verify signature (CIRCLE_PUBLIC_KEY) + policy id/version
   ProviderB->>Store: Persist vote envelopes; reject duplicates/replays
-  Note over ProviderA,ProviderB: Envelopes are signed with CIRCLE_PRIVATE_KEY; ISSUER tags who wrote it.
+  Note over ProviderA,ProviderB: Envelopes are signed with CIRCLE_PRIVATE_KEY (ISSUER tags source)
 ```
 
 ## Capabilities by module
