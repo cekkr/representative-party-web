@@ -17,6 +17,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares for small talk/info; kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
+- **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
 
 ## Data topology & adapters
 - Modes: `DATA_MODE=centralized` (single adapter, no gossip writes), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
