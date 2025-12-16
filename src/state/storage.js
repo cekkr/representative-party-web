@@ -64,6 +64,10 @@ export async function persistGroupPolicies(state) {
   await state.store.saveGroupPolicies(state.groupPolicies);
 }
 
+export async function persistGroupElections(state) {
+  await state.store.saveGroupElections(state.groupElections);
+}
+
 export async function persistActors(state) {
   await state.store.saveActors([...state.actors.values()]);
 }
@@ -85,6 +89,7 @@ function hydrateState(data) {
     notifications: data.notifications,
     groups: data.groups,
     groupPolicies: data.groupPolicies,
+    groupElections: data.groupElections,
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     settings: data.settings || { initialized: false },
   };

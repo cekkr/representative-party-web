@@ -3,6 +3,7 @@ import { evaluateAction } from '../services/policy.js';
 import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../services/groups.js';
 import { createNotification } from '../services/notifications.js';
 import { getGroupPolicy, setGroupPolicy } from '../services/groupPolicy.js';
+import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../services/groupElections.js';
 import { sendHtml, sendJson } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
@@ -13,6 +14,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
   const groups = listGroups(state).map((group) => ({
     ...group,
     policy: getGroupPolicy(state, group.id),
+    elections: listElections(state, group.id),
   }));
   const html = await renderPage(
     'groups',
@@ -41,6 +43,48 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   if (action === 'leave') {
     const groupId = sanitizeText(body.groupId || '', 80);
     await leaveGroup({ groupId, citizen, state });
+    return renderGroups({ req, res, state, wantsPartial });
+  }
+
+  if (action === 'startElection') {
+    const permission = evaluateAction(state, citizen, 'moderate');
+    if (!permission.allowed) {
+      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to start election.' });
+    }
+    const groupId = sanitizeText(body.groupId || '', 80);
+    const topic = sanitizeText(body.topic || 'general', 64);
+    const candidates = (body.candidates || '').split(',').map((v) => sanitizeText(v, 80)).filter(Boolean);
+    await startElection({ groupId, topic, candidates, state });
+    return renderGroups({ req, res, state, wantsPartial });
+  }
+
+  if (action === 'voteElection') {
+    const electionId = sanitizeText(body.electionId || '', 80);
+    const candidateHash = sanitizeText(body.candidateHash || '', 80);
+    await castElectionVote({ electionId, voterHash: citizen?.pidHash, candidateHash, state });
+    return renderGroups({ req, res, state, wantsPartial });
+  }
+
+  if (action === 'closeElection') {
+    const permission = evaluateAction(state, citizen, 'moderate');
+    if (!permission.allowed) {
+      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to close election.' });
+    }
+    const electionId = sanitizeText(body.electionId || '', 80);
+    const election = await closeElection({ electionId, state });
+    if (election) {
+      const winner = pickWinner(election, state);
+      if (winner) {
+        await setGroupDelegate({
+          groupId: election.groupId,
+          topic: election.topic,
+          delegateHash: winner.candidateHash,
+          priority: 10,
+          provider: 'group-election',
+          state,
+        });
+      }
+    }
     return renderGroups({ req, res, state, wantsPartial });
   }
 
@@ -105,6 +149,7 @@ function renderGroupList(groups, citizen) {
       const delegates = (group.delegates || [])
         .map((d) => `<li>${d.topic} → ${d.delegateHash} (prio ${d.priority})</li>`)
         .join('');
+      const elections = renderElections(group.elections || [], citizen);
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -153,7 +198,60 @@ function renderGroupList(groups, citizen) {
               <button type="submit" class="ghost">Save</button>
             </form>
           </details>
+          <details class="note">
+            <summary>Delegate election</summary>
+            <form class="stack" method="post" action="/groups" data-enhance="groups">
+              <input type="hidden" name="action" value="startElection" />
+              <input type="hidden" name="groupId" value="${group.id}" />
+              <label class="field">
+                <span>Topic</span>
+                <input name="topic" placeholder="energy" />
+              </label>
+              <label class="field">
+                <span>Candidate hashes (comma separated)</span>
+                <input name="candidates" placeholder="hash1,hash2" />
+              </label>
+              <button class="ghost" type="submit">Start election</button>
+            </form>
+            ${elections}
+          </details>
         </article>
+      `;
+    })
+    .join('\n');
+}
+
+function renderElections(elections, citizen) {
+  if (!elections.length) return '<p class="muted small">No elections.</p>';
+  return elections
+    .map((election) => {
+      const tally = election.votes || [];
+      return `
+        <div class="muted small">
+          <p>Election ${election.topic} · Status: ${election.status}</p>
+          ${
+            election.status === 'open'
+              ? `
+            <form class="form-inline" method="post" action="/groups" data-enhance="groups">
+              <input type="hidden" name="action" value="voteElection" />
+              <input type="hidden" name="electionId" value="${election.id}" />
+              <select name="candidateHash">
+                ${election.candidates
+                  .map((c) => `<option value="${c}">${c}</option>`)
+                  .join('')}
+              </select>
+              <button type="submit" class="ghost">Vote</button>
+            </form>
+            <form class="form-inline" method="post" action="/groups" data-enhance="groups">
+              <input type="hidden" name="action" value="closeElection" />
+              <input type="hidden" name="electionId" value="${election.id}" />
+              <button type="submit" class="ghost">Close and pick winner</button>
+            </form>
+          `
+              : ''
+          }
+          <p>Votes: ${tally.length}</p>
+        </div>
       `;
     })
     .join('\n');

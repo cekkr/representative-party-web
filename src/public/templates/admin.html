@@ -44,6 +44,22 @@
         <input name="preferredPeer" value="{{preferredPeer}}" placeholder="https://peer.party" />
       </label>
     </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Default group election mode</span>
+        <select name="defaultElectionMode">
+          <option value="priority" {{defaultElectionModePriority}}>Priority</option>
+          <option value="vote" {{defaultElectionModeVote}}>Vote</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Default group conflict rule</span>
+        <select name="defaultConflictRule">
+          <option value="highest_priority" {{defaultConflictHighest}}>Highest priority</option>
+          <option value="prompt_user" {{defaultConflictPrompt}}>Prompt user</option>
+        </select>
+      </label>
+    </div>
     <label class="field">
       <span>Notes</span>
       <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>

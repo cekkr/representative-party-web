@@ -22,6 +22,10 @@ export async function createGroup({ name, description, topics, creatorHash, stat
   return group;
 }
 
+export function getGroupRoles(group) {
+  return group.roles || [];
+}
+
 export async function joinGroup({ groupId, citizen, state }) {
   const group = (state.groups || []).find((g) => g.id === groupId);
   if (!group || !citizen?.pidHash) return null;

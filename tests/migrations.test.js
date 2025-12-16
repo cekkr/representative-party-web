@@ -15,6 +15,7 @@ test('migrations normalize sessions and settings', () => {
     delegations: [],
     notifications: [],
     groups: [],
+    groupElections: [],
     actors: [],
     settings: {},
   };
@@ -36,5 +37,6 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(Array.isArray(data.delegations));
   assert.ok(Array.isArray(data.notifications));
   assert.ok(Array.isArray(data.groups));
+  assert.ok(Array.isArray(data.groupElections));
   assert.deepEqual(data.settings.extensions, []);
 });

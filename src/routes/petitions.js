@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getCitizen } from '../services/citizen.js';
 import { classifyTopic } from '../services/classification.js';
 import { resolveDelegation } from '../services/delegation.js';
+import { recommendDelegationForCitizen } from '../services/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../services/policy.js';
 import { createNotification } from '../services/notifications.js';
 import { persistPetitions, persistVotes } from '../state/storage.js';
@@ -20,6 +21,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const moderateGate = evaluateAction(state, citizen, 'moderate');
   const signatures = state.signatures || [];
   const conflicts = state.delegations?.filter((d) => d.conflict) || [];
+  const suggestions = renderSuggestions(citizen, state);
   const html = await renderPage(
     'petitions',
     {
@@ -31,10 +33,29 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       roleLabel: citizen?.role || 'guest',
       petitionsList: renderPetitionList(state.petitions, state.votes, signatures, citizen, moderateGate.allowed),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
+      delegationSuggestions: suggestions,
     },
     { wantsPartial, title: 'Petitions & Votes' },
   );
   return sendHtml(res, html);
+}
+
+function renderSuggestions(citizen, state) {
+  if (!citizen) return 'Login to see group delegate suggestions.';
+  const rec = recommendDelegationForCitizen(citizen, 'general', state);
+  if (!rec.suggestions || !rec.suggestions.length) return 'No suggestions.';
+  return `
+    <form data-enhance="delegation-conflict" action="/delegation/conflict" method="post" class="stack">
+      <label>Select delegate for topic "general"</label>
+      <select name="delegateHash">
+        ${rec.suggestions
+          .map((s) => `<option value="${s.delegateHash}">${s.delegateHash} (prio ${s.priority} via group ${s.groupId || ''})</option>`)
+          .join('')}
+      </select>
+      <input type="hidden" name="topic" value="general" />
+      <button class="ghost" type="submit">Use delegate</button>
+    </form>
+  `;
 }
 
 export async function submitPetition({ req, res, state, wantsPartial }) {

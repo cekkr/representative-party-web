@@ -40,18 +40,22 @@ npm start
   - `GET/POST /petitions` drafts persisted petitions; per-role gates surface UI errors.
   - Petition lifecycle with statuses (draft/open/closed), quorum field, topic classification hook, moderator-only status updates.
   - `POST /petitions/vote` records a single vote per petitioner per petition; tallies rendered server-side; strict circles block anonymous votes; auto-delegation option uses stored delegates when provided.
+  - `/petitions/sign` records signatures; petitions auto-open when quorum is reached.
 - Extension registry endpoint:
   - `GET /extensions` lists available modules + metadata; `POST /extensions` enables/disables modules and persists settings (no env change required).
 - Topic classification + delegation prep:
   - `src/services/classification.js` consults extensions for topic categorization; default falls back to "general".
   - `src/services/delegation.js` persists per-topic delegates (provider-aware) and can auto-resolve votes; voters can override manually.
+  - Delegation conflict UI lets citizens pick a delegate when group cachets conflict (`/delegation/conflict`).
 - Groups:
   - `GET/POST /groups` to list/create/join/leave groups; groups publish preferred delegates per topic with priorities (`/groups/delegate`), feeding auto-delegation and conflict surfacing.
+  - Group elections: start/vote/close delegate elections per topic; winners auto-set as delegates. Group policies define election mode (priority/vote) and conflict rules independent from Party Circle policy.
 - Notifications:
   - Internal notification registry persisted to JSON; `/notifications` lists current user notifications, `/notifications/read` marks them read.
 - Admin and first-install UI:
   - `GET/POST /admin` lets operators set Circle name/policy toggles, require verification, and add peers; settings persist to `src/data/settings.json` and feed policy evaluation.
   - Session overrides + extension toggles live in the Admin page (calls `/extensions` under the hood).
+  - Admin exposes default group policy knobs (election mode, conflict rule) distinct from Party Circle policy.
 - Static assets and templates live in `src/public`:
   - `app.css`, `app.js`
   - HTML templates under `src/public/templates` (layout + pages, including the discussion view)

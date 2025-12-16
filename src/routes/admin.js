@@ -36,6 +36,8 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const requireVerification = parseBoolean(body.requireVerification, false);
   const newPeer = sanitizeText(body.peerJoin || '', 200);
   const preferredPeer = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
+  const defaultElectionMode = sanitizeText(body.defaultElectionMode || prev.groupPolicy?.electionMode || 'priority', 32);
+  const defaultConflictRule = sanitizeText(body.defaultConflictRule || prev.groupPolicy?.conflictRule || 'highest_priority', 32);
 
   state.settings = {
     ...prev,
@@ -47,6 +49,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     adminContact: sanitizeText(body.adminContact || prev.adminContact || '', 120),
     preferredPeer,
     notes: sanitizeText(body.notes || prev.notes || '', 400),
+    groupPolicy: {
+      electionMode: defaultElectionMode,
+      conflictRule: defaultConflictRule,
+    },
   };
 
   let peersAdded = 0;
@@ -125,6 +131,8 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
   const extensions = state.extensions?.active || [];
   const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'citizen');
   const extensionsList = renderExtensions(availableExtensions);
+  const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
+  const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
 
   return {
     circleName: effective.circleName,
@@ -142,6 +150,10 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
     flash,
     postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
+    defaultElectionModePriority: defaultElectionMode === 'priority' ? 'selected' : '',
+    defaultElectionModeVote: defaultElectionMode === 'vote' ? 'selected' : '',
+    defaultConflictHighest: defaultConflictRule === 'highest_priority' ? 'selected' : '',
+    defaultConflictPrompt: defaultConflictRule === 'prompt_user' ? 'selected' : '',
     extensionsList,
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',

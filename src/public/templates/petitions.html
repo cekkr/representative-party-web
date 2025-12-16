@@ -10,6 +10,10 @@
     <p class="muted small">Handle: {{citizenHandle}}</p>
     <p class="muted small">Party Circle policy governs quorum/votes; group cachets inform delegation only.</p>
     <p class="muted small">Delegation conflicts: {{conflictList}}</p>
+    <div class="muted small">
+      <p>Suggested delegates (from your groups):</p>
+      {{delegationSuggestions}}
+    </div>
   </div>
   <form class="stack" method="post" action="/petitions" data-enhance="petitions">
     <div class="form-grid">

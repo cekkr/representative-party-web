@@ -1,4 +1,4 @@
-export const LATEST_SCHEMA_VERSION = 5;
+export const LATEST_SCHEMA_VERSION = 6;
 
 const MIGRATIONS = [
   {
@@ -105,6 +105,16 @@ const MIGRATIONS = [
         groups: data.groups || [],
         signatures: data.signatures || [],
         groupPolicies: data.groupPolicies || [],
+      };
+    },
+  },
+  {
+    version: 6,
+    description: 'Add group elections persistence scaffold.',
+    up: (data) => {
+      return {
+        ...data,
+        groupElections: data.groupElections || [],
       };
     },
   },

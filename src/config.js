@@ -44,6 +44,7 @@ export const FILES = {
   notifications: join(PATHS.DATA_ROOT, 'notifications.json'),
   groups: join(PATHS.DATA_ROOT, 'groups.json'),
   groupPolicies: join(PATHS.DATA_ROOT, 'group-policies.json'),
+  groupElections: join(PATHS.DATA_ROOT, 'group-elections.json'),
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
   meta: join(PATHS.DATA_ROOT, 'meta.json'),
   settings: join(PATHS.DATA_ROOT, 'settings.json'),
