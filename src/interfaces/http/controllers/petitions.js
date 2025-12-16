@@ -9,6 +9,7 @@ import { createNotification } from '../../modules/messaging/notifications.js';
 import { persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
 import { countSignatures, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
 import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -20,9 +21,11 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const petitionGate = evaluateAction(state, citizen, 'petition');
   const voteGate = evaluateAction(state, citizen, 'vote');
   const moderateGate = evaluateAction(state, citizen, 'moderate');
-  const signatures = state.signatures || [];
+  const signatures = filterVisibleEntries(state.signatures, state);
   const conflicts = state.delegations?.filter((d) => d.conflict) || [];
   const suggestions = renderSuggestions(citizen, state);
+  const petitions = filterVisibleEntries(state.petitions, state);
+  const votes = filterVisibleEntries(state.votes, state);
   const html = await renderPage(
     'petitions',
     {
@@ -32,7 +35,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
       roleLabel: citizen?.role || 'guest',
-      petitionsList: renderPetitionList(state.petitions, state.votes, signatures, citizen, moderateGate.allowed),
+      petitionsList: renderPetitionList(petitions, votes, signatures, citizen, moderateGate.allowed),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
       delegationSuggestions: suggestions,
     },
@@ -86,7 +89,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     topic,
   };
 
-  state.petitions.unshift(petition);
+  const stamped = stampLocalEntry(state, petition);
+  state.petitions.unshift(stamped);
   await persistPetitions(state);
   if (citizen?.pidHash) {
     await createNotification(state, {
@@ -148,11 +152,12 @@ export async function castVote({ req, res, state, wantsPartial }) {
     choice,
     createdAt: new Date().toISOString(),
   };
-  vote.envelope = buildVoteEnvelope(vote);
+  const stamped = stampLocalEntry(state, vote);
+  vote.envelope = buildVoteEnvelope({ ...stamped, ...vote });
 
   // Replace previous vote by same author on the same petition
   const filtered = state.votes.filter((entry) => !(entry.petitionId === petitionId && entry.authorHash === authorHash));
-  filtered.unshift(vote);
+  filtered.unshift({ ...stamped, ...vote });
   state.votes = filtered;
   await persistVotes(state);
   if (citizen?.pidHash) {

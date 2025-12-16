@@ -9,6 +9,7 @@ export function buildLedgerEnvelope(state) {
     id: `ledger-${Date.now()}`,
     issuer: ISSUER,
     issuedAt: new Date().toISOString(),
+    status: 'validated',
     policy: {
       id: POLICIES.id,
       version: POLICIES.version,

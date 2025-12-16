@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 7;
+export const LATEST_SCHEMA_VERSION = 8;
 
 const MIGRATIONS = [
   {
@@ -135,6 +135,20 @@ const MIGRATIONS = [
       return {
         ...data,
         settings: { ...settings, data: dataConfig },
+      };
+    },
+  },
+  {
+    version: 8,
+    description: 'Add validationStatus to discussions, petitions, votes, and signatures for preview gating.',
+    up: (data) => {
+      const withValidation = (list) => (list || []).map((entry) => ({ validationStatus: entry.validationStatus || 'validated', ...entry }));
+      return {
+        ...data,
+        discussions: withValidation(data.discussions),
+        petitions: withValidation(data.petitions),
+        votes: withValidation(data.votes),
+        signatures: withValidation(data.signatures),
       };
     },
   },

@@ -65,10 +65,10 @@ sequenceDiagram
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors via `src/modules/federation/activitypub.js`; `/ap/inbox` placeholder for inbound federation payloads.
 
 ## Persistence, adapters, and data modes
-- Default JSON stores live under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `settings.json`, `meta.json`). `adapters/memory.js` offers an in-memory option for ephemeral runs/tests.
-- `src/infra/persistence/migrations.js` normalizes schema versions (handles/roles, petition lifecycle, delegation/notifications, extensions, group elections, data topology). Metadata lives in `meta.json`.
+- Default JSON stores live under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `settings.json`, `meta.json`). `adapters/memory.js` offers an in-memory option for ephemeral runs/tests. Stubs for `adapters/sql.js` and `adapters/kv.js` exist to lock the interface but will throw until implemented.
+- `src/infra/persistence/migrations.js` normalizes schema versions (handles/roles, petition lifecycle, delegation/notifications, extensions, group elections, data topology, validationStatus on content). Metadata lives in `meta.json`.
 - `src/infra/persistence/storage.js` hydrates state and routes through `src/infra/persistence/store.js` which chooses an adapter (`DATA_ADAPTER`, default json). Back up `src/data/` before upgrades or switching adapters.
-- Data topology is controlled by settings/env: `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (allow preview writes), and `DATA_ADAPTER` (adapter driver). `src/modules/federation/replication.js` exposes the active profile and preview gating for gossip/ingest.
+- Data topology is controlled by settings/env: `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (allow preview writes), and `DATA_ADAPTER` (adapter driver). `src/modules/federation/replication.js` exposes the active profile and preview gating for gossip/ingest and filters UI lists when previews are disabled; preview entries are labeled in discussions/petitions/forum views when surfaced.
 
 ## Configuration
 - Runtime: Node.js ESM app; `npm install`, `npm start` (defaults to `http://0.0.0.0:3000`).
@@ -78,7 +78,7 @@ sequenceDiagram
   - `CIRCLE_EXTENSIONS` (comma-separated module names under `src/modules/extensions`, e.g. `sample-policy-tighten`)
   - `CIRCLE_ISSUER` (provider id on envelopes/federation exports)
   - `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` (PEM) to sign/verify vote envelopes and ledger exports
-  - `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_ADAPTER` (`json`|`memory`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (true/false for storing preview data before validation)
+  - `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_ADAPTER` (`json`|`memory`|`sql`|`kv` — sql/kv are stubs), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (true/false for storing preview data before validation)
 - Persisted settings (name, policy toggles, extensions, peers) live in `src/data/settings.json`; admin UI edits them in place.
 
 ## Development and testing

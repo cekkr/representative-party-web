@@ -17,6 +17,7 @@ export function renderPetitionList(petitions, votes, signatures, citizen, canMod
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(petition.status || 'draft')}</span>
+            ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
             <span class="pill ghost">Topic: ${escapeHtml(petition.topic || 'general')}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>

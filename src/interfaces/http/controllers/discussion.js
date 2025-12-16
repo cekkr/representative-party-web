@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { getCitizen } from '../../modules/identity/citizen.js';
 import { evaluateAction, getCirclePolicyState } from '../../modules/circle/policy.js';
 import { persistDiscussions } from '../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -39,7 +40,8 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
     authorHash: citizen?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
   };
-  state.discussions.unshift(entry);
+  const stamped = stampLocalEntry(state, entry);
+  state.discussions.unshift(stamped);
   await persistDiscussions(state);
 
   if (wantsPartial) {
@@ -65,7 +67,7 @@ async function renderDiscussionShell({ state, citizen, wantsPartial }) {
       citizenStatus: citizen
         ? 'Posting as verified citizen bound to a blinded PID hash.'
         : 'Start the wallet flow to post with accountability.',
-      discussionList: renderDiscussionList(state.discussions),
+      discussionList: renderDiscussionList(filterVisibleEntries(state.discussions, state)),
       verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
       circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
       policyId: policy.id,

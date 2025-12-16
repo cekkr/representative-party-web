@@ -1,5 +1,6 @@
 import { getCitizen } from '../../modules/identity/citizen.js';
 import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
+import { filterVisibleEntries } from '../../modules/federation/replication.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
 
@@ -9,13 +10,15 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const effective = getEffectivePolicy(state);
   const gateSummary = summarizeGateSnapshot(buildPolicyGates(state));
   const extensionsSummary = summarizeExtensions(state);
+  const visibleDiscussions = filterVisibleEntries(state.discussions, state);
+  const visiblePetitions = filterVisibleEntries(state.petitions, state);
   const html = await renderPage(
     'home',
     {
       ledgerSize: state.uniquenessLedger.size,
       actorCount: state.actors.size,
-      discussionCount: state.discussions.length,
-      petitionCount: state.petitions.length,
+      discussionCount: visibleDiscussions.length,
+      petitionCount: visiblePetitions.length,
       groupCount: state.groups.length,
       citizenHandle: citizen?.handle,
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',

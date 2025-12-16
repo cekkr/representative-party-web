@@ -38,3 +38,19 @@ export function describeProfile(profile) {
   const preview = profile?.allowPreviews ?? DATA.allowPreviews;
   return `${mode}/${adapter} (${validation}${preview ? ', previews on' : ''})`;
 }
+
+export function stampLocalEntry(state, entry = {}) {
+  const profile = getReplicationProfile(state);
+  return {
+    validationStatus: 'validated',
+    mode: profile.mode,
+    adapter: profile.adapter,
+    ...entry,
+  };
+}
+
+export function filterVisibleEntries(list, state) {
+  const profile = getReplicationProfile(state);
+  if (profile.allowPreviews) return list || [];
+  return (list || []).filter((item) => (item?.validationStatus || 'validated') !== 'preview');
+}

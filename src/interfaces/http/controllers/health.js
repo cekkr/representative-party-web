@@ -1,5 +1,5 @@
 import { POLICIES } from '../../config.js';
-import { getReplicationProfile } from '../../modules/federation/replication.js';
+import { filterVisibleEntries, getReplicationProfile } from '../../modules/federation/replication.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../modules/circle/policy.js';
 import { sendJson } from '../../shared/utils/http.js';
 
@@ -16,6 +16,11 @@ export function renderHealth({ res, state }) {
     delegations: state.delegations.length,
     notifications: state.notifications.length,
     groups: state.groups.length,
+    visible: {
+      discussions: filterVisibleEntries(state.discussions, state).length,
+      petitions: filterVisibleEntries(state.petitions, state).length,
+      votes: filterVisibleEntries(state.votes, state).length,
+    },
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
     data: getReplicationProfile(state),

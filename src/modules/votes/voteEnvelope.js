@@ -5,6 +5,7 @@ import { POLICIES } from '../../config.js';
 const ISSUER = process.env.CIRCLE_ISSUER || 'local-circle';
 
 export function buildVoteEnvelope(vote) {
+  const status = vote.validationStatus === 'preview' ? 'preview' : 'validated';
   const payload = {
     issuer: ISSUER,
     policy: {
@@ -15,6 +16,7 @@ export function buildVoteEnvelope(vote) {
     authorHash: vote.authorHash,
     choice: vote.choice,
     createdAt: vote.createdAt,
+    status,
   };
   const signature = signPayload(payload);
   return signature ? { ...payload, signature } : payload;

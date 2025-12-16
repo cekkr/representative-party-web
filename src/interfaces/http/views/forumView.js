@@ -22,6 +22,7 @@ function renderThreads(threads, comments, citizen) {
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(thread.topic || 'general')}</span>
             <span class="pill ghost">Article</span>
+            ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${new Date(thread.createdAt).toLocaleString()}</span>
           </div>
           <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
@@ -54,6 +55,7 @@ function renderComments(comments) {
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
+            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
           </div>
           <p>${escapeHtml(comment.content)}</p>

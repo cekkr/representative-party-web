@@ -4,6 +4,7 @@ import { getCitizen } from '../../modules/identity/citizen.js';
 import { classifyTopic } from '../../modules/topics/classification.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
 import { persistDiscussions } from '../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -14,7 +15,7 @@ export async function renderForumRoute({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
   const html = await renderPage(
     'forum',
-    renderForum(state.discussions, citizen),
+    renderForum(filterVisibleEntries(state.discussions, state), citizen),
     { wantsPartial, title: 'Forum' },
   );
   return sendHtml(res, html);
@@ -43,10 +44,11 @@ export async function postThread({ req, res, state, wantsPartial }) {
     createdAt: new Date().toISOString(),
     parentId: null,
   };
-  state.discussions.unshift(entry);
+  const stamped = stampLocalEntry(state, entry);
+  state.discussions.unshift(stamped);
   await persistDiscussions(state);
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(state.discussions, citizen), { wantsPartial: true, title: 'Forum' });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), citizen), { wantsPartial: true, title: 'Forum' });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');
@@ -78,10 +80,11 @@ export async function postComment({ req, res, state, wantsPartial }) {
     createdAt: new Date().toISOString(),
     parentId,
   };
-  state.discussions.unshift(entry);
+  const stamped = stampLocalEntry(state, entry);
+  state.discussions.unshift(stamped);
   await persistDiscussions(state);
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(state.discussions, citizen), { wantsPartial: true, title: 'Forum' });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), citizen), { wantsPartial: true, title: 'Forum' });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');
