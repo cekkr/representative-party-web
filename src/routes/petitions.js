@@ -8,6 +8,7 @@ import { evaluateAction, getEffectivePolicy } from '../services/policy.js';
 import { createNotification } from '../services/notifications.js';
 import { persistPetitions, persistVotes } from '../state/storage.js';
 import { countSignatures, hasSigned, signPetition } from '../services/signatures.js';
+import { buildVoteEnvelope } from '../services/voteEnvelope.js';
 import { sendHtml, sendJson, sendRedirect } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
@@ -147,6 +148,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
     choice,
     createdAt: new Date().toISOString(),
   };
+  vote.envelope = buildVoteEnvelope(vote);
 
   // Replace previous vote by same author on the same petition
   const filtered = state.votes.filter((entry) => !(entry.petitionId === petitionId && entry.authorHash === authorHash));

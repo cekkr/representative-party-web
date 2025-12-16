@@ -25,6 +25,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ### Phase 1 — Operative Social Network & Circle Policy (Months 1-4)
 - Bind verified sessions to handles/profiles and roles (citizen/moderator/delegate), and enforce Circle policy for posting/petition/vote with visible status in the UI and `/health`.
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs.
+- Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
 - Federation stays stubbed (ActivityPub actor/inbox/outbox + ledger gossip placeholders) to avoid blocking local UX; hardening is a later phase.
@@ -32,6 +33,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; identity-rate-limiting instead of CAPTCHA.
+- **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
 
 ### Phase 3 — Decision Engine (Months 8-11)

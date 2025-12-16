@@ -12,6 +12,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
 - Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy.
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; citizens can always override with their own choice per topic.
+- Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).

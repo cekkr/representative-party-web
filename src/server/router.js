@@ -15,6 +15,7 @@ import { renderAdmin, updateAdmin } from '../routes/admin.js';
 import { getExtensions, toggleExtension } from '../routes/extensions.js';
 import { renderNotifications, markNotificationsRead } from '../routes/notifications.js';
 import { resolveConflict } from '../routes/delegation.js';
+import { exportVotes, gossipVotes } from '../routes/votes.js';
 import { sendNotFound } from '../utils/http.js';
 
 export async function routeRequest(req, res, state) {
@@ -125,6 +126,14 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/delegation/conflict') {
     return resolveConflict({ req, res, state });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/votes/ledger') {
+    return exportVotes({ res, state });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/votes/gossip') {
+    return gossipVotes({ req, res, state });
   }
 
   if (req.method === 'GET' && url.pathname === '/extensions') {

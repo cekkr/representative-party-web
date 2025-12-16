@@ -43,6 +43,7 @@ npm start
   - `/petitions/sign` records signatures; petitions auto-open when quorum is reached.
 - Extension registry endpoint:
   - `GET /extensions` lists available modules + metadata; `POST /extensions` enables/disables modules and persists settings (no env change required).
+  - `GET /votes/ledger` exports signed vote envelopes; `POST /votes/gossip` ingests signed envelopes to avoid injected/replayed votes across providers.
 - Topic classification + delegation prep:
   - `src/services/classification.js` consults extensions for topic categorization; default falls back to "general".
   - `src/services/delegation.js` persists per-topic delegates (provider-aware) and can auto-resolve votes; voters can override manually.
