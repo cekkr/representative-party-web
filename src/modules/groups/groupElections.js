@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { persistGroupElections } from '../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { getGroupPolicy } from './groupPolicy.js';
 
 export async function startElection({ groupId, topic, candidates, state }) {
@@ -12,13 +13,14 @@ export async function startElection({ groupId, topic, candidates, state }) {
     status: 'open',
     createdAt: new Date().toISOString(),
   };
-  state.groupElections = [election, ...(state.groupElections || [])];
+  const stamped = stampLocalEntry(state, election);
+  state.groupElections = [stamped, ...(state.groupElections || [])];
   await persistGroupElections(state);
-  return election;
+  return stamped;
 }
 
 export function listElections(state, groupId) {
-  return (state.groupElections || []).filter((e) => e.groupId === groupId);
+  return filterVisibleEntries(state.groupElections, state).filter((e) => e.groupId === groupId);
 }
 
 export async function castElectionVote({ electionId, voterHash, candidateHash, state }) {
@@ -27,7 +29,7 @@ export async function castElectionVote({ electionId, voterHash, candidateHash, s
   if (!election) return null;
   const votes = election.votes || [];
   const filtered = votes.filter((v) => v.voterHash !== voterHash);
-  filtered.push({ voterHash, candidateHash, castAt: new Date().toISOString() });
+  filtered.push({ voterHash, candidateHash, castAt: new Date().toISOString(), validationStatus: election.validationStatus || 'validated' });
   election.votes = filtered;
   await persistGroupElections(state);
   return election;

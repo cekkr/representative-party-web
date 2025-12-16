@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { persistNotifications } from '../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 
 export async function createNotification(state, notification) {
   const entry = {
@@ -13,13 +14,14 @@ export async function createNotification(state, notification) {
     createdAt: new Date().toISOString(),
     read: false,
   };
-  state.notifications.unshift(entry);
+  const stamped = stampLocalEntry(state, entry);
+  state.notifications.unshift(stamped);
   await persistNotifications(state);
 }
 
 export function listNotificationsForCitizen(state, citizen) {
   if (!citizen || !citizen.pidHash) return [];
-  return (state.notifications || []).filter((n) => n.recipientHash === citizen.pidHash || n.recipientHash === 'broadcast');
+  return filterVisibleEntries(state.notifications, state).filter((n) => n.recipientHash === citizen.pidHash || n.recipientHash === 'broadcast');
 }
 
 export async function markAllRead(state, citizen) {

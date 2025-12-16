@@ -22,7 +22,8 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const voteGate = evaluateAction(state, citizen, 'vote');
   const moderateGate = evaluateAction(state, citizen, 'moderate');
   const signatures = filterVisibleEntries(state.signatures, state);
-  const conflicts = state.delegations?.filter((d) => d.conflict) || [];
+  const delegations = filterVisibleEntries(state.delegations, state);
+  const conflicts = delegations?.filter((d) => d.conflict) || [];
   const suggestions = renderSuggestions(citizen, state);
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);

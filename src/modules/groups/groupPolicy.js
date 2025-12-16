@@ -1,4 +1,5 @@
 import { persistGroupPolicies } from '../../infra/persistence/storage.js';
+import { stampLocalEntry } from '../federation/replication.js';
 
 export function getGroupPolicy(state, groupId) {
   const found = (state.groupPolicies || []).find((p) => p.groupId === groupId);
@@ -15,7 +16,7 @@ export function getGroupPolicy(state, groupId) {
 export async function setGroupPolicy(state, policy) {
   const list = state.groupPolicies || [];
   const filtered = list.filter((p) => p.groupId !== policy.groupId);
-  filtered.push(policy);
+  filtered.push(stampLocalEntry(state, policy));
   state.groupPolicies = filtered;
   await persistGroupPolicies(state);
 }

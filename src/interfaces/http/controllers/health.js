@@ -20,6 +20,7 @@ export function renderHealth({ res, state }) {
       discussions: filterVisibleEntries(state.discussions, state).length,
       petitions: filterVisibleEntries(state.petitions, state).length,
       votes: filterVisibleEntries(state.votes, state).length,
+      groups: filterVisibleEntries(state.groups, state).length,
     },
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),

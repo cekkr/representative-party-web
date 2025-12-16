@@ -1,4 +1,4 @@
-import { POLICIES } from '../../config.js';
+import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../modules/topics/topicGardenerClient.js';
 import { persistPeers, persistSessions, persistSettings } from '../../infra/persistence/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
@@ -43,6 +43,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const topicGardenerUrl = sanitizeText(body.topicGardenerUrl || prev.topicGardener?.url || '', 240);
   const topicAnchors = parseList(body.topicAnchors, prev.topicGardener?.anchors || DEFAULT_TOPIC_ANCHORS);
   const topicPinned = parseList(body.topicPinned, prev.topicGardener?.pinned || []);
+  const dataMode = normalizeDataMode(body.dataMode || prev.data?.mode || DATA_DEFAULTS.mode);
+  const dataAdapter = normalizeDataAdapter(body.dataAdapter || prev.data?.adapter || DATA_DEFAULTS.adapter);
+  const dataValidation = normalizeValidationLevel(body.dataValidation || prev.data?.validationLevel || DATA_DEFAULTS.validationLevel);
+  const dataPreview = parseBoolean(body.dataPreview, prev.data?.allowPreviews ?? DATA_DEFAULTS.allowPreviews);
 
   state.settings = {
     ...prev,
@@ -63,7 +67,14 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       anchors: topicAnchors.length ? topicAnchors : DEFAULT_TOPIC_ANCHORS,
       pinned: topicPinned,
     },
+    data: {
+      mode: dataMode,
+      adapter: dataAdapter,
+      validationLevel: dataValidation,
+      allowPreviews: dataPreview,
+    },
   };
+  state.dataConfig = state.settings.data;
 
   let peersAdded = 0;
   const peersToAdd = Array.from(new Set([newPeer, preferredPeer].filter(Boolean)));
@@ -166,6 +177,7 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
   const replicationProfile = getReplicationProfile(state);
+  const dataConfig = state.settings?.data || DATA_DEFAULTS;
 
   return {
     circleName: effective.circleName,
@@ -203,6 +215,17 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
     dataAdapter: replicationProfile.adapter,
     dataValidation: replicationProfile.validationLevel,
     dataPreview: replicationProfile.allowPreviews ? 'on' : 'off',
+    dataModeCentralized: dataConfig.mode === 'centralized' ? 'selected' : '',
+    dataModeHybrid: dataConfig.mode === 'hybrid' ? 'selected' : '',
+    dataModeP2P: dataConfig.mode === 'p2p' ? 'selected' : '',
+    dataValidationStrict: dataConfig.validationLevel === 'strict' ? 'selected' : '',
+    dataValidationObserve: dataConfig.validationLevel === 'observe' ? 'selected' : '',
+    dataValidationOff: dataConfig.validationLevel === 'off' ? 'selected' : '',
+    dataAdapterJson: dataConfig.adapter === 'json' ? 'selected' : '',
+    dataAdapterMemory: dataConfig.adapter === 'memory' ? 'selected' : '',
+    dataAdapterSql: dataConfig.adapter === 'sql' ? 'selected' : '',
+    dataAdapterKv: dataConfig.adapter === 'kv' ? 'selected' : '',
+    dataPreviewChecked: dataConfig.allowPreviews ? 'checked' : '',
   };
 }
 

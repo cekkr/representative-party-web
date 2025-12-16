@@ -37,6 +37,39 @@
     </div>
     <div class="form-grid">
       <label class="field">
+        <span>Data mode</span>
+        <select name="dataMode">
+          <option value="centralized" {{dataModeCentralized}}>centralized</option>
+          <option value="hybrid" {{dataModeHybrid}}>hybrid</option>
+          <option value="p2p" {{dataModeP2P}}>p2p</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Validation level</span>
+        <select name="dataValidation">
+          <option value="strict" {{dataValidationStrict}}>strict</option>
+          <option value="observe" {{dataValidationObserve}}>observe</option>
+          <option value="off" {{dataValidationOff}}>off</option>
+        </select>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Data adapter</span>
+        <select name="dataAdapter">
+          <option value="json" {{dataAdapterJson}}>json (default)</option>
+          <option value="memory" {{dataAdapterMemory}}>memory (ephemeral)</option>
+          <option value="sql" {{dataAdapterSql}}>sql (sqlite3 optional dep)</option>
+          <option value="kv" {{dataAdapterKv}}>kv (file-based)</option>
+        </select>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="dataPreview" {{dataPreviewChecked}} />
+        <span>Allow preview data (store uncertified entries)</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
         <span>Admin contact</span>
         <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
       </label>

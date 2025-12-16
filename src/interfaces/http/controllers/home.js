@@ -12,6 +12,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const extensionsSummary = summarizeExtensions(state);
   const visibleDiscussions = filterVisibleEntries(state.discussions, state);
   const visiblePetitions = filterVisibleEntries(state.petitions, state);
+  const visibleGroups = filterVisibleEntries(state.groups, state);
   const html = await renderPage(
     'home',
     {
@@ -19,7 +20,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       actorCount: state.actors.size,
       discussionCount: visibleDiscussions.length,
       petitionCount: visiblePetitions.length,
-      groupCount: state.groups.length,
+      groupCount: visibleGroups.length,
       citizenHandle: citizen?.handle,
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',
       policyDetail: `Policy ${effective.id} v${effective.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,

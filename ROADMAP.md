@@ -19,7 +19,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Data topology & adapters
 - Modes: `DATA_MODE=centralized` (single adapter, no gossip writes), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
-- Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQL/KV stubs are present to lock the interface, with JSON/memory as implemented adapters.
+- Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQLite-backed SQL and file-based KV adapters exist (SQL requires optional `sqlite3`); JSON/memory remain defaults.
 - Phase alignment: Phase 1 ships the adapterized interface + JSON driver + replication profile stub; Phase 2 adds SQL/kv drivers and hybrid-mode wiring; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
 
 ## UX Baseline (to harden during Phase 1)

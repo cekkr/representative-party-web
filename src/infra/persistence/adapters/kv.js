@@ -1,89 +1,153 @@
-export function createKeyValueAdapter() {
-  return new KeyValueStateStore();
+import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
+
+import { PATHS } from '../../../config.js';
+
+const KEYS = [
+  'ledger',
+  'sessions',
+  'peers',
+  'discussions',
+  'petitions',
+  'signatures',
+  'votes',
+  'delegations',
+  'notifications',
+  'groups',
+  'groupPolicies',
+  'groupElections',
+  'actors',
+  'settings',
+  'meta',
+];
+
+export function createKeyValueAdapter(options = {}) {
+  const filename = options.filename || PATHS.DATA_KV;
+  return new KeyValueStateStore(filename);
 }
 
 class KeyValueStateStore {
-  constructor() {
+  constructor(filename) {
     this.adapterId = 'kv';
+    this.filename = filename;
+    this.cache = null;
   }
 
   async prepare() {
-    throw notImplemented();
+    await mkdir(dirname(this.filename), { recursive: true });
+    this.cache = await this.readStore();
   }
 
   async loadData() {
-    throw notImplemented();
+    const store = this.cache || (await this.readStore());
+    const data = {};
+    for (const key of KEYS) {
+      data[key] = store[key] ?? defaultForKey(key);
+    }
+    return data;
   }
 
   async loadMeta() {
-    throw notImplemented();
+    const store = this.cache || (await this.readStore());
+    return store.meta || { schemaVersion: 0, migrations: [] };
   }
 
-  async saveData() {
-    throw notImplemented();
+  async saveData(data) {
+    const store = this.cache || (await this.readStore());
+    const next = { ...store };
+    for (const key of KEYS) {
+      next[key] = data[key] ?? defaultForKey(key);
+    }
+    this.cache = next;
+    await this.writeStore(next);
   }
 
-  async saveMeta() {
-    throw notImplemented();
+  async saveMeta(meta) {
+    await this.saveKey('meta', meta);
   }
 
-  async saveLedger() {
-    throw notImplemented();
+  async saveLedger(entries) {
+    await this.saveKey('ledger', entries);
   }
 
-  async saveSessions() {
-    throw notImplemented();
+  async saveSessions(entries) {
+    await this.saveKey('sessions', entries);
   }
 
-  async savePeers() {
-    throw notImplemented();
+  async savePeers(entries) {
+    await this.saveKey('peers', entries);
   }
 
-  async saveDiscussions() {
-    throw notImplemented();
+  async saveDiscussions(entries) {
+    await this.saveKey('discussions', entries);
   }
 
-  async savePetitions() {
-    throw notImplemented();
+  async savePetitions(entries) {
+    await this.saveKey('petitions', entries);
   }
 
-  async saveVotes() {
-    throw notImplemented();
+  async saveVotes(entries) {
+    await this.saveKey('votes', entries);
   }
 
-  async saveSignatures() {
-    throw notImplemented();
+  async saveSignatures(entries) {
+    await this.saveKey('signatures', entries);
   }
 
-  async saveDelegations() {
-    throw notImplemented();
+  async saveDelegations(entries) {
+    await this.saveKey('delegations', entries);
   }
 
-  async saveNotifications() {
-    throw notImplemented();
+  async saveNotifications(entries) {
+    await this.saveKey('notifications', entries);
   }
 
-  async saveGroups() {
-    throw notImplemented();
+  async saveGroups(entries) {
+    await this.saveKey('groups', entries);
   }
 
-  async saveGroupPolicies() {
-    throw notImplemented();
+  async saveGroupPolicies(entries) {
+    await this.saveKey('groupPolicies', entries);
   }
 
-  async saveGroupElections() {
-    throw notImplemented();
+  async saveGroupElections(entries) {
+    await this.saveKey('groupElections', entries);
   }
 
-  async saveActors() {
-    throw notImplemented();
+  async saveActors(entries) {
+    await this.saveKey('actors', entries);
   }
 
-  async saveSettings() {
-    throw notImplemented();
+  async saveSettings(settings) {
+    await this.saveKey('settings', settings);
+  }
+
+  async saveKey(key, value) {
+    const store = this.cache || (await this.readStore());
+    const next = { ...store, [key]: value };
+    this.cache = next;
+    await this.writeStore(next);
+  }
+
+  async readStore() {
+    try {
+      const raw = await readFile(this.filename, 'utf-8');
+      return JSON.parse(raw);
+    } catch (error) {
+      if (error.code === 'ENOENT') {
+        return {};
+      }
+      throw error;
+    }
+  }
+
+  async writeStore(store) {
+    await writeFile(this.filename, JSON.stringify(store, null, 2));
   }
 }
 
-function notImplemented() {
-  return new Error('Key-value adapter is not implemented yet. Configure DATA_ADAPTER=json|memory until the KV driver is added.');
+function defaultForKey(key) {
+  if (key === 'meta') return { schemaVersion: 0, migrations: [] };
+  if (key === 'settings') return { initialized: false };
+  return [];
 }

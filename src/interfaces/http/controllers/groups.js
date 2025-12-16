@@ -154,6 +154,7 @@ function renderGroupList(groups, citizen) {
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">Group</span>
+            ${group.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${group.topics?.join(', ') || 'general'}</span>
           </div>
           <h3>${group.name}</h3>

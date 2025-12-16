@@ -2,14 +2,15 @@ import { randomUUID } from 'node:crypto';
 
 import { persistSignatures, persistPetitions } from '../../infra/persistence/storage.js';
 import { createNotification } from '../messaging/notifications.js';
+import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 
 export function countSignatures(petitionId, state) {
-  return (state.signatures || []).filter((s) => s.petitionId === petitionId).length;
+  return filterVisibleEntries(state.signatures, state).filter((s) => s.petitionId === petitionId).length;
 }
 
 export function hasSigned(petitionId, citizen, state) {
   if (!citizen?.pidHash) return false;
-  return (state.signatures || []).some((s) => s.petitionId === petitionId && s.authorHash === citizen.pidHash);
+  return filterVisibleEntries(state.signatures, state).some((s) => s.petitionId === petitionId && s.authorHash === citizen.pidHash);
 }
 
 export async function signPetition({ petition, citizen, state }) {
@@ -20,7 +21,8 @@ export async function signPetition({ petition, citizen, state }) {
     authorHash: citizen.pidHash,
     createdAt: new Date().toISOString(),
   };
-  state.signatures.unshift(entry);
+  const stamped = stampLocalEntry(state, entry);
+  state.signatures.unshift(stamped);
   await persistSignatures(state);
   const count = countSignatures(petition.id, state);
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {

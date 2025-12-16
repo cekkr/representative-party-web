@@ -37,6 +37,8 @@ export const PATHS = {
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
   EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
+  DATA_SQLITE: join(ROOT_DIR, 'data', 'state.sqlite'),
+  DATA_KV: join(ROOT_DIR, 'data', 'kv-store.json'),
 };
 
 export const FILES = {

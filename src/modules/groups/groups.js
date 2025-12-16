@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
 import { persistGroups } from '../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 
 export function listGroups(state) {
-  return state.groups || [];
+  return filterVisibleEntries(state.groups, state);
 }
 
 export async function createGroup({ name, description, topics, creatorHash, state }) {
@@ -17,9 +18,10 @@ export async function createGroup({ name, description, topics, creatorHash, stat
     delegates: [],
     createdAt: new Date().toISOString(),
   };
-  state.groups.unshift(group);
+  const stamped = stampLocalEntry(state, group);
+  state.groups.unshift(stamped);
   await persistGroups(state);
-  return group;
+  return stamped;
 }
 
 export function getGroupRoles(group) {
@@ -68,7 +70,7 @@ export async function setGroupDelegate({ groupId, topic, delegateHash, priority,
 export function recommendDelegationForCitizen(citizen, topic, state) {
   if (!citizen?.pidHash) return { suggestions: [], conflict: false };
   const topicKey = (topic || 'general').toLowerCase();
-  const groups = (state.groups || []).filter((g) => g.members?.includes(citizen.pidHash));
+  const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(citizen.pidHash));
   const suggestions = [];
   for (const group of groups) {
     const match = (group.delegates || []).find((d) => d.topic === topicKey) || (group.delegates || []).find((d) => d.topic === 'general');

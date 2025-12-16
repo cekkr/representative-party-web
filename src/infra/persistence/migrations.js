@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 8;
+export const LATEST_SCHEMA_VERSION = 9;
 
 const MIGRATIONS = [
   {
@@ -149,6 +149,21 @@ const MIGRATIONS = [
         petitions: withValidation(data.petitions),
         votes: withValidation(data.votes),
         signatures: withValidation(data.signatures),
+      };
+    },
+  },
+  {
+    version: 9,
+    description: 'Add validationStatus to groups, group policies, elections, delegations, and notifications for preview gating.',
+    up: (data) => {
+      const withValidation = (list) => (list || []).map((entry) => ({ validationStatus: entry.validationStatus || 'validated', ...entry }));
+      return {
+        ...data,
+        groups: withValidation(data.groups),
+        groupPolicies: withValidation(data.groupPolicies),
+        groupElections: withValidation(data.groupElections),
+        delegations: withValidation(data.delegations),
+        notifications: withValidation(data.notifications),
       };
     },
   },
