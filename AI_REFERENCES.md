@@ -10,7 +10,8 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
- - Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy.
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy.
+- Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; citizens can always override with their own choice per topic.
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/server/bootstrap.js` (HTTP), `src/server/router.js` (routes).
