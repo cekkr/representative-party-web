@@ -11,6 +11,7 @@ import {
   removeFollowEdge,
 } from '../../modules/social/followGraph.js';
 import { buildFeed, createPost, findPost } from '../../modules/social/posts.js';
+import { notifySocialParticipants } from '../../modules/social/notifications.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -35,8 +36,10 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followCount: follows.length,
       followerCount: followers.length,
       followList: renderFollowList(follows),
-      feedList: renderSocialPosts(feed),
-      followTypeOptions: renderFollowTypeOptions(),
+      feedList: renderSocialPosts(feed, { enableReplies: Boolean(citizen) }),
+      followTypeOptions: renderFollowTypeOptions(followTypeFilter),
+      followTypeFilter,
+      followTypeSelectedAll: followTypeFilter ? '' : 'selected',
     },
     { wantsPartial, title: 'Social feed' },
   );
@@ -75,8 +78,9 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   }
 
   try {
-    createPost(state, { citizen, content, replyTo, visibility, targetHash, targetHandle });
+    const post = createPost(state, { citizen, content, replyTo, visibility, targetHash, targetHandle });
     await persistSocialPosts(state);
+    await notifySocialParticipants(state, { post, author: citizen, targetSession });
   } catch (error) {
     if (error.code === 'missing_content') {
       return sendJson(res, 400, { error: 'missing_content' });
@@ -171,6 +175,10 @@ export async function listRelationships({ req, res, state }) {
   });
 }
 
-function renderFollowTypeOptions() {
-  return DEFAULT_FOLLOW_TYPES.map((type) => `<option value="${type}">${type}</option>`).join('\n');
+function renderFollowTypeOptions(selectedType = '') {
+  const normalized = selectedType ? normalizeFollowType(selectedType) : '';
+  return DEFAULT_FOLLOW_TYPES.map((type) => {
+    const selected = normalized === type ? ' selected' : '';
+    return `<option value="${type}"${selected}>${type}</option>`;
+  }).join('\n');
 }

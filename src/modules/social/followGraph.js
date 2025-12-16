@@ -52,7 +52,7 @@ export function listFollowersOf(state, targetHash) {
 
 export function findSessionByHandle(state, handle) {
   if (!handle) return null;
-  const normalized = handle.trim().toLowerCase();
+  const normalized = handle.trim().replace(/^@+/, '').toLowerCase();
   for (const session of state.sessions.values()) {
     const sessionHandle = (session.handle || '').toLowerCase();
     if (sessionHandle === normalized) return session;

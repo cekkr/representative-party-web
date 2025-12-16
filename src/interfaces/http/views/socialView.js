@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../shared/utils/text.js';
 
-export function renderSocialPosts(posts) {
+export function renderSocialPosts(posts, { enableReplies = false } = {}) {
   if (!posts || posts.length === 0) {
     return '<p class="muted">No posts yet. Follow someone and start the conversation.</p>';
   }
@@ -30,6 +30,7 @@ export function renderSocialPosts(posts) {
           }
           ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
           <p class="muted small">Author hash: ${escapeHtml(post.authorHash)}</p>
+          ${enableReplies ? renderReplyForm(post) : ''}
         </article>
       `;
     })
@@ -57,4 +58,31 @@ export function renderFollowList(follows) {
       `;
     })
     .join('\n');
+}
+
+function renderReplyForm(post) {
+  const targetValue = post.authorHandle ? escapeHtml(post.authorHandle) : '';
+  return `
+    <form class="stack bordered" method="post" action="/social/post" data-enhance="social-reply">
+      <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
+      <label class="field">
+        <span class="muted small">Reply</span>
+        <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span>Visibility</span>
+          <select name="visibility">
+            <option value="public" selected>Public</option>
+            <option value="direct">Direct</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Direct to (handle, optional)</span>
+          <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
+        </label>
+      </div>
+      <button class="ghost" type="submit">Send reply</button>
+    </form>
+  `;
 }

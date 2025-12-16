@@ -74,6 +74,18 @@
 <section class="panel">
   <p class="eyebrow">Feed</p>
   <h3>Posts from the people you follow</h3>
+  <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
+    <label class="field">
+      <span>Filter by follow type</span>
+      <select name="type">
+        <option value="" {{followTypeSelectedAll}}>All</option>
+        {{followTypeOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
   <div class="list-stack">
     {{feedList}}
   </div>
