@@ -5,9 +5,50 @@ import { classifyTopic } from '../src/services/classification.js';
 import { resolveDelegation, setDelegation } from '../src/services/delegation.js';
 import { recommendDelegationForCitizen } from '../src/services/groups.js';
 
-test('classifyTopic falls back to general without extensions', () => {
-  const topic = classifyTopic('Any text', { extensions: { active: [] } });
+test('classifyTopic falls back to general without extensions', async () => {
+  const topic = await classifyTopic('Any text', { extensions: { active: [] }, settings: {} });
   assert.equal(topic, 'general');
+});
+
+test('classifyTopic uses topic gardener helper and caches result', async () => {
+  let calls = 0;
+  const state = {
+    extensions: { active: [] },
+    settings: { topicGardener: { anchors: ['general', 'energy'], pinned: ['energy'] } },
+    helpers: {
+      topicGardener: {
+        classify: async ({ text, anchors, pinned }) => {
+          calls += 1;
+          assert.equal(text, 'Energy policy note');
+          assert.ok(anchors.includes('energy'));
+          assert.ok(pinned.includes('energy'));
+          return { topic: 'energy-policy' };
+        },
+      },
+    },
+  };
+
+  const topicFirst = await classifyTopic('Energy policy note', state);
+  const topicSecond = await classifyTopic('Energy policy note', state);
+  assert.equal(topicFirst, 'energy');
+  assert.equal(topicSecond, 'energy');
+  assert.equal(calls, 1);
+});
+
+test('classifyTopic reconciles provider topics back to anchors', async () => {
+  const state = {
+    extensions: {
+      active: [
+        {
+          id: 'local-classifier',
+          classifyTopic: () => 'climate-change',
+        },
+      ],
+    },
+    settings: { topicGardener: { anchors: ['general', 'climate'], pinned: [] } },
+  };
+  const topic = await classifyTopic('Some post content', state);
+  assert.equal(topic, 'climate');
 });
 
 test('resolveDelegation uses stored entry', async () => {

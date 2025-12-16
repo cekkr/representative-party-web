@@ -1,4 +1,5 @@
 import { POLICIES } from '../config.js';
+import { DEFAULT_TOPIC_ANCHORS } from '../services/topicGardenerClient.js';
 import { persistPeers, persistSessions, persistSettings } from '../state/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../services/policy.js';
 import { listAvailableExtensions } from '../extensions/registry.js';
@@ -38,6 +39,9 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const preferredPeer = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
   const defaultElectionMode = sanitizeText(body.defaultElectionMode || prev.groupPolicy?.electionMode || 'priority', 32);
   const defaultConflictRule = sanitizeText(body.defaultConflictRule || prev.groupPolicy?.conflictRule || 'highest_priority', 32);
+  const topicGardenerUrl = sanitizeText(body.topicGardenerUrl || prev.topicGardener?.url || '', 240);
+  const topicAnchors = parseList(body.topicAnchors, prev.topicGardener?.anchors || DEFAULT_TOPIC_ANCHORS);
+  const topicPinned = parseList(body.topicPinned, prev.topicGardener?.pinned || []);
 
   state.settings = {
     ...prev,
@@ -52,6 +56,11 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     groupPolicy: {
       electionMode: defaultElectionMode,
       conflictRule: defaultConflictRule,
+    },
+    topicGardener: {
+      url: topicGardenerUrl,
+      anchors: topicAnchors.length ? topicAnchors : DEFAULT_TOPIC_ANCHORS,
+      pinned: topicPinned,
     },
   };
 
@@ -95,6 +104,25 @@ function parseBoolean(value, fallback) {
   return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }
 
+function parseList(value, fallback = []) {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((entry) => sanitizeText(entry, 64)).filter(Boolean);
+    return cleaned.length ? dedupe(cleaned) : dedupe(fallback);
+  }
+  if (value === undefined || value === null || value === '') {
+    return dedupe(fallback);
+  }
+  const parts = String(value)
+    .split(',')
+    .map((entry) => sanitizeText(entry, 64))
+    .filter(Boolean);
+  return parts.length ? dedupe(parts) : dedupe(fallback);
+}
+
+function dedupe(list) {
+  return [...new Set(list || [])];
+}
+
 async function updateSession(state, body) {
   const sessionId = sanitizeText(body.sessionId || '', 72);
   const role = sanitizeText(body.sessionRole || 'citizen', 32) || 'citizen';
@@ -133,6 +161,9 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
   const extensionsList = renderExtensions(availableExtensions);
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
+  const topicConfig = state.settings?.topicGardener || {};
+  const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
+  const topicPinned = (topicConfig.pinned || []).join(', ');
 
   return {
     circleName: effective.circleName,
@@ -162,6 +193,9 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
     sessionRoleDelegate: roleFlags.delegate,
     sessionRoleModerator: roleFlags.moderator,
     sessionRoleAdmin: roleFlags.admin,
+    topicGardenerUrl: topicConfig.url || '',
+    topicAnchors,
+    topicPinned,
   };
 }
 

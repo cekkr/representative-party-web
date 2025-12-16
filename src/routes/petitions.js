@@ -69,7 +69,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const body = await readRequestBody(req);
   const title = sanitizeText(body.title || '', 120);
   const summary = sanitizeText(body.summary || '', 800);
-  const topic = classifyTopic(`${title} ${summary}`, state);
+  const topic = await classifyTopic(`${title} ${summary}`, state);
 
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });

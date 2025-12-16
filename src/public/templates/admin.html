@@ -60,6 +60,21 @@
         </select>
       </label>
     </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Topic gardener URL (optional)</span>
+        <input name="topicGardenerUrl" value="{{topicGardenerUrl}}" placeholder="http://localhost:8070/classify" />
+      </label>
+      <label class="field">
+        <span>Topic anchors (comma separated)</span>
+        <input name="topicAnchors" value="{{topicAnchors}}" placeholder="general,governance,economy" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Pinned topics (comma separated)</span>
+      <input name="topicPinned" value="{{topicPinned}}" placeholder="climate,health,education" />
+    </label>
+    <p class="muted small">Anchors and pins guide the topic gardener to reconcile provider labels.</p>
     <label class="field">
       <span>Notes</span>
       <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>

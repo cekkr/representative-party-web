@@ -32,7 +32,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
   if (!title || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
-  const topic = classifyTopic(`${title} ${content}`, state);
+  const topic = await classifyTopic(`${title} ${content}`, state);
   const entry = {
     id: randomUUID(),
     topic,
