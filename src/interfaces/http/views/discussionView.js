@@ -13,6 +13,7 @@ export function renderDiscussionList(entries) {
             <span class="pill">${escapeHtml(entry.topic)}</span>
             <span class="pill ghost">${escapeHtml(entry.stance)}</span>
             ${entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${entry.issuer ? `<span class="pill ghost">from ${escapeHtml(entry.issuer)}</span>` : ''}
             <span class="muted small">${new Date(entry.createdAt).toLocaleString()}</span>
           </div>
           <p>${escapeHtml(entry.content)}</p>

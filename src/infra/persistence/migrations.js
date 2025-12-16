@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 10;
+export const LATEST_SCHEMA_VERSION = 11;
 
 const MIGRATIONS = [
   {
@@ -205,6 +205,33 @@ const MIGRATIONS = [
         ...data,
         socialFollows: (data.socialFollows || []).map(normalizeFollow),
         socialPosts: (data.socialPosts || []).map(normalizePost).filter(Boolean),
+      };
+    },
+  },
+  {
+    version: 11,
+    description: 'Add issuer/provenance stamps to social follows/posts.',
+    up: (data) => {
+      const enhance = (entry = {}, index, kind) => {
+        const issuer = entry.issuer || 'unknown';
+        const provenance = entry.provenance || {
+          issuer,
+          mode: entry.mode || DATA_DEFAULTS.mode,
+          adapter: entry.adapter || DATA_DEFAULTS.adapter,
+        };
+        return {
+          ...entry,
+          issuer,
+          provenance,
+          validatedAt: entry.validatedAt || (entry.validationStatus === 'preview' ? null : new Date().toISOString()),
+          validatedBy: entry.validatedBy || (entry.validationStatus === 'preview' ? null : issuer),
+          id: entry.id || `${kind}-${index}`,
+        };
+      };
+      return {
+        ...data,
+        socialFollows: (data.socialFollows || []).map((entry, idx) => enhance(entry, idx, 'follow')),
+        socialPosts: (data.socialPosts || []).map((entry, idx) => enhance(entry, idx, 'post')),
       };
     },
   },

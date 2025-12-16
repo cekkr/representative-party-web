@@ -113,6 +113,13 @@ main {
   gap: 1rem;
 }
 
+.status-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 0.5rem;
+}
+
 .panel {
   background: linear-gradient(180deg, rgba(15, 22, 39, 0.9), rgba(15, 22, 39, 0.82));
   border: 1px solid var(--border);

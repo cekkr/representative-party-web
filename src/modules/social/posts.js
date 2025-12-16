@@ -2,11 +2,15 @@ import { randomUUID } from 'node:crypto';
 
 import { sanitizeText } from '../../shared/utils/text.js';
 import { stampLocalEntry, filterVisibleEntries } from '../federation/replication.js';
+import { createSocialNote, wrapCreateActivity } from '../federation/activitypub.js';
 import { listFollowsFor, normalizeFollowType } from './followGraph.js';
 
 const MAX_POST_LENGTH = 560;
 
-export function createPost(state, { citizen, content, replyTo = null, visibility = 'public', targetHash = '', targetHandle = '' }) {
+export function createPost(
+  state,
+  { citizen, content, replyTo = null, visibility = 'public', targetHash = '', targetHandle = '', baseUrl },
+) {
   const body = sanitizeText(content, MAX_POST_LENGTH);
   if (!body) {
     const error = new Error('missing_content');
@@ -31,7 +35,13 @@ export function createPost(state, { citizen, content, replyTo = null, visibility
     visibility: normalizedVisibility,
     targetHash: normalizedVisibility === 'direct' ? targetHash : '',
     targetHandle: normalizedVisibility === 'direct' ? targetHandle : '',
+    policyId: state?.settings?.policyId || 'party-circle-alpha',
+    policyVersion: state?.settings?.policyVersion || 1,
   });
+
+  const note = createSocialNote({ post: entry, baseUrl });
+  const activity = wrapCreateActivity({ note, baseUrl });
+  entry.activityPub = { note, activity };
 
   state.socialPosts = [entry, ...(state.socialPosts || [])];
   return entry;

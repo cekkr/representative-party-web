@@ -1,4 +1,4 @@
-import { DATA } from '../../config.js';
+import { DATA, ISSUER } from '../../config.js';
 
 export function getReplicationProfile(state) {
   const config = state?.dataConfig || {};
@@ -41,10 +41,19 @@ export function describeProfile(profile) {
 
 export function stampLocalEntry(state, entry = {}) {
   const profile = getReplicationProfile(state);
+  const now = new Date().toISOString();
   return {
     validationStatus: 'validated',
     mode: profile.mode,
     adapter: profile.adapter,
+    issuer: ISSUER,
+    provenance: {
+      issuer: ISSUER,
+      mode: profile.mode,
+      adapter: profile.adapter,
+    },
+    validatedAt: entry.validationStatus === 'preview' ? null : now,
+    validatedBy: entry.validationStatus === 'preview' ? null : ISSUER,
     ...entry,
   };
 }

@@ -5,6 +5,7 @@ const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
 
 export const HOST = process.env.HOST || '0.0.0.0';
 export const PORT = process.env.PORT || 3000;
+export const ISSUER = process.env.CIRCLE_ISSUER || 'local-circle';
 
 export const MIME_TYPES = {
   '.css': 'text/css',

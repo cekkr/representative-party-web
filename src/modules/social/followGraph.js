@@ -24,6 +24,14 @@ export function ensureFollowEdge(state, { followerHash, targetHash, targetHandle
     type: followType,
     createdAt: new Date().toISOString(),
     validationStatus: 'validated',
+    issuer: state?.issuer || null,
+    provenance: {
+      issuer: state?.issuer || null,
+      mode: state?.dataConfig?.mode,
+      adapter: state?.dataConfig?.adapter,
+    },
+    validatedAt: new Date().toISOString(),
+    validatedBy: state?.issuer || null,
   };
 
   state.socialFollows = [entry, ...filtered];

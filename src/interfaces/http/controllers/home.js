@@ -3,6 +3,7 @@ import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../.
 import { filterVisibleEntries } from '../../modules/federation/replication.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
+import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
@@ -28,6 +29,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to configure and persist Circle policies.',
       gateSummary,
       extensionsSummary,
+      statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
     { wantsPartial, title: 'Representative Party' },
   );

@@ -13,10 +13,11 @@ import {
 import { buildFeed, createPost, findPost } from '../../modules/social/posts.js';
 import { notifySocialParticipants } from '../../modules/social/notifications.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
+import { readRequestBody, deriveBaseUrl } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
+import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const citizen = getCitizen(req, state);
@@ -25,6 +26,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const follows = citizen ? listFollowsFor(state, citizen.pidHash, followTypeFilter || undefined) : [];
   const followers = citizen ? listFollowersOf(state, citizen.pidHash) : [];
   const permission = evaluateAction(state, citizen, 'post');
+  const statusMeta = deriveStatusMeta(state);
 
   const html = await renderPage(
     'social',
@@ -40,6 +42,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followTypeOptions: renderFollowTypeOptions(followTypeFilter),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
+      statusStrip: renderStatusStrip(statusMeta),
     },
     { wantsPartial, title: 'Social feed' },
   );
@@ -78,7 +81,8 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   }
 
   try {
-    const post = createPost(state, { citizen, content, replyTo, visibility, targetHash, targetHandle });
+    const baseUrl = deriveBaseUrl(req);
+    const post = createPost(state, { citizen, content, replyTo, visibility, targetHash, targetHandle, baseUrl });
     await persistSocialPosts(state);
     await notifySocialParticipants(state, { post, author: citizen, targetSession });
   } catch (error) {

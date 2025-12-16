@@ -25,6 +25,10 @@ export function createSocialNote({ post, baseUrl }) {
     to: post.visibility === 'direct' ? [] : ['https://www.w3.org/ns/activitystreams#Public'],
     bto: post.visibility === 'direct' && post.targetHash ? [`${baseUrl}/ap/actors/${post.targetHash}`] : [],
     inReplyTo: post.replyTo ? `${baseUrl}/ap/objects/${post.replyTo}` : null,
+    policy: {
+      id: post.policyId || 'party-circle-alpha',
+      version: post.policyVersion || 1,
+    },
   };
 }
 

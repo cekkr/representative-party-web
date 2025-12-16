@@ -9,6 +9,7 @@ import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { renderDiscussionList } from '../views/discussionView.js';
 import { renderPage } from '../views/templates.js';
+import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial }) {
   const citizen = getCitizen(req, state);
@@ -77,6 +78,7 @@ async function renderDiscussionShell({ state, citizen, wantsPartial }) {
       postingStatus,
       postingReason: permission.message || '',
       roleLabel: citizen?.role || 'guest',
+      statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
     { wantsPartial, title: 'Deliberation Sandbox' },
   );

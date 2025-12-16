@@ -20,6 +20,7 @@ export function renderSocialPosts(posts, { enableReplies = false } = {}) {
             ${visibilityPill}
             ${replyPill}
             ${previewPill}
+            ${renderIssuerPill(post)}
             <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
           </div>
           <p>${escapeHtml(post.content)}</p>
@@ -85,4 +86,10 @@ function renderReplyForm(post) {
       <button class="ghost" type="submit">Send reply</button>
     </form>
   `;
+}
+
+function renderIssuerPill(post) {
+  const issuer = post.issuer || post.provenance?.issuer;
+  if (!issuer) return '';
+  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
