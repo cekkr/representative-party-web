@@ -1,0 +1,33 @@
+<section class="panel">
+  <p class="eyebrow">Groups</p>
+  <h2>Think tanks & cohorts</h2>
+  <p class="muted small">Handle: {{citizenHandle}} · Hash: {{citizenHash}}</p>
+  <form class="stack" method="post" action="/groups" data-enhance="groups">
+    <input type="hidden" name="action" value="create" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Name</span>
+        <input name="name" placeholder="Energy Circle" required />
+      </label>
+      <label class="field">
+        <span>Topics (comma-separated)</span>
+        <input name="topics" placeholder="energy,climate" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Description</span>
+      <textarea name="description" rows="3" placeholder="Purpose of this group"></textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Create group</button>
+      <a class="ghost" href="/extensions" data-partial>Manage extensions</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Available groups</p>
+  <div class="discussion-list">
+    {{groups}}
+  </div>
+</section>

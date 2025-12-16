@@ -100,7 +100,9 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   if (!choice || choice === 'auto') {
-    const delegation = resolveDelegation(citizen, exists.topic, state);
+    const delegation = resolveDelegation(citizen, exists.topic, state, {
+      notify: (notification) => createNotification(state, notification),
+    });
     if (delegation) {
       choice = `delegate:${delegation.delegateHash}`;
     } else {

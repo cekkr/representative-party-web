@@ -16,6 +16,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       actorCount: state.actors.size,
       discussionCount: state.discussions.length,
       petitionCount: state.petitions.length,
+      groupCount: state.groups.length,
       citizenHandle: citizen?.handle,
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',
       policyDetail: `Policy ${effective.id} v${effective.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,

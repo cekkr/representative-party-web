@@ -1,0 +1,28 @@
+<section class="panel">
+  <p class="eyebrow">Forum</p>
+  <h2>Articles & commentary</h2>
+  <p class="muted small">Handle: {{citizenHandle}} · Role: {{roleLabel}}</p>
+  <form class="stack" method="post" action="/forum" data-enhance="forum">
+    <div class="form-grid">
+      <label class="field">
+        <span>Title</span>
+        <input name="title" placeholder="Write a headline" required />
+      </label>
+    </div>
+    <label class="field">
+      <span>Body</span>
+      <textarea name="content" rows="4" placeholder="Share analysis, facts, or opinion" required></textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Publish article</button>
+      <a class="ghost" href="/petitions" data-partial>Relate to petitions</a>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Threads</p>
+  <div class="discussion-list">
+    {{threads}}
+  </div>
+</section>

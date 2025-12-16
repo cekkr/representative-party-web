@@ -1,7 +1,8 @@
 import { persistDelegations } from '../state/storage.js';
+import { recommendDelegationForCitizen } from './groups.js';
 
 // Resolve delegation choice for a topic using stored delegations or extension hooks.
-export function resolveDelegation(citizen, topic, state) {
+export function resolveDelegation(citizen, topic, state, { notify } = {}) {
   if (!citizen || !citizen.pidHash) return null;
   const topicKey = normalizeTopic(topic);
   const direct = (state.delegations || []).find(
@@ -16,6 +17,25 @@ export function resolveDelegation(citizen, topic, state) {
       if (result) return result;
     }
   }
+
+  const groupRec = recommendDelegationForCitizen(citizen, topicKey, state);
+  if (groupRec.chosen) {
+    if (groupRec.conflict && typeof notify === 'function') {
+      notify({
+        type: 'delegation_conflict',
+        recipientHash: citizen.pidHash,
+        message: `Delegation conflict on topic "${topicKey}" between group suggestions.`,
+      });
+    }
+    return {
+      ownerHash: citizen.pidHash,
+      delegateHash: groupRec.chosen.delegateHash,
+      provider: groupRec.chosen.provider,
+      topic: topicKey,
+      via: 'group',
+    };
+  }
+
   return null;
 }
 

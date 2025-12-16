@@ -5,6 +5,8 @@ import { completeAuth, startAuth } from '../routes/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../routes/circle.js';
 import { renderDiscussion, postDiscussion } from '../routes/discussion.js';
 import { renderPetitions, submitPetition, castVote, updatePetitionStatus } from '../routes/petitions.js';
+import { renderForumRoute, postThread, postComment } from '../routes/forum.js';
+import { renderGroups, createOrJoinGroup, setGroupDelegateRoute } from '../routes/groups.js';
 import { renderHealth } from '../routes/health.js';
 import { renderHome } from '../routes/home.js';
 import { servePublic } from '../routes/static.js';
@@ -41,6 +43,17 @@ export async function routeRequest(req, res, state) {
     return postDiscussion({ req, res, state, wantsPartial });
   }
 
+  if (req.method === 'GET' && url.pathname === '/forum') {
+    return renderForumRoute({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/forum') {
+    return postThread({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/forum/comment') {
+    return postComment({ req, res, state, wantsPartial });
+  }
   if (req.method === 'GET' && url.pathname === '/petitions') {
     return renderPetitions({ req, res, state, wantsPartial });
   }
@@ -55,6 +68,18 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/petitions/status') {
     return updatePetitionStatus({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'GET' && url.pathname === '/groups') {
+    return renderGroups({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/groups') {
+    return createOrJoinGroup({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/groups/delegate') {
+    return setGroupDelegateRoute({ req, res, state, wantsPartial });
   }
 
   if (req.method === 'POST' && url.pathname === '/circle/gossip') {

@@ -78,7 +78,7 @@ const MIGRATIONS = [
   },
   {
     version: 5,
-    description: 'Add delegations/notifications scaffolds and petition lifecycle defaults.',
+    description: 'Add delegations/notifications/groups scaffolds and petition lifecycle defaults.',
     up: (data) => {
       const petitions = (data.petitions || []).map((petition, index) => ({
         id: petition.id || `legacy-petition-${index}`,
@@ -102,6 +102,7 @@ const MIGRATIONS = [
         votes,
         delegations: data.delegations || [],
         notifications: data.notifications || [],
+        groups: data.groups || [],
       };
     },
   },

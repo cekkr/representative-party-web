@@ -28,6 +28,8 @@ npm start
   - `POST /ap/inbox` accepts incoming federation payloads (placeholder).
 - Discussion sandbox tied to verified citizens:
   - `GET /discussion` renders the thread list; `POST /discussion` appends a post using the verified session cookie when policies enforce it.
+- Forum:
+  - `GET/POST /forum` publishes long-form articles; `/forum/comment` supports threaded comments; topics auto-classified via extensible hook.
 - Health endpoint (`GET /health`) reports ledger/sessions/actors/peers counts and active policies.
 - Role-aware policy gates:
   - Sessions persist a handle + role (citizen/moderator/delegate) and banned flag via schema v3 migration.
@@ -43,6 +45,8 @@ npm start
 - Topic classification + delegation prep:
   - `src/services/classification.js` consults extensions for topic categorization; default falls back to "general".
   - `src/services/delegation.js` persists per-topic delegates (provider-aware) and can auto-resolve votes; voters can override manually.
+- Groups:
+  - `GET/POST /groups` to list/create/join/leave groups; groups publish preferred delegates per topic with priorities (`/groups/delegate`), feeding auto-delegation and conflict surfacing.
 - Notifications:
   - Internal notification registry persisted to JSON; `/notifications` lists current user notifications, `/notifications/read` marks them read.
 - Admin and first-install UI:
