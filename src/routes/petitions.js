@@ -6,6 +6,7 @@ import { resolveDelegation } from '../services/delegation.js';
 import { evaluateAction, getEffectivePolicy } from '../services/policy.js';
 import { createNotification } from '../services/notifications.js';
 import { persistPetitions, persistVotes } from '../state/storage.js';
+import { countSignatures, hasSigned, signPetition } from '../services/signatures.js';
 import { sendHtml, sendJson, sendRedirect } from '../utils/http.js';
 import { readRequestBody } from '../utils/request.js';
 import { sanitizeText } from '../utils/text.js';
@@ -17,6 +18,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const petitionGate = evaluateAction(state, citizen, 'petition');
   const voteGate = evaluateAction(state, citizen, 'vote');
   const moderateGate = evaluateAction(state, citizen, 'moderate');
+  const signatures = state.signatures || [];
   const html = await renderPage(
     'petitions',
     {
@@ -26,7 +28,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
       roleLabel: citizen?.role || 'guest',
-      petitionsList: renderPetitionList(state.petitions, state.votes, moderateGate.allowed),
+      petitionsList: renderPetitionList(state.petitions, state.votes, signatures, citizen, moderateGate.allowed),
     },
     { wantsPartial, title: 'Petitions & Votes' },
   );
@@ -168,6 +170,29 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   petition.quorum = quorum;
   await persistPetitions(state);
 
+  if (wantsPartial) {
+    const html = await renderPetitions({ req, res, state, wantsPartial: true });
+    return sendHtml(res, html);
+  }
+  return sendRedirect(res, '/petitions');
+}
+
+export async function signPetitionRoute({ req, res, state, wantsPartial }) {
+  const citizen = getCitizen(req, state);
+  const permission = evaluateAction(state, citizen, 'vote');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Signing not allowed.' });
+  }
+  const body = await readRequestBody(req);
+  const petitionId = sanitizeText(body.petitionId || '', 120);
+  const petition = state.petitions.find((p) => p.id === petitionId);
+  if (!petition) {
+    return sendJson(res, 404, { error: 'petition_not_found' });
+  }
+  if (hasSigned(petitionId, citizen, state)) {
+    return sendJson(res, 400, { error: 'already_signed' });
+  }
+  await signPetition({ petition, citizen, state });
   if (wantsPartial) {
     const html = await renderPetitions({ req, res, state, wantsPartial: true });
     return sendHtml(res, html);

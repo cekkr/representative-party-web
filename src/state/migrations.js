@@ -103,6 +103,7 @@ const MIGRATIONS = [
         delegations: data.delegations || [],
         notifications: data.notifications || [],
         groups: data.groups || [],
+        signatures: data.signatures || [],
       };
     },
   },

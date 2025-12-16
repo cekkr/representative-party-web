@@ -33,6 +33,8 @@ export function resolveDelegation(citizen, topic, state, { notify } = {}) {
       provider: groupRec.chosen.provider,
       topic: topicKey,
       via: 'group',
+      priority: groupRec.chosen.priority,
+      conflict: groupRec.conflict,
     };
   }
 

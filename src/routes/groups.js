@@ -16,6 +16,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
       groups: renderGroupList(groups, citizen),
       citizenHandle: citizen?.handle || 'Guest',
       citizenHash: citizen?.pidHash || '',
+      circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
     },
     { wantsPartial, title: 'Groups' },
   );

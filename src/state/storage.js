@@ -40,6 +40,10 @@ export async function persistPetitions(state) {
   await state.store.savePetitions(state.petitions);
 }
 
+export async function persistSignatures(state) {
+  await state.store.saveSignatures(state.signatures);
+}
+
 export async function persistVotes(state) {
   await state.store.saveVotes(state.votes);
 }
@@ -71,6 +75,7 @@ function hydrateState(data) {
     peers: new Set(data.peers),
     discussions: data.discussions,
     petitions: data.petitions,
+    signatures: data.signatures,
     votes: data.votes,
     delegations: data.delegations,
     notifications: data.notifications,

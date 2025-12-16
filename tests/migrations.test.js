@@ -10,9 +10,11 @@ test('migrations normalize sessions and settings', () => {
     peers: ['https://peer.example'],
     discussions: [],
     petitions: [],
+    signatures: [],
     votes: [],
     delegations: [],
     notifications: [],
+    groups: [],
     actors: [],
     settings: {},
   };
@@ -29,8 +31,10 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(session.handle.startsWith('citizen-'));
   assert.equal(data.settings.circleName, 'Party Circle');
   assert.ok(Array.isArray(data.petitions));
+  assert.ok(Array.isArray(data.signatures));
   assert.ok(Array.isArray(data.votes));
   assert.ok(Array.isArray(data.delegations));
   assert.ok(Array.isArray(data.notifications));
+  assert.ok(Array.isArray(data.groups));
   assert.deepEqual(data.settings.extensions, []);
 });

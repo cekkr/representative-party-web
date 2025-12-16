@@ -38,6 +38,7 @@ export const FILES = {
   peers: join(PATHS.DATA_ROOT, 'peers.json'),
   discussions: join(PATHS.DATA_ROOT, 'discussions.json'),
   petitions: join(PATHS.DATA_ROOT, 'petitions.json'),
+  signatures: join(PATHS.DATA_ROOT, 'signatures.json'),
   votes: join(PATHS.DATA_ROOT, 'votes.json'),
   delegations: join(PATHS.DATA_ROOT, 'delegations.json'),
   notifications: join(PATHS.DATA_ROOT, 'notifications.json'),

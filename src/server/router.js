@@ -4,7 +4,7 @@ import { serveActor, inbox } from '../routes/activitypub.js';
 import { completeAuth, startAuth } from '../routes/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../routes/circle.js';
 import { renderDiscussion, postDiscussion } from '../routes/discussion.js';
-import { renderPetitions, submitPetition, castVote, updatePetitionStatus } from '../routes/petitions.js';
+import { renderPetitions, submitPetition, castVote, updatePetitionStatus, signPetitionRoute } from '../routes/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../routes/forum.js';
 import { renderGroups, createOrJoinGroup, setGroupDelegateRoute } from '../routes/groups.js';
 import { renderHealth } from '../routes/health.js';
@@ -60,6 +60,10 @@ export async function routeRequest(req, res, state) {
 
   if (req.method === 'POST' && url.pathname === '/petitions') {
     return submitPetition({ req, res, state, wantsPartial });
+  }
+
+  if (req.method === 'POST' && url.pathname === '/petitions/sign') {
+    return signPetitionRoute({ req, res, state, wantsPartial });
   }
 
   if (req.method === 'POST' && url.pathname === '/petitions/vote') {

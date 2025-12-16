@@ -51,6 +51,7 @@ export async function setGroupDelegate({ groupId, topic, delegateHash, priority,
     priority: Number(priority) || 0,
     provider: provider || 'local',
     updatedAt: new Date().toISOString(),
+    votes: (group.votes || {})[topicKey] || { policy: 'priority' },
   });
   group.delegates = filtered;
   await persistGroups(state);
