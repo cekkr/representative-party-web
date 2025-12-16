@@ -3,6 +3,7 @@ This file captures the essential implementation directives. Keep it in sync with
 ## Concept anchors
 - User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “citizen” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
 - Messaging-first kernel: start as a simple threaded messaging surface (discussion/forum + notifications). Petitions, votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
+- Parallel social feed & follows: add a Twitter-like follow graph with typed edges (circle/interest/info/alerts) to drive a “small talk + info” micro-post lane. Short posts support replies, mentions/tags, and lightweight reshares; defaults keep it conversational and non-binding so petitions/votes stay distinct.
 - Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
 - Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable (providers can run solo messaging networks or join a Circle).
 - Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers; when multiple providers belong to the same social-party ring, they should also prefer a shared client (or compatible clients) to keep UX and enforcement aligned across that ring.
@@ -26,9 +27,9 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/app/server.js` (HTTP), `src/app/router.js` (table-driven routes).
-- **Interfaces (HTTP)**: `src/interfaces/http/controllers/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`, `admin`, `votes`); view helpers in `src/interfaces/http/views/`.
-- **Domain modules**: `src/modules/identity/*` (auth scaffold + blinded hash, citizen session lookup, privileges), `src/modules/circle/*` (policy gates, ledger envelope signing/verification), `src/modules/messaging/notifications.js`, `src/modules/topics/*` (classification hook + topic gardener client), `src/modules/petitions/signatures.js`, `src/modules/votes/voteEnvelope.js`, `src/modules/delegation/delegation.js`, `src/modules/groups/*` (delegation cachets, per-group rules, elections), `src/modules/federation/activitypub.js`, `src/modules/extensions/registry.js` + `sample-policy-tighten.js`.
-- **State/persistence**: `src/infra/persistence/storage.js` (interface), adapter drivers under `src/infra/persistence/adapters/` (JSON now; SQL/kv planned), replication/validation helpers in `src/modules/federation/replication.js`, migrations in `src/infra/persistence/migrations.js`, and the store entry in `src/infra/persistence/store.js`.
+- **Interfaces (HTTP)**: `src/interfaces/http/controllers/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`, `admin`, `votes`, `social` for follows/feed/posts); view helpers in `src/interfaces/http/views/`.
+- **Domain modules**: `src/modules/identity/*` (auth scaffold + blinded hash, citizen session lookup, privileges), `src/modules/circle/*` (policy gates, ledger envelope signing/verification), `src/modules/messaging/notifications.js`, `src/modules/topics/*` (classification hook + topic gardener client), `src/modules/petitions/signatures.js`, `src/modules/votes/voteEnvelope.js`, `src/modules/delegation/delegation.js`, `src/modules/groups/*` (delegation cachets, per-group rules, elections), `src/modules/social/*` (follow graph + micro-posts + mentions/tags/reshares), `src/modules/federation/activitypub.js`, `src/modules/extensions/registry.js` + `sample-policy-tighten.js`.
+- **State/persistence**: `src/infra/persistence/storage.js` (interface), adapter drivers under `src/infra/persistence/adapters/` (JSON now; SQL/kv planned), replication/validation helpers in `src/modules/federation/replication.js`, migrations in `src/infra/persistence/migrations.js`, and the store entry in `src/infra/persistence/store.js` (social follows + micro-posts persist through the same adapters).
 - **Helper services**: AI/ML workers live in `src/infra/workers/` (Python projects, e.g., topic gardener). Node code should call them via `src/modules/topics/topicGardenerClient.js` to avoid conflicting provider outputs and duplicated computation across classification providers.
 - **Shared utilities**: `src/shared/utils/` (http helpers, request parsing, text sanitization/escaping).
 - **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
@@ -41,6 +42,7 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## Endpoints
 - `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
+- `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle.
 - `/petitions` (GET/POST) scaffold for drafting petitions; `/petitions/vote` to cast votes; `/petitions/sign` for signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.
 - `/notifications` (GET) list internal notifications; `/notifications/read` marks all read.
@@ -51,6 +53,7 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## Near-term implementation focus
 - Ship the messaging-first social network first: bind verified user sessions to handles/profiles (citizen is a Circle-specific, natural-person guarantee), model privileges (author/mod/delegate) and Circle policy enforcement for posting/petition/vote.
+- Parallel social feed: deliver typed follow edges (circle/interest/info/alerts) and a micro-post lane (short text + optional link/attachments) with replies/mentions/reshares. Keep UX copy explicit that this lane is for small talk/info; petitions/votes/forum stay the authoritative tracks.
 - Adoption path: keep messaging + notifications usable alone; petitions/votes/delegation/federation/topic gardener stay optional so orgs can layer capabilities as staff and policy mature.
 - Model and validate data exchanges end-to-end: persisted discussions/petitions/votes with author-session binding, rate limits, quorum/ban checks, delegation edges, and audit trails that surface in the UI.
 - Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
