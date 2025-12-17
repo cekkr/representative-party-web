@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { logTransaction, listTransactions, hashPayload } from '../src/modules/transactions/registry.js';
+import { logTransaction, listTransactions, hashPayload, exportTransactionsEnvelope } from '../src/modules/transactions/registry.js';
 
 test('transactions registry logs and lists validated entries', async () => {
   const state = {
@@ -26,4 +26,10 @@ test('transactions registry logs and lists validated entries', async () => {
   const listed = listTransactions(state, { type: 'vote_cast', limit: 10 });
   assert.equal(listed.length, 1);
   assert.equal(listed[0].id, entry.id);
+
+  const envelope = exportTransactionsEnvelope(state, { limit: 10 });
+  assert.ok(envelope.summary);
+  assert.ok(Array.isArray(envelope.entries));
+  assert.equal(envelope.entries.length, 1);
+  assert.equal(envelope.entries[0].digest, entry.digest);
 });

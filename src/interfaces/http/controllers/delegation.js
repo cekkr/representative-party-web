@@ -1,5 +1,6 @@
 import { getCitizen } from '../../modules/identity/citizen.js';
 import { chooseDelegation } from '../../modules/delegation/delegation.js';
+import { logTransaction } from '../../modules/transactions/registry.js';
 import { sendJson } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -13,5 +14,10 @@ export async function resolveConflict({ req, res, state }) {
     return sendJson(res, 400, { error: 'missing_delegate' });
   }
   await chooseDelegation({ citizen, topic, delegateHash, state });
+  await logTransaction(state, {
+    type: 'delegation_set',
+    actorHash: citizen?.pidHash || 'anonymous',
+    payload: { topic, delegateHash },
+  });
   return sendJson(res, 200, { status: 'ok', topic, delegateHash });
 }

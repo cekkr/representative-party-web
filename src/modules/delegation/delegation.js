@@ -1,4 +1,5 @@
 import { persistDelegations } from '../../infra/persistence/storage.js';
+import { logTransaction } from '../transactions/registry.js';
 import { recommendDelegationForCitizen } from '../groups/groups.js';
 
 // Resolve delegation choice for a topic using stored delegations or extension hooks.
@@ -62,6 +63,11 @@ export async function setDelegation({ citizen, topic, delegateHash, provider, st
   filtered.unshift(entry);
   state.delegations = filtered;
   await persistDelegations(state);
+  await logTransaction(state, {
+    type: 'delegation_set',
+    actorHash: citizen.pidHash,
+    payload: { topic: topicKey, delegateHash, provider },
+  });
 }
 
 export function normalizeTopic(topic) {

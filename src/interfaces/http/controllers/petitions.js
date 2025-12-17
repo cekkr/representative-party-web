@@ -213,6 +213,12 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   petition.status = status;
   petition.quorum = quorum;
   await persistPetitions(state);
+  await logTransaction(state, {
+    type: 'petition_status',
+    actorHash: citizen?.pidHash || 'anonymous',
+    petitionId,
+    payload: { status, quorum },
+  });
 
   if (wantsPartial) {
     const html = await renderPetitions({ req, res, state, wantsPartial: true });
