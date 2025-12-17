@@ -11,11 +11,10 @@ import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../
 import { listAvailableExtensions } from '../../modules/extensions/registry.js';
 import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
 import {
-  CANONICAL_PROFILE_FIELDS,
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
   normalizeProviderFields,
-  parseAttributePayload,
+  parseAttributePayloadWithValidation,
   parseProviderFieldInput,
   upsertProviderAttributes,
 } from '../../modules/structure/structureManager.js';
@@ -200,14 +199,26 @@ async function updateSession(state, body) {
 }
 
 async function updateStructure(state, body) {
-  const parsedFields = parseProviderFieldInput(body.providerFields || '');
-  const normalized = normalizeProviderFields(parsedFields);
+  const { fields, errors } = parseProviderFieldInput(body.providerFields || '');
+  const normalized = normalizeProviderFields(fields);
   state.profileStructures = normalized;
   await persistProfileStructures(state);
+  recordAdminAudit(state, {
+    action: 'structure.update',
+    summary: `fields=${normalized.length}${errors.length ? ` errors=${errors.length}` : ''}`,
+  });
+  await persistSettings(state);
+  const flashParts = [];
+  if (normalized.length) {
+    flashParts.push(`Provider-local schema saved (${normalized.length} field${normalized.length === 1 ? '' : 's'}).`);
+  } else {
+    flashParts.push('Provider-local schema cleared.');
+  }
+  if (errors.length) {
+    flashParts.push(`Validation: ${errors.join(' ')}`);
+  }
   return {
-    flash: normalized.length
-      ? `Provider-local schema saved (${normalized.length} field${normalized.length === 1 ? '' : 's'}).`
-      : 'Provider-local schema cleared.',
+    flash: flashParts.join(' '),
     providerFieldsValue: formatProviderFieldsForTextarea(normalized),
   };
 }
@@ -223,19 +234,26 @@ async function updateProfileAttributes(state, body) {
     return { flash: `Session "${sessionId}" not found.`, attributesSessionId: sessionId, attributesPayloadValue: payload };
   }
   const providerFields = normalizeProviderFields(state.profileStructures || []);
-  const attributes = parseAttributePayload(payload, providerFields);
+  const { attributes, errors } = parseAttributePayloadWithValidation(payload, providerFields);
   state.profileStructures = providerFields;
   const replace = Object.keys(attributes).length === 0;
   const entry = upsertProviderAttributes(state, { sessionId, handle: session.handle, attributes, replace });
   await persistProfileStructures(state);
   await persistProfileAttributes(state);
+  recordAdminAudit(state, {
+    action: 'profile.attributes',
+    summary: `session=${sessionId} fields=${entry?.provider ? Object.keys(entry.provider).length : 0}`,
+  });
+  await persistSettings(state);
 
-  const flash =
-    entry && entry.provider && Object.keys(entry.provider).length
-      ? `Provider attributes saved for session "${sessionId}".`
-      : `Provider attributes cleared for session "${sessionId}".`;
+  const flashParts = [];
+  const hasValues = entry && entry.provider && Object.keys(entry.provider).length;
+  flashParts.push(hasValues ? `Provider attributes saved for session "${sessionId}".` : `Provider attributes cleared for session "${sessionId}".`);
+  if (errors.length) {
+    flashParts.push(`Validation: ${errors.join(' ')}`);
+  }
   return {
-    flash,
+    flash: flashParts.join(' '),
     attributesSessionId: sessionId,
     attributesPayloadValue: renderAttributesPayload(entry?.provider),
   };
@@ -322,6 +340,18 @@ function renderAttributesPayload(provider = {}) {
   return Object.entries(provider || {})
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n');
+}
+
+function recordAdminAudit(state, { action, summary }) {
+  const settings = state.settings || {};
+  const log = settings.auditLog || [];
+  const entry = {
+    at: new Date().toISOString(),
+    action,
+    summary,
+  };
+  const nextLog = [...log, entry].slice(-50);
+  state.settings = { ...settings, auditLog: nextLog };
 }
 
 function roleSelectFlags(role) {

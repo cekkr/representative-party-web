@@ -140,7 +140,7 @@
       <span>Provider-local fields (one per line: key:type:label, add ! for required)</span>
       <textarea name="providerFields" rows="4" placeholder="email:email:Contact email">{{providerFieldsValue}}</textarea>
     </label>
-    <p class="muted small">Example: <code>email:email:Contact email</code>. Canonical fields stay fixed across the party ring (handle, credential/wallet binding, blinded hash, role, banned).</p>
+    <p class="muted small">Example: <code>email:email:Contact email</code>. Allowed types: string, email, phone, boolean, number. Canonical fields stay fixed across the party ring (handle, credential/wallet binding, blinded hash, role, banned).</p>
     <div class="cta-row">
       <button class="cta" type="submit">Save provider schema</button>
       <span class="muted small">Fields saved: {{providerFieldCount}}</span>

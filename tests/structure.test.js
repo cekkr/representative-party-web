@@ -4,24 +4,30 @@ import assert from 'node:assert/strict';
 import {
   buildProfileSchema,
   CANONICAL_PROFILE_FIELDS,
-  parseAttributePayload,
+  parseAttributePayloadWithValidation,
   parseProviderFieldInput,
   upsertProviderAttributes,
 } from '../src/modules/structure/structureManager.js';
+import { resolveContactChannels } from '../src/modules/messaging/outbound.js';
 
 test('structure manager normalizes provider fields and attributes', () => {
-  const providerFields = parseProviderFieldInput('email:email:Contact email\nnotify:boolean:Notify me');
+  const { fields, errors } = parseProviderFieldInput('email:email:Contact email\nnotify:boolean:Notify me');
+  assert.equal(errors.length, 0);
 
-  assert.equal(providerFields.length, 2);
-  assert.equal(providerFields[0].key, 'email');
-  assert.equal(providerFields[0].type, 'email');
-  assert.equal(providerFields[1].key, 'notify');
-  assert.equal(providerFields[1].type, 'boolean');
+  assert.equal(fields.length, 2);
+  assert.equal(fields[0].key, 'email');
+  assert.equal(fields[0].type, 'email');
+  assert.equal(fields[1].key, 'notify');
+  assert.equal(fields[1].type, 'boolean');
 
-  const schema = buildProfileSchema(providerFields);
-  assert.ok(schema.length >= CANONICAL_PROFILE_FIELDS.length + providerFields.length);
+  const schema = buildProfileSchema(fields);
+  assert.ok(schema.length >= CANONICAL_PROFILE_FIELDS.length + fields.length);
 
-  const attributes = parseAttributePayload('email: user@example.org\nnotify: true\nignored: nope', providerFields);
+  const { attributes, errors: attrErrors } = parseAttributePayloadWithValidation(
+    'email: user@example.org\nnotify: true\nignored: nope',
+    fields,
+  );
+  assert.equal(attrErrors.length, 0);
   assert.deepEqual(attributes, { email: 'user@example.org', notify: true });
 
   const state = { profileAttributes: [] };
@@ -30,4 +36,16 @@ test('structure manager normalizes provider fields and attributes', () => {
   assert.equal(entry.sessionId, 'sess-1');
   assert.equal(entry.provider.email, 'user@example.org');
   assert.equal(entry.provider.notify, true);
+
+  const { attributes: invalidAttrs, errors: invalidErrors } = parseAttributePayloadWithValidation('email: not-an-email', fields);
+  assert.equal(invalidErrors.length, 1);
+  assert.deepEqual(invalidAttrs, {});
+
+  const contact = resolveContactChannels(
+    { profileStructures: fields, profileAttributes: [entry] },
+    { sessionId: 'sess-1', handle: 'citizen-1' },
+  );
+  assert.equal(contact.email, 'user@example.org');
+  assert.equal(contact.handle, 'citizen-1');
+  assert.equal(contact.providerOnly, true);
 });

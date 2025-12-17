@@ -9,7 +9,9 @@ export const CANONICAL_PROFILE_FIELDS = [
 ];
 
 const CANONICAL_KEYS = new Set(CANONICAL_PROFILE_FIELDS.map((field) => field.key));
-const ALLOWED_TYPES = ['string', 'email', 'boolean', 'number'];
+const ALLOWED_TYPES = ['string', 'email', 'boolean', 'number', 'phone'];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
+const PHONE_REGEX = /^\+?[0-9().\-\s]{7,20}$/;
 
 export function buildProfileSchema(providerFields = []) {
   const normalized = normalizeProviderFields(providerFields);
@@ -17,9 +19,16 @@ export function buildProfileSchema(providerFields = []) {
 }
 
 export function normalizeProviderFields(fields = []) {
-  return (fields || [])
-    .map((field, index) => normalizeProviderField(field, index))
-    .filter(Boolean);
+  const seen = new Set();
+  const normalized = [];
+  for (const [index, field] of (fields || []).entries()) {
+    const candidate = normalizeProviderField(field, index);
+    if (!candidate) continue;
+    if (seen.has(candidate.key)) continue;
+    seen.add(candidate.key);
+    normalized.push(candidate);
+  }
+  return normalized;
 }
 
 export function formatProviderFieldsForTextarea(fields = []) {
@@ -29,12 +38,15 @@ export function formatProviderFieldsForTextarea(fields = []) {
 }
 
 export function parseProviderFieldInput(raw, fallback = []) {
-  if (raw === undefined || raw === null) return normalizeProviderFields(fallback);
+  if (raw === undefined || raw === null) {
+    return { fields: normalizeProviderFields(fallback), errors: [] };
+  }
   const text = String(raw).trim();
-  if (!text) return [];
+  if (!text) return { fields: [], errors: [] };
   const parsedJson = tryParseJson(text);
   if (Array.isArray(parsedJson)) {
-    return normalizeProviderFields(parsedJson);
+    const { fields, errors } = validateProviderFields(parsedJson);
+    return { fields, errors };
   }
   const lines = text
     .split('\n')
@@ -56,23 +68,34 @@ export function parseProviderFieldInput(raw, fallback = []) {
       };
     })
     .filter(Boolean);
-  return normalizeProviderFields(draftFields);
+  const { fields, errors } = validateProviderFields(draftFields);
+  return { fields, errors };
 }
 
 export function parseAttributePayload(raw, providerSchema = []) {
+  const { attributes } = parseAttributePayloadWithValidation(raw, providerSchema);
+  return attributes;
+}
+
+export function parseAttributePayloadWithValidation(raw, providerSchema = []) {
   const source = normalizeAttributeSource(raw);
-  if (!source) return {};
+  if (!source) return { attributes: {}, errors: [] };
   const providerIndex = indexProviderSchema(providerSchema);
   const output = {};
+  const errors = [];
   for (const [rawKey, rawValue] of Object.entries(source)) {
     const key = sanitizeKey(rawKey);
     const field = providerIndex.get(key);
     if (!field) continue;
-    const value = coerceValueForField(rawValue, field);
+    const { value, error } = coerceValueForField(rawValue, field);
+    if (error) {
+      errors.push(`${key}: ${error}`);
+      continue;
+    }
     if (value === undefined) continue;
     output[key] = value;
   }
-  return output;
+  return { attributes: output, errors };
 }
 
 export function upsertProviderAttributes(state, { sessionId, handle, attributes = {}, replace = false }) {
@@ -100,6 +123,30 @@ export function upsertProviderAttributes(state, { sessionId, handle, attributes 
 
 export function describeCanonicalProfile() {
   return CANONICAL_PROFILE_FIELDS.map((field) => `${field.key} (${field.type}${field.required ? ', required' : ''})`).join(', ');
+}
+
+export function validateProviderFields(fields = []) {
+  const errors = [];
+  const normalized = [];
+  const seen = new Set();
+  for (const [index, field] of (fields || []).entries()) {
+    const candidate = normalizeProviderField(field, index);
+    if (!candidate) {
+      errors.push(`Field ${index + 1} is invalid or collides with canonical keys.`);
+      continue;
+    }
+    if (!ALLOWED_TYPES.includes(candidate.type)) {
+      errors.push(`Field "${candidate.key}" uses unsupported type "${candidate.type}".`);
+      continue;
+    }
+    if (seen.has(candidate.key)) {
+      errors.push(`Duplicate field "${candidate.key}" discarded.`);
+      continue;
+    }
+    seen.add(candidate.key);
+    normalized.push(candidate);
+  }
+  return { fields: normalized, errors };
 }
 
 function normalizeProviderField(field = {}, index = 0) {
@@ -167,23 +214,34 @@ function normalizeAttributeSource(raw) {
 
 function coerceValueForField(rawValue, field) {
   if (field.type === 'boolean') {
-    if (typeof rawValue === 'boolean') return rawValue;
+    if (typeof rawValue === 'boolean') return { value: rawValue };
     const text = String(rawValue).toLowerCase();
-    if (!text) return undefined;
-    if (text === 'true' || text === '1' || text === 'yes' || text === 'on') return true;
-    if (text === 'false' || text === '0' || text === 'no' || text === 'off') return false;
-    return undefined;
+    if (!text) return { value: undefined, error: field.required ? 'Value empty' : null };
+    if (text === 'true' || text === '1' || text === 'yes' || text === 'on') return { value: true };
+    if (text === 'false' || text === '0' || text === 'no' || text === 'off') return { value: false };
+    return { value: undefined, error: 'Invalid boolean' };
   }
   if (field.type === 'number') {
+    if (rawValue === '' || rawValue === null || rawValue === undefined) {
+      return { value: undefined, error: field.required ? 'Value empty' : null };
+    }
     const parsed = Number(rawValue);
-    return Number.isFinite(parsed) ? parsed : undefined;
+    return Number.isFinite(parsed) ? { value: parsed } : { value: undefined, error: 'Invalid number' };
+  }
+  if (field.type === 'phone') {
+    const textValue = sanitizeText(String(rawValue || ''), 48);
+    if (!textValue) return { value: undefined, error: field.required ? 'Phone empty' : null };
+    if (!PHONE_REGEX.test(textValue)) return { value: undefined, error: 'Invalid phone format' };
+    return { value: textValue };
   }
   const textValue = sanitizeText(String(rawValue || ''), 240);
-  if (!textValue) return undefined;
+  if (!textValue) return { value: undefined, error: field.required ? 'Value empty' : null };
   if (field.type === 'email') {
-    return textValue.toLowerCase();
+    const lower = textValue.toLowerCase();
+    if (!EMAIL_REGEX.test(lower)) return { value: undefined, error: 'Invalid email format' };
+    return { value: lower };
   }
-  return textValue;
+  return { value: textValue };
 }
 
 function indexProviderSchema(schema = []) {
