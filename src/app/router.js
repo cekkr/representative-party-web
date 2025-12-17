@@ -28,6 +28,7 @@ import {
   unfollowHandle,
   listRelationships,
 } from '../interfaces/http/controllers/social.js';
+import { renderTransactions } from '../interfaces/http/controllers/transactions.js';
 import { sendNotFound } from '../shared/utils/http.js';
 
 const routes = [
@@ -68,6 +69,7 @@ const routes = [
   { method: 'GET', path: '/extensions', action: getExtensions },
   { method: 'POST', path: '/extensions', action: toggleExtension },
   { method: 'GET', path: '/admin/audit', action: exportAuditLog },
+  { method: 'GET', path: '/transactions', action: renderTransactions },
   {
     method: 'GET',
     prefix: '/ap/actors/',

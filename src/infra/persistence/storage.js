@@ -96,6 +96,10 @@ export async function persistProfileAttributes(state) {
   await state.store.saveProfileAttributes(state.profileAttributes || []);
 }
 
+export async function persistTransactions(state) {
+  await state.store.saveTransactions(state.transactions || []);
+}
+
 function hydrateState(data) {
   const settings = data.settings || { initialized: false };
   return {
@@ -114,6 +118,7 @@ function hydrateState(data) {
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     socialFollows: data.socialFollows || [],
     socialPosts: data.socialPosts || [],
+    transactions: data.transactions || [],
     profileStructures: data.profileStructures || [],
     profileAttributes: data.profileAttributes || [],
     settings,

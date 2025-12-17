@@ -10,6 +10,7 @@ import { persistPetitions, persistVotes } from '../../infra/persistence/storage.
 import { countSignatures, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
 import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
+import { logTransaction } from '../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -93,6 +94,12 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const stamped = stampLocalEntry(state, petition);
   state.petitions.unshift(stamped);
   await persistPetitions(state);
+  await logTransaction(state, {
+    type: 'petition_drafted',
+    actorHash: citizen?.pidHash || 'anonymous',
+    petitionId: petition.id,
+    payload: { title, topic, summary },
+  });
   if (citizen?.pidHash) {
     await createNotification(state, {
       type: 'petition_created',
@@ -161,6 +168,12 @@ export async function castVote({ req, res, state, wantsPartial }) {
   filtered.unshift({ ...stamped, ...vote });
   state.votes = filtered;
   await persistVotes(state);
+  await logTransaction(state, {
+    type: 'vote_cast',
+    actorHash: authorHash,
+    petitionId,
+    payload: { choice, envelope: vote.envelope },
+  });
   if (citizen?.pidHash) {
     await createNotification(state, {
       type: 'vote_recorded',

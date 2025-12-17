@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 12;
+export const LATEST_SCHEMA_VERSION = 13;
 
 const MIGRATIONS = [
   {
@@ -245,6 +245,16 @@ const MIGRATIONS = [
         ...data,
         profileStructures: structures,
         profileAttributes: attributes,
+      };
+    },
+  },
+  {
+    version: 13,
+    description: 'Add transactions registry scaffold.',
+    up: (data) => {
+      return {
+        ...data,
+        transactions: Array.isArray(data.transactions) ? data.transactions : [],
       };
     },
   },

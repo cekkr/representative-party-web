@@ -30,5 +30,9 @@ export function renderHealth({ res, state }) {
     schemaVersion: state.meta?.schemaVersion || 0,
     now: new Date().toISOString(),
     auditLog: (state.settings?.auditLog || []).slice(-10),
+    transactions: {
+      count: state.transactions?.length || 0,
+      recent: (state.transactions || []).slice(0, 5).map((t) => ({ id: t.id, type: t.type, digest: t.digest, at: t.createdAt })),
+    },
   });
 }
