@@ -11,6 +11,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Architecture Baseline (Phase 1 kernel)
 - **Modular NodeJS monolith**: app entry under `src/app/` (server + table-driven router), HTTP controllers in `src/interfaces/http/controllers/`, domain logic in `src/modules/`, persistence in `src/infra/persistence/`, shared helpers in `src/shared/`, and view helpers in `src/interfaces/http/views/`.
 - **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “citizen” for civic Circles to enforce natural-person guarantees.
+- **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded hash) stay fixed across a party ring; provider-local optional fields (contact email, personal info, notification preferences) are modeled via a schema/data-table editor and stored locally to power provider-owned notifications/consent.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
 - **Federation seeds**: ActivityPub actor emitter, inbox placeholder, gossip endpoints for peer/ledger sync.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
@@ -49,6 +50,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (citizens when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
+- **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
