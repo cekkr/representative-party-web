@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { persistSignatures, persistPetitions } from '../../infra/persistence/storage.js';
-import { createNotification } from '../messaging/notifications.js';
+import { createNotificationWithOutbound } from '../messaging/notifications.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 
 export function countSignatures(petitionId, state) {
@@ -28,11 +28,15 @@ export async function signPetition({ petition, citizen, state }) {
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {
     petition.status = 'open';
     await persistPetitions(state);
-    await createNotification(state, {
-      type: 'quorum_reached',
-      recipientHash: citizen.pidHash,
-      petitionId: petition.id,
-      message: `Quorum reached for petition "${petition.title}". Status set to open.`,
-    });
+    await createNotificationWithOutbound(
+      state,
+      {
+        type: 'quorum_reached',
+        recipientHash: citizen.pidHash,
+        petitionId: petition.id,
+        message: `Quorum reached for petition "${petition.title}". Status set to open.`,
+      },
+      { sessionId: citizen.sessionId, handle: citizen.handle },
+    );
   }
 }

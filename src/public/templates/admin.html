@@ -172,6 +172,15 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Admin audit</p>
+  <h2>Recent configuration changes</h2>
+  <p class="muted small">Last 10 actions are listed; older entries roll off for privacy. Includes schema and profile updates.</p>
+  <div class="stack">
+    {{auditLog}}
+  </div>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Extensions</p>
   <h2>Toggle modules</h2>
   <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>

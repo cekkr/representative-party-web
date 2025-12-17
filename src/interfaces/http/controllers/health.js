@@ -29,5 +29,6 @@ export function renderHealth({ res, state }) {
     policies: POLICIES,
     schemaVersion: state.meta?.schemaVersion || 0,
     now: new Date().toISOString(),
+    auditLog: (state.settings?.auditLog || []).slice(-10),
   });
 }

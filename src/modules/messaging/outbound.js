@@ -1,4 +1,16 @@
 import { normalizeProviderFields } from '../structure/structureManager.js';
+import { sanitizeText } from '../../shared/utils/text.js';
+
+const defaultTransport = {
+  async sendEmail({ to, subject, body }) {
+    console.info(`[outbound email stub] to=${to} subject=${subject} body=${body.slice(0, 160)}`);
+    return true;
+  },
+  async sendSms({ to, body }) {
+    console.info(`[outbound sms stub] to=${to} body=${body.slice(0, 160)}`);
+    return true;
+  },
+};
 
 /**
  * Resolve provider-local contact channels (email/phone/notify flag) for a session/handle.
@@ -27,6 +39,20 @@ export function resolveContactChannels(state, { sessionId, handle } = {}) {
     if (field.type === 'boolean' && field.key === 'notify') contact.notify = Boolean(value);
   }
   return contact;
+}
+
+export async function deliverOutbound(state, { contact, notification, transport = defaultTransport }) {
+  if (!contact) return { delivered: false, channels: {} };
+  const subject = sanitizeText(notification.message || 'Notification', 120);
+  const body = notification.message || '';
+  const channels = {};
+  if (contact.email && transport.sendEmail) {
+    channels.email = await transport.sendEmail({ to: contact.email, subject, body, notification });
+  }
+  if (contact.phone && transport.sendSms) {
+    channels.sms = await transport.sendSms({ to: contact.phone, body, notification });
+  }
+  return { delivered: Boolean(channels.email || channels.sms), channels };
 }
 
 function findProviderAttributes(state, sessionId, handle) {

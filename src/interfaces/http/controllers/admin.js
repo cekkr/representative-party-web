@@ -280,6 +280,7 @@ function buildAdminViewModel(
   const providerFieldsValueRendered = providerFieldsValue ?? formatProviderFieldsForTextarea(providerFields);
   const attributesSessionIdValue = attributesSessionId || '';
   const attributesPayloadValueRendered = attributesPayloadValue || '';
+  const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
 
   return {
     circleName: effective.circleName,
@@ -333,6 +334,7 @@ function buildAdminViewModel(
     providerFieldCount: providerFields.length,
     attributesSessionId: attributesSessionIdValue,
     attributesPayloadValue: attributesPayloadValueRendered,
+    auditLog: renderAuditLog(auditEntries),
   };
 }
 
@@ -352,6 +354,21 @@ function recordAdminAudit(state, { action, summary }) {
   };
   const nextLog = [...log, entry].slice(-50);
   state.settings = { ...settings, auditLog: nextLog };
+}
+
+function renderAuditLog(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No admin audit entries yet.</p>';
+  }
+  return `
+    <ul class="stack small">
+      ${entries
+        .slice(-10)
+        .reverse()
+        .map((entry) => `<li><strong>${entry.action}</strong> — ${entry.summary} <span class="muted">${entry.at}</span></li>`)
+        .join('')}
+    </ul>
+  `;
 }
 
 function roleSelectFlags(role) {

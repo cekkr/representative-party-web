@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { persistNotifications } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
-import { resolveContactChannels } from './outbound.js';
+import { deliverOutbound, resolveContactChannels } from './outbound.js';
 
 export async function createNotification(state, notification) {
   const entry = {
@@ -23,7 +23,9 @@ export async function createNotification(state, notification) {
 export async function createNotificationWithOutbound(state, notification, contactHint = {}) {
   const contact = resolveContactChannels(state, contactHint);
   await createNotification(state, notification);
-  return contact;
+  const outbound = state.outbound || {};
+  const result = await deliverOutbound(state, { contact, notification, transport: outbound });
+  return { contact, outbound: result };
 }
 
 export function listNotificationsForCitizen(state, citizen) {

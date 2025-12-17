@@ -1,4 +1,4 @@
-import { createNotification } from '../messaging/notifications.js';
+import { createNotificationWithOutbound } from '../messaging/notifications.js';
 import { findSessionByHandle } from './followGraph.js';
 
 const SNIPPET_LENGTH = 120;
@@ -11,6 +11,8 @@ export async function notifySocialParticipants(state, { post, author, targetSess
     recipients.set(targetSession.pidHash, {
       type: 'social_direct',
       message: `Direct message from ${author?.handle || 'someone'}: ${snippet}`,
+      sessionId: targetSession.id,
+      handle: targetSession.handle,
     });
   }
 
@@ -22,15 +24,17 @@ export async function notifySocialParticipants(state, { post, author, targetSess
     recipients.set(session.pidHash, {
       type: 'social_mention',
       message: `Mention from ${author?.handle || 'someone'}: ${snippet}`,
+      sessionId: session.id,
+      handle: session.handle,
     });
   }
 
   for (const [recipientHash, payload] of recipients.entries()) {
-    await createNotification(state, {
+    await createNotificationWithOutbound(state, {
       type: payload.type,
       recipientHash,
       message: payload.message,
-    });
+    }, { sessionId: payload.sessionId, handle: payload.handle });
   }
 }
 

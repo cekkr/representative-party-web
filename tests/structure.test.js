@@ -8,7 +8,7 @@ import {
   parseProviderFieldInput,
   upsertProviderAttributes,
 } from '../src/modules/structure/structureManager.js';
-import { resolveContactChannels } from '../src/modules/messaging/outbound.js';
+import { resolveContactChannels, deliverOutbound } from '../src/modules/messaging/outbound.js';
 
 test('structure manager normalizes provider fields and attributes', () => {
   const { fields, errors } = parseProviderFieldInput('email:email:Contact email\nnotify:boolean:Notify me');
@@ -48,4 +48,12 @@ test('structure manager normalizes provider fields and attributes', () => {
   assert.equal(contact.email, 'user@example.org');
   assert.equal(contact.handle, 'citizen-1');
   assert.equal(contact.providerOnly, true);
+
+  const outbound = await deliverOutbound(
+    {},
+    { contact, notification: { message: 'Hello world' }, transport: { sendEmail: async () => true, sendSms: async () => true } },
+  );
+  assert.equal(outbound.delivered, true);
+  assert.equal(outbound.channels.email, true);
+  assert.equal(outbound.channels.sms, true);
 });
