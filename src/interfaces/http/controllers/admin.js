@@ -1,9 +1,24 @@
 import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../modules/topics/topicGardenerClient.js';
-import { persistPeers, persistSessions, persistSettings } from '../../infra/persistence/storage.js';
+import {
+  persistPeers,
+  persistProfileAttributes,
+  persistProfileStructures,
+  persistSessions,
+  persistSettings,
+} from '../../infra/persistence/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
 import { listAvailableExtensions } from '../../modules/extensions/registry.js';
 import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
+import {
+  CANONICAL_PROFILE_FIELDS,
+  describeCanonicalProfile,
+  formatProviderFieldsForTextarea,
+  normalizeProviderFields,
+  parseAttributePayload,
+  parseProviderFieldInput,
+  upsertProviderAttributes,
+} from '../../modules/structure/structureManager.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
@@ -24,6 +39,26 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const intent = body.intent || 'settings';
   if (intent === 'session') {
     const result = await updateSession(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings' },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'structure') {
+    const result = await updateStructure(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings' },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'profile-attributes') {
+    const result = await updateProfileAttributes(state, body);
     const availableExtensions = await listAvailableExtensions(state);
     const html = await renderPage(
       'admin',
@@ -164,7 +199,52 @@ async function updateSession(state, body) {
   };
 }
 
-function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensions = [] }) {
+async function updateStructure(state, body) {
+  const parsedFields = parseProviderFieldInput(body.providerFields || '');
+  const normalized = normalizeProviderFields(parsedFields);
+  state.profileStructures = normalized;
+  await persistProfileStructures(state);
+  return {
+    flash: normalized.length
+      ? `Provider-local schema saved (${normalized.length} field${normalized.length === 1 ? '' : 's'}).`
+      : 'Provider-local schema cleared.',
+    providerFieldsValue: formatProviderFieldsForTextarea(normalized),
+  };
+}
+
+async function updateProfileAttributes(state, body) {
+  const sessionId = sanitizeText(body.attributesSessionId || '', 72);
+  const payload = body.attributesPayload || '';
+  if (!sessionId) {
+    return { flash: 'Session ID required to persist profile attributes.', attributesPayloadValue: payload };
+  }
+  const session = state.sessions.get(sessionId);
+  if (!session) {
+    return { flash: `Session "${sessionId}" not found.`, attributesSessionId: sessionId, attributesPayloadValue: payload };
+  }
+  const providerFields = normalizeProviderFields(state.profileStructures || []);
+  const attributes = parseAttributePayload(payload, providerFields);
+  state.profileStructures = providerFields;
+  const replace = Object.keys(attributes).length === 0;
+  const entry = upsertProviderAttributes(state, { sessionId, handle: session.handle, attributes, replace });
+  await persistProfileStructures(state);
+  await persistProfileAttributes(state);
+
+  const flash =
+    entry && entry.provider && Object.keys(entry.provider).length
+      ? `Provider attributes saved for session "${sessionId}".`
+      : `Provider attributes cleared for session "${sessionId}".`;
+  return {
+    flash,
+    attributesSessionId: sessionId,
+    attributesPayloadValue: renderAttributesPayload(entry?.provider),
+  };
+}
+
+function buildAdminViewModel(
+  state,
+  { flash, sessionForm = {}, availableExtensions = [], providerFieldsValue, attributesSessionId, attributesPayloadValue } = {},
+) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
   const postingGate = evaluateAction(state, null, 'post');
@@ -178,6 +258,10 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
   const topicPinned = (topicConfig.pinned || []).join(', ');
   const replicationProfile = getReplicationProfile(state);
   const dataConfig = state.settings?.data || DATA_DEFAULTS;
+  const providerFields = normalizeProviderFields(state.profileStructures || []);
+  const providerFieldsValueRendered = providerFieldsValue ?? formatProviderFieldsForTextarea(providerFields);
+  const attributesSessionIdValue = attributesSessionId || '';
+  const attributesPayloadValueRendered = attributesPayloadValue || '';
 
   return {
     circleName: effective.circleName,
@@ -226,7 +310,18 @@ function buildAdminViewModel(state, { flash, sessionForm = {}, availableExtensio
     dataAdapterSql: dataConfig.adapter === 'sql' ? 'selected' : '',
     dataAdapterKv: dataConfig.adapter === 'kv' ? 'selected' : '',
     dataPreviewChecked: dataConfig.allowPreviews ? 'checked' : '',
+    canonicalProfileSummary: describeCanonicalProfile(),
+    providerFieldsValue: providerFieldsValueRendered,
+    providerFieldCount: providerFields.length,
+    attributesSessionId: attributesSessionIdValue,
+    attributesPayloadValue: attributesPayloadValueRendered,
   };
+}
+
+function renderAttributesPayload(provider = {}) {
+  return Object.entries(provider || {})
+    .map(([key, value]) => `${key}: ${value}`)
+    .join('\n');
 }
 
 function roleSelectFlags(role) {

@@ -19,6 +19,8 @@ const KEYS = [
   'actors',
   'socialFollows',
   'socialPosts',
+  'profileStructures',
+  'profileAttributes',
   'settings',
   'meta',
 ];
@@ -126,6 +128,14 @@ class KeyValueStateStore {
 
   async saveSocialPosts(entries) {
     await this.saveKey('socialPosts', entries);
+  }
+
+  async saveProfileStructures(entries) {
+    await this.saveKey('profileStructures', entries);
+  }
+
+  async saveProfileAttributes(entries) {
+    await this.saveKey('profileAttributes', entries);
   }
 
   async saveSettings(settings) {

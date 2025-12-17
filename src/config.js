@@ -58,6 +58,8 @@ export const FILES = {
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
   socialFollows: join(PATHS.DATA_ROOT, 'social-follows.json'),
   socialPosts: join(PATHS.DATA_ROOT, 'social-posts.json'),
+  profileStructures: join(PATHS.DATA_ROOT, 'profile-structures.json'),
+  profileAttributes: join(PATHS.DATA_ROOT, 'profile-attributes.json'),
   meta: join(PATHS.DATA_ROOT, 'meta.json'),
   settings: join(PATHS.DATA_ROOT, 'settings.json'),
 };

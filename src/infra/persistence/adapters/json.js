@@ -32,6 +32,8 @@ class JsonStateStore {
       actors: await this.readJson(FILES.actors, []),
       socialFollows: await this.readJson(FILES.socialFollows, []),
       socialPosts: await this.readJson(FILES.socialPosts, []),
+      profileStructures: await this.readJson(FILES.profileStructures, []),
+      profileAttributes: await this.readJson(FILES.profileAttributes, []),
       settings: await this.readJson(FILES.settings, { initialized: false }),
     };
   }
@@ -56,6 +58,8 @@ class JsonStateStore {
     await this.writeJson(FILES.actors, data.actors || []);
     await this.writeJson(FILES.socialFollows, data.socialFollows || []);
     await this.writeJson(FILES.socialPosts, data.socialPosts || []);
+    await this.writeJson(FILES.profileStructures, data.profileStructures || []);
+    await this.writeJson(FILES.profileAttributes, data.profileAttributes || []);
     await this.writeJson(FILES.settings, data.settings || { initialized: false });
   }
 
@@ -121,6 +125,14 @@ class JsonStateStore {
 
   async saveSocialPosts(entries) {
     await this.writeJson(FILES.socialPosts, entries);
+  }
+
+  async saveProfileStructures(entries) {
+    await this.writeJson(FILES.profileStructures, entries);
+  }
+
+  async saveProfileAttributes(entries) {
+    await this.writeJson(FILES.profileAttributes, entries);
   }
 
   async saveSettings(settings) {

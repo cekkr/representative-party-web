@@ -1,6 +1,6 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 
-export const LATEST_SCHEMA_VERSION = 11;
+export const LATEST_SCHEMA_VERSION = 12;
 
 const MIGRATIONS = [
   {
@@ -232,6 +232,19 @@ const MIGRATIONS = [
         ...data,
         socialFollows: (data.socialFollows || []).map((entry, idx) => enhance(entry, idx, 'follow')),
         socialPosts: (data.socialPosts || []).map((entry, idx) => enhance(entry, idx, 'post')),
+      };
+    },
+  },
+  {
+    version: 12,
+    description: 'Add provider-local profile structure and attributes scaffolds.',
+    up: (data) => {
+      const structures = Array.isArray(data.profileStructures) ? data.profileStructures : [];
+      const attributes = Array.isArray(data.profileAttributes) ? data.profileAttributes : [];
+      return {
+        ...data,
+        profileStructures: structures,
+        profileAttributes: attributes,
       };
     },
   },

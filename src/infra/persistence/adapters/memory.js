@@ -95,6 +95,14 @@ class MemoryStateStore {
   async saveSettings(settings) {
     this._data.settings = clone(settings || { initialized: false });
   }
+
+  async saveProfileStructures(entries) {
+    this._data.profileStructures = clone(entries || []);
+  }
+
+  async saveProfileAttributes(entries) {
+    this._data.profileAttributes = clone(entries || []);
+  }
 }
 
 function clone(value) {
@@ -118,6 +126,8 @@ function getEmptyData() {
     actors: [],
     socialFollows: [],
     socialPosts: [],
+    profileStructures: [],
+    profileAttributes: [],
     settings: { initialized: false },
   };
 }

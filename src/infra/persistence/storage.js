@@ -88,6 +88,14 @@ export async function persistSettings(state) {
   await state.store.saveSettings(state.settings);
 }
 
+export async function persistProfileStructures(state) {
+  await state.store.saveProfileStructures(state.profileStructures || []);
+}
+
+export async function persistProfileAttributes(state) {
+  await state.store.saveProfileAttributes(state.profileAttributes || []);
+}
+
 function hydrateState(data) {
   const settings = data.settings || { initialized: false };
   return {
@@ -106,6 +114,8 @@ function hydrateState(data) {
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     socialFollows: data.socialFollows || [],
     socialPosts: data.socialPosts || [],
+    profileStructures: data.profileStructures || [],
+    profileAttributes: data.profileAttributes || [],
     settings,
   };
 }
