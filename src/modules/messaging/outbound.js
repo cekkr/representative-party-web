@@ -43,7 +43,10 @@ export function resolveContactChannels(state, { sessionId, handle } = {}) {
 
 export async function deliverOutbound(state, { contact, notification, transport = defaultTransport }) {
   if (!contact) return { delivered: false, channels: {} };
-  const subject = sanitizeText(notification.message || 'Notification', 120);
+  if (contact.notify === false) return { delivered: false, channels: {}, suppressed: true };
+  const circleName = sanitizeText(state?.settings?.circleName || 'Party Circle', 80) || 'Party Circle';
+  const typeLabel = sanitizeText(notification?.type || 'Notification', 48) || 'Notification';
+  const subject = sanitizeText(`${circleName} · ${typeLabel}`, 120);
   const body = notification.message || '';
   const channels = {};
   if (contact.email && transport.sendEmail) {

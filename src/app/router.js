@@ -1,6 +1,6 @@
 import { URL } from 'node:url';
 
-import { renderAdmin, updateAdmin } from '../interfaces/http/controllers/admin.js';
+import { renderAdmin, updateAdmin, exportAuditLog } from '../interfaces/http/controllers/admin.js';
 import { serveActor, inbox } from '../interfaces/http/controllers/activitypub.js';
 import { completeAuth, startAuth } from '../interfaces/http/controllers/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../interfaces/http/controllers/circle.js';
@@ -67,6 +67,7 @@ const routes = [
   { method: 'POST', path: '/votes/gossip', action: gossipVotes },
   { method: 'GET', path: '/extensions', action: getExtensions },
   { method: 'POST', path: '/extensions', action: toggleExtension },
+  { method: 'GET', path: '/admin/audit', action: exportAuditLog },
   {
     method: 'GET',
     prefix: '/ap/actors/',

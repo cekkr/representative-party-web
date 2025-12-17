@@ -18,7 +18,7 @@ import {
   parseProviderFieldInput,
   upsertProviderAttributes,
 } from '../../modules/structure/structureManager.js';
-import { sendHtml } from '../../shared/utils/http.js';
+import { sendHtml, sendJson } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
@@ -31,6 +31,11 @@ export async function renderAdmin({ req, res, state, wantsPartial }) {
     { wantsPartial, title: 'Admin · Circle Settings' },
   );
   return sendHtml(res, html);
+}
+
+export function exportAuditLog({ res, state }) {
+  const entries = (state.settings?.auditLog || []).slice(-50);
+  return sendJson(res, 200, { auditLog: entries });
 }
 
 export async function updateAdmin({ req, res, state, wantsPartial }) {
