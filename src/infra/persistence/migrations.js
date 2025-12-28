@@ -55,7 +55,7 @@ const MIGRATIONS = [
         const pidHash = session.pidHash || session.hash || null;
         return {
           ...session,
-          role: session.role || 'citizen',
+          role: session.role || 'person',
           handle: session.handle || deriveHandleFromPid(pidHash, session.id || session.sessionId || session.sid),
           banned: Boolean(session.banned),
         };
@@ -304,7 +304,7 @@ function normalizeSession(session) {
     salt: session.salt || session.nonce || '',
     offer: session.offer || session.credentialOffer || null,
     actorId: session.actorId || null,
-    role: session.role || 'citizen',
+    role: session.role || 'person',
     handle: session.handle || deriveHandleFromPid(pidHash, id),
     banned: Boolean(session.banned),
   };
@@ -346,12 +346,12 @@ function deriveHashFromActorId(actorId) {
 
 function deriveHandleFromPid(pidHash, fallbackId) {
   if (pidHash) {
-    return `citizen-${String(pidHash).slice(0, 8)}`;
+    return `person-${String(pidHash).slice(0, 8)}`;
   }
   if (fallbackId) {
     return `session-${String(fallbackId).slice(0, 8)}`;
   }
-  return 'citizen';
+  return 'person';
 }
 
 function parseEnvExtensions() {

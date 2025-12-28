@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { createActor } from '../../modules/federation/activitypub.js';
 import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../modules/identity/auth.js';
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { getCirclePolicyState } from '../../modules/circle/policy.js';
 import { deriveBaseUrl } from '../../shared/utils/request.js';
 import { sendHtml } from '../../shared/utils/http.js';
@@ -14,7 +14,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
   const url = new URL(req.url, baseUrl);
   const resumeId = url.searchParams.get('session');
   const existing = resumeId ? state.sessions.get(resumeId) : null;
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const policy = getCirclePolicyState(state);
 
   if (existing && existing.status === 'verified') {
@@ -25,7 +25,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
       },
-      { wantsPartial, title: 'Citizen Verified' },
+      { wantsPartial, title: 'Person Verified' },
     );
     const cookie = buildSessionCookie(existing.id);
     return sendHtml(res, html, { 'Set-Cookie': cookie });
@@ -42,7 +42,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
     issuedAt: shouldResume ? existing.issuedAt : Date.now(),
     salt,
     offer,
-    role: existing?.role || 'citizen',
+    role: existing?.role || 'person',
     banned: existing?.banned || false,
   });
   await persistSessions(state);
@@ -63,7 +63,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         policy.enforcement === 'strict'
           ? 'Circle enforcement active: verification required to post or vote.'
           : 'Circle observing mode: verification encouraged for accountability.',
-      citizenHandle: citizen?.handle,
+      personHandle: person?.handle,
     },
     { wantsPartial, title: 'EUDI Wallet Handshake' },
   );
@@ -105,8 +105,8 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   state.actors.set(pidHash, actor);
   await persistActors(state);
 
-  const handle = session.handle || `citizen-${pidHash.slice(0, 8)}`;
-  const role = session.role || 'citizen';
+  const handle = session.handle || `person-${pidHash.slice(0, 8)}`;
+  const role = session.role || 'person';
   const banned = Boolean(session.banned);
 
   state.sessions.set(sessionId, {
@@ -125,7 +125,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   const html = await renderPage(
     'verification-complete',
     { pidHashShort: pidHash.slice(0, 8), ledgerNote, actorId: actor.id },
-    { wantsPartial, title: 'Citizen Verified' },
+    { wantsPartial, title: 'Person Verified' },
   );
 
   const cookie = buildSessionCookie(sessionId);

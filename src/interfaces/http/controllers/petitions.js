@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { classifyTopic } from '../../modules/topics/classification.js';
 import { resolveDelegation } from '../../modules/delegation/delegation.js';
-import { recommendDelegationForCitizen } from '../../modules/groups/groups.js';
+import { recommendDelegationForPerson } from '../../modules/groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.js';
 import { createNotification } from '../../modules/messaging/notifications.js';
 import { persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
@@ -18,26 +18,26 @@ import { renderPetitionList } from '../views/petitionView.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const petitionGate = evaluateAction(state, citizen, 'petition');
-  const voteGate = evaluateAction(state, citizen, 'vote');
-  const moderateGate = evaluateAction(state, citizen, 'moderate');
+  const person = getPerson(req, state);
+  const petitionGate = evaluateAction(state, person, 'petition');
+  const voteGate = evaluateAction(state, person, 'vote');
+  const moderateGate = evaluateAction(state, person, 'moderate');
   const signatures = filterVisibleEntries(state.signatures, state);
   const delegations = filterVisibleEntries(state.delegations, state);
   const conflicts = delegations?.filter((d) => d.conflict) || [];
-  const suggestions = renderSuggestions(citizen, state);
+  const suggestions = renderSuggestions(person, state);
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);
   const html = await renderPage(
     'petitions',
     {
-      citizenHandle: citizen?.handle || 'Not verified yet',
+      personHandle: person?.handle || 'Not verified yet',
       petitionStatus: petitionGate.allowed ? 'You can draft petitions.' : petitionGate.message || petitionGate.reason,
       voteStatus: voteGate.allowed ? 'You can vote on petitions.' : voteGate.message || voteGate.reason,
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
-      roleLabel: citizen?.role || 'guest',
-      petitionsList: renderPetitionList(petitions, votes, signatures, citizen, moderateGate.allowed),
+      roleLabel: person?.role || 'guest',
+      petitionsList: renderPetitionList(petitions, votes, signatures, person, moderateGate.allowed),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
       delegationSuggestions: suggestions,
     },
@@ -46,9 +46,9 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   return sendHtml(res, html);
 }
 
-function renderSuggestions(citizen, state) {
-  if (!citizen) return 'Login to see group delegate suggestions.';
-  const rec = recommendDelegationForCitizen(citizen, 'general', state);
+function renderSuggestions(person, state) {
+  if (!person) return 'Login to see group delegate suggestions.';
+  const rec = recommendDelegationForPerson(person, 'general', state);
   if (!rec.suggestions || !rec.suggestions.length) return 'No suggestions.';
   return `
     <form data-enhance="delegation-conflict" action="/delegation/conflict" method="post" class="stack">
@@ -65,8 +65,8 @@ function renderSuggestions(citizen, state) {
 }
 
 export async function submitPetition({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'petition');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'petition');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Petitioning not allowed.' });
   }
@@ -84,7 +84,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     id: randomUUID(),
     title,
     summary,
-    authorHash: citizen?.pidHash || 'anonymous',
+    authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     status: 'draft',
     quorum: Number(body.quorum || 0),
@@ -96,14 +96,14 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   await persistPetitions(state);
   await logTransaction(state, {
     type: 'petition_drafted',
-    actorHash: citizen?.pidHash || 'anonymous',
+    actorHash: person?.pidHash || 'anonymous',
     petitionId: petition.id,
     payload: { title, topic, summary },
   });
-  if (citizen?.pidHash) {
+  if (person?.pidHash) {
     await createNotification(state, {
       type: 'petition_created',
-      recipientHash: citizen.pidHash,
+      recipientHash: person.pidHash,
       petitionId: petition.id,
       message: `Petition "${title}" drafted. Topic ${topic}.`,
       expiresAt: null,
@@ -119,8 +119,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
 }
 
 export async function castVote({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'vote');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'vote');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Voting not allowed.' });
   }
@@ -138,7 +138,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   if (!choice || choice === 'auto') {
-    const delegation = resolveDelegation(citizen, exists.topic, state, {
+    const delegation = resolveDelegation(person, exists.topic, state, {
       notify: (notification) => createNotification(state, notification),
     });
     if (delegation) {
@@ -149,11 +149,11 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   const policy = getEffectivePolicy(state);
-  if (policy.enforceCircle && (!citizen || !citizen.pidHash)) {
-    return sendJson(res, 401, { error: 'strict_requires_verification', message: 'Strict Circle: only verified citizens may vote.' });
+  if (policy.enforceCircle && (!person || !person.pidHash)) {
+    return sendJson(res, 401, { error: 'strict_requires_verification', message: 'Strict Circle: only verified people may vote.' });
   }
 
-  const authorHash = citizen?.pidHash || 'anonymous';
+  const authorHash = person?.pidHash || 'anonymous';
   const vote = {
     petitionId,
     authorHash,
@@ -174,10 +174,10 @@ export async function castVote({ req, res, state, wantsPartial }) {
     petitionId,
     payload: { choice, envelope: vote.envelope },
   });
-  if (citizen?.pidHash) {
+  if (person?.pidHash) {
     await createNotification(state, {
       type: 'vote_recorded',
-      recipientHash: citizen.pidHash,
+      recipientHash: person.pidHash,
       petitionId,
       message: `Vote recorded for petition "${exists.title}" with choice "${choice}".`,
       expiresAt: null,
@@ -193,8 +193,8 @@ export async function castVote({ req, res, state, wantsPartial }) {
 }
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'moderate');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Moderation not allowed.' });
   }
@@ -215,7 +215,7 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   await persistPetitions(state);
   await logTransaction(state, {
     type: 'petition_status',
-    actorHash: citizen?.pidHash || 'anonymous',
+    actorHash: person?.pidHash || 'anonymous',
     petitionId,
     payload: { status, quorum },
   });
@@ -228,8 +228,8 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
 }
 
 export async function signPetitionRoute({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'vote');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'vote');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Signing not allowed.' });
   }
@@ -239,10 +239,10 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
   if (!petition) {
     return sendJson(res, 404, { error: 'petition_not_found' });
   }
-  if (hasSigned(petitionId, citizen, state)) {
+  if (hasSigned(petitionId, person, state)) {
     return sendJson(res, 400, { error: 'already_signed' });
   }
-  await signPetition({ petition, citizen, state });
+  await signPetition({ petition, person, state });
   if (wantsPartial) {
     const html = await renderPetitions({ req, res, state, wantsPartial: true });
     return sendHtml(res, html);

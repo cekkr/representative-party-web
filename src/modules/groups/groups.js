@@ -28,22 +28,22 @@ export function getGroupRoles(group) {
   return group.roles || [];
 }
 
-export async function joinGroup({ groupId, citizen, state }) {
+export async function joinGroup({ groupId, person, state }) {
   const group = (state.groups || []).find((g) => g.id === groupId);
-  if (!group || !citizen?.pidHash) return null;
-  if (!group.members.includes(citizen.pidHash)) {
-    group.members.push(citizen.pidHash);
+  if (!group || !person?.pidHash) return null;
+  if (!group.members.includes(person.pidHash)) {
+    group.members.push(person.pidHash);
     group.roles = group.roles || [];
-    group.roles.push({ hash: citizen.pidHash, role: 'member', joinedAt: new Date().toISOString() });
+    group.roles.push({ hash: person.pidHash, role: 'member', joinedAt: new Date().toISOString() });
     await persistGroups(state);
   }
   return group;
 }
 
-export async function leaveGroup({ groupId, citizen, state }) {
+export async function leaveGroup({ groupId, person, state }) {
   const group = (state.groups || []).find((g) => g.id === groupId);
-  if (!group || !citizen?.pidHash) return null;
-  group.members = group.members.filter((m) => m !== citizen.pidHash);
+  if (!group || !person?.pidHash) return null;
+  group.members = group.members.filter((m) => m !== person.pidHash);
   await persistGroups(state);
   return group;
 }
@@ -67,10 +67,10 @@ export async function setGroupDelegate({ groupId, topic, delegateHash, priority,
   return group;
 }
 
-export function recommendDelegationForCitizen(citizen, topic, state) {
-  if (!citizen?.pidHash) return { suggestions: [], conflict: false };
+export function recommendDelegationForPerson(person, topic, state) {
+  if (!person?.pidHash) return { suggestions: [], conflict: false };
   const topicKey = (topic || 'general').toLowerCase();
-  const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(citizen.pidHash));
+  const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(person.pidHash));
   const suggestions = [];
   for (const group of groups) {
     const match = (group.delegates || []).find((d) => d.topic === topicKey) || (group.delegates || []).find((d) => d.topic === 'general');

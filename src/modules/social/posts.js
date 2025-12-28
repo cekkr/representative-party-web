@@ -9,7 +9,7 @@ const MAX_POST_LENGTH = 560;
 
 export function createPost(
   state,
-  { citizen, content, replyTo = null, visibility = 'public', targetHash = '', targetHandle = '', baseUrl },
+  { person, content, replyTo = null, visibility = 'public', targetHash = '', targetHandle = '', baseUrl },
 ) {
   const body = sanitizeText(content, MAX_POST_LENGTH);
   if (!body) {
@@ -27,8 +27,8 @@ export function createPost(
 
   const entry = stampLocalEntry(state, {
     id: randomUUID(),
-    authorHash: citizen?.pidHash || 'anonymous',
-    authorHandle: citizen?.handle || 'guest',
+    authorHash: person?.pidHash || 'anonymous',
+    authorHandle: person?.handle || 'guest',
     content: body,
     createdAt: new Date().toISOString(),
     replyTo: replyTo || null,
@@ -47,13 +47,13 @@ export function createPost(
   return entry;
 }
 
-export function buildFeed(state, citizen, { followType } = {}) {
+export function buildFeed(state, person, { followType } = {}) {
   const allPosts = filterVisibleEntries(state.socialPosts || [], state);
-  if (!citizen) {
+  if (!person) {
     return allPosts.filter((post) => post.visibility !== 'direct').slice(0, 80);
   }
 
-  const ownHash = citizen.pidHash;
+  const ownHash = person.pidHash;
   const normalizedType = followType ? normalizeFollowType(followType) : null;
   const follows = listFollowsFor(state, ownHash, normalizedType || undefined);
   const followedHashes = new Set(follows.map((edge) => edge.targetHash));

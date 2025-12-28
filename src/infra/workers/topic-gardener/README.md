@@ -4,7 +4,7 @@ Lightweight Python helper that mirrors the DynamicTopicCategorization notes. It 
 
 - Endpoint: `POST /classify` with JSON `{ "text": "...", "anchors": ["general", "..."], "pinned": ["..."] }`
 - Response: `{ "topic": "economy", "provider": "topic-gardener", "anchors": [...], "pinned": [...] }`
-- Anchors: admin/policy-provided list that keeps labels consistent (e.g., `governance`, `economy`, `society`, `technology`). Pinned topics reflect user/citizen-picked categories.
+- Anchors: admin/policy-provided list that keeps labels consistent (e.g., `governance`, `economy`, `society`, `technology`). Pinned topics reflect user/person-picked categories.
 - This stub uses simple keyword heuristics and prefers pinned/anchor matches; swap the `choose_topic` function with a BERTopic/LLM-backed flow when ready.
 
 Run locally:

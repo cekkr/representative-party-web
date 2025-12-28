@@ -1,16 +1,16 @@
-This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) while framing the base as a messaging-first social network that existing orgs can adopt without heavy restructuring. Default actor is a user; “citizen” is a civic/party Circle label that signals a verified natural person (exclusion principle: org/bot/service accounts cannot hold handles). Near-term priority is an operable messaging layer with durable data and policy gates; deep protocol polish follows once users can actually interact.
+This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) while framing the base as a messaging-first social network that existing orgs can adopt without heavy restructuring. Default actor is a user; “person” is a civic/party Circle label that signals a verified natural person (exclusion principle: org/bot/service accounts cannot hold handles). Near-term priority is an operable messaging layer with durable data and policy gates; deep protocol polish follows once users can actually interact.
 
 ## Anchoring Principles (from Representative Parties)
-- **One person/citizen, One Voice** backed by blinded identity; federation guards against double representation and toxic providers. “Citizen” is a Circle-specific label layered on top of the user role when civic proof is enabled.
+- **One person/person, One Voice** backed by blinded identity; federation guards against double representation and toxic providers. “Person” is a Circle-specific label layered on top of the user role when civic proof is enabled.
 - **Exclusion principle**: only natural persons can hold handles or act; org/bot/service accounts are blocked via verification policy and banned flagging.
 - **Soft-power accountability**: transparency and auditable trails instead of hard imperative mandates.
-- **Liquid representation**: delegation is topic-scoped, revocable, and visible; users/citizens can migrate without losing history.
+- **Liquid representation**: delegation is topic-scoped, revocable, and visible; users/people can migrate without losing history.
 - **Phygital inclusion**: the digital platform must remain accessible via desktop/mobile and be mirrored by physical “agorà” touchpoints.
 - **Messaging-first adoption**: start with a simple messaging/social layer; petitions/votes/delegation/federation are modular so existing orgs can extend at their own pace.
 
 ## Architecture Baseline (Phase 1 kernel)
 - **Modular NodeJS monolith**: app entry under `src/app/` (server + table-driven router), HTTP controllers in `src/interfaces/http/controllers/`, domain logic in `src/modules/`, persistence in `src/infra/persistence/`, shared helpers in `src/shared/`, and view helpers in `src/interfaces/http/views/`.
-- **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “citizen” for civic Circles to enforce natural-person guarantees.
+- **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “person” for civic Circles to enforce natural-person guarantees.
 - **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded hash) stay fixed across a party ring; provider-local optional fields (contact email, personal info, notification preferences) are modeled via a schema/data-table editor and stored locally to power provider-owned notifications/consent.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
 - **Federation seeds**: ActivityPub actor emitter, inbox placeholder, gossip endpoints for peer/ledger sync.
@@ -28,7 +28,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## UX Baseline (to harden during Phase 1)
 - Clear entry points: CTA for “Verify with EU Wallet” and “Start debating” with copy that explains privacy (hash-only, no PII stored) and the natural-person exclusion principle when civic mode is on.
 - Deep link / QR duality: desktop shows QR + copyable link; mobile prioritizes direct handoff.
-- Accountability cues: show verified handle/citizen badge, ledger count, and Circle policy status on every page frame.
+- Accountability cues: show verified handle/person badge, ledger count, and Circle policy status on every page frame.
 - Error/edge flows: graceful partial responses for session issues; offline-friendly offer preview and retry CTA.
 - Accessibility: keyboard-friendly forms, high-contrast defaults, and no client-side blocking for SSR-first paths.
 
@@ -39,7 +39,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Implementation Roadmap
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
-- Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “citizen” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
+- Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
 - Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs (petitions/votes can stay disabled in messaging-only deployments).
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
@@ -49,7 +49,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
-- **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (citizens when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
+- **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (people when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override.
@@ -72,7 +72,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 # General roadmap
 
-This version keeps the **"Party Circle"** and **European Digital Identity (EUDI)** integration as a first-class capability while keeping the day-one footprint messaging-first. Verification enforcement is policy-driven per Circle: enable it to mark users as citizens (natural-person guarantee) or run in lighter user-only mode. The first milestone is an operative messaging network with handles, role-aware privileges, and end-to-end validated data flows; protocol depth and federation details harden afterward.
+This version keeps the **"Party Circle"** and **European Digital Identity (EUDI)** integration as a first-class capability while keeping the day-one footprint messaging-first. Verification enforcement is policy-driven per Circle: enable it to mark users as people (natural-person guarantee) or run in lighter user-only mode. The first milestone is an operative messaging network with handles, role-aware privileges, and end-to-end validated data flows; protocol depth and federation details harden afterward.
 
 ### **Technical Philosophy & Stack Overview**
 
@@ -81,7 +81,7 @@ This version keeps the **"Party Circle"** and **European Digital Identity (EUDI)
       * **SEO:** Server-Side Rendering (SSR) for distinct URLs and indexing.
       * **Performance:** Vanilla JS "Router Interceptor" for an app-like feel (fetching partial HTML/JSON) without heavy framework bloat.
   * **Protocol:** **Federated (ActivityPub) + OIDC4VP**.
-      * **Identity:** Decoupled. The server knows *that* you are a unique user; when civic proof is enabled it marks you as a citizen (natural-person guarantee) without learning *who* you are.
+      * **Identity:** Decoupled. The server knows *that* you are a unique user; when civic proof is enabled it marks you as a person (natural-person guarantee) without learning *who* you are.
       * **Federation:** "Party Circle" servers share a "Allow List" of trusted providers and sync user uniqueness hashes to prevent double-voting across the network.
 
 -----
@@ -98,7 +98,7 @@ Instead of a traditional login (email/password), the framework acts as a **Verif
     1.  User clicks "Login with EU Wallet."
     2.  The server generates a QR Code / Deep Link requesting a **Unique Pseudonymous ID** (PID) from the user's EUDI Wallet.
     3.  **Privacy Logic:** The request explicitly asks *only* for a unique hash (e.g., `hash(NationalID + Salt)`), **not** the user's name or address.
-    4.  **Zero-Knowledge Proof:** The wallet proves the user is a valid citizen of a specific region without revealing their identity to the server.
+    4.  **Zero-Knowledge Proof:** The wallet proves the user is a valid person of a specific region without revealing their identity to the server.
   * **Non-EU Regions:** The module is abstract. A "Circle" in the US could swap the EUDI OIDC4VP driver for a different OIDC provider (e.g., a state ID system), provided it guarantees uniqueness.
 
 #### **2. The "Uniqueness Ledger" (Anti-Sock Puppet)**
@@ -119,8 +119,8 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 
 | Module Name | Role & Policy |
 | :--- | :--- |
-| **1. Party Circle (Civic kernel, optional)** | **Governance:** Manages OIDC4VP strategy, the "Uniqueness Ledger," and the list of federated peers when Circle mode is enabled. <br> **Policy:** Enforces the "One person/citizen, One Voice" rule, applies the natural-person exclusion principle, and handles "Toxic Provider" exclusion lists. |
-| **2. Discussion (Agorà)** | **Debate:** Standard threads with "Pro/Con" structure. <br> **Policy:** linked to the verified handle (user-by-default, citizen badge when civic proof is on) so participants are accountable to their unique hash. |
+| **1. Party Circle (Civic kernel, optional)** | **Governance:** Manages OIDC4VP strategy, the "Uniqueness Ledger," and the list of federated peers when Circle mode is enabled. <br> **Policy:** Enforces the "One person/person, One Voice" rule, applies the natural-person exclusion principle, and handles "Toxic Provider" exclusion lists. |
+| **2. Discussion (Agorà)** | **Debate:** Standard threads with "Pro/Con" structure. <br> **Policy:** linked to the verified handle (user-by-default, person badge when civic proof is on) so participants are accountable to their unique hash. |
 | **3. Dynamic Topics (Ext.)** | **Organization:** Users create nested category trees (tags). <br> **Policy:** Topics evolve organically based on usage metrics. |
 | **4. Petitions (Ext.)** | **Initiative:** Collaborative drafting of laws/proposals. <br> **Policy:** Git-like version control for text. Requires a signature threshold (Quorum) to move to Discussion. |
 | **5. The Connector** | **Workflow:** Logic engine (Petition $\rightarrow$ Discussion $\rightarrow$ Vote). |
@@ -149,11 +149,11 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * Build the "Deep Link" handler: A generic JS module that detects `openid-credential-offer://` links and triggers the user's installed EUDI Wallet app (or displays a QR code on desktop).
 4.  **Messaging baseline:**
       * Ship SSR discussion/forum surfaces and the notification registry as the default value even without petitions/votes enabled.
-      * Keep handles/roles visible so policy can later enforce the citizen-only exclusion principle without reworking the UX.
+      * Keep handles/roles visible so policy can later enforce the person-only exclusion principle without reworking the UX.
 
 #### **Phase 2: Deliberation & Structure (Months 5-7)**
 
-*Goal: Give users/citizens deliberation tools when the organization opts in.*
+*Goal: Give users/people deliberation tools when the organization opts in.*
 
 1.  **Petitions Module:**
       * Build the collaborative editor.

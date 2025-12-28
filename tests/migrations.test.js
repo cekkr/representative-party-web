@@ -29,9 +29,9 @@ test('migrations normalize sessions and settings', () => {
   assert.equal(migratedMeta.schemaVersion, LATEST_SCHEMA_VERSION);
   assert.equal(data.ledger.length, 1, 'deduplicated ledger entries');
   assert.equal(session.id, 'sess-123');
-  assert.equal(session.role, 'citizen');
+  assert.equal(session.role, 'person');
   assert.equal(session.banned, false);
-  assert.ok(session.handle.startsWith('citizen-'));
+  assert.ok(session.handle.startsWith('person-'));
   assert.equal(data.settings.circleName, 'Party Circle');
   assert.ok(Array.isArray(data.petitions));
   assert.ok(Array.isArray(data.signatures));

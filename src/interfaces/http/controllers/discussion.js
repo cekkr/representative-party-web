@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { evaluateAction, getCirclePolicyState } from '../../modules/circle/policy.js';
 import { persistDiscussions } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
@@ -12,14 +12,14 @@ import { renderPage } from '../views/templates.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const html = await renderDiscussionShell({ state, citizen, wantsPartial });
+  const person = getPerson(req, state);
+  const html = await renderDiscussionShell({ state, person, wantsPartial });
   return sendHtml(res, html);
 }
 
 export async function postDiscussion({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'post');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message });
   }
@@ -38,7 +38,7 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
     topic,
     stance,
     content,
-    authorHash: citizen?.pidHash || 'anonymous',
+    authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
   };
   const stamped = stampLocalEntry(state, entry);
@@ -46,16 +46,16 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
   await persistDiscussions(state);
 
   if (wantsPartial) {
-    const html = await renderDiscussionShell({ state, citizen, wantsPartial });
+    const html = await renderDiscussionShell({ state, person, wantsPartial });
     return sendHtml(res, html);
   }
 
   return sendRedirect(res, '/discussion');
 }
 
-async function renderDiscussionShell({ state, citizen, wantsPartial }) {
+async function renderDiscussionShell({ state, person, wantsPartial }) {
   const policy = getCirclePolicyState(state);
-  const permission = evaluateAction(state, citizen, 'post');
+  const permission = evaluateAction(state, person, 'post');
   const postingStatus = permission.allowed
     ? `Posting allowed as ${permission.role}.`
     : `Posting blocked: ${permission.message || permission.reason}`;
@@ -64,9 +64,9 @@ async function renderDiscussionShell({ state, citizen, wantsPartial }) {
     'discussion',
     {
       ledgerSize: state.uniquenessLedger.size,
-      citizenHandle: citizen?.handle || 'Not verified yet',
-      citizenStatus: citizen
-        ? 'Posting as verified citizen bound to a blinded PID hash.'
+      personHandle: person?.handle || 'Not verified yet',
+      personStatus: person
+        ? 'Posting as verified person bound to a blinded PID hash.'
         : 'Start the wallet flow to post with accountability.',
       discussionList: renderDiscussionList(filterVisibleEntries(state.discussions, state)),
       verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
@@ -77,7 +77,7 @@ async function renderDiscussionShell({ state, citizen, wantsPartial }) {
       hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
       postingStatus,
       postingReason: permission.message || '',
-      roleLabel: citizen?.role || 'guest',
+      roleLabel: person?.role || 'guest',
       statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
     { wantsPartial, title: 'Deliberation Sandbox' },

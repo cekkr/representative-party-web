@@ -176,7 +176,7 @@ function dedupe(list) {
 
 async function updateSession(state, body) {
   const sessionId = sanitizeText(body.sessionId || '', 72);
-  const role = sanitizeText(body.sessionRole || 'citizen', 32) || 'citizen';
+  const role = sanitizeText(body.sessionRole || 'person', 32) || 'person';
   const banned = parseBoolean(body.sessionBanned, false);
   const handle = sanitizeText(body.sessionHandle || '', 64);
   if (!sessionId) {
@@ -189,7 +189,7 @@ async function updateSession(state, body) {
 
   const next = {
     ...session,
-    role: role || session.role || 'citizen',
+    role: role || session.role || 'person',
     banned,
   };
   if (handle) {
@@ -272,7 +272,7 @@ function buildAdminViewModel(
   const effective = getEffectivePolicy(state);
   const postingGate = evaluateAction(state, null, 'post');
   const extensions = state.extensions?.active || [];
-  const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'citizen');
+  const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'person');
   const extensionsList = renderExtensions(availableExtensions);
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
@@ -311,7 +311,7 @@ function buildAdminViewModel(
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',
     sessionBannedChecked: sessionForm.banned ? 'checked' : '',
-    sessionRoleCitizen: roleFlags.citizen,
+    sessionRolePerson: roleFlags.person,
     sessionRoleDelegate: roleFlags.delegate,
     sessionRoleModerator: roleFlags.moderator,
     sessionRoleAdmin: roleFlags.admin,
@@ -378,7 +378,7 @@ function renderAuditLog(entries = []) {
 
 function roleSelectFlags(role) {
   return {
-    citizen: role === 'citizen' ? 'selected' : '',
+    person: role === 'person' ? 'selected' : '',
     delegate: role === 'delegate' ? 'selected' : '',
     moderator: role === 'moderator' ? 'selected' : '',
     admin: role === 'admin' ? 'selected' : '',

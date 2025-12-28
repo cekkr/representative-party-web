@@ -1,4 +1,4 @@
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
 import { persistSocialFollows, persistSocialPosts } from '../../infra/persistence/storage.js';
 import {
@@ -20,25 +20,25 @@ import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const feed = buildFeed(state, citizen, { followType: followTypeFilter || undefined });
-  const follows = citizen ? listFollowsFor(state, citizen.pidHash, followTypeFilter || undefined) : [];
-  const followers = citizen ? listFollowersOf(state, citizen.pidHash) : [];
-  const permission = evaluateAction(state, citizen, 'post');
+  const feed = buildFeed(state, person, { followType: followTypeFilter || undefined });
+  const follows = person ? listFollowsFor(state, person.pidHash, followTypeFilter || undefined) : [];
+  const followers = person ? listFollowersOf(state, person.pidHash) : [];
+  const permission = evaluateAction(state, person, 'post');
   const statusMeta = deriveStatusMeta(state);
 
   const html = await renderPage(
     'social',
     {
-      citizenHandle: citizen?.handle || 'Guest session',
-      roleLabel: citizen?.role || 'guest',
+      personHandle: person?.handle || 'Guest session',
+      roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
       postingReason: permission.message || permission.reason || '',
       followCount: follows.length,
       followerCount: followers.length,
       followList: renderFollowList(follows),
-      feedList: renderSocialPosts(feed, { enableReplies: Boolean(citizen) }),
+      feedList: renderSocialPosts(feed, { enableReplies: Boolean(person) }),
       followTypeOptions: renderFollowTypeOptions(followTypeFilter),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
@@ -51,8 +51,8 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
 }
 
 export async function postSocialMessage({ req, res, state, wantsPartial, url }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'post');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting blocked.' });
   }
@@ -82,9 +82,9 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 
   try {
     const baseUrl = deriveBaseUrl(req);
-    const post = createPost(state, { citizen, content, replyTo, visibility, targetHash, targetHandle, baseUrl });
+    const post = createPost(state, { person, content, replyTo, visibility, targetHash, targetHandle, baseUrl });
     await persistSocialPosts(state);
-    await notifySocialParticipants(state, { post, author: citizen, targetSession });
+    await notifySocialParticipants(state, { post, author: person, targetSession });
   } catch (error) {
     if (error.code === 'missing_content') {
       return sendJson(res, 400, { error: 'missing_content' });
@@ -103,8 +103,8 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 }
 
 export async function followHandle({ req, res, state, wantsPartial, url }) {
-  const citizen = getCitizen(req, state);
-  if (!citizen) {
+  const person = getPerson(req, state);
+  if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to follow.' });
   }
 
@@ -115,12 +115,12 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
   if (!targetSession) {
     return sendJson(res, 404, { error: 'handle_not_found', message: 'Handle not found.' });
   }
-  if (targetSession.pidHash === citizen.pidHash) {
+  if (targetSession.pidHash === person.pidHash) {
     return sendJson(res, 400, { error: 'invalid_target', message: 'You cannot follow yourself.' });
   }
 
   ensureFollowEdge(state, {
-    followerHash: citizen.pidHash,
+    followerHash: person.pidHash,
     targetHash: targetSession.pidHash,
     targetHandle: targetSession.handle,
     type: followType,
@@ -135,8 +135,8 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
 }
 
 export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
-  const citizen = getCitizen(req, state);
-  if (!citizen) {
+  const person = getPerson(req, state);
+  if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to unfollow.' });
   }
 
@@ -148,7 +148,7 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
   }
 
   removeFollowEdge(state, {
-    followerHash: citizen.pidHash,
+    followerHash: person.pidHash,
     targetHash: targetSession.pidHash,
   });
   await persistSocialFollows(state);
@@ -161,10 +161,10 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
 }
 
 export async function listRelationships({ req, res, state }) {
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const query = req.url ? new URL(req.url, `http://${req.headers.host}`) : null;
   const handleParam = query?.searchParams.get('handle') || '';
-  const targetSession = handleParam ? findSessionByHandle(state, handleParam) : citizen;
+  const targetSession = handleParam ? findSessionByHandle(state, handleParam) : person;
 
   if (!targetSession) {
     return sendJson(res, 404, { error: 'handle_not_found', message: 'Handle not found.' });

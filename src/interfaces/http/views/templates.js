@@ -11,8 +11,8 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   if (wantsPartial) return body;
   const layout = await loadTemplate('layout');
   const layoutData = { ...data, body, title };
-  if (!layoutData.citizenHandle) {
-    layoutData.citizenHandle = 'Guest session';
+  if (!layoutData.personHandle) {
+    layoutData.personHandle = 'Guest session';
   }
   return applyTemplate(layout, layoutData);
 }

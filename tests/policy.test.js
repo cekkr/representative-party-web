@@ -17,10 +17,10 @@ test('allows guest posting when verification is disabled', () => {
   assert.equal(decision.role, 'guest');
 });
 
-test('blocks banned citizens regardless of action', () => {
+test('blocks banned people regardless of action', () => {
   const state = buildState({ requireVerification: true });
-  const citizen = { sessionId: 'sess-1', pidHash: 'hash-1', role: 'citizen', banned: true };
-  const decision = evaluateAction(state, citizen, 'post');
+  const person = { sessionId: 'sess-1', pidHash: 'hash-1', role: 'person', banned: true };
+  const decision = evaluateAction(state, person, 'post');
   assert.equal(decision.allowed, false);
   assert.equal(decision.reason, 'banned');
 });
@@ -41,11 +41,11 @@ test('extensions can tighten action rules', () => {
     }),
   };
   const state = buildState({ requireVerification: true }, { active: [extension] });
-  const citizen = { sessionId: 'sess-3', pidHash: 'hash-3', role: 'citizen', banned: false };
+  const person = { sessionId: 'sess-3', pidHash: 'hash-3', role: 'person', banned: false };
   const delegate = { sessionId: 'sess-4', pidHash: 'hash-4', role: 'delegate', banned: false };
-  const decisionCitizen = evaluateAction(state, citizen, 'petition');
+  const decisionPerson = evaluateAction(state, person, 'petition');
   const decisionDelegate = evaluateAction(state, delegate, 'petition');
-  assert.equal(decisionCitizen.allowed, false);
+  assert.equal(decisionPerson.allowed, false);
   assert.equal(decisionDelegate.allowed, true);
 });
 

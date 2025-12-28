@@ -1,6 +1,6 @@
 // Centralize privilege resolution so posting/petition/vote checks share the same rules.
-export function getPrivilegesForCitizen(citizen, _state) {
-  if (!citizen) {
+export function getPrivilegesForPerson(person, _state) {
+  if (!person) {
     return {
       role: 'guest',
       sessionId: null,
@@ -13,8 +13,8 @@ export function getPrivilegesForCitizen(citizen, _state) {
     };
   }
 
-  const role = citizen.role || 'citizen';
-  const banned = Boolean(citizen.banned);
+  const role = person.role || 'person';
+  const banned = Boolean(person.banned);
   const canModerate = role === 'admin' || role === 'moderator';
   const canVote = !banned && role !== 'guest';
   const canPetition = !banned && role !== 'guest';
@@ -22,7 +22,7 @@ export function getPrivilegesForCitizen(citizen, _state) {
 
   return {
     role,
-    sessionId: citizen.sessionId || null,
+    sessionId: person.sessionId || null,
     banned,
     canPost,
     canModerate,

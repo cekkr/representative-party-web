@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { classifyTopic } from '../../modules/topics/classification.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
 import { persistDiscussions } from '../../infra/persistence/storage.js';
@@ -12,18 +12,18 @@ import { renderForum } from '../views/forumView.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const html = await renderPage(
     'forum',
-    renderForum(filterVisibleEntries(state.discussions, state), citizen),
+    renderForum(filterVisibleEntries(state.discussions, state), person),
     { wantsPartial, title: 'Forum' },
   );
   return sendHtml(res, html);
 }
 
 export async function postThread({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'post');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
   }
@@ -40,7 +40,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
     stance: 'article',
     title,
     content,
-    authorHash: citizen?.pidHash || 'anonymous',
+    authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     parentId: null,
   };
@@ -48,15 +48,15 @@ export async function postThread({ req, res, state, wantsPartial }) {
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), citizen), { wantsPartial: true, title: 'Forum' });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum' });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');
 }
 
 export async function postComment({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'post');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
   }
@@ -76,7 +76,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
     stance: 'comment',
     title: '',
     content,
-    authorHash: citizen?.pidHash || 'anonymous',
+    authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     parentId,
   };
@@ -84,7 +84,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), citizen), { wantsPartial: true, title: 'Forum' });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum' });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');

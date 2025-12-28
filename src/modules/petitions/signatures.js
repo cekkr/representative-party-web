@@ -8,17 +8,17 @@ export function countSignatures(petitionId, state) {
   return filterVisibleEntries(state.signatures, state).filter((s) => s.petitionId === petitionId).length;
 }
 
-export function hasSigned(petitionId, citizen, state) {
-  if (!citizen?.pidHash) return false;
-  return filterVisibleEntries(state.signatures, state).some((s) => s.petitionId === petitionId && s.authorHash === citizen.pidHash);
+export function hasSigned(petitionId, person, state) {
+  if (!person?.pidHash) return false;
+  return filterVisibleEntries(state.signatures, state).some((s) => s.petitionId === petitionId && s.authorHash === person.pidHash);
 }
 
-export async function signPetition({ petition, citizen, state }) {
-  if (!citizen?.pidHash) return;
+export async function signPetition({ petition, person, state }) {
+  if (!person?.pidHash) return;
   const entry = {
     id: randomUUID(),
     petitionId: petition.id,
-    authorHash: citizen.pidHash,
+    authorHash: person.pidHash,
     createdAt: new Date().toISOString(),
   };
   const stamped = stampLocalEntry(state, entry);
@@ -32,11 +32,11 @@ export async function signPetition({ petition, citizen, state }) {
       state,
       {
         type: 'quorum_reached',
-        recipientHash: citizen.pidHash,
+        recipientHash: person.pidHash,
         petitionId: petition.id,
         message: `Quorum reached for petition "${petition.title}". Status set to open.`,
       },
-      { sessionId: citizen.sessionId, handle: citizen.handle },
+      { sessionId: person.sessionId, handle: person.handle },
     );
   }
 }

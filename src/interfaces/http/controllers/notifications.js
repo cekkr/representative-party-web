@@ -1,17 +1,17 @@
-import { getCitizen } from '../../modules/identity/citizen.js';
-import { listNotificationsForCitizen, markAllRead } from '../../modules/messaging/notifications.js';
+import { getPerson } from '../../modules/identity/person.js';
+import { listNotificationsForPerson, markAllRead } from '../../modules/messaging/notifications.js';
 import { escapeHtml } from '../../shared/utils/text.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderNotifications({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const notifications = listNotificationsForCitizen(state, citizen);
+  const person = getPerson(req, state);
+  const notifications = listNotificationsForPerson(state, person);
   const html = await renderPage(
     'notifications',
     {
       notifications: renderNotificationList(notifications),
-      citizenHandle: citizen?.handle || 'Guest',
+      personHandle: person?.handle || 'Guest',
     },
     { wantsPartial, title: 'Notifications' },
   );
@@ -19,8 +19,8 @@ export async function renderNotifications({ req, res, state, wantsPartial }) {
 }
 
 export async function markNotificationsRead({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  await markAllRead(state, citizen);
+  const person = getPerson(req, state);
+  await markAllRead(state, person);
   return renderNotifications({ req, res, state, wantsPartial });
 }
 

@@ -24,7 +24,7 @@ test('transactions registry logs and lists validated entries', async () => {
 
   const entry = await logTransaction(state, {
     type: 'vote_cast',
-    actorHash: 'citizen-123',
+    actorHash: 'person-123',
     petitionId: 'petition-1',
     payload,
   });
@@ -54,7 +54,7 @@ test('transactions export and verify with signatures', async () => {
   const payload = { choice: 'yes' };
   await logTransaction(state, {
     type: 'vote_cast',
-    actorHash: 'citizen-123',
+    actorHash: 'person-123',
     petitionId: 'petition-1',
     payload,
   });

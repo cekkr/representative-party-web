@@ -11,7 +11,7 @@ A Node.js implementation of the Representative Party "Party Circle" (or party/so
 - Tests + adapter report: `npm test` and `npm run db:check`
 
 ## What this project solves
-- One citizen = one voice via blinded PID hashes; no raw PII is stored.
+- One person = one voice via blinded PID hashes; no raw PII is stored.
 - Soft-power accountability: auditable policy gates and traceable vote envelopes instead of imperative mandates.
 - Liquid representation: topic-scoped delegation, revocable at any time, surfaced in UI and vote resolution.
 - Parallel social feed: typed follows (circle/interest/info/alerts) power a short-form “small talk + info” lane with replies/mentions/tags/reshares that stays non-binding and distinct from petitions/votes/forum.
@@ -40,14 +40,14 @@ A Node.js implementation of the Representative Party "Party Circle" (or party/so
 ## Identity + session flow (OIDC4VP scaffold)
 ```mermaid
 sequenceDiagram
-  actor Citizen
+  actor Person
   participant Browser
   participant Server
   participant Wallet as EUDI Wallet
   participant Ledger
   Browser->>Server: GET /auth/eudi
   Server-->>Browser: Offer deep link + QR (sessionId + salt)
-  Citizen->>Wallet: Open link / scan QR
+  Person->>Wallet: Open link / scan QR
   Wallet-->>Server: OIDC4VP response (PID proof)
   Server->>Server: hash(pid + salt) -> blindedPid
   Server->>Ledger: Persist blindedPid in sessions + uniqueness ledger
@@ -73,10 +73,10 @@ sequenceDiagram
 ## Capabilities by module
 - **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/controllers/auth.js`. Pending sessions can be resumed with `?session={id}`.
 - **Uniqueness Ledger + circle sync:** Ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
-- **Policy gates:** Role-aware checks (citizen/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
+- **Policy gates:** Role-aware checks (person/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
 - **Social feed & follows:** `/social/*` handles short posts + replies + reshares driven by typed follows (circle/interest/info/alerts). Follow edges and micro-posts persist through `src/infra/persistence/storage.js`; UX keeps this lane scoped to small talk/info so petitions/votes remain distinct.
-- **Petitions + votes:** `/petitions` draft/open/close petitions, signatures at `/petitions/sign`; `/petitions/vote` records one vote per citizen and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes.
+- **Petitions + votes:** `/petitions` draft/open/close petitions, signatures at `/petitions/sign`; `/petitions/vote` records one vote per person and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes.
 - **Delegation & groups:** `src/modules/delegation/delegation.js` stores per-topic delegates with auto-resolution; `/delegation/conflict` prompts when cachets clash. `src/modules/groups/*` publishes delegate preferences and runs elections; group policy (priority vs vote, conflict rules) is stored independently.
 - **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `src/infra/workers/topic-gardener/server.py`.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; backing store handled by `src/modules/messaging/notifications.js`.

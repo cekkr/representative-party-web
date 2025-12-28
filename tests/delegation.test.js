@@ -15,8 +15,8 @@ test('delegation set logs transaction', async () => {
     },
   };
 
-  const citizen = { pidHash: 'citizen-1' };
-  await setDelegation({ citizen, topic: 'general', delegateHash: 'delegate-1', provider: 'manual', state });
+  const person = { pidHash: 'person-1' };
+  await setDelegation({ person, topic: 'general', delegateHash: 'delegate-1', provider: 'manual', state });
 
   assert.equal(state.delegations.length, 1);
   assert.equal(state.delegations[0].delegateHash, 'delegate-1');

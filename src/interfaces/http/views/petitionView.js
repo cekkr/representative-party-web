@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../shared/utils/text.js';
 
-export function renderPetitionList(petitions, votes, signatures, citizen, canModerate) {
+export function renderPetitionList(petitions, votes, signatures, person, canModerate) {
   if (!petitions.length) {
     return '<p class="muted">No petitions yet. Draft the first one.</p>';
   }
@@ -12,7 +12,7 @@ export function renderPetitionList(petitions, votes, signatures, citizen, canMod
       const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
       const voteDisabled = petition.status !== 'open';
       const signatureCount = (signatures || []).filter((s) => s.petitionId === petition.id).length;
-      const hasSigned = citizen?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === citizen.pidHash) : false;
+      const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
       return `
         <article class="discussion">
           <div class="discussion__meta">

@@ -1,16 +1,16 @@
 import { escapeHtml } from '../../shared/utils/text.js';
 
-export function renderForum(entries, citizen) {
+export function renderForum(entries, person) {
   const threads = entries.filter((e) => !e.parentId);
   const comments = entries.filter((e) => e.parentId);
   return {
-    threads: renderThreads(threads, comments, citizen),
-    citizenHandle: citizen?.handle || 'Guest',
-    roleLabel: citizen?.role || 'guest',
+    threads: renderThreads(threads, comments, person),
+    personHandle: person?.handle || 'Guest',
+    roleLabel: person?.role || 'guest',
   };
 }
 
-function renderThreads(threads, comments, citizen) {
+function renderThreads(threads, comments, person) {
   if (!threads.length) {
     return '<p class="muted">No threads yet. Start a discussion.</p>';
   }

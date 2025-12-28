@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { classifyTopic } from '../src/modules/topics/classification.js';
 import { getTopicConfig } from '../src/modules/topics/topicGardenerClient.js';
 import { resolveDelegation, setDelegation } from '../src/modules/delegation/delegation.js';
-import { recommendDelegationForCitizen } from '../src/modules/groups/groups.js';
+import { recommendDelegationForPerson } from '../src/modules/groups/groups.js';
 
 test('classifyTopic falls back to general without extensions', async () => {
   const topic = await classifyTopic('Any text', { extensions: { active: [] }, settings: {} });
@@ -76,14 +76,14 @@ test('resolveDelegation uses stored entry', async () => {
     store: { saveDelegations: async () => {} },
     groups: [],
   };
-  const citizen = { pidHash: 'hash-1' };
-  await setDelegation({ citizen, topic: 'energy', delegateHash: 'delegate-hash', provider: 'peer', state });
-  const result = resolveDelegation(citizen, 'energy', state);
+  const person = { pidHash: 'hash-1' };
+  await setDelegation({ person, topic: 'energy', delegateHash: 'delegate-hash', provider: 'peer', state });
+  const result = resolveDelegation(person, 'energy', state);
   assert.equal(result.delegateHash, 'delegate-hash');
 });
 
 test('group recommendations provide prioritized delegate', () => {
-  const citizen = { pidHash: 'me' };
+  const person = { pidHash: 'me' };
   const state = {
     delegations: [],
     extensions: { active: [] },
@@ -92,7 +92,7 @@ test('group recommendations provide prioritized delegate', () => {
       { id: 'g2', members: ['me'], delegates: [{ topic: 'energy', delegateHash: 'd2', priority: 1 }] },
     ],
   };
-  const rec = recommendDelegationForCitizen(citizen, 'energy', state);
+  const rec = recommendDelegationForPerson(person, 'energy', state);
   assert.equal(rec.chosen.delegateHash, 'd1');
   assert.equal(rec.conflict, false);
 });

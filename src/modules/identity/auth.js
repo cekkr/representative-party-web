@@ -8,7 +8,7 @@ export function buildCredentialOffer({ sessionId, baseUrl }) {
       {
         id: 'pid_hash',
         name: 'Pseudonymous Identifier',
-        purpose: 'Prove you are a unique citizen without revealing identity',
+        purpose: 'Prove you are a unique person without revealing identity',
         constraints: { fields: [{ path: ['$.sub'], filter: { type: 'string' } }] },
       },
     ],

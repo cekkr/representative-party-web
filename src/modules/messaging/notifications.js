@@ -28,16 +28,16 @@ export async function createNotificationWithOutbound(state, notification, contac
   return { contact, outbound: result };
 }
 
-export function listNotificationsForCitizen(state, citizen) {
-  if (!citizen || !citizen.pidHash) return [];
-  return filterVisibleEntries(state.notifications, state).filter((n) => n.recipientHash === citizen.pidHash || n.recipientHash === 'broadcast');
+export function listNotificationsForPerson(state, person) {
+  if (!person || !person.pidHash) return [];
+  return filterVisibleEntries(state.notifications, state).filter((n) => n.recipientHash === person.pidHash || n.recipientHash === 'broadcast');
 }
 
-export async function markAllRead(state, citizen) {
-  if (!citizen || !citizen.pidHash) return;
+export async function markAllRead(state, person) {
+  if (!person || !person.pidHash) return;
   let changed = false;
   state.notifications = (state.notifications || []).map((n) => {
-    if ((n.recipientHash === citizen.pidHash || n.recipientHash === 'broadcast') && !n.read) {
+    if ((n.recipientHash === person.pidHash || n.recipientHash === 'broadcast') && !n.read) {
       changed = true;
       return { ...n, read: true };
     }

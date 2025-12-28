@@ -1,12 +1,12 @@
 import { POLICIES } from '../../config.js';
-import { getPrivilegesForCitizen } from '../identity/privileges.js';
+import { getPrivilegesForPerson } from '../identity/privileges.js';
 
-const ROLE_ORDER = ['guest', 'citizen', 'delegate', 'moderator', 'admin'];
+const ROLE_ORDER = ['guest', 'person', 'delegate', 'moderator', 'admin'];
 
 const BASE_ACTION_RULES = {
-  post: { capability: 'canPost', minRole: 'citizen', requireVerification: undefined, allowGuestWhenOpen: true },
-  petition: { capability: 'canPetition', minRole: 'citizen', requireVerification: true },
-  vote: { capability: 'canVote', minRole: 'citizen', requireVerification: true },
+  post: { capability: 'canPost', minRole: 'person', requireVerification: undefined, allowGuestWhenOpen: true },
+  petition: { capability: 'canPetition', minRole: 'person', requireVerification: true },
+  vote: { capability: 'canVote', minRole: 'person', requireVerification: true },
   moderate: { capability: 'canModerate', allowedRoles: ['moderator', 'admin'], requireVerification: true },
 };
 
@@ -39,14 +39,14 @@ export function getCirclePolicyState(state) {
   };
 }
 
-export function evaluateAction(state, citizen, action = 'post') {
+export function evaluateAction(state, person, action = 'post') {
   const policy = getEffectivePolicy(state);
   const rules = resolveActionRules(state);
   const rule = rules[action] || rules.post;
   const enforcement = policy.enforceCircle ? 'strict' : 'observing';
   const verificationRequired = rule.requireVerification ?? policy.requireVerification;
 
-  if (!citizen && verificationRequired) {
+  if (!person && verificationRequired) {
     return decorateDecision(state, {
       allowed: false,
       reason: 'verification_required',
@@ -57,7 +57,7 @@ export function evaluateAction(state, citizen, action = 'post') {
     });
   }
 
-  if (!citizen && !verificationRequired && rule.allowGuestWhenOpen) {
+  if (!person && !verificationRequired && rule.allowGuestWhenOpen) {
     return decorateDecision(state, {
       allowed: true,
       reason: 'open_circle_guest',
@@ -67,7 +67,7 @@ export function evaluateAction(state, citizen, action = 'post') {
     });
   }
 
-  const privileges = getPrivilegesForCitizen(citizen, state);
+  const privileges = getPrivilegesForPerson(person, state);
   if (privileges.banned) {
     return decorateDecision(state, {
       allowed: false,
@@ -115,22 +115,22 @@ export function evaluateAction(state, citizen, action = 'post') {
   return decorateDecision(state, { allowed: true, reason: 'ok', role: privileges.role, enforcement, action });
 }
 
-export function evaluateDiscussionPermission(state, citizen) {
-  return evaluateAction(state, citizen, 'post');
+export function evaluateDiscussionPermission(state, person) {
+  return evaluateAction(state, person, 'post');
 }
 
-export function summarizeGates(state, citizen) {
+export function summarizeGates(state, person) {
   return {
-    post: evaluateAction(state, citizen, 'post'),
-    petition: evaluateAction(state, citizen, 'petition'),
-    vote: evaluateAction(state, citizen, 'vote'),
+    post: evaluateAction(state, person, 'post'),
+    petition: evaluateAction(state, person, 'petition'),
+    vote: evaluateAction(state, person, 'vote'),
   };
 }
 
 export function buildPolicyGates(state) {
   return {
     guest: summarizeGates(state, null),
-    citizen: summarizeGates(state, { role: 'citizen', sessionId: 'sample', pidHash: 'sample' }),
+    person: summarizeGates(state, { role: 'person', sessionId: 'sample', pidHash: 'sample' }),
     delegate: summarizeGates(state, { role: 'delegate', sessionId: 'sample', pidHash: 'sample' }),
   };
 }

@@ -1,4 +1,4 @@
-import { getCitizen } from '../../modules/identity/citizen.js';
+import { getPerson } from '../../modules/identity/person.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
 import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../../modules/groups/groups.js';
 import { createNotification } from '../../modules/messaging/notifications.js';
@@ -10,7 +10,7 @@ import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const groups = listGroups(state).map((group) => ({
     ...group,
     policy: getGroupPolicy(state, group.id),
@@ -19,9 +19,9 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'groups',
     {
-      groups: renderGroupList(groups, citizen),
-      citizenHandle: citizen?.handle || 'Guest',
-      citizenHash: citizen?.pidHash || '',
+      groups: renderGroupList(groups, person),
+      personHandle: person?.handle || 'Guest',
+      personHash: person?.pidHash || '',
       circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
     },
     { wantsPartial, title: 'Groups' },
@@ -30,24 +30,24 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
 }
 
 export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
+  const person = getPerson(req, state);
   const body = await readRequestBody(req);
   const action = body.action || 'create';
 
   if (action === 'join') {
     const groupId = sanitizeText(body.groupId || '', 80);
-    await joinGroup({ groupId, citizen, state });
+    await joinGroup({ groupId, person, state });
     return renderGroups({ req, res, state, wantsPartial });
   }
 
   if (action === 'leave') {
     const groupId = sanitizeText(body.groupId || '', 80);
-    await leaveGroup({ groupId, citizen, state });
+    await leaveGroup({ groupId, person, state });
     return renderGroups({ req, res, state, wantsPartial });
   }
 
   if (action === 'startElection') {
-    const permission = evaluateAction(state, citizen, 'moderate');
+    const permission = evaluateAction(state, person, 'moderate');
     if (!permission.allowed) {
       return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to start election.' });
     }
@@ -61,12 +61,12 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   if (action === 'voteElection') {
     const electionId = sanitizeText(body.electionId || '', 80);
     const candidateHash = sanitizeText(body.candidateHash || '', 80);
-    await castElectionVote({ electionId, voterHash: citizen?.pidHash, candidateHash, state });
+    await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, state });
     return renderGroups({ req, res, state, wantsPartial });
   }
 
   if (action === 'closeElection') {
-    const permission = evaluateAction(state, citizen, 'moderate');
+    const permission = evaluateAction(state, person, 'moderate');
     if (!permission.allowed) {
       return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to close election.' });
     }
@@ -88,7 +88,7 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     return renderGroups({ req, res, state, wantsPartial });
   }
 
-  const permission = evaluateAction(state, citizen, 'post');
+  const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to create group.' });
   }
@@ -96,18 +96,18 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   const name = sanitizeText(body.name || '', 120);
   const description = sanitizeText(body.description || '', 400);
   const topics = (body.topics || '').split(',').map((t) => sanitizeText(t, 64)).filter(Boolean);
-  const group = await createGroup({ name, description, topics, creatorHash: citizen?.pidHash, state });
+  const group = await createGroup({ name, description, topics, creatorHash: person?.pidHash, state });
   await createNotification(state, {
     type: 'group_created',
-    recipientHash: citizen?.pidHash || 'broadcast',
+    recipientHash: person?.pidHash || 'broadcast',
     message: `Group "${group.name}" created.`,
   });
   return renderGroups({ req, res, state, wantsPartial });
 }
 
 export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'moderate');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to set delegates.' });
   }
@@ -119,15 +119,15 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
   await setGroupDelegate({ groupId, topic, delegateHash, priority, provider: sanitizeText(body.provider || 'local', 64), state });
   await createNotification(state, {
     type: 'group_delegate',
-    recipientHash: citizen?.pidHash || 'broadcast',
+    recipientHash: person?.pidHash || 'broadcast',
     message: `Updated delegate for topic "${topic}" in group.`,
   });
   return renderGroups({ req, res, state, wantsPartial });
 }
 
 export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) {
-  const citizen = getCitizen(req, state);
-  const permission = evaluateAction(state, citizen, 'moderate');
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to set policies.' });
   }
@@ -140,16 +140,16 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
   return renderGroups({ req, res, state, wantsPartial });
 }
 
-function renderGroupList(groups, citizen) {
+function renderGroupList(groups, person) {
   if (!groups.length) return '<p class="muted">No groups yet.</p>';
   return groups
     .map((group) => {
-      const member = citizen?.pidHash ? group.members?.includes(citizen.pidHash) : false;
+      const member = person?.pidHash ? group.members?.includes(person.pidHash) : false;
       const policy = group.policy || {};
       const delegates = (group.delegates || [])
         .map((d) => `<li>${d.topic} → ${d.delegateHash} (prio ${d.priority})</li>`)
         .join('');
-      const elections = renderElections(group.elections || [], citizen);
+      const elections = renderElections(group.elections || [], person);
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -222,7 +222,7 @@ function renderGroupList(groups, citizen) {
     .join('\n');
 }
 
-function renderElections(elections, citizen) {
+function renderElections(elections, person) {
   if (!elections.length) return '<p class="muted small">No elections.</p>';
   return elections
     .map((election) => {
