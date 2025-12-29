@@ -269,24 +269,6 @@ If you want to contribute, start by reading `AGENTS.md` and keep changes aligned
 - P2P-first ring: `DATA_MODE=p2p DATA_ADAPTER=kv DATA_KV_FILE=./data/ring.json DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false CIRCLE_PUBLIC_KEY=/path/pub.pem` enables gossip-first sync and only accepts signed/validated envelopes.
 - Topic/delegation experiments: `DATA_PREVIEW=true DATA_VALIDATION_LEVEL=observe` allows preview entries from topic gardeners or classification helpers; UI marks previews and replication filters them when disabled.
 
-## Identity + session flow (OIDC4VP scaffold)
-```mermaid
-sequenceDiagram
-  actor Person
-  participant Browser
-  participant Server
-  participant Wallet as EUDI Wallet
-  participant Ledger
-  Browser->>Server: GET /auth/eudi
-  Server-->>Browser: Offer deep link + QR (sessionId + salt)
-  Person->>Wallet: Open link / scan QR
-  Wallet-->>Server: OIDC4VP response (PID proof)
-  Server->>Server: hash(pid + salt) -> blindedPid
-  Server->>Ledger: Persist blindedPid in sessions + uniqueness ledger
-  Server-->>Browser: Set session cookie (handle, role, banned flag)
-  Note over Server,Ledger: Only blinded hashes are stored (no raw PID)
-```
-
 ## Federation, vote envelopes, and redundancy
 ```mermaid
 sequenceDiagram
