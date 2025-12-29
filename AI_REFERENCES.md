@@ -76,3 +76,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
 - Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules; provider policy remains about data/validation.
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
+
+## Possible next steps:
+- Add a per‑proposal deep link target so feed items can jump to a specific proposal.
+- Extend ranked‑choice to full multi‑round transfers when you add third‑choice ballots.
