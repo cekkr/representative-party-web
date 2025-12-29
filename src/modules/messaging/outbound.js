@@ -58,6 +58,22 @@ export async function deliverOutbound(state, { contact, notification, transport 
   return { delivered: Boolean(channels.email || channels.sms), channels };
 }
 
+export function resolveNotificationPreferences(state, { sessionId, handle } = {}) {
+  const attrs = findProviderAttributes(state, sessionId, handle);
+  const provider = attrs?.provider || {};
+  const globalNotify = readBooleanPreference(provider.notify, true);
+  const proposalPreference = readFirstMatchingPreference(provider, [
+    'notifyProposalComments',
+    'notify_proposal_comments',
+    'proposalComments',
+    'proposal_comments',
+    'notifyPetitionComments',
+  ]);
+  return {
+    proposalComments: proposalPreference ?? globalNotify,
+  };
+}
+
 function findProviderAttributes(state, sessionId, handle) {
   const list = state.profileAttributes || [];
   if (sessionId) {
@@ -67,6 +83,24 @@ function findProviderAttributes(state, sessionId, handle) {
   if (handle) {
     const match = list.find((entry) => entry.handle === handle);
     if (match) return match;
+  }
+  return null;
+}
+
+function readBooleanPreference(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on') return true;
+  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === 'off') return false;
+  return fallback;
+}
+
+function readFirstMatchingPreference(provider, keys = []) {
+  for (const key of keys) {
+    if (provider[key] !== undefined) {
+      return readBooleanPreference(provider[key], null);
+    }
   }
   return null;
 }

@@ -13,10 +13,10 @@ This file captures the essential implementation directives. Keep it in sync with
 - Extensions: optional modules under `src/modules/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code; use them to align with organizational policies instead of forking.
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
 - Topic stewardship & gardening: users (people in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
-- Notification registry: internal notifications persisted to JSON with basic read/unread handling.
+- Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second-choice picks for person elections (Alaska-style resolution later).
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second-choice picks with ranked/tie-break resolution for person elections (Alaska-style).
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
@@ -44,13 +44,14 @@ This file captures the essential implementation directives. Keep it in sync with
 - Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
 - Layout must show Circle policy flag, verified handle when present, and ledger/actor/discussion counts for accountability cues.
 - Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash.
+- Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
 
 ## Endpoints
 - `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
 - `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle.
 - `/petitions` (GET/POST) drafts proposals with summary + optional full text; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.
-- `/notifications` (GET) list internal notifications; `/notifications/read` marks all read.
+- `/notifications` (GET) list internal notifications; `/notifications/read` marks all read; `/notifications/preferences` stores per-user alert toggles (proposal comments).
 - `/forum` (GET/POST) publish articles; `/forum/comment` post comments.
 - `/groups` (GET/POST) list/create/join groups; `/groups/delegate` set group-level preferred delegates.
 - `/delegation/conflict` resolve delegation conflicts by user choice.
@@ -70,7 +71,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
-- Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications`.
+- Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications` with per-user preferences for proposal comment alerts.
 - Topic gardener helper: build DynamicTopicCategorization as a Python helper in `src/infra/workers/topic-gardener/` (online ingestion + scheduled refactor) with a stable API consumed by `src/modules/topics/classification.js`. Respect user/person-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. A stub HTTP helper sits in `src/infra/workers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`.
 - Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
 - Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules; provider policy remains about data/validation.

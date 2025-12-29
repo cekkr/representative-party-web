@@ -19,7 +19,7 @@ import { renderHealth } from '../interfaces/http/controllers/health.js';
 import { renderHome } from '../interfaces/http/controllers/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
 import { getExtensions, toggleExtension } from '../interfaces/http/controllers/extensions.js';
-import { renderNotifications, markNotificationsRead } from '../interfaces/http/controllers/notifications.js';
+import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../interfaces/http/controllers/notifications.js';
 import { resolveConflict } from '../interfaces/http/controllers/delegation.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
@@ -66,6 +66,7 @@ const routes = [
   { method: 'POST', path: '/admin', action: updateAdmin },
   { method: 'GET', path: '/notifications', action: renderNotifications },
   { method: 'POST', path: '/notifications/read', action: markNotificationsRead },
+  { method: 'POST', path: '/notifications/preferences', action: updateNotificationPreferences },
   { method: 'POST', path: '/delegation/conflict', action: resolveConflict },
   { method: 'GET', path: '/votes/ledger', action: exportVotes },
   { method: 'POST', path: '/votes/gossip', action: gossipVotes },

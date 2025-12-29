@@ -8,16 +8,19 @@ import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.
 import { createNotification, createNotificationWithOutbound } from '../../modules/messaging/notifications.js';
 import { persistDiscussions, persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
 import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
+import { resolveNotificationPreferences } from '../../modules/messaging/outbound.js';
+import { extractMentions } from '../../modules/social/posts.js';
+import { findSessionByHandle } from '../../modules/social/followGraph.js';
 import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
 import { logTransaction } from '../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
-import { renderPetitionList } from '../views/petitionView.js';
+import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { renderPage } from '../views/templates.js';
 
-export async function renderPetitions({ req, res, state, wantsPartial }) {
+export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
   const petitionGate = evaluateAction(state, person, 'petition');
   const voteGate = evaluateAction(state, person, 'vote');
@@ -32,6 +35,12 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
+  const query = url || new URL(req.url, `http://${req.headers.host}`);
+  const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
+  const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
+  const petitionLookup = buildPetitionLookup(petitions);
+  const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
+  const stageFilterOptions = renderStageFilterOptions(stageFilter);
   const html = await renderPage(
     'petitions',
     {
@@ -41,10 +50,12 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
       roleLabel: person?.role || 'guest',
-      petitionsList: renderPetitionList(petitions, votes, signatures, person, moderateGate.allowed, commentsByPetition),
+      petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
+      discussionFeed: renderProposalDiscussionFeed(discussionFeedItems),
+      stageFilterOptions,
     },
     { wantsPartial, title: 'Proposals & Votes' },
   );
@@ -258,7 +269,7 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
   return sendRedirect(res, '/petitions');
 }
 
-export async function postPetitionComment({ req, res, state, wantsPartial }) {
+export async function postPetitionComment({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
@@ -289,9 +300,10 @@ export async function postPetitionComment({ req, res, state, wantsPartial }) {
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
-  await notifyPetitionAuthor(state, { petition, commenter: person, petitionId });
+  await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
+  await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true });
+    const html = await renderPetitions({ req, res, state, wantsPartial: true, url });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/petitions');
@@ -308,6 +320,15 @@ function groupCommentsByPetition(comments = []) {
   return map;
 }
 
+function buildPetitionLookup(petitions = []) {
+  const map = new Map();
+  for (const petition of petitions) {
+    if (!petition?.id) continue;
+    map.set(petition.id, petition);
+  }
+  return map;
+}
+
 function isVotingStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'open' || normalized === 'vote';
@@ -318,11 +339,13 @@ function getQuorumAdvanceLabel(state) {
   return stage === 'vote' ? 'vote' : 'discussion';
 }
 
-async function notifyPetitionAuthor(state, { petition, commenter, petitionId }) {
+async function notifyPetitionAuthor(state, { petition, commenter, petitionId, content }) {
   if (!petition || !petition.authorHash) return;
   if (commenter?.pidHash && petition.authorHash === commenter.pidHash) return;
   const authorSession = findSessionByHash(state, petition.authorHash);
   const commenterLabel = commenter?.handle || 'someone';
+  const prefs = resolveNotificationPreferences(state, { sessionId: authorSession?.id, handle: authorSession?.handle });
+  if (!prefs.proposalComments) return;
   await createNotificationWithOutbound(
     state,
     {
@@ -341,4 +364,71 @@ function findSessionByHash(state, pidHash) {
     if (session.pidHash === pidHash) return session;
   }
   return null;
+}
+
+async function notifyPetitionMentions(state, { petition, commenter, petitionId, content }) {
+  const mentions = extractMentions(content || '');
+  if (!mentions.length) return;
+  const recipients = new Map();
+  for (const handle of mentions) {
+    const session = findSessionByHandle(state, handle);
+    if (!session) continue;
+    if (commenter?.pidHash && session.pidHash === commenter.pidHash) continue;
+    if (recipients.has(session.pidHash)) continue;
+    const prefs = resolveNotificationPreferences(state, { sessionId: session.id, handle: session.handle });
+    if (!prefs.proposalComments) continue;
+    recipients.set(session.pidHash, { sessionId: session.id, handle: session.handle });
+  }
+  for (const [recipientHash, recipient] of recipients.entries()) {
+    await createNotificationWithOutbound(
+      state,
+      {
+        type: 'petition_comment_mention',
+        recipientHash,
+        petitionId,
+        message: `Mention in proposal "${petition.title}" discussion by ${commenter?.handle || 'someone'}.`,
+      },
+      { sessionId: recipient.sessionId, handle: recipient.handle },
+    );
+  }
+}
+
+function normalizeStageFilter(value) {
+  const normalized = String(value || '').toLowerCase();
+  const allowed = new Set(['all', 'draft', 'discussion', 'vote', 'open', 'closed']);
+  if (!allowed.has(normalized)) return 'all';
+  return normalized === 'open' ? 'vote' : normalized;
+}
+
+function filterPetitionsByStage(petitions = [], stageFilter = 'all') {
+  if (stageFilter === 'all') return petitions;
+  return petitions.filter((petition) => normalizeStageFilter(petition.status) === stageFilter);
+}
+
+function renderStageFilterOptions(selected = 'all') {
+  const options = [
+    { value: 'all', label: 'All stages' },
+    { value: 'discussion', label: 'Discussion' },
+    { value: 'vote', label: 'Vote' },
+    { value: 'draft', label: 'Draft' },
+    { value: 'closed', label: 'Closed' },
+  ];
+  return options
+    .map((option) => {
+      const chosen = selected === option.value ? ' selected' : '';
+      return `<option value="${option.value}"${chosen}>${option.label}</option>`;
+    })
+    .join('\n');
+}
+
+function buildDiscussionFeedItems(comments = [], petitionLookup, stageFilter) {
+  const items = [];
+  for (const comment of comments) {
+    const petition = petitionLookup.get(comment.petitionId);
+    if (!petition) continue;
+    const petitionStage = normalizeStageFilter(petition.status);
+    if (stageFilter !== 'all' && petitionStage !== stageFilter) continue;
+    items.push({ comment, petition });
+  }
+  return items.sort((a, b) => Date.parse(b.comment.createdAt) - Date.parse(a.comment.createdAt)).slice(0, 30);
 }

@@ -36,11 +36,19 @@
     }
     try {
       const formData = new FormData(form);
-      const response = await fetch(form.action, {
-        method: form.method || 'POST',
-        headers: { 'X-Requested-With': 'partial' },
-        body: new URLSearchParams(formData),
-      });
+      const method = (form.method || 'POST').toUpperCase();
+      const headers = { 'X-Requested-With': 'partial' };
+      let url = form.action;
+      const options = { method, headers };
+      if (method === 'GET') {
+        const params = new URLSearchParams(formData);
+        const target = new URL(form.action, window.location.origin);
+        target.search = params.toString();
+        url = target.toString();
+      } else {
+        options.body = new URLSearchParams(formData);
+      }
+      const response = await fetch(url, options);
       if (!response.ok) {
         if (response.status === 401) {
           try {
@@ -55,7 +63,7 @@
       }
       const html = await response.text();
       root.innerHTML = html;
-      window.history.pushState({}, '', form.action);
+      window.history.pushState({}, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       triggerDeepLink();
     } catch (error) {

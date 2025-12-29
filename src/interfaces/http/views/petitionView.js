@@ -15,6 +15,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
       const signatureCount = (signatures || []).filter((s) => s.petitionId === petition.id).length;
       const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
       const comments = commentsByPetition.get(petition.id) || [];
+      const lastCommentAt = getLastCommentAt(comments);
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -24,6 +25,8 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
             <span class="pill ghost">Topic: ${escapeHtml(petition.topic || 'general')}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
             <span class="pill ghost">Signatures: ${signatureCount}</span>
+            <span class="pill ghost">Discussion: ${comments.length}</span>
+            ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
           </div>
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
@@ -158,6 +161,31 @@ function renderPetitionComments(comments) {
     .join('\n');
 }
 
+export function renderProposalDiscussionFeed(items) {
+  if (!items.length) {
+    return '<p class="muted">No proposal discussions yet. Join a discussion to surface activity.</p>';
+  }
+  return items
+    .map(({ comment, petition }) => {
+      const statusLabel = displayStatus(petition?.status || 'draft');
+      const snippet = (comment.content || '').slice(0, 180);
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">${escapeHtml(statusLabel)}</span>
+            <span class="pill ghost">Proposal</span>
+            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+          </div>
+          <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
+          <p>${escapeHtml(snippet)}</p>
+          <p class="muted small">Comment by ${escapeHtml(comment.authorHash || 'anonymous')}</p>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
 function displayStatus(status = '') {
   const normalized = String(status || '').toLowerCase();
   if (normalized === 'open') return 'vote';
@@ -167,4 +195,16 @@ function displayStatus(status = '') {
 function isVotingStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'open' || normalized === 'vote';
+}
+
+function getLastCommentAt(comments) {
+  if (!comments.length) return '';
+  let latest = 0;
+  for (const comment of comments) {
+    const time = Date.parse(comment.createdAt || '');
+    if (!Number.isNaN(time) && time > latest) {
+      latest = time;
+    }
+  }
+  return latest ? new Date(latest).toLocaleString() : '';
 }
