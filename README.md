@@ -1,14 +1,238 @@
-# Representative Party Framework
+## Representative Party Framework
 
-Messaging-first Party Circle kernel for civic and party networks. This is a Node.js SSR app with OIDC4VP verification scaffolding, a blinded uniqueness ledger, petitions and votes, delegation, and federation stubs. It is designed so organizations can adopt the messaging layer first and enable more modules as policy matures.
+A **messaging‑first “Party Circle” kernel** for civic and political organizations that want deliberation and representation *without* turning identity into a surveillance problem.
 
-## At a glance
-- Verified sessions with blinded PID hashes; no raw PII is stored.
-- "User" is the default actor; "person" is a Circle label for verified natural persons (exclusion principle: no org/bot/service accounts can hold handles).
-- Discussion, forum, and notifications are the base; petitions, votes, delegation, federation, and topic gardener are optional.
-- Parallel social feed with typed follows for small-talk/info that stays distinct from petitions/votes/forum.
-- Pluggable storage adapters and data modes (centralized, hybrid, p2p) with signed envelopes for auditability.
-- Extensions under `src/modules/extensions/` let you tighten policy without forking core code.
+This repository is a Node.js SSR application that starts as a usable discussion + notification network, then lets you progressively enable higher‑stakes modules (petitions, votes, delegation, federation) as your policy and governance mature. The identity layer is designed around **blinded uniqueness**: the server can enforce *one natural person = one voice* **without storing raw PII**.
+
+> **Status / intent**
+> This is a practical scaffold meant for pilots, internal deployments, and research‑grade iteration. Some protocols (OIDC4VP, ActivityPub, federation hardening) are present as scaffolding and will evolve—see `ROADMAP.md`.
+
+---
+
+## Why this exists
+
+Most “civic platforms” fail in one of two ways:
+
+1. **They ship “voting” before shipping “conversation.”** People need a place to learn, argue, and revise ideas before any decision has legitimacy.
+2. **They bind trust to centralized identity.** That creates pressure to collect personal data, which becomes a liability and a power imbalance.
+
+This project takes the opposite stance:
+
+- Start with **messaging and accountability cues**.
+- Add **formal decision tools** only when you can defend them socially and operationally.
+- Keep identity **privacy‑first** by storing only **blinded hashes** (not names, not documents).
+
+---
+
+## Who it’s for
+
+- Parties, civic committees, associations, unions, NGOs, and community groups
+- Researchers prototyping representation models (liquid delegation, topic‑scoped voting, federation)
+- Teams that need a *deployable* baseline today, not a perfect protocol paper
+
+---
+
+## Highlights
+
+- **Messaging‑first kernel**: discussion + forum + notifications work alone.
+- **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
+- **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
+- **Petitions → votes pipeline**: proposals, signatures/quorum, deliberation feed, vote envelopes (signable).
+- **Liquid representation**: topic‑scoped delegation with revocable overrides.
+- **Federation stubs + redundancy knobs**: gossip endpoints and signed envelopes for auditability.
+- **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
+- **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
+
+---
+
+## Vocabulary (important)
+
+- **user**: the default actor in general deployments.
+- **person**: a Circle label for a **verified natural person** (civic/party mode).  
+  When civic mode is enabled, the *exclusion principle* applies: **org/bot/service accounts cannot hold handles or act**.
+
+The code keeps this distinction explicit so deployments can start lightweight and become stricter later without rewiring the UX.
+
+---
+
+## What you can do with it
+
+### 1) Run a discussion network now
+- Handles, roles, moderation flags, notifications
+- SSR pages + partial‑HTML navigation (fast, indexable, minimal JS)
+
+### 2) Add civic “Circle” guarantees when ready
+- OIDC4VP verification scaffold (EUDI wallet flow)
+- Store only **blinded** identity hashes for uniqueness + session roles
+
+### 3) Turn on proposals, votes, delegation, federation incrementally
+- Petitions and signatures (quorum gates)
+- Signed vote envelopes and exports
+- Topic‑scoped delegation and group‑level recommendations
+- Peer gossip endpoints and quarantine hooks (stubbed)
+
+---
+
+## Quick start
+
+**Prereqs:** Node.js 20+ (ESM) and npm. `sqlite3` is bundled for the optional SQL adapter.
+
+```bash
+npm install
+
+# Ephemeral dev (in‑memory)
+DATA_ADAPTER=memory DATA_MODE=centralized npm start
+
+# Persisted JSON (default)
+npm start
+```
+
+Useful recipes:
+
+```bash
+# Run messaging UI without Circle enforcement
+DATA_MODE=centralized DATA_ADAPTER=memory ENFORCE_CIRCLE=false npm start
+
+# Verified Circle with strict validation + signing
+CIRCLE_PRIVATE_KEY=./priv.pem CIRCLE_PUBLIC_KEY=./pub.pem DATA_VALIDATION_LEVEL=strict ENFORCE_CIRCLE=true npm start
+
+# Tests + adapter report
+npm test
+npm run db:check
+```
+
+### Defaults
+- Server: `http://0.0.0.0:3000`
+- JSON persistence (default): writes under `src/data/`
+
+### Useful endpoints
+- `/` landing, `/health` metrics
+- `/auth/eudi` start verification, `/auth/callback` return
+- `/discussion`, `/forum`, `/notifications`
+- `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
+- `/social/*` micro‑posts and follows
+- `/admin` settings and policy toggles, `/extensions` extension toggles
+- `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub stubs
+
+---
+
+## How identity works (OIDC4VP scaffold)
+
+The verifier flow is designed to be **privacy‑preserving**: the server stores only a blinded hash derived from the wallet‑presented identifier plus a server salt.
+
+```mermaid
+sequenceDiagram
+  actor Person
+  participant Browser
+  participant Server
+  participant Wallet as Wallet (OIDC4VP / EUDI)
+  participant Ledger
+
+  Browser->>Server: GET /auth/eudi
+  Server-->>Browser: Offer deep link + QR (sessionId + salt)
+  Person->>Wallet: Open link / scan QR
+  Wallet-->>Server: OIDC4VP response (PID proof)
+  Server->>Server: hash(pid + salt) -> blindedPid
+  Server->>Ledger: Persist blindedPid in sessions + uniqueness ledger
+  Server-->>Browser: Set session cookie (handle, role, banned flag)
+  Note over Server,Ledger: Only blinded hashes are stored (no raw PID/PII)
+```
+
+> **Important**: this repo provides the *verification scaffold and policy hooks*. Compliance and production hardening depend on your deployment’s legal and security context—treat the identity layer as a component you audit and evolve.
+
+---
+
+## Modules at a glance
+
+**Always-on value (messaging kernel)**
+- **Discussion + forum**: threaded posts/comments with SSR UI.
+- **Notifications**: internal read/unread registry and preferences.
+- **Social feed**: micro‑post lane with typed follows (circle/interest/info/alerts) kept separate from petitions/votes.
+
+**Optional governance tools**
+- **Petitions**: draft proposals, signatures/quorum, stage transitions, discussion feed.
+- **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
+- **Delegation**: topic‑scoped delegation with conflict resolution UI.
+- **Groups/elections**: group‑level delegate preferences and elections (advisory by design).
+
+**Circle & federation scaffolding**
+- **Uniqueness ledger + gossip**: exchange ledger hashes and peer hints.
+- **ActivityPub stubs**: actors + inbox placeholders to anchor federation work.
+
+---
+
+## Data modes, adapters, and preview/validation
+
+The persistence layer is intentionally storage‑agnostic:
+
+- **Adapters**: `json` (default), `memory` (ephemeral), `sql` (SQLite), `kv` (single‑file KV JSON).
+- **Modes**:
+  - `DATA_MODE=centralized`: single provider store, no gossip writes
+  - `DATA_MODE=hybrid`: canonical store + gossip as redundancy/audit
+  - `DATA_MODE=p2p`: gossip‑ledger primary, optional local cache
+
+Two switches gate uncertified data:
+
+- `DATA_VALIDATION_LEVEL` (`strict|observe|off`)
+- `DATA_PREVIEW` (`true|false`) to store and/or render preview entries
+
+This allows deployments to experiment with helpers (topic gardeners, classification) and federation inputs *without silently treating them as authoritative*.
+
+---
+
+## Configuration (core knobs)
+
+- Server: `HOST`, `PORT`
+- Circle/policy: `ENFORCE_CIRCLE`, `CIRCLE_POLICY_ID`, `CIRCLE_ISSUER`, `GOSSIP_INTERVAL_SECONDS`
+- Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`)
+- Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM)
+- Persistence:
+  - `DATA_MODE` (`centralized|hybrid|p2p`)
+  - `DATA_ADAPTER` (`json|memory|sql|kv`)
+  - `DATA_VALIDATION_LEVEL` (`strict|observe|off`)
+  - `DATA_PREVIEW` (`true|false`)
+  - SQL: `DATA_SQLITE_URL` / `DATA_SQLITE_FILE`
+  - KV: `DATA_KV_FILE`
+
+Provider settings are persisted in `src/data/settings.json` and can be edited via `/admin`.
+
+---
+
+## Project map
+
+- **Entry/server**: `src/index.js`, `src/app/server.js`, `src/app/router.js`
+- **HTTP controllers**: `src/interfaces/http/controllers/`
+- **Domain modules**: `src/modules/` (identity, circle policy, messaging, topics, petitions, votes, delegation, groups, federation, extensions)
+- **Persistence**: `src/infra/persistence/` (adapters, migrations, store selector)
+- **SSR templates**: `src/public/templates/` (+ `src/public/app.css`, `src/public/app.js`)
+
+---
+
+## Operational notes (privacy, safety, backups)
+
+- **No raw PID/PII**: persist only blinded hashes. Treat any provider‑local optional fields (email, personal details) as *local only* and never gossip them.
+- **Peers are hints, not trust anchors**: federation tooling should assume peers can be wrong or malicious; strict validation and quarantine are part of the intended hardening path.
+- **Backups**: if you run with JSON/KV storage, schedule backups of `src/data/` (or your DB/KV file), especially before migrations.
+
+---
+
+## Further reading
+
+- `ROADMAP.md` — phased delivery plan and sequencing rationale  
+- `AGENTS.md` — implementation directives and vocabulary contract  
+- `principle-docs/RepresentativeParties.md` — design principles and thesis  
+- `principle-docs/DynamicTopicCategorization.md` — topic gardener spec  
+- `AI_REFERENCES.md` — implementation directives
+
+---
+
+## Contributing
+
+If you want to contribute, start by reading `AGENTS.md` and keep changes aligned with the vocabulary and privacy constraints. Small, testable modules are preferred over deep rewrites.
+
+
+---
+---
 
 ## Quick start
 - Prereqs: Node.js 20+ (ESM) and npm. `sqlite3` is bundled for the optional SQL adapter.
@@ -77,6 +301,8 @@ sequenceDiagram
   ProviderB->>Store: Persist vote envelopes, reject duplicates/replays
   Note over ProviderA,ProviderB: Envelopes are signed with CIRCLE_PRIVATE_KEY (ISSUER tags source)
 ```
+
+---
 
 ## Capabilities by module
 - **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/controllers/auth.js`. Pending sessions can be resumed with `?session={id}`.
