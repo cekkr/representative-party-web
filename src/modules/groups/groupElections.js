@@ -23,13 +23,24 @@ export function listElections(state, groupId) {
   return filterVisibleEntries(state.groupElections, state).filter((e) => e.groupId === groupId);
 }
 
-export async function castElectionVote({ electionId, voterHash, candidateHash, state }) {
+export async function castElectionVote({ electionId, voterHash, candidateHash, secondChoiceHash, state }) {
   const elections = state.groupElections || [];
   const election = elections.find((e) => e.id === electionId && e.status === 'open');
   if (!election) return null;
   const votes = election.votes || [];
   const filtered = votes.filter((v) => v.voterHash !== voterHash);
-  filtered.push({ voterHash, candidateHash, castAt: new Date().toISOString(), validationStatus: election.validationStatus || 'validated' });
+  const candidates = election.candidates || [];
+  const normalizedSecond =
+    secondChoiceHash && secondChoiceHash !== candidateHash && candidates.includes(secondChoiceHash)
+      ? secondChoiceHash
+      : null;
+  filtered.push({
+    voterHash,
+    candidateHash,
+    secondChoiceHash: normalizedSecond,
+    castAt: new Date().toISOString(),
+    validationStatus: election.validationStatus || 'validated',
+  });
   election.votes = filtered;
   await persistGroupElections(state);
   return election;

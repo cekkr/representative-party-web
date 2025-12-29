@@ -61,7 +61,8 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   if (action === 'voteElection') {
     const electionId = sanitizeText(body.electionId || '', 80);
     const candidateHash = sanitizeText(body.candidateHash || '', 80);
-    await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, state });
+    const secondChoiceHash = sanitizeText(body.secondChoiceHash || '', 80);
+    await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, secondChoiceHash, state });
     return renderGroups({ req, res, state, wantsPartial });
   }
 
@@ -237,6 +238,12 @@ function renderElections(elections, person) {
               <input type="hidden" name="action" value="voteElection" />
               <input type="hidden" name="electionId" value="${election.id}" />
               <select name="candidateHash">
+                ${election.candidates
+                  .map((c) => `<option value="${c}">${c}</option>`)
+                  .join('')}
+              </select>
+              <select name="secondChoiceHash">
+                <option value="">Second choice (optional)</option>
                 ${election.candidates
                   .map((c) => `<option value="${c}">${c}</option>`)
                   .join('')}

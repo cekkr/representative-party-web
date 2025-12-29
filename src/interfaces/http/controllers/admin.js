@@ -79,6 +79,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const preferredPeer = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
   const defaultElectionMode = sanitizeText(body.defaultElectionMode || prev.groupPolicy?.electionMode || 'priority', 32);
   const defaultConflictRule = sanitizeText(body.defaultConflictRule || prev.groupPolicy?.conflictRule || 'highest_priority', 32);
+  const petitionQuorumAdvance = normalizeQuorumAdvance(body.petitionQuorumAdvance || prev.petitionQuorumAdvance || 'discussion');
   const topicGardenerUrl = sanitizeText(body.topicGardenerUrl || prev.topicGardener?.url || '', 240);
   const topicAnchors = parseList(body.topicAnchors, prev.topicGardener?.anchors || DEFAULT_TOPIC_ANCHORS);
   const topicPinned = parseList(body.topicPinned, prev.topicGardener?.pinned || []);
@@ -97,6 +98,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     adminContact: sanitizeText(body.adminContact || prev.adminContact || '', 120),
     preferredPeer,
     notes: sanitizeText(body.notes || prev.notes || '', 400),
+    petitionQuorumAdvance,
     groupPolicy: {
       electionMode: defaultElectionMode,
       conflictRule: defaultConflictRule,
@@ -276,6 +278,7 @@ function buildAdminViewModel(
   const extensionsList = renderExtensions(availableExtensions);
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
+  const petitionQuorumAdvance = normalizeQuorumAdvance(state.settings?.petitionQuorumAdvance || 'discussion');
   const topicConfig = state.settings?.topicGardener || {};
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
@@ -307,6 +310,8 @@ function buildAdminViewModel(
     defaultElectionModeVote: defaultElectionMode === 'vote' ? 'selected' : '',
     defaultConflictHighest: defaultConflictRule === 'highest_priority' ? 'selected' : '',
     defaultConflictPrompt: defaultConflictRule === 'prompt_user' ? 'selected' : '',
+    petitionQuorumAdvanceDiscussion: petitionQuorumAdvance === 'discussion' ? 'selected' : '',
+    petitionQuorumAdvanceVote: petitionQuorumAdvance === 'vote' ? 'selected' : '',
     extensionsList,
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',
@@ -383,6 +388,11 @@ function roleSelectFlags(role) {
     moderator: role === 'moderator' ? 'selected' : '',
     admin: role === 'admin' ? 'selected' : '',
   };
+}
+
+function normalizeQuorumAdvance(value) {
+  const normalized = sanitizeText(value || '', 24).toLowerCase();
+  return normalized === 'vote' ? 'vote' : 'discussion';
 }
 
 function renderExtensions(list) {

@@ -5,9 +5,9 @@ import { classifyTopic } from '../../modules/topics/classification.js';
 import { resolveDelegation } from '../../modules/delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../modules/groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.js';
-import { createNotification } from '../../modules/messaging/notifications.js';
+import { createNotification, createNotificationWithOutbound } from '../../modules/messaging/notifications.js';
 import { persistDiscussions, persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
-import { countSignatures, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
+import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
 import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
 import { logTransaction } from '../../modules/transactions/registry.js';
@@ -31,6 +31,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const suggestions = renderSuggestions(person, state);
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);
+  const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
   const html = await renderPage(
     'petitions',
     {
@@ -43,6 +44,7 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
       petitionsList: renderPetitionList(petitions, votes, signatures, person, moderateGate.allowed, commentsByPetition),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
       delegationSuggestions: suggestions,
+      quorumAdvanceLabel,
     },
     { wantsPartial, title: 'Proposals & Votes' },
   );
@@ -287,6 +289,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial }) {
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
+  await notifyPetitionAuthor(state, { petition, commenter: person, petitionId });
   if (wantsPartial) {
     const html = await renderPetitions({ req, res, state, wantsPartial: true });
     return sendHtml(res, html);
@@ -308,4 +311,34 @@ function groupCommentsByPetition(comments = []) {
 function isVotingStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'open' || normalized === 'vote';
+}
+
+function getQuorumAdvanceLabel(state) {
+  const stage = getQuorumAdvanceStage(state);
+  return stage === 'vote' ? 'vote' : 'discussion';
+}
+
+async function notifyPetitionAuthor(state, { petition, commenter, petitionId }) {
+  if (!petition || !petition.authorHash) return;
+  if (commenter?.pidHash && petition.authorHash === commenter.pidHash) return;
+  const authorSession = findSessionByHash(state, petition.authorHash);
+  const commenterLabel = commenter?.handle || 'someone';
+  await createNotificationWithOutbound(
+    state,
+    {
+      type: 'petition_comment',
+      recipientHash: petition.authorHash,
+      petitionId,
+      message: `New comment on proposal "${petition.title}" from ${commenterLabel}.`,
+    },
+    { sessionId: authorSession?.id, handle: authorSession?.handle },
+  );
+}
+
+function findSessionByHash(state, pidHash) {
+  if (!pidHash || !state?.sessions) return null;
+  for (const session of state.sessions.values()) {
+    if (session.pidHash === pidHash) return session;
+  }
+  return null;
 }

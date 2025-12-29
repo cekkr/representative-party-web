@@ -16,7 +16,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; future phase adds second-choice capture for person elections (Alaska-style).
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second-choice picks for person elections (Alaska-style resolution later).
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
@@ -67,7 +67,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
 - Testing: node built-in tests cover hashing, migration normalization, and Circle policy gates so regressions in critical flows surface quickly.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
-- Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, and vote tallies; UI surfaces gate errors per role.
+- Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
 - Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications`.

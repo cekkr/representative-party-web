@@ -26,17 +26,24 @@ export async function signPetition({ petition, person, state }) {
   await persistSignatures(state);
   const count = countSignatures(petition.id, state);
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {
-    petition.status = 'discussion';
+    const advanceStage = getQuorumAdvanceStage(state);
+    petition.status = advanceStage === 'vote' ? 'open' : 'discussion';
     await persistPetitions(state);
+    const nextLabel = advanceStage === 'vote' ? 'vote' : 'discussion';
     await createNotificationWithOutbound(
       state,
       {
         type: 'quorum_reached',
         recipientHash: person.pidHash,
         petitionId: petition.id,
-        message: `Quorum reached for proposal "${petition.title}". Status set to discussion.`,
+        message: `Quorum reached for proposal "${petition.title}". Status set to ${nextLabel}.`,
       },
       { sessionId: person.sessionId, handle: person.handle },
     );
   }
+}
+
+export function getQuorumAdvanceStage(state) {
+  const raw = state?.settings?.petitionQuorumAdvance || 'discussion';
+  return raw === 'vote' ? 'vote' : 'discussion';
 }
