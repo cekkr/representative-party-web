@@ -2,7 +2,7 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## Concept anchors
 - User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “person” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
-- Messaging-first kernel: start as a simple threaded messaging surface (discussion/forum + notifications). Petitions, votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
+- Messaging-first kernel: start as a simple threaded messaging surface (discussion/forum + notifications). Law proposals (petitions), votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
 - Parallel social feed & follows: add a Twitter-like follow graph with typed edges (circle/interest/info/alerts) to drive a “small talk + info” micro-post lane. Short posts support replies, mentions/tags, and lightweight reshares; defaults keep it conversational and non-binding so petitions/votes stay distinct.
 - Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
 - Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable (providers can run solo messaging networks or join a Circle).
@@ -16,7 +16,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy.
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; future phase adds second-choice capture for person elections (Alaska-style).
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
@@ -48,7 +48,7 @@ This file captures the essential implementation directives. Keep it in sync with
 ## Endpoints
 - `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
 - `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle.
-- `/petitions` (GET/POST) scaffold for drafting petitions; `/petitions/vote` to cast votes; `/petitions/sign` for signatures/quorum; gates enforce per-role policy.
+- `/petitions` (GET/POST) drafts proposals with summary + optional full text; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.
 - `/notifications` (GET) list internal notifications; `/notifications/read` marks all read.
 - `/forum` (GET/POST) publish articles; `/forum/comment` post comments.
@@ -67,7 +67,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
 - Testing: node built-in tests cover hashing, migration normalization, and Circle policy gates so regressions in critical flows surface quickly.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
-- Petition/vote scaffold: petitions persisted to JSON with per-role gating and vote tallies; UI surfaces gate errors per role.
+- Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
 - Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications`.

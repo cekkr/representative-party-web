@@ -6,7 +6,7 @@ import { resolveDelegation } from '../../modules/delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../modules/groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.js';
 import { createNotification } from '../../modules/messaging/notifications.js';
-import { persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
+import { persistDiscussions, persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
 import { countSignatures, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
 import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
@@ -24,6 +24,9 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
   const moderateGate = evaluateAction(state, person, 'moderate');
   const signatures = filterVisibleEntries(state.signatures, state);
   const delegations = filterVisibleEntries(state.delegations, state);
+  const discussionEntries = filterVisibleEntries(state.discussions, state);
+  const petitionComments = discussionEntries.filter((entry) => entry.petitionId);
+  const commentsByPetition = groupCommentsByPetition(petitionComments);
   const conflicts = delegations?.filter((d) => d.conflict) || [];
   const suggestions = renderSuggestions(person, state);
   const petitions = filterVisibleEntries(state.petitions, state);
@@ -32,16 +35,16 @@ export async function renderPetitions({ req, res, state, wantsPartial }) {
     'petitions',
     {
       personHandle: person?.handle || 'Not verified yet',
-      petitionStatus: petitionGate.allowed ? 'You can draft petitions.' : petitionGate.message || petitionGate.reason,
-      voteStatus: voteGate.allowed ? 'You can vote on petitions.' : voteGate.message || voteGate.reason,
+      petitionStatus: petitionGate.allowed ? 'You can draft proposals.' : petitionGate.message || petitionGate.reason,
+      voteStatus: voteGate.allowed ? 'You can vote on proposals.' : voteGate.message || voteGate.reason,
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
       roleLabel: person?.role || 'guest',
-      petitionsList: renderPetitionList(petitions, votes, signatures, person, moderateGate.allowed),
+      petitionsList: renderPetitionList(petitions, votes, signatures, person, moderateGate.allowed, commentsByPetition),
       conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
       delegationSuggestions: suggestions,
     },
-    { wantsPartial, title: 'Petitions & Votes' },
+    { wantsPartial, title: 'Proposals & Votes' },
   );
   return sendHtml(res, html);
 }
@@ -68,13 +71,14 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'petition');
   if (!permission.allowed) {
-    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Petitioning not allowed.' });
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Proposal drafting not allowed.' });
   }
 
   const body = await readRequestBody(req);
   const title = sanitizeText(body.title || '', 120);
   const summary = sanitizeText(body.summary || '', 800);
-  const topic = await classifyTopic(`${title} ${summary}`, state);
+  const proposalText = sanitizeText(body.body || '', 4000);
+  const topic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
 
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
@@ -84,6 +88,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     id: randomUUID(),
     title,
     summary,
+    body: proposalText,
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     status: 'draft',
@@ -105,7 +110,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
       type: 'petition_created',
       recipientHash: person.pidHash,
       petitionId: petition.id,
-      message: `Petition "${title}" drafted. Topic ${topic}.`,
+      message: `Proposal "${title}" drafted. Topic ${topic}.`,
       expiresAt: null,
     });
   }
@@ -133,8 +138,8 @@ export async function castVote({ req, res, state, wantsPartial }) {
   if (!exists) {
     return sendJson(res, 404, { error: 'petition_not_found' });
   }
-  if (exists.status !== 'open') {
-    return sendJson(res, 400, { error: 'petition_closed', message: 'Petition not open for votes.' });
+  if (!isVotingStage(exists.status)) {
+    return sendJson(res, 400, { error: 'petition_closed', message: 'Proposal not open for votes.' });
   }
 
   if (!choice || choice === 'auto') {
@@ -200,9 +205,10 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   }
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);
-  const status = sanitizeText(body.status || '', 32);
+  const rawStatus = sanitizeText(body.status || '', 32);
+  const status = rawStatus === 'vote' ? 'open' : rawStatus;
   const quorum = Number(body.quorum || 0);
-  const validStatus = ['draft', 'open', 'closed'];
+  const validStatus = ['draft', 'discussion', 'open', 'vote', 'closed'];
   if (!validStatus.includes(status)) {
     return sendJson(res, 400, { error: 'invalid_status' });
   }
@@ -248,4 +254,58 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/petitions');
+}
+
+export async function postPetitionComment({ req, res, state, wantsPartial }) {
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'post');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
+  }
+  const body = await readRequestBody(req);
+  const petitionId = sanitizeText(body.petitionId || '', 120);
+  const content = sanitizeText(body.content || '', 800);
+  if (!petitionId || !content) {
+    return sendJson(res, 400, { error: 'missing_fields' });
+  }
+  const petition = state.petitions.find((p) => p.id === petitionId);
+  if (!petition) {
+    return sendJson(res, 404, { error: 'petition_not_found' });
+  }
+  if (petition.status === 'closed') {
+    return sendJson(res, 400, { error: 'petition_closed', message: 'Discussion closed for this proposal.' });
+  }
+  const entry = {
+    id: randomUUID(),
+    petitionId,
+    topic: petition.topic || 'general',
+    stance: 'comment',
+    content,
+    authorHash: person?.pidHash || 'anonymous',
+    createdAt: new Date().toISOString(),
+  };
+  const stamped = stampLocalEntry(state, entry);
+  state.discussions.unshift(stamped);
+  await persistDiscussions(state);
+  if (wantsPartial) {
+    const html = await renderPetitions({ req, res, state, wantsPartial: true });
+    return sendHtml(res, html);
+  }
+  return sendRedirect(res, '/petitions');
+}
+
+function groupCommentsByPetition(comments = []) {
+  const map = new Map();
+  for (const comment of comments) {
+    if (!comment.petitionId) continue;
+    const list = map.get(comment.petitionId) || [];
+    list.push(comment);
+    map.set(comment.petitionId, list);
+  }
+  return map;
+}
+
+function isVotingStage(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'open' || normalized === 'vote';
 }

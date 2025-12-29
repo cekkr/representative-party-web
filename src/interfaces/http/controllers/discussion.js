@@ -60,6 +60,13 @@ async function renderDiscussionShell({ state, person, wantsPartial }) {
     ? `Posting allowed as ${permission.role}.`
     : `Posting blocked: ${permission.message || permission.reason}`;
 
+  const discussionEntries = filterVisibleEntries(state.discussions, state).filter((entry) => {
+    if (entry.petitionId) return false;
+    if (entry.parentId) return false;
+    if (entry.stance === 'article' || entry.stance === 'comment') return false;
+    return true;
+  });
+
   return renderPage(
     'discussion',
     {
@@ -68,7 +75,7 @@ async function renderDiscussionShell({ state, person, wantsPartial }) {
       personStatus: person
         ? 'Posting as verified person bound to a blinded PID hash.'
         : 'Start the wallet flow to post with accountability.',
-      discussionList: renderDiscussionList(filterVisibleEntries(state.discussions, state)),
+      discussionList: renderDiscussionList(discussionEntries),
       verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
       circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
       policyId: policy.id,

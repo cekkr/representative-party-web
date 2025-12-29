@@ -86,6 +86,7 @@ const MIGRATIONS = [
         id: petition.id || `legacy-petition-${index}`,
         title: petition.title || 'Untitled petition',
         summary: petition.summary || '',
+        body: petition.body || petition.text || '',
         authorHash: petition.authorHash || 'anonymous',
         createdAt: petition.createdAt || new Date().toISOString(),
         status: petition.status || 'draft',
@@ -317,9 +318,12 @@ function normalizeDiscussion(entry, index) {
     id: entry.id || `legacy-${index}`,
     topic: stringOrFallback(entry.topic, 'General'),
     stance: stringOrFallback(entry.stance, 'neutral'),
+    title: stringOrEmpty(entry.title),
     content,
     authorHash: stringOrFallback(entry.authorHash, 'anonymous'),
     createdAt: entry.createdAt || entry.timestamp || new Date().toISOString(),
+    parentId: entry.parentId || null,
+    petitionId: entry.petitionId || null,
   };
 }
 

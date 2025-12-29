@@ -13,9 +13,14 @@ import { renderPage } from '../views/templates.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
+  const forumEntries = filterVisibleEntries(state.discussions, state).filter((entry) => {
+    if (entry.petitionId) return false;
+    if (entry.stance === 'article' || entry.stance === 'comment') return true;
+    return Boolean(entry.parentId);
+  });
   const html = await renderPage(
     'forum',
-    renderForum(filterVisibleEntries(state.discussions, state), person),
+    renderForum(forumEntries, person),
     { wantsPartial, title: 'Forum' },
   );
   return sendHtml(res, html);

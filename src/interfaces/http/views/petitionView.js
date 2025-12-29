@@ -1,22 +1,24 @@
 import { escapeHtml } from '../../shared/utils/text.js';
 
-export function renderPetitionList(petitions, votes, signatures, person, canModerate) {
+export function renderPetitionList(petitions, votes, signatures, person, canModerate, commentsByPetition = new Map()) {
   if (!petitions.length) {
-    return '<p class="muted">No petitions yet. Draft the first one.</p>';
+    return '<p class="muted">No proposals yet. Draft the first one.</p>';
   }
 
   const voteBuckets = buildVoteBuckets(votes);
 
   return petitions
     .map((petition) => {
+      const statusLabel = displayStatus(petition.status);
       const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
-      const voteDisabled = petition.status !== 'open';
+      const voteDisabled = !isVotingStage(petition.status);
       const signatureCount = (signatures || []).filter((s) => s.petitionId === petition.id).length;
       const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
+      const comments = commentsByPetition.get(petition.id) || [];
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(petition.status || 'draft')}</span>
+            <span class="pill">${escapeHtml(statusLabel)}</span>
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
             <span class="pill ghost">Topic: ${escapeHtml(petition.topic || 'general')}</span>
@@ -25,6 +27,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
           </div>
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
+          ${renderProposalText(petition.body)}
           <p class="muted small">Author hash: ${escapeHtml(petition.authorHash || 'anonymous')}</p>
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
           ${
@@ -33,13 +36,13 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
               : `
           <form class="form-inline" method="post" action="/petitions/sign" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
-            <button type="submit" class="ghost">Sign petition</button>
+            <button type="submit" class="ghost">Sign proposal</button>
           </form>
           `
           }
           ${
             voteDisabled
-              ? '<p class="muted small">Voting disabled while petition is not open.</p>'
+              ? '<p class="muted small">Voting disabled while proposal is not in the vote stage.</p>'
               : `
           <form class="form-inline" method="post" action="/petitions/vote" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
@@ -53,6 +56,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
           </form>
           `
           }
+          ${renderDiscussionBlock(petition, comments)}
           ${canModerate ? renderModerationForm(petition) : ''}
         </article>
       `;
@@ -77,18 +81,90 @@ function buildVoteBuckets(votes) {
 }
 
 function renderModerationForm(petition) {
+  const status = petition.status === 'open' ? 'vote' : petition.status;
   return `
     <form class="form-inline" method="post" action="/petitions/status" data-enhance="petitions">
       <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
       <label>Status
         <select name="status">
-          <option value="draft" ${petition.status === 'draft' ? 'selected' : ''}>draft</option>
-          <option value="open" ${petition.status === 'open' ? 'selected' : ''}>open</option>
-          <option value="closed" ${petition.status === 'closed' ? 'selected' : ''}>closed</option>
+          <option value="draft" ${status === 'draft' ? 'selected' : ''}>draft</option>
+          <option value="discussion" ${status === 'discussion' ? 'selected' : ''}>discussion</option>
+          <option value="vote" ${status === 'vote' ? 'selected' : ''}>vote</option>
+          <option value="closed" ${status === 'closed' ? 'selected' : ''}>closed</option>
         </select>
       </label>
       <label>Quorum <input name="quorum" value="${petition.quorum || 0}" size="4" /></label>
       <button type="submit" class="ghost">Apply</button>
     </form>
   `;
+}
+
+function renderProposalText(text) {
+  if (!text) return '';
+  return `
+    <details class="note">
+      <summary>Proposal text</summary>
+      <pre>${escapeHtml(text)}</pre>
+    </details>
+  `;
+}
+
+function renderDiscussionBlock(petition, comments) {
+  const count = comments.length;
+  const disabled = petition.status === 'closed';
+  const discussionList = renderPetitionComments(comments);
+  return `
+    <details class="note">
+      <summary>Discussion (${count})</summary>
+      ${
+        disabled
+          ? '<p class="muted small">Discussion closed.</p>'
+          : `
+      <form class="stack" method="post" action="/petitions/comment" data-enhance="petitions">
+        <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+        <label class="field">
+          <span>Comment</span>
+          <textarea name="content" rows="2" placeholder="Add a discussion note" required></textarea>
+        </label>
+        <button class="ghost" type="submit">Post comment</button>
+      </form>
+      `
+      }
+      <div class="discussion-list">
+        ${discussionList}
+      </div>
+    </details>
+  `;
+}
+
+function renderPetitionComments(comments) {
+  if (!comments.length) {
+    return '<p class="muted small">No discussion notes yet.</p>';
+  }
+  return comments
+    .map((comment) => {
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill ghost">Comment</span>
+            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+          </div>
+          <p>${escapeHtml(comment.content)}</p>
+          <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function displayStatus(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'open') return 'vote';
+  return normalized || 'draft';
+}
+
+function isVotingStage(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'open' || normalized === 'vote';
 }

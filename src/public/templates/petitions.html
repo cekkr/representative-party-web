@@ -1,6 +1,6 @@
 <section class="panel">
-  <p class="eyebrow">Petitions</p>
-  <h2>Petition drafting & voting scaffold</h2>
+  <p class="eyebrow">Law proposals</p>
+  <h2>Draft → discuss → vote pipeline</h2>
   <div class="callout">
     <p class="muted small">Role: {{roleLabel}}</p>
     <p class="muted small">Petition gate: {{petitionStatus}}</p>
@@ -28,17 +28,21 @@
     </div>
     <label class="field">
       <span>Summary</span>
-      <textarea name="summary" rows="4" placeholder="Describe the petition goals" required></textarea>
+      <textarea name="summary" rows="3" placeholder="Describe the proposal goals" required></textarea>
+    </label>
+    <label class="field">
+      <span>Proposal text (optional)</span>
+      <textarea name="body" rows="6" placeholder="Write the draft legal or policy text"></textarea>
     </label>
     <div class="cta-row">
-      <button class="cta" type="submit">Draft petition</button>
+      <button class="cta" type="submit">Draft proposal</button>
       <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
     </div>
   </form>
 </section>
 
 <section class="panel">
-  <p class="eyebrow">Open petitions</p>
+  <p class="eyebrow">Active proposals</p>
   <div class="discussion-list">
     {{petitionsList}}
   </div>

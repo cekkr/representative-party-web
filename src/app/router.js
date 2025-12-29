@@ -11,6 +11,7 @@ import {
   castVote,
   updatePetitionStatus,
   signPetitionRoute,
+  postPetitionComment,
 } from '../interfaces/http/controllers/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../interfaces/http/controllers/forum.js';
 import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../interfaces/http/controllers/groups.js';
@@ -44,6 +45,7 @@ const routes = [
   { method: 'GET', path: '/petitions', action: renderPetitions },
   { method: 'POST', path: '/petitions', action: submitPetition },
   { method: 'POST', path: '/petitions/sign', action: signPetitionRoute },
+  { method: 'POST', path: '/petitions/comment', action: postPetitionComment },
   { method: 'POST', path: '/petitions/vote', action: castVote },
   { method: 'POST', path: '/petitions/status', action: updatePetitionStatus },
   { method: 'GET', path: '/groups', action: renderGroups },

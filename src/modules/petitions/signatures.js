@@ -26,7 +26,7 @@ export async function signPetition({ petition, person, state }) {
   await persistSignatures(state);
   const count = countSignatures(petition.id, state);
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {
-    petition.status = 'open';
+    petition.status = 'discussion';
     await persistPetitions(state);
     await createNotificationWithOutbound(
       state,
@@ -34,7 +34,7 @@ export async function signPetition({ petition, person, state }) {
         type: 'quorum_reached',
         recipientHash: person.pidHash,
         petitionId: petition.id,
-        message: `Quorum reached for petition "${petition.title}". Status set to open.`,
+        message: `Quorum reached for proposal "${petition.title}". Status set to discussion.`,
       },
       { sessionId: person.sessionId, handle: person.handle },
     );
