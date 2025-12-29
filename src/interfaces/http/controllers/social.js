@@ -59,13 +59,31 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 
   const body = await readRequestBody(req);
   const content = body.content || '';
-  const visibility = body.visibility === 'direct' ? 'direct' : 'public';
   const replyTo = body.replyTo || null;
+  const reshareOf = sanitizeText(body.reshareOf || '', 120) || null;
+  const isReshare = Boolean(reshareOf);
+  const visibility = isReshare ? 'public' : body.visibility === 'direct' ? 'direct' : 'public';
   let targetHash = '';
   let targetHandle = '';
+  let targetSession = null;
+  let resharePost = null;
 
-  if (visibility === 'direct' || body.targetHandle) {
-    const targetSession = findSessionByHandle(state, body.targetHandle || '');
+  if (replyTo && isReshare) {
+    return sendJson(res, 400, { error: 'conflicting_intent', message: 'Reply and reshare cannot be combined.' });
+  }
+
+  if (isReshare) {
+    resharePost = findPost(state, reshareOf);
+    if (!resharePost) {
+      return sendJson(res, 404, { error: 'missing_reshare', message: 'Cannot reshare: original post not found.' });
+    }
+    if (resharePost.visibility === 'direct') {
+      return sendJson(res, 400, { error: 'reshare_private', message: 'Direct posts cannot be reshared.' });
+    }
+  }
+
+  if (!isReshare && (visibility === 'direct' || body.targetHandle)) {
+    targetSession = findSessionByHandle(state, body.targetHandle || '');
     if (!targetSession) {
       return sendJson(res, 404, { error: 'target_not_found', message: 'Target handle not found for direct post.' });
     }
@@ -82,7 +100,17 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 
   try {
     const baseUrl = deriveBaseUrl(req);
-    const post = createPost(state, { person, content, replyTo, visibility, targetHash, targetHandle, baseUrl });
+    const post = createPost(state, {
+      person,
+      content,
+      replyTo,
+      visibility,
+      targetHash,
+      targetHandle,
+      baseUrl,
+      reshareOf: isReshare ? reshareOf : null,
+      resharePost,
+    });
     await persistSocialPosts(state);
     await notifySocialParticipants(state, { post, author: person, targetSession });
   } catch (error) {
@@ -91,6 +119,15 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
     }
     if (error.code === 'missing_target') {
       return sendJson(res, 400, { error: 'missing_target', message: 'Direct posts require a target handle.' });
+    }
+    if (error.code === 'missing_reshare') {
+      return sendJson(res, 404, { error: 'missing_reshare', message: 'Cannot reshare: original post not found.' });
+    }
+    if (error.code === 'reshare_private') {
+      return sendJson(res, 400, { error: 'reshare_private', message: 'Direct posts cannot be reshared.' });
+    }
+    if (error.code === 'conflicting_intent') {
+      return sendJson(res, 400, { error: 'conflicting_intent', message: 'Reply and reshare cannot be combined.' });
     }
     throw error;
   }

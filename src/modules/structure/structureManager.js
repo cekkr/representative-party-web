@@ -215,7 +215,7 @@ function normalizeAttributeSource(raw) {
 function coerceValueForField(rawValue, field) {
   if (field.type === 'boolean') {
     if (typeof rawValue === 'boolean') return { value: rawValue };
-    const text = String(rawValue).toLowerCase();
+    const text = String(rawValue).trim().toLowerCase();
     if (!text) return { value: undefined, error: field.required ? 'Value empty' : null };
     if (text === 'true' || text === '1' || text === 'yes' || text === 'on') return { value: true };
     if (text === 'false' || text === '0' || text === 'no' || text === 'off') return { value: false };

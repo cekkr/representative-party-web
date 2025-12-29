@@ -6,13 +6,31 @@ import { createSocialNote, wrapCreateActivity } from '../federation/activitypub.
 import { listFollowsFor, normalizeFollowType } from './followGraph.js';
 
 const MAX_POST_LENGTH = 560;
+const MENTION_REGEX = /@([a-zA-Z0-9._-]{2,64})/g;
+const TAG_REGEX = /#([a-zA-Z0-9_-]{2,48})/g;
 
 export function createPost(
   state,
-  { person, content, replyTo = null, visibility = 'public', targetHash = '', targetHandle = '', baseUrl },
+  {
+    person,
+    content,
+    replyTo = null,
+    visibility = 'public',
+    targetHash = '',
+    targetHandle = '',
+    baseUrl,
+    reshareOf = null,
+    resharePost = null,
+  },
 ) {
   const body = sanitizeText(content, MAX_POST_LENGTH);
-  if (!body) {
+  const wantsReshare = Boolean(reshareOf);
+  if (replyTo && wantsReshare) {
+    const error = new Error('conflicting_intent');
+    error.code = 'conflicting_intent';
+    throw error;
+  }
+  if (!body && !wantsReshare) {
     const error = new Error('missing_content');
     error.code = 'missing_content';
     throw error;
@@ -25,6 +43,30 @@ export function createPost(
     throw error;
   }
 
+  let reshare = null;
+  if (wantsReshare) {
+    const source = resharePost || findPost(state, reshareOf);
+    if (!source) {
+      const error = new Error('missing_reshare');
+      error.code = 'missing_reshare';
+      throw error;
+    }
+    if (source.visibility === 'direct') {
+      const error = new Error('reshare_private');
+      error.code = 'reshare_private';
+      throw error;
+    }
+    reshare = {
+      id: source.id,
+      authorHash: source.authorHash,
+      authorHandle: source.authorHandle,
+      content: source.content,
+      createdAt: source.createdAt,
+    };
+  }
+
+  const mentions = extractMentions(body);
+  const tags = extractTags(body);
   const entry = stampLocalEntry(state, {
     id: randomUUID(),
     authorHash: person?.pidHash || 'anonymous',
@@ -32,6 +74,10 @@ export function createPost(
     content: body,
     createdAt: new Date().toISOString(),
     replyTo: replyTo || null,
+    mentions,
+    tags,
+    reshareOf: reshare ? reshare.id : null,
+    reshare,
     visibility: normalizedVisibility,
     targetHash: normalizedVisibility === 'direct' ? targetHash : '',
     targetHandle: normalizedVisibility === 'direct' ? targetHandle : '',
@@ -81,4 +127,24 @@ export function buildFeed(state, person, { followType } = {}) {
 
 export function findPost(state, postId) {
   return (state.socialPosts || []).find((post) => post.id === postId);
+}
+
+export function extractMentions(content = '') {
+  const handles = new Set();
+  MENTION_REGEX.lastIndex = 0;
+  let match;
+  while ((match = MENTION_REGEX.exec(content))) {
+    handles.add(match[1].toLowerCase());
+  }
+  return [...handles];
+}
+
+export function extractTags(content = '') {
+  const tags = new Set();
+  TAG_REGEX.lastIndex = 0;
+  let match;
+  while ((match = TAG_REGEX.exec(content))) {
+    tags.add(match[1].toLowerCase());
+  }
+  return [...tags];
 }

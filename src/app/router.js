@@ -56,6 +56,7 @@ const routes = [
   { method: 'POST', path: '/circle/peers', action: registerPeer },
   { method: 'GET', path: '/social/feed', action: renderSocialFeed },
   { method: 'POST', path: '/social/post', action: postSocialMessage },
+  { method: 'POST', path: '/social/reply', action: postSocialMessage },
   { method: 'POST', path: '/social/follow', action: followHandle },
   { method: 'POST', path: '/social/unfollow', action: unfollowHandle },
   { method: 'GET', path: '/social/relationships', action: listRelationships },

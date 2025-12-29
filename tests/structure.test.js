@@ -10,7 +10,7 @@ import {
 } from '../src/modules/structure/structureManager.js';
 import { resolveContactChannels, deliverOutbound } from '../src/modules/messaging/outbound.js';
 
-test('structure manager normalizes provider fields and attributes', () => {
+test('structure manager normalizes provider fields and attributes', async () => {
   const { fields, errors } = parseProviderFieldInput('email:email:Contact email\nphone:phone:Mobile\nnotify:boolean:Notify me');
   assert.equal(errors.length, 0);
 

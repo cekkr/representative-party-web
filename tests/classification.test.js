@@ -73,7 +73,7 @@ test('resolveDelegation uses stored entry', async () => {
   const state = {
     delegations: [],
     extensions: { active: [] },
-    store: { saveDelegations: async () => {} },
+    store: { saveDelegations: async () => {}, saveTransactions: async () => {} },
     groups: [],
   };
   const person = { pidHash: 'hash-1' };

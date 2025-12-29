@@ -1,11 +1,13 @@
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
+import { extractMentions } from './posts.js';
 import { findSessionByHandle } from './followGraph.js';
 
 const SNIPPET_LENGTH = 120;
 
 export async function notifySocialParticipants(state, { post, author, targetSession }) {
   const recipients = new Map();
-  const snippet = (post.content || '').slice(0, SNIPPET_LENGTH);
+  const snippetSource = (post.content || post.reshare?.content || '').slice(0, SNIPPET_LENGTH);
+  const snippet = snippetSource || '';
 
   if (post.visibility === 'direct' && targetSession?.pidHash) {
     recipients.set(targetSession.pidHash, {
@@ -16,7 +18,7 @@ export async function notifySocialParticipants(state, { post, author, targetSess
     });
   }
 
-  const mentions = extractMentions(post.content || '');
+  const mentions = Array.isArray(post.mentions) ? post.mentions : extractMentions(post.content || '');
   for (const handle of mentions) {
     const session = findSessionByHandle(state, handle);
     if (!session || session.pidHash === author?.pidHash) continue;
@@ -29,6 +31,18 @@ export async function notifySocialParticipants(state, { post, author, targetSess
     });
   }
 
+  if (post.reshareOf && post.reshare?.authorHash) {
+    const session = findSessionByHash(state, post.reshare.authorHash) || findSessionByHandle(state, post.reshare.authorHandle || '');
+    if (session && session.pidHash !== author?.pidHash) {
+      recipients.set(session.pidHash, {
+        type: 'social_reshare',
+        message: `Reshare by ${author?.handle || 'someone'}: ${snippet}`,
+        sessionId: session.id,
+        handle: session.handle,
+      });
+    }
+  }
+
   for (const [recipientHash, payload] of recipients.entries()) {
     await createNotificationWithOutbound(state, {
       type: payload.type,
@@ -38,12 +52,10 @@ export async function notifySocialParticipants(state, { post, author, targetSess
   }
 }
 
-function extractMentions(content = '') {
-  const regex = /@([a-zA-Z0-9._-]{2,64})/g;
-  const handles = new Set();
-  let match;
-  while ((match = regex.exec(content))) {
-    handles.add(match[1]);
+function findSessionByHash(state, pidHash) {
+  if (!pidHash || !state?.sessions) return null;
+  for (const session of state.sessions.values()) {
+    if (session.pidHash === pidHash) return session;
   }
-  return [...handles];
+  return null;
 }
