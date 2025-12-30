@@ -98,12 +98,14 @@ CIRCLE_PRIVATE_KEY=./priv.pem CIRCLE_PUBLIC_KEY=./pub.pem DATA_VALIDATION_LEVEL=
 
 # Tests + adapter report
 npm test
+npm run test:ui   # UI-only suite (Puppeteer)
 npm run db:check
 ```
 
 Testing notes:
-- `npm test` now includes Puppeteer UI flows and P2P ring smoke tests; they spin up local servers on ad hoc ports with temp data files.
-- If headless Chrome fails in CI, set up the system dependencies or run the UI tests separately.
+- `npm test` runs the full node:test suite (including Puppeteer UI flows and P2P ring smoke tests) and spins up local servers on ad hoc ports with temp data files.
+- `npm run test:ui` runs the UI-only Puppeteer flow for a stable CI entry point.
+- If headless Chrome fails in CI, set up the system dependencies or skip the UI suite.
 
 ### Defaults
 - Server: `http://0.0.0.0:3000`
@@ -244,7 +246,7 @@ If you want to contribute, start by reading `AGENTS.md` and keep changes aligned
 - Dev server (ephemeral): `DATA_ADAPTER=memory DATA_MODE=centralized npm start`
 - Single-provider with persisted JSON: `npm start` (defaults to `http://0.0.0.0:3000`, stores under `src/data/`)
 - Circle with signing/validation: `CIRCLE_PRIVATE_KEY=./priv.pem CIRCLE_PUBLIC_KEY=./pub.pem DATA_VALIDATION_LEVEL=strict npm start`
-- Tests + adapter report: `npm test` and `npm run db:check`
+- Tests + adapter report: `npm test`, `npm run test:ui`, and `npm run db:check`
 
 ## Core ideas
 - One person = one voice via blinded PID hashes and policy gates.
@@ -263,7 +265,7 @@ If you want to contribute, start by reading `AGENTS.md` and keep changes aligned
 - **Shared:** cross-cutting utilities in `src/shared/utils/`.
 - **Views/assets:** SSR templates in `src/public/templates`, styles/JS in `src/public/`.
 - **Extensions:** registry in `src/modules/extensions/registry.js` with sample `sample-policy-tighten.js`; enable via `CIRCLE_EXTENSIONS`.
-- **Tests:** `npm test` runs the `node:test` suite in `tests/` (hashing, migrations, policy gates, classification, extensions).
+- **Tests:** `npm test` runs the `node:test` suite in `tests/` (hashing, migrations, policy gates, classification, extensions, Puppeteer UI flows, ring gossip); `npm run test:ui` runs the UI-only flow.
 
 ## Common deployment recipes (settings + policy + extensions)
 - Local messaging sandbox (no verification): `DATA_MODE=centralized DATA_ADAPTER=memory ENFORCE_CIRCLE=false` to exercise UI flows without writing to disk.
@@ -339,7 +341,8 @@ sequenceDiagram
 - Install & run:
   ```bash
   npm install
-  npm test   # node:test: hashing, migrations, classification hooks, policy gates, extension registry
+  npm test      # node:test: hashing, migrations, classification hooks, policy gates, extensions, UI + ring tests
+  npm run test:ui  # Puppeteer UI-only flow
   npm start  # starts the SSR server
   npm run db:check  # prints adapter/profile + record counts for the current DATA_ADAPTER
   ```

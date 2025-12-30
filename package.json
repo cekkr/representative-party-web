@@ -21,6 +21,7 @@
   "scripts": {
     "start": "node src/index.js",
     "test": "node --test",
+    "test:ui": "node --test tests/ui.test.js",
     "db:check": "node scripts/db-check.js"
   },
   "dependencies": {
