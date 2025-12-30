@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 
-import { getPerson } from '../../modules/identity/person.js';
-import { classifyTopic } from '../../modules/topics/classification.js';
-import { evaluateAction } from '../../modules/circle/policy.js';
-import { persistDiscussions } from '../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { classifyTopic } from '../../../modules/topics/classification.js';
+import { evaluateAction } from '../../../modules/circle/policy.js';
+import { persistDiscussions } from '../../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderForum } from '../views/forumView.js';
 import { renderPage } from '../views/templates.js';
 

@@ -67,7 +67,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
 - Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
-- Testing: node built-in tests cover hashing, migration normalization, and Circle policy gates so regressions in critical flows surface quickly.
+- Testing: node built-in tests cover hashing, migration normalization, module toggles, Circle policy gates, UI role flows (Puppeteer), and ring gossip consistency to catch regressions in critical flows.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.

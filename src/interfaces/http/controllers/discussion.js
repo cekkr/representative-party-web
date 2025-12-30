@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { getPerson } from '../../modules/identity/person.js';
-import { evaluateAction, getCirclePolicyState } from '../../modules/circle/policy.js';
-import { persistDiscussions } from '../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { persistDiscussions } from '../../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderDiscussionList } from '../views/discussionView.js';
 import { renderPage } from '../views/templates.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';

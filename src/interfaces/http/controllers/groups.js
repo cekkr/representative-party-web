@@ -1,13 +1,13 @@
-import { getPerson } from '../../modules/identity/person.js';
-import { evaluateAction } from '../../modules/circle/policy.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
-import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../../modules/groups/groups.js';
-import { createNotification } from '../../modules/messaging/notifications.js';
-import { getGroupPolicy, setGroupPolicy } from '../../modules/groups/groupPolicy.js';
-import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../modules/groups/groupElections.js';
-import { sendHtml, sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { evaluateAction } from '../../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
+import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../../../modules/groups/groups.js';
+import { createNotification } from '../../../modules/messaging/notifications.js';
+import { getGroupPolicy, setGroupPolicy } from '../../../modules/groups/groupPolicy.js';
+import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../../modules/groups/groupElections.js';
+import { sendHtml, sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 

@@ -101,6 +101,10 @@ npm test
 npm run db:check
 ```
 
+Testing notes:
+- `npm test` now includes Puppeteer UI flows and P2P ring smoke tests; they spin up local servers on ad hoc ports with temp data files.
+- If headless Chrome fails in CI, set up the system dependencies or run the UI tests separately.
+
 ### Defaults
 - Server: `http://0.0.0.0:3000`
 - JSON persistence (default): writes under `src/data/`

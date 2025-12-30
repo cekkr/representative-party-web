@@ -1,8 +1,8 @@
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
-import { MIME_TYPES, PATHS } from '../../config.js';
-import { sendNotFound } from '../../shared/utils/http.js';
+import { MIME_TYPES, PATHS } from '../../../config.js';
+import { sendNotFound } from '../../../shared/utils/http.js';
 
 export async function servePublic({ res, pathname }) {
   const safePath = pathname.replace(/^\/public\//, '');

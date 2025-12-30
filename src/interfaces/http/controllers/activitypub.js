@@ -1,6 +1,6 @@
-import { sendJson, sendNotFound } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
+import { sendJson, sendNotFound } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function serveActor({ res, state, hash }) {

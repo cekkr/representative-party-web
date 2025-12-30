@@ -1,10 +1,10 @@
-import { getPerson } from '../../modules/identity/person.js';
-import { chooseDelegation } from '../../modules/delegation/delegation.js';
-import { logTransaction } from '../../modules/transactions/registry.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
-import { sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { chooseDelegation } from '../../../modules/delegation/delegation.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
+import { sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function resolveConflict({ req, res, state }) {

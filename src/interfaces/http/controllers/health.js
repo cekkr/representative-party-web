@@ -1,7 +1,7 @@
-import { POLICIES } from '../../config.js';
-import { filterVisibleEntries, getReplicationProfile } from '../../modules/federation/replication.js';
-import { buildPolicyGates, getCirclePolicyState } from '../../modules/circle/policy.js';
-import { sendJson } from '../../shared/utils/http.js';
+import { POLICIES } from '../../../config.js';
+import { filterVisibleEntries, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
   return sendJson(res, 200, {

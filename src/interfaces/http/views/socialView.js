@@ -1,4 +1,4 @@
-import { escapeHtml } from '../../shared/utils/text.js';
+import { escapeHtml } from '../../../shared/utils/text.js';
 
 export function renderSocialPosts(posts, { enableReplies = false } = {}) {
   if (!posts || posts.length === 0) {

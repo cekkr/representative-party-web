@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { DEFAULT_PAGE_TITLE, PATHS } from '../../config.js';
+import { DEFAULT_PAGE_TITLE, PATHS } from '../../../config.js';
 import { renderNav } from './navigation.js';
 
 const templateCache = new Map();

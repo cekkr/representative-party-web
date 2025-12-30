@@ -1,8 +1,8 @@
-import { loadExtensions, listAvailableExtensions } from '../../modules/extensions/registry.js';
-import { persistSettings } from '../../infra/persistence/storage.js';
-import { sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { loadExtensions, listAvailableExtensions } from '../../../modules/extensions/registry.js';
+import { persistSettings } from '../../../infra/persistence/storage.js';
+import { sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 
 export async function getExtensions({ res, state }) {
   const available = await listAvailableExtensions(state);

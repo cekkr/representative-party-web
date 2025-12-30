@@ -1,9 +1,9 @@
-import { persistLedger, persistPeers } from '../../infra/persistence/storage.js';
-import { sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { buildLedgerEnvelope, verifyLedgerEnvelope } from '../../modules/circle/federation.js';
-import { decideStatus, getReplicationProfile } from '../../modules/federation/replication.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
+import { persistLedger, persistPeers } from '../../../infra/persistence/storage.js';
+import { sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { buildLedgerEnvelope, verifyLedgerEnvelope } from '../../../modules/circle/federation.js';
+import { decideStatus, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function handleGossip({ req, res, state }) {

@@ -1,7 +1,7 @@
-import { getPerson } from '../../modules/identity/person.js';
-import { evaluateAction } from '../../modules/circle/policy.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
-import { persistSocialFollows, persistSocialPosts } from '../../infra/persistence/storage.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { evaluateAction } from '../../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
+import { persistSocialFollows, persistSocialPosts } from '../../../infra/persistence/storage.js';
 import {
   DEFAULT_FOLLOW_TYPES,
   ensureFollowEdge,
@@ -10,12 +10,12 @@ import {
   listFollowsFor,
   normalizeFollowType,
   removeFollowEdge,
-} from '../../modules/social/followGraph.js';
-import { buildFeed, createPost, findPost } from '../../modules/social/posts.js';
-import { notifySocialParticipants } from '../../modules/social/notifications.js';
-import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
-import { readRequestBody, deriveBaseUrl } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+} from '../../../modules/social/followGraph.js';
+import { buildFeed, createPost, findPost } from '../../../modules/social/posts.js';
+import { notifySocialParticipants } from '../../../modules/social/notifications.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';

@@ -1,16 +1,16 @@
-import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
-import { DEFAULT_TOPIC_ANCHORS } from '../../modules/topics/topicGardenerClient.js';
+import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
+import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import {
   persistPeers,
   persistProfileAttributes,
   persistProfileStructures,
   persistSessions,
   persistSettings,
-} from '../../infra/persistence/storage.js';
-import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
-import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../modules/circle/modules.js';
-import { listAvailableExtensions } from '../../modules/extensions/registry.js';
-import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
+} from '../../../infra/persistence/storage.js';
+import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
+import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
+import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
+import { describeProfile, getReplicationProfile } from '../../../modules/federation/replication.js';
 import {
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
@@ -18,10 +18,10 @@ import {
   parseAttributePayloadWithValidation,
   parseProviderFieldInput,
   upsertProviderAttributes,
-} from '../../modules/structure/structureManager.js';
-import { sendHtml, sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+} from '../../../modules/structure/structureManager.js';
+import { sendHtml, sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {

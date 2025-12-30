@@ -25,5 +25,8 @@
   },
   "dependencies": {
     "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "puppeteer": "^24.34.0"
   }
 }

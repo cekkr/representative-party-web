@@ -1,4 +1,4 @@
-import { resolveModuleSettings } from '../../modules/circle/modules.js';
+import { resolveModuleSettings } from '../../../modules/circle/modules.js';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', partial: true },

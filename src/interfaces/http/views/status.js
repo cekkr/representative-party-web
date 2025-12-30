@@ -1,5 +1,5 @@
-import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
-import { getCirclePolicyState } from '../../modules/circle/policy.js';
+import { describeProfile, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { getCirclePolicyState } from '../../../modules/circle/policy.js';
 
 export function deriveStatusMeta(state) {
   const policy = getCirclePolicyState(state);

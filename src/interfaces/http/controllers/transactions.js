@@ -1,5 +1,5 @@
-import { listTransactions, exportTransactionsEnvelope } from '../../modules/transactions/registry.js';
-import { sendJson } from '../../shared/utils/http.js';
+import { listTransactions, exportTransactionsEnvelope } from '../../../modules/transactions/registry.js';
+import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderTransactions({ res, state, url }) {
   const type = url.searchParams.get('type') || null;

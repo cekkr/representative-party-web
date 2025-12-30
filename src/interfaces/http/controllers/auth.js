@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto';
 
-import { createActor } from '../../modules/federation/activitypub.js';
-import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../modules/identity/auth.js';
-import { getPerson } from '../../modules/identity/person.js';
-import { getCirclePolicyState } from '../../modules/circle/policy.js';
-import { deriveBaseUrl } from '../../shared/utils/request.js';
-import { sendHtml } from '../../shared/utils/http.js';
-import { persistActors, persistLedger, persistSessions } from '../../infra/persistence/storage.js';
+import { createActor } from '../../../modules/federation/activitypub.js';
+import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../../modules/identity/auth.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { deriveBaseUrl } from '../../../shared/utils/request.js';
+import { sendHtml } from '../../../shared/utils/http.js';
+import { persistActors, persistLedger, persistSessions } from '../../../infra/persistence/storage.js';
 import { renderPage } from '../views/templates.js';
 
 export async function startAuth({ req, res, state, wantsPartial }) {

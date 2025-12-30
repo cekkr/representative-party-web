@@ -1,23 +1,23 @@
 import { randomUUID } from 'node:crypto';
 
-import { getPerson } from '../../modules/identity/person.js';
-import { classifyTopic } from '../../modules/topics/classification.js';
-import { resolveDelegation } from '../../modules/delegation/delegation.js';
-import { recommendDelegationForPerson } from '../../modules/groups/groups.js';
-import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.js';
-import { isModuleEnabled, resolveModuleSettings } from '../../modules/circle/modules.js';
-import { createNotification, createNotificationWithOutbound } from '../../modules/messaging/notifications.js';
-import { persistDiscussions, persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
-import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
-import { resolveNotificationPreferences } from '../../modules/messaging/outbound.js';
-import { extractMentions } from '../../modules/social/posts.js';
-import { findSessionByHandle } from '../../modules/social/followGraph.js';
-import { buildVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../modules/federation/replication.js';
-import { logTransaction } from '../../modules/transactions/registry.js';
-import { sendHtml, sendJson, sendRedirect } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { sanitizeText } from '../../shared/utils/text.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { classifyTopic } from '../../../modules/topics/classification.js';
+import { resolveDelegation } from '../../../modules/delegation/delegation.js';
+import { recommendDelegationForPerson } from '../../../modules/groups/groups.js';
+import { evaluateAction, getEffectivePolicy } from '../../../modules/circle/policy.js';
+import { isModuleEnabled, resolveModuleSettings } from '../../../modules/circle/modules.js';
+import { createNotification, createNotificationWithOutbound } from '../../../modules/messaging/notifications.js';
+import { persistDiscussions, persistPetitions, persistVotes } from '../../../infra/persistence/storage.js';
+import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../../modules/petitions/signatures.js';
+import { resolveNotificationPreferences } from '../../../modules/messaging/outbound.js';
+import { extractMentions } from '../../../modules/social/posts.js';
+import { findSessionByHandle } from '../../../modules/social/followGraph.js';
+import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
@@ -151,8 +151,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   }
 
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true });
-    return sendHtml(res, html);
+    return renderPetitions({ req, res, state, wantsPartial: true });
   }
 
   return sendRedirect(res, '/petitions');
@@ -234,8 +233,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true });
-    return sendHtml(res, html);
+    return renderPetitions({ req, res, state, wantsPartial: true });
   }
 
   return sendRedirect(res, '/petitions');
@@ -274,8 +272,7 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   });
 
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true });
-    return sendHtml(res, html);
+    return renderPetitions({ req, res, state, wantsPartial: true });
   }
   return sendRedirect(res, '/petitions');
 }
@@ -300,8 +297,7 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
   }
   await signPetition({ petition, person, state });
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true });
-    return sendHtml(res, html);
+    return renderPetitions({ req, res, state, wantsPartial: true });
   }
   return sendRedirect(res, '/petitions');
 }
@@ -343,8 +339,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
   if (wantsPartial) {
-    const html = await renderPetitions({ req, res, state, wantsPartial: true, url });
-    return sendHtml(res, html);
+    return renderPetitions({ req, res, state, wantsPartial: true, url });
   }
   return sendRedirect(res, '/petitions');
 }

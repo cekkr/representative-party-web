@@ -1,9 +1,9 @@
-import { buildVoteEnvelope, verifyVoteEnvelope } from '../../modules/votes/voteEnvelope.js';
-import { persistVotes } from '../../infra/persistence/storage.js';
-import { sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
-import { decideStatus, getReplicationProfile } from '../../modules/federation/replication.js';
-import { isModuleEnabled } from '../../modules/circle/modules.js';
+import { buildVoteEnvelope, verifyVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
+import { persistVotes } from '../../../infra/persistence/storage.js';
+import { sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
+import { decideStatus, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function exportVotes({ res, state }) {

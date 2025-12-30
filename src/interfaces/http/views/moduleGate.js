@@ -1,5 +1,5 @@
-import { getModuleDefinition } from '../../modules/circle/modules.js';
-import { sendHtml, sendJson } from '../../shared/utils/http.js';
+import { getModuleDefinition } from '../../../modules/circle/modules.js';
+import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { renderPage } from './templates.js';
 
 export async function renderModuleDisabled({ res, state, wantsPartial, moduleKey }) {

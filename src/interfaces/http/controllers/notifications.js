@@ -1,11 +1,11 @@
-import { getPerson } from '../../modules/identity/person.js';
-import { listNotificationsForPerson, markAllRead } from '../../modules/messaging/notifications.js';
-import { resolveNotificationPreferences } from '../../modules/messaging/outbound.js';
-import { persistProfileAttributes } from '../../infra/persistence/storage.js';
-import { upsertProviderAttributes } from '../../modules/structure/structureManager.js';
-import { escapeHtml } from '../../shared/utils/text.js';
-import { sendHtml, sendJson } from '../../shared/utils/http.js';
-import { readRequestBody } from '../../shared/utils/request.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { listNotificationsForPerson, markAllRead } from '../../../modules/messaging/notifications.js';
+import { resolveNotificationPreferences } from '../../../modules/messaging/outbound.js';
+import { persistProfileAttributes } from '../../../infra/persistence/storage.js';
+import { upsertProviderAttributes } from '../../../modules/structure/structureManager.js';
+import { escapeHtml } from '../../../shared/utils/text.js';
+import { sendHtml, sendJson } from '../../../shared/utils/http.js';
+import { readRequestBody } from '../../../shared/utils/request.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderNotifications({ req, res, state, wantsPartial }) {
