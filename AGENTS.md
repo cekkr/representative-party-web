@@ -16,7 +16,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second-choice picks with ranked/tie-break resolution for person elections (Alaska-style).
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second/third-choice picks with multi-round transfers for person elections (Alaska-style).
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
@@ -78,5 +78,4 @@ This file captures the essential implementation directives. Keep it in sync with
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
 
 ## Possible next steps:
-- Add a per‑proposal deep link target so feed items can jump to a specific proposal.
-- Extend ranked‑choice to full multi‑round transfers when you add third‑choice ballots.
+- Add per-module toggles so petitions/votes/delegation/federation/topic gardener can be disabled for messaging-only deployments without dead-end navigation.

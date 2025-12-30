@@ -16,8 +16,9 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
       const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
       const comments = commentsByPetition.get(petition.id) || [];
       const lastCommentAt = getLastCommentAt(comments);
+      const anchorId = `petition-${petition.id}`;
       return `
-        <article class="discussion">
+        <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
@@ -27,6 +28,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
             <span class="pill ghost">Signatures: ${signatureCount}</span>
             <span class="pill ghost">Discussion: ${comments.length}</span>
             ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
+            <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
           </div>
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
@@ -169,6 +171,8 @@ export function renderProposalDiscussionFeed(items) {
     .map(({ comment, petition }) => {
       const statusLabel = displayStatus(petition?.status || 'draft');
       const snippet = (comment.content || '').slice(0, 180);
+      const anchorId = petition?.id ? `petition-${petition.id}` : null;
+      const permalink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -176,6 +180,7 @@ export function renderProposalDiscussionFeed(items) {
             <span class="pill ghost">Proposal</span>
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+            ${permalink}
           </div>
           <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
           <p>${escapeHtml(snippet)}</p>

@@ -23,7 +23,7 @@ export function listElections(state, groupId) {
   return filterVisibleEntries(state.groupElections, state).filter((e) => e.groupId === groupId);
 }
 
-export async function castElectionVote({ electionId, voterHash, candidateHash, secondChoiceHash, state }) {
+export async function castElectionVote({ electionId, voterHash, candidateHash, secondChoiceHash, thirdChoiceHash, state }) {
   const elections = state.groupElections || [];
   const election = elections.find((e) => e.id === electionId && e.status === 'open');
   if (!election) return null;
@@ -34,10 +34,18 @@ export async function castElectionVote({ electionId, voterHash, candidateHash, s
     secondChoiceHash && secondChoiceHash !== candidateHash && candidates.includes(secondChoiceHash)
       ? secondChoiceHash
       : null;
+  const normalizedThird =
+    thirdChoiceHash &&
+    thirdChoiceHash !== candidateHash &&
+    thirdChoiceHash !== normalizedSecond &&
+    candidates.includes(thirdChoiceHash)
+      ? thirdChoiceHash
+      : null;
   filtered.push({
     voterHash,
     candidateHash,
     secondChoiceHash: normalizedSecond,
+    thirdChoiceHash: normalizedThird,
     castAt: new Date().toISOString(),
     validationStatus: election.validationStatus || 'validated',
   });
@@ -75,15 +83,12 @@ function resolveRankedChoiceWinner(election) {
   if (!candidates.length || !votes.length) return null;
 
   let active = new Set(candidates);
-  const workingVotes = votes.map((vote) => ({
-    first: vote.candidateHash,
-    second: vote.secondChoiceHash || null,
-  }));
+  const ballots = buildRankedBallots(votes, candidates);
   let rounds = 0;
 
   while (active.size > 1) {
     rounds += 1;
-    const counts = tallyFirstChoices(workingVotes, active);
+    const counts = tallyPreferences(ballots, active);
     const total = sumCounts(counts, active);
     if (!total) break;
 
@@ -96,16 +101,6 @@ function resolveRankedChoiceWinner(election) {
     const lowestCandidates = findLowestCandidates(counts, active);
     if (lowestCandidates.length >= active.size) break;
 
-    const lowestSet = new Set(lowestCandidates);
-    for (const vote of workingVotes) {
-      if (!active.has(vote.first)) {
-        vote.first = null;
-      }
-      if (vote.first && lowestSet.has(vote.first)) {
-        const fallback = vote.second;
-        vote.first = fallback && active.has(fallback) && !lowestSet.has(fallback) ? fallback : null;
-      }
-    }
     for (const candidate of lowestCandidates) {
       active.delete(candidate);
     }
@@ -118,24 +113,48 @@ function resolveRankedChoiceWinner(election) {
 
   const remaining = candidates.filter((candidate) => active.has(candidate));
   if (!remaining.length) return null;
-  const tieBreak = breakTieWithSecondChoice(votes, remaining);
+  const tieBreak = breakTieWithPreferences(ballots, remaining);
   if (tieBreak) {
     return { candidateHash: tieBreak, method: 'tie_break', rounds };
   }
   return { candidateHash: remaining[0], method: 'fallback', rounds };
 }
 
-function tallyFirstChoices(votes, active) {
+function buildRankedBallots(votes, candidates) {
+  const candidateSet = new Set(candidates);
+  return (votes || [])
+    .map((vote) => {
+      const seen = new Set();
+      const ranked = [];
+      for (const choice of [vote.candidateHash, vote.secondChoiceHash, vote.thirdChoiceHash]) {
+        if (!choice || !candidateSet.has(choice) || seen.has(choice)) continue;
+        seen.add(choice);
+        ranked.push(choice);
+      }
+      return ranked;
+    })
+    .filter((ranked) => ranked.length > 0);
+}
+
+function tallyPreferences(ballots, active) {
   const counts = {};
   for (const candidate of active) {
     counts[candidate] = 0;
   }
-  for (const vote of votes) {
-    if (vote.first && active.has(vote.first)) {
-      counts[vote.first] = (counts[vote.first] || 0) + 1;
+  for (const ballot of ballots) {
+    const choice = pickActiveChoice(ballot, active);
+    if (choice) {
+      counts[choice] = (counts[choice] || 0) + 1;
     }
   }
   return counts;
+}
+
+function pickActiveChoice(ballot, active) {
+  for (const choice of ballot) {
+    if (active.has(choice)) return choice;
+  }
+  return null;
 }
 
 function sumCounts(counts, active) {
@@ -178,19 +197,21 @@ function findLowestCandidates(counts, active) {
   return losers;
 }
 
-function breakTieWithSecondChoice(votes, candidates) {
+function breakTieWithPreferences(ballots, candidates) {
   const candidateSet = new Set(candidates);
-  const counts = {};
+  const scores = {};
   for (const candidate of candidates) {
-    counts[candidate] = 0;
+    scores[candidate] = 0;
   }
-  for (const vote of votes) {
-    const second = vote.secondChoiceHash;
-    if (second && candidateSet.has(second)) {
-      counts[second] = (counts[second] || 0) + 1;
+  for (const ballot of ballots) {
+    for (let idx = 0; idx < ballot.length; idx += 1) {
+      const choice = ballot[idx];
+      if (!candidateSet.has(choice)) continue;
+      const weight = ballot.length - idx;
+      scores[choice] += weight;
     }
   }
-  const top = findTopCandidates(counts, candidateSet);
+  const top = findTopCandidates(scores, candidateSet);
   if (top.length === 1) return top[0];
   return candidates[0];
 }

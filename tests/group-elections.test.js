@@ -12,19 +12,46 @@ function buildState() {
   };
 }
 
-test('group elections store second choice when valid', async () => {
+test('group elections store second and third choice when valid', async () => {
   const state = buildState();
-  const election = await startElection({ groupId: 'g1', topic: 'energy', candidates: ['c1', 'c2'], state });
-  await castElectionVote({ electionId: election.id, voterHash: 'v1', candidateHash: 'c1', secondChoiceHash: 'c2', state });
+  const election = await startElection({ groupId: 'g1', topic: 'energy', candidates: ['c1', 'c2', 'c3'], state });
+  await castElectionVote({
+    electionId: election.id,
+    voterHash: 'v1',
+    candidateHash: 'c1',
+    secondChoiceHash: 'c2',
+    thirdChoiceHash: 'c3',
+    state,
+  });
   assert.equal(election.votes.length, 1);
   assert.equal(election.votes[0].secondChoiceHash, 'c2');
+  assert.equal(election.votes[0].thirdChoiceHash, 'c3');
 });
 
-test('group elections ignore invalid second choice', async () => {
+test('group elections ignore invalid secondary choices', async () => {
   const state = buildState();
-  const election = await startElection({ groupId: 'g2', topic: 'health', candidates: ['a', 'b'], state });
-  await castElectionVote({ electionId: election.id, voterHash: 'v2', candidateHash: 'a', secondChoiceHash: 'a', state });
+  const election = await startElection({ groupId: 'g2', topic: 'health', candidates: ['a', 'b', 'c'], state });
+  await castElectionVote({
+    electionId: election.id,
+    voterHash: 'v2',
+    candidateHash: 'a',
+    secondChoiceHash: 'a',
+    thirdChoiceHash: 'b',
+    state,
+  });
   assert.equal(election.votes[0].secondChoiceHash, null);
+  assert.equal(election.votes[0].thirdChoiceHash, 'b');
+  await castElectionVote({
+    electionId: election.id,
+    voterHash: 'v3',
+    candidateHash: 'b',
+    secondChoiceHash: 'c',
+    thirdChoiceHash: 'c',
+    state,
+  });
+  const vote = election.votes.find((entry) => entry.voterHash === 'v3');
+  assert.equal(vote.secondChoiceHash, 'c');
+  assert.equal(vote.thirdChoiceHash, null);
 });
 
 test('group elections resolve winner using second choice transfer', async () => {
@@ -36,4 +63,18 @@ test('group elections resolve winner using second choice transfer', async () => 
   const winner = pickWinner(election, state);
   assert.equal(winner.candidateHash, 'x');
   assert.ok(['ranked', 'tie_break'].includes(winner.method));
+});
+
+test('group elections resolve winner using third choice transfers', async () => {
+  const state = buildState();
+  const election = await startElection({ groupId: 'g4', topic: 'civic', candidates: ['a', 'b', 'c', 'd'], state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v1', candidateHash: 'a', secondChoiceHash: 'd', thirdChoiceHash: 'b', state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v2', candidateHash: 'a', secondChoiceHash: 'd', thirdChoiceHash: 'b', state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v3', candidateHash: 'b', secondChoiceHash: 'c', thirdChoiceHash: 'a', state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v4', candidateHash: 'c', secondChoiceHash: 'b', thirdChoiceHash: 'a', state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v5', candidateHash: 'd', secondChoiceHash: 'a', thirdChoiceHash: 'b', state });
+  await castElectionVote({ electionId: election.id, voterHash: 'v6', candidateHash: 'd', secondChoiceHash: 'a', thirdChoiceHash: 'b', state });
+  const winner = pickWinner(election, state);
+  assert.equal(winner.candidateHash, 'a');
+  assert.equal(winner.method, 'ranked');
 });

@@ -52,12 +52,15 @@ function renderNotificationList(list) {
   }
   return list
     .map((n) => {
+      const anchorId = n.petitionId ? `petition-${n.petitionId}` : '';
+      const proposalLink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${n.type}</span>
+            <span class="pill">${escapeHtml(n.type)}</span>
             <span class="muted small">${new Date(n.createdAt).toLocaleString()}</span>
             ${n.read ? '<span class="pill ghost">read</span>' : ''}
+            ${proposalLink}
           </div>
           <p>${escapeHtml(n.message)}</p>
           ${n.expiresAt ? `<p class="muted small">Expires: ${new Date(n.expiresAt).toLocaleString()}</p>` : ''}

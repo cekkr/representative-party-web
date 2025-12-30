@@ -57,7 +57,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ### Phase 3 — Decision Engine (Months 8-11)
 - **Voting module**: implement Schulze/Condorcet; split authentication (hash) from anonymized ballot storage.
-- **Second-choice option (person elections)**: add ranked-choice/second-preference capture for ballots that select a person (Alaska-style), so ties or eliminations can resolve to a stored second choice.
+- **Ranked-choice ballots (person elections)**: group delegate elections already capture up to three preferences with multi-round transfers (Alaska-style); extend the same ranked-choice capture to the core voting module when it lands.
 - **Delegation graph**: revocable, topic-scoped delegation with decay/visibility rules; worker to compute power weights.
 - UX: ballot clarity (options, ranking helper), delegation previews, and “explain my influence” summaries.
 
