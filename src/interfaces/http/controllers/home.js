@@ -1,6 +1,7 @@
 import { getPerson } from '../../modules/identity/person.js';
 import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
 import { filterVisibleEntries } from '../../modules/federation/replication.js';
+import { isModuleEnabled } from '../../modules/circle/modules.js';
 import { sendHtml } from '../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
@@ -14,6 +15,10 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const visibleDiscussions = filterVisibleEntries(state.discussions, state);
   const visiblePetitions = filterVisibleEntries(state.petitions, state);
   const visibleGroups = filterVisibleEntries(state.groups, state);
+  const federationEnabled = isModuleEnabled(state, 'federation');
+  const ledgerLink = federationEnabled
+    ? '<a class="ghost" href="/circle/ledger" target="_blank" rel="noreferrer">Ledger feed</a>'
+    : '';
   const html = await renderPage(
     'home',
     {
@@ -29,9 +34,10 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to configure and persist Circle policies.',
       gateSummary,
       extensionsSummary,
+      ledgerLink,
       statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
-    { wantsPartial, title: 'Representative Party' },
+    { wantsPartial, title: 'Representative Party', state },
   );
   return sendHtml(res, html);
 }

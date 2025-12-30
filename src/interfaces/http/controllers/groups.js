@@ -1,5 +1,6 @@
 import { getPerson } from '../../modules/identity/person.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../modules/circle/modules.js';
 import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../../modules/groups/groups.js';
 import { createNotification } from '../../modules/messaging/notifications.js';
 import { getGroupPolicy, setGroupPolicy } from '../../modules/groups/groupPolicy.js';
@@ -8,8 +9,12 @@ import { sendHtml, sendJson } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'groups' });
+  }
   const person = getPerson(req, state);
   const groups = listGroups(state).map((group) => ({
     ...group,
@@ -24,12 +29,15 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
       personHash: person?.pidHash || '',
       circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
     },
-    { wantsPartial, title: 'Groups' },
+    { wantsPartial, title: 'Groups', state },
   );
   return sendHtml(res, html);
 }
 
 export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+  }
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
   const action = body.action || 'create';
@@ -108,6 +116,9 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
 }
 
 export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {
@@ -128,6 +139,9 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
 }
 
 export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {

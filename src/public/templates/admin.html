@@ -9,6 +9,7 @@
     <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
     <p class="muted small">Data: {{dataProfile}}</p>
     <p class="muted small">Extensions: {{extensionsSummary}}</p>
+    <p class="muted small">{{modulesSummary}}</p>
     <p class="muted small">Initialized: {{initialized}}</p>
     <p class="muted small">{{notes}}</p>
     <p class="muted small">{{firstRunNote}}</p>
@@ -143,6 +144,20 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Modules</p>
+  <h2>Core feature toggles</h2>
+  <p class="muted small">Disable optional modules for messaging-only deployments.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="modules" />
+    <div class="form-grid">{{modulesList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save module toggles</button>
+    </div>
+    <p class="muted small">Reload to refresh navigation after changing modules.</p>
+  </form>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Structure manager</p>
   <h2>Profile schema (canonical + provider-local)</h2>
   <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
@@ -194,7 +209,7 @@
 
 <section class="panel">
   <p class="eyebrow">Extensions</p>
-  <h2>Toggle modules</h2>
+  <h2>Toggle extensions</h2>
   <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>
   <form class="stack" method="post" action="/extensions" data-enhance="extensions">
     <div class="form-grid">{{extensionsList}}</div>

@@ -19,7 +19,7 @@ export async function renderNotifications({ req, res, state, wantsPartial }) {
       personHandle: person?.handle || 'Guest',
       preferencesPanel: preferencePanel,
     },
-    { wantsPartial, title: 'Notifications' },
+    { wantsPartial, title: 'Notifications', state },
   );
   return sendHtml(res, html);
 }

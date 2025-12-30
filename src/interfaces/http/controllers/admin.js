@@ -8,6 +8,7 @@ import {
   persistSettings,
 } from '../../infra/persistence/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../modules/circle/policy.js';
+import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../modules/extensions/registry.js';
 import { describeProfile, getReplicationProfile } from '../../modules/federation/replication.js';
 import {
@@ -28,7 +29,7 @@ export async function renderAdmin({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'admin',
     buildAdminViewModel(state, { flash: null, availableExtensions }),
-    { wantsPartial, title: 'Admin · Circle Settings' },
+    { wantsPartial, title: 'Admin · Circle Settings', state },
   );
   return sendHtml(res, html);
 }
@@ -47,7 +48,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const html = await renderPage(
       'admin',
       buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings' },
+      { wantsPartial, title: 'Admin · Circle Settings', state },
     );
     return sendHtml(res, html);
   }
@@ -57,7 +58,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const html = await renderPage(
       'admin',
       buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings' },
+      { wantsPartial, title: 'Admin · Circle Settings', state },
     );
     return sendHtml(res, html);
   }
@@ -67,7 +68,17 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const html = await renderPage(
       'admin',
       buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings' },
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'modules') {
+    const result = await updateModules(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
     );
     return sendHtml(res, html);
   }
@@ -83,6 +94,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const topicGardenerUrl = sanitizeText(body.topicGardenerUrl || prev.topicGardener?.url || '', 240);
   const topicAnchors = parseList(body.topicAnchors, prev.topicGardener?.anchors || DEFAULT_TOPIC_ANCHORS);
   const topicPinned = parseList(body.topicPinned, prev.topicGardener?.pinned || []);
+  const modules = normalizeModuleSettings(prev.modules || {});
   const dataMode = normalizeDataMode(body.dataMode || prev.data?.mode || DATA_DEFAULTS.mode);
   const dataAdapter = normalizeDataAdapter(body.dataAdapter || prev.data?.adapter || DATA_DEFAULTS.adapter);
   const dataValidation = normalizeValidationLevel(body.dataValidation || prev.data?.validationLevel || DATA_DEFAULTS.validationLevel);
@@ -108,6 +120,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       anchors: topicAnchors.length ? topicAnchors : DEFAULT_TOPIC_ANCHORS,
       pinned: topicPinned,
     },
+    modules,
     data: {
       mode: dataMode,
       adapter: dataAdapter,
@@ -146,6 +159,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const html = await renderPage('admin', buildAdminViewModel(state, { flash: flashParts.join(' '), availableExtensions }), {
     wantsPartial,
     title: 'Admin · Circle Settings',
+    state,
   });
   return sendHtml(res, html);
 }
@@ -266,6 +280,25 @@ async function updateProfileAttributes(state, body) {
   };
 }
 
+async function updateModules(state, body) {
+  const definitions = listModuleDefinitions();
+  const toggles = {};
+  for (const definition of definitions) {
+    toggles[definition.key] = Object.prototype.hasOwnProperty.call(body, `module_${definition.key}`);
+  }
+  const normalized = normalizeModuleSettings(toggles);
+  state.settings = { ...(state.settings || {}), modules: normalized };
+  const enabled = Object.entries(normalized)
+    .filter(([, value]) => value)
+    .map(([key]) => key);
+  recordAdminAudit(state, {
+    action: 'modules.update',
+    summary: `enabled=${enabled.length ? enabled.join(',') : 'none'}`,
+  });
+  await persistSettings(state);
+  return { flash: 'Module toggles updated. Reload to refresh navigation.' };
+}
+
 function buildAdminViewModel(
   state,
   { flash, sessionForm = {}, availableExtensions = [], providerFieldsValue, attributesSessionId, attributesPayloadValue } = {},
@@ -276,6 +309,9 @@ function buildAdminViewModel(
   const extensions = state.extensions?.active || [];
   const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'person');
   const extensionsList = renderExtensions(availableExtensions);
+  const moduleToggles = listModuleToggles(state);
+  const modulesList = renderModules(moduleToggles);
+  const modulesSummary = moduleToggles.filter((mod) => mod.enabled).map((mod) => mod.key).join(', ') || 'None';
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
   const petitionQuorumAdvance = normalizeQuorumAdvance(state.settings?.petitionQuorumAdvance || 'discussion');
@@ -306,6 +342,8 @@ function buildAdminViewModel(
     flash,
     postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
+    modulesSummary: `Modules: ${modulesSummary}`,
+    modulesList,
     defaultElectionModePriority: defaultElectionMode === 'priority' ? 'selected' : '',
     defaultElectionModeVote: defaultElectionMode === 'vote' ? 'selected' : '',
     defaultConflictHighest: defaultConflictRule === 'highest_priority' ? 'selected' : '',
@@ -405,6 +443,22 @@ function renderExtensions(list) {
         <label class="field checkbox">
           <input type="checkbox" name="extensions" value="${ext.id}" ${ext.enabled ? 'checked' : ''} />
           <span>${ext.id} — ${description}</span>
+        </label>
+      `;
+    })
+    .join('\n');
+}
+
+function renderModules(list) {
+  if (!list || !list.length) return '<p class="muted small">No module toggles available.</p>';
+  return list
+    .map((mod) => {
+      const requires = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}` : '';
+      const description = [mod.description, requires].filter(Boolean).join(' ');
+      return `
+        <label class="field checkbox">
+          <input type="checkbox" name="module_${mod.key}" ${mod.enabled ? 'checked' : ''} data-module-toggle="${mod.key}" />
+          <span>${mod.label} — ${description || 'Optional module'}</span>
         </label>
       `;
     })

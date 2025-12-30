@@ -5,6 +5,7 @@ import { classifyTopic } from '../../modules/topics/classification.js';
 import { resolveDelegation } from '../../modules/delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../modules/groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../modules/circle/policy.js';
+import { isModuleEnabled, resolveModuleSettings } from '../../modules/circle/modules.js';
 import { createNotification, createNotificationWithOutbound } from '../../modules/messaging/notifications.js';
 import { persistDiscussions, persistPetitions, persistVotes } from '../../infra/persistence/storage.js';
 import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../modules/petitions/signatures.js';
@@ -19,19 +20,34 @@ import { readRequestBody } from '../../shared/utils/request.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { renderPage } from '../views/templates.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'petitions' });
+  }
   const person = getPerson(req, state);
+  const modules = resolveModuleSettings(state);
   const petitionGate = evaluateAction(state, person, 'petition');
-  const voteGate = evaluateAction(state, person, 'vote');
+  const voteGate = modules.votes
+    ? evaluateAction(state, person, 'vote')
+    : { allowed: false, reason: 'module_disabled', message: 'Voting module disabled.' };
   const moderateGate = evaluateAction(state, person, 'moderate');
+  const delegationEnabled = modules.delegation;
+  const groupsEnabled = modules.groups;
+  const showDelegation = delegationEnabled && groupsEnabled;
   const signatures = filterVisibleEntries(state.signatures, state);
   const delegations = filterVisibleEntries(state.delegations, state);
   const discussionEntries = filterVisibleEntries(state.discussions, state);
   const petitionComments = discussionEntries.filter((entry) => entry.petitionId);
   const commentsByPetition = groupCommentsByPetition(petitionComments);
-  const conflicts = delegations?.filter((d) => d.conflict) || [];
-  const suggestions = renderSuggestions(person, state);
+  const conflicts = delegationEnabled ? delegations?.filter((d) => d.conflict) || [] : [];
+  let suggestions = 'Delegation module disabled.';
+  if (delegationEnabled && !groupsEnabled) {
+    suggestions = 'Group suggestions unavailable (groups disabled).';
+  } else if (showDelegation) {
+    suggestions = renderSuggestions(person, state);
+  }
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
@@ -50,14 +66,17 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       petitionGateReason: petitionGate.message || '',
       voteGateReason: voteGate.message || '',
       roleLabel: person?.role || 'guest',
-      petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition),
-      conflictList: conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected',
+      petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
+        allowDelegation: delegationEnabled,
+        allowVoting: modules.votes,
+      }),
+      conflictList: delegationEnabled ? conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected' : 'Delegation disabled.',
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
       discussionFeed: renderProposalDiscussionFeed(discussionFeedItems),
       stageFilterOptions,
     },
-    { wantsPartial, title: 'Proposals & Votes' },
+    { wantsPartial, title: 'Proposals & Votes', state },
   );
   return sendHtml(res, html);
 }
@@ -81,6 +100,9 @@ function renderSuggestions(person, state) {
 }
 
 export async function submitPetition({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'petition');
   if (!permission.allowed) {
@@ -137,6 +159,12 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
 }
 
 export async function castVote({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
+  if (!isModuleEnabled(state, 'votes')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'votes' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'vote');
   if (!permission.allowed) {
@@ -155,6 +183,9 @@ export async function castVote({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'petition_closed', message: 'Proposal not open for votes.' });
   }
 
+  if (choice === 'auto' && !isModuleEnabled(state, 'delegation')) {
+    choice = 'abstain';
+  }
   if (!choice || choice === 'auto') {
     const delegation = resolveDelegation(person, exists.topic, state, {
       notify: (notification) => createNotification(state, notification),
@@ -211,6 +242,9 @@ export async function castVote({ req, res, state, wantsPartial }) {
 }
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'moderate');
   if (!permission.allowed) {
@@ -247,6 +281,9 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
 }
 
 export async function signPetitionRoute({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'vote');
   if (!permission.allowed) {
@@ -270,6 +307,9 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
 }
 
 export async function postPetitionComment({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {

@@ -1,6 +1,16 @@
 import { escapeHtml } from '../../shared/utils/text.js';
 
-export function renderPetitionList(petitions, votes, signatures, person, canModerate, commentsByPetition = new Map()) {
+export function renderPetitionList(
+  petitions,
+  votes,
+  signatures,
+  person,
+  canModerate,
+  commentsByPetition = new Map(),
+  options = {},
+) {
+  const allowDelegation = options.allowDelegation !== false;
+  const allowVoting = options.allowVoting !== false;
   if (!petitions.length) {
     return '<p class="muted">No proposals yet. Draft the first one.</p>';
   }
@@ -11,7 +21,11 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
     .map((petition) => {
       const statusLabel = displayStatus(petition.status);
       const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
-      const voteDisabled = !isVotingStage(petition.status);
+      const stageAllowsVoting = isVotingStage(petition.status);
+      const voteDisabled = !stageAllowsVoting || !allowVoting;
+      const voteDisabledLabel = allowVoting
+        ? 'Voting disabled while proposal is not in the vote stage.'
+        : 'Voting module disabled.';
       const signatureCount = (signatures || []).filter((s) => s.petitionId === petition.id).length;
       const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
       const comments = commentsByPetition.get(petition.id) || [];
@@ -47,7 +61,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
           }
           ${
             voteDisabled
-              ? '<p class="muted small">Voting disabled while proposal is not in the vote stage.</p>'
+              ? `<p class="muted small">${voteDisabledLabel}</p>`
               : `
           <form class="form-inline" method="post" action="/petitions/vote" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
@@ -55,7 +69,7 @@ export function renderPetitionList(petitions, votes, signatures, person, canMode
               <option value="yes">yes</option>
               <option value="no">no</option>
               <option value="abstain" selected>abstain</option>
-              <option value="auto">auto (use delegation)</option>
+              ${allowDelegation ? '<option value="auto">auto (use delegation)</option>' : ''}
             </select>
             <button type="submit" class="ghost">Vote</button>
           </form>

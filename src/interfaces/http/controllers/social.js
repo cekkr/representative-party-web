@@ -1,5 +1,6 @@
 import { getPerson } from '../../modules/identity/person.js';
 import { evaluateAction } from '../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../modules/circle/modules.js';
 import { persistSocialFollows, persistSocialPosts } from '../../infra/persistence/storage.js';
 import {
   DEFAULT_FOLLOW_TYPES,
@@ -18,8 +19,12 @@ import { sanitizeText } from '../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'social')) {
+    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'social' });
+  }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined });
@@ -44,13 +49,16 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       statusStrip: renderStatusStrip(statusMeta),
     },
-    { wantsPartial, title: 'Social feed' },
+    { wantsPartial, title: 'Social feed', state },
   );
 
   return sendHtml(res, html);
 }
 
 export async function postSocialMessage({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'social')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+  }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
@@ -140,6 +148,9 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 }
 
 export async function followHandle({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'social')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+  }
   const person = getPerson(req, state);
   if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to follow.' });
@@ -172,6 +183,9 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
 }
 
 export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'social')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+  }
   const person = getPerson(req, state);
   if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to unfollow.' });
@@ -198,6 +212,9 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
 }
 
 export async function listRelationships({ req, res, state }) {
+  if (!isModuleEnabled(state, 'social')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+  }
   const person = getPerson(req, state);
   const query = req.url ? new URL(req.url, `http://${req.headers.host}`) : null;
   const handleParam = query?.searchParams.get('handle') || '';

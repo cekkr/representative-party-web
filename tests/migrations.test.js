@@ -33,6 +33,8 @@ test('migrations normalize sessions and settings', () => {
   assert.equal(session.banned, false);
   assert.ok(session.handle.startsWith('person-'));
   assert.equal(data.settings.circleName, 'Party Circle');
+  assert.ok(data.settings.modules);
+  assert.equal(data.settings.modules.petitions, true);
   assert.ok(Array.isArray(data.petitions));
   assert.ok(Array.isArray(data.signatures));
   assert.ok(Array.isArray(data.votes));

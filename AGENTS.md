@@ -11,6 +11,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Personalizable structure manager: keep a minimal canonical profile (handle, required credential/wallet binding, role/banned flag, blinded hash) consistent across a party ring while letting providers attach dynamic fields (contact email, personal details, notification preferences, etc.) through a schema/data-table editor. Required fields stay enforced globally; provider-only fields remain local (no gossip) and the provider is responsible for consent and delivery (e.g., notification emails/SMS).
 - Human-ready baseline: keep modules small, env-driven, and documented so teams can ship/maintain without AI assistance if needed.
 - Extensions: optional modules under `src/modules/extensions/` (enabled via `CIRCLE_EXTENSIONS`) can extend policy/action gates and decorate decisions without changing core code; use them to align with organizational policies instead of forking.
+- Module toggles: core modules (petitions/votes/delegation/groups/federation/topic gardener/social) are admin-configurable; navigation/endpoints must respect disabled modules, returning a module-disabled page or 403 JSON.
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
 - Topic stewardship & gardening: users (people in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
@@ -70,6 +71,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
+- Module toggles: `/admin` lets operators disable optional modules (petitions/votes/delegation/groups/federation/topic gardener/social) for messaging-only deployments; navigation and endpoints honor the settings to avoid dead ends.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
 - Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications` with per-user preferences for proposal comment alerts.
 - Topic gardener helper: build DynamicTopicCategorization as a Python helper in `src/infra/workers/topic-gardener/` (online ingestion + scheduled refactor) with a stable API consumed by `src/modules/topics/classification.js`. Respect user/person-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. A stub HTTP helper sits in `src/infra/workers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`.
@@ -78,4 +80,4 @@ This file captures the essential implementation directives. Keep it in sync with
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
 
 ## Possible next steps:
-- Add per-module toggles so petitions/votes/delegation/federation/topic gardener can be disabled for messaging-only deployments without dead-end navigation.
+- Add module-aware UI tests (Puppeteer) to validate nav visibility and disabled endpoint UX.

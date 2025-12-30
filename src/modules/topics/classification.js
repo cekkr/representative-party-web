@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { classifyWithGardener, DEFAULT_TOPIC_ANCHORS, getTopicConfig } from './topicGardenerClient.js';
+import { isModuleEnabled } from '../circle/modules.js';
 
 // Cache classifications to avoid redundant calls to the topic gardener/helper
 // for the same payload and anchor set. Cache stays in-memory (no persistence).
@@ -16,14 +17,17 @@ export async function classifyTopic(text, state) {
   const pinned = config.pinned || [];
   if (!normalizedText) return anchors[0] || 'general';
 
-  const cacheKey = buildCacheKey(normalizedText, anchors, pinned);
+  const useGardener = isModuleEnabled(state, 'topicGardener');
+  const cacheKey = buildCacheKey(normalizedText, anchors, pinned, useGardener);
   if (cache.has(cacheKey)) return cache.get(cacheKey);
 
   const candidates = [];
 
-  const gardener = await classifyWithGardener(normalizedText, state, { anchors, pinned });
-  if (gardener?.topic) {
-    candidates.push({ topic: gardener.topic, source: gardener.provider || 'topic-gardener' });
+  if (useGardener) {
+    const gardener = await classifyWithGardener(normalizedText, state, { anchors, pinned });
+    if (gardener?.topic) {
+      candidates.push({ topic: gardener.topic, source: gardener.provider || 'topic-gardener' });
+    }
   }
 
   const extensions = state?.extensions?.active || [];
@@ -96,9 +100,9 @@ function normalizeTopic(value) {
   return slug || 'general';
 }
 
-function buildCacheKey(text, anchors, pinned) {
+function buildCacheKey(text, anchors, pinned, useGardener) {
   const hash = createHash('sha256').update(text).digest('hex');
   const anchorKey = (anchors || []).map(normalizeTopic).join(',');
   const pinnedKey = (pinned || []).map(normalizeTopic).join(',');
-  return `${hash}:${anchorKey}:${pinnedKey}`;
+  return `${hash}:${anchorKey}:${pinnedKey}:${useGardener ? 'gardener' : 'local'}`;
 }

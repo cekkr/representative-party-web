@@ -25,7 +25,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
       },
-      { wantsPartial, title: 'Person Verified' },
+      { wantsPartial, title: 'Person Verified', state },
     );
     const cookie = buildSessionCookie(existing.id);
     return sendHtml(res, html, { 'Set-Cookie': cookie });
@@ -65,7 +65,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
           : 'Circle observing mode: verification encouraged for accountability.',
       personHandle: person?.handle,
     },
-    { wantsPartial, title: 'EUDI Wallet Handshake' },
+    { wantsPartial, title: 'EUDI Wallet Handshake', state },
   );
   return sendHtml(res, html);
 }
@@ -79,7 +79,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
     const html = await renderPage(
       'error',
       { message: 'Missing or unknown session. Restart the EUDI flow.' },
-      { wantsPartial, title: 'Invalid Session' },
+      { wantsPartial, title: 'Invalid Session', state },
     );
     return sendHtml(res, html);
   }
@@ -90,7 +90,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
     const html = await renderPage(
       'error',
       { message: 'No PID provided. The Verifiable Presentation is missing the subject.' },
-      { wantsPartial, title: 'Invalid PID' },
+      { wantsPartial, title: 'Invalid PID', state },
     );
     return sendHtml(res, html);
   }
@@ -125,7 +125,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   const html = await renderPage(
     'verification-complete',
     { pidHashShort: pidHash.slice(0, 8), ledgerNote, actorId: actor.id },
-    { wantsPartial, title: 'Person Verified' },
+    { wantsPartial, title: 'Person Verified', state },
   );
 
   const cookie = buildSessionCookie(sessionId);

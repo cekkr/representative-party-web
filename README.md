@@ -296,13 +296,13 @@ sequenceDiagram
 - **Delegation & groups:** `src/modules/delegation/delegation.js` stores per-topic delegates with auto-resolution; `/delegation/conflict` prompts when cachets clash. `src/modules/groups/*` publishes delegate preferences and runs elections with optional second/third-choice ballots and multi-round transfers; group policy (priority vs vote, conflict rules) is stored independently.
 - **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `src/infra/workers/topic-gardener/server.py`.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; `/notifications/preferences` stores per-user proposal comment alert preferences; backing store handled by `src/modules/messaging/notifications.js`.
-- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, default group policy, topic gardener, and session overrides without editing JSON.
+- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, core modules (petitions/votes/delegation/groups/federation/topic gardener/social), default group policy, topic gardener, and session overrides without editing JSON.
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors via `src/modules/federation/activitypub.js`; `/ap/inbox` placeholder for inbound federation payloads.
 - **Transactions registry:** `/transactions` lists local, stamped entries for sensitive actions (petition drafts/status changes, votes, delegation overrides); `/transactions/export` emits a signed digest envelope when keys are configured for cross-provider reconciliation.
 
 ## UI & templating (extension-aware)
 - SSR-first shell lives in `src/public/templates/` with `layout.html` wrapping page templates; status strip surfaces Circle enforcement + validation/preview state so users see why content is gated. Styles/JS in `src/public/app.css` and `src/public/app.js`.
-- Navigation and panels stay modular: keep links visible only for enabled modules (discussion/forum/social/petitions/groups) to avoid dead ends; extension toggles (`/extensions` or `CIRCLE_EXTENSIONS`) should drive whether policy badges and gate messages render.
+- Navigation and panels stay modular: keep links visible only for enabled modules (discussion/forum/social/petitions/groups) to avoid dead ends; module toggles live in `/admin` and extension toggles (`/extensions` or `CIRCLE_EXTENSIONS`) drive policy badges and gate messages.
 - Preview/provenance cues are consistent across modules (pills for `Preview` and `from {issuer}`); when `DATA_PREVIEW=false`, the server hides previews, otherwise label them. Social feed shows follow-type filters + inline replies; discussion/forum reuse the same pill language.
 - Templating personalization: duplicate templates under `src/public/templates/` to theme per deployment (colors/fonts can be tweaked in `app.css`); keep SSR placeholders (`{{...}}`) intact for router partial responses. Avoid SPA-only components to preserve partial-render navigation.
 - Extension UI hooks: use light-touch badges or info strips to signal tightened policies (extension-driven gate changes) instead of new flows; policy messages come from `circle/policy` so custom extensions display automatically. Notifications and social mentions reuse the same renderer to keep UX coherent across modules.
@@ -326,6 +326,7 @@ sequenceDiagram
 - `CIRCLE_EXTENSIONS` (comma-separated module names under `src/modules/extensions`, e.g. `sample-policy-tighten`)
 - `CIRCLE_ISSUER` (provider id on envelopes/federation exports)
 - `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` (PEM) to sign/verify vote envelopes and ledger exports
+- Module toggles: configured in `/admin` and stored in `settings.modules` to disable optional modules for messaging-only deployments
 - `DATA_MODE` (`centralized` | `hybrid` | `p2p`), `DATA_ADAPTER` (`json`|`memory`|`sql`|`kv` -- sql requires optional `sqlite3`), `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`), `DATA_PREVIEW` (true/false for storing preview data before validation)
 - `DATA_SQLITE_URL`/`DATA_SQLITE_FILE` to set the SQLite path when using `DATA_ADAPTER=sql`; `DATA_KV_FILE` to set the KV file path
 - Persisted settings (name, policy toggles, extensions, peers) live in `src/data/settings.json`; admin UI edits them in place.

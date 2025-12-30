@@ -87,6 +87,6 @@ async function renderDiscussionShell({ state, person, wantsPartial }) {
       roleLabel: person?.role || 'guest',
       statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
-    { wantsPartial, title: 'Deliberation Sandbox' },
+    { wantsPartial, title: 'Deliberation Sandbox', state },
   );
 }

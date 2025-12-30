@@ -1,6 +1,7 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
+import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 13;
+export const LATEST_SCHEMA_VERSION = 14;
 
 const MIGRATIONS = [
   {
@@ -256,6 +257,20 @@ const MIGRATIONS = [
       return {
         ...data,
         transactions: Array.isArray(data.transactions) ? data.transactions : [],
+      };
+    },
+  },
+  {
+    version: 14,
+    description: 'Add module toggle settings scaffold.',
+    up: (data) => {
+      const settings = data.settings || {};
+      return {
+        ...data,
+        settings: {
+          ...settings,
+          modules: normalizeModuleSettings(settings.modules || {}),
+        },
       };
     },
   },

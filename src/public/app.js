@@ -50,7 +50,7 @@
       }
       const response = await fetch(url, options);
       if (!response.ok) {
-        if (response.status === 401) {
+        if (response.status === 401 || response.status === 403) {
           try {
             const payload = await response.json();
             alert(payload.message || payload.error || 'Not allowed for this role.');

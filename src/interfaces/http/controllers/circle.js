@@ -3,8 +3,13 @@ import { sendJson } from '../../shared/utils/http.js';
 import { readRequestBody } from '../../shared/utils/request.js';
 import { buildLedgerEnvelope, verifyLedgerEnvelope } from '../../modules/circle/federation.js';
 import { decideStatus, getReplicationProfile } from '../../modules/federation/replication.js';
+import { isModuleEnabled } from '../../modules/circle/modules.js';
+import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export async function handleGossip({ req, res, state }) {
+  if (!isModuleEnabled(state, 'federation')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+  }
   const body = await readRequestBody(req);
   const envelope = body.envelope;
   const replicationProfile = getReplicationProfile(state);
@@ -53,15 +58,24 @@ export async function handleGossip({ req, res, state }) {
 }
 
 export function exportLedger({ res, state }) {
+  if (!isModuleEnabled(state, 'federation')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+  }
   const envelope = buildLedgerEnvelope(state);
   return sendJson(res, 200, { entries: [...state.uniquenessLedger], envelope, replication: getReplicationProfile(state) });
 }
 
 export function listPeers({ res, state }) {
+  if (!isModuleEnabled(state, 'federation')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+  }
   return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });
 }
 
 export async function registerPeer({ req, res, state }) {
+  if (!isModuleEnabled(state, 'federation')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+  }
   const body = await readRequestBody(req);
   if (body.peer) {
     state.peers.add(String(body.peer));
