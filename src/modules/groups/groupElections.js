@@ -66,6 +66,7 @@ export async function closeElection({ electionId, state }) {
   const election = (state.groupElections || []).find((e) => e.id === electionId);
   if (!election) return null;
   election.status = 'closed';
+  election.closedAt = new Date().toISOString();
   await persistGroupElections(state);
   return election;
 }

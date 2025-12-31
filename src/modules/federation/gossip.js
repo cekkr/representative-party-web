@@ -304,6 +304,8 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
     ok: 0,
     failed: 0,
     skipped: !votesPayload,
+    added: 0,
+    updated: 0,
   };
   const errors = [];
 
@@ -322,6 +324,12 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
     }
     if (result.votes?.ok) {
       votes.ok += 1;
+      if (Number.isFinite(result.votes.added)) {
+        votes.added += result.votes.added;
+      }
+      if (Number.isFinite(result.votes.updated)) {
+        votes.updated += result.votes.updated;
+      }
     } else {
       votes.failed += 1;
       errors.push(buildError(result, 'votes'));
@@ -343,7 +351,7 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
 
 function summarizePullResults({ peerResults, peers, reason, startedAt, finishedAt }) {
   const ledger = { sent: peers.length, ok: 0, failed: 0 };
-  const votes = { sent: peers.length, ok: 0, failed: 0, skipped: false };
+  const votes = { sent: peers.length, ok: 0, failed: 0, skipped: false, added: 0, updated: 0 };
   const errors = [];
 
   for (const result of peerResults) {
@@ -363,6 +371,12 @@ function summarizePullResults({ peerResults, peers, reason, startedAt, finishedA
     }
     if (result.votes?.ok) {
       votes.ok += 1;
+      if (Number.isFinite(result.votes.added)) {
+        votes.added += result.votes.added;
+      }
+      if (Number.isFinite(result.votes.updated)) {
+        votes.updated += result.votes.updated;
+      }
     } else {
       votes.failed += 1;
       errors.push(buildError(result, 'votes'));
@@ -397,7 +411,7 @@ function buildSkippedSummary({ reason, startedAt, finishedAt, skip }) {
     finishedAt,
     peers: 0,
     ledger: { sent: 0, ok: 0, failed: 0 },
-    votes: { sent: 0, ok: 0, failed: 0, skipped: true },
+    votes: { sent: 0, ok: 0, failed: 0, skipped: true, added: 0, updated: 0 },
     errors: [],
     skipped: skip,
   };
@@ -411,7 +425,7 @@ function buildErrorSummary({ reason, startedAt, finishedAt, error, peers }) {
     finishedAt,
     peers: peers.length,
     ledger: { sent: peers.length, ok: 0, failed: peers.length },
-    votes: { sent: peers.length, ok: 0, failed: peers.length, skipped: false },
+    votes: { sent: peers.length, ok: 0, failed: peers.length, skipped: false, added: 0, updated: 0 },
     errors: [{ peer: 'scheduler', scope: 'gossip', error: error?.message || String(error) }],
   };
 }

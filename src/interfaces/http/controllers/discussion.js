@@ -11,6 +11,7 @@ import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js'
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderDiscussionList } from '../views/discussionView.js';
+import { getActorLabels } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
@@ -85,6 +86,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
 async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const policy = getCirclePolicyState(state);
   const permission = evaluateAction(state, person, 'post');
+  const actorLabels = getActorLabels(state);
   const postingStatus = permission.allowed
     ? `Posting allowed as ${permission.role}.`
     : `Posting blocked: ${permission.message || permission.reason}`;
@@ -115,7 +117,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       ledgerSize: state.uniquenessLedger.size,
       personHandle: person?.handle || 'Not verified yet',
       personStatus: person
-        ? 'Posting as verified person bound to a blinded PID hash.'
+        ? `Posting as verified ${actorLabels.actorLabel} bound to a blinded PID hash.`
         : 'Start the wallet flow to post with accountability.',
       discussionList: renderDiscussionList(discussionEntries),
       verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
@@ -123,7 +125,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       policyId: policy.id,
       policyVersion: policy.version,
       circleName: policy.circleName,
-      hashOnlyMessage: 'Hash-only ledger: only salted PID hashes are stored to link posts to accountability.',
+      hashOnlyMessage: `Hash-only ledger: only salted PID hashes are stored to link posts to ${actorLabels.actorLabelPlural} for accountability.`,
       postingStatus,
       postingReason: permission.message || '',
       roleLabel: person?.role || 'guest',

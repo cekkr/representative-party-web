@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { persistGroups } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
+import { pickWinner } from './groupElections.js';
 import { getGroupPolicy } from './groupPolicy.js';
 
 export function listGroups(state) {
@@ -102,22 +103,28 @@ export async function setGroupDelegate({ groupId, topic, delegateHash, priority,
 
 export function recommendDelegationForPerson(person, topic, state) {
   if (!person?.pidHash) return { suggestions: [], conflict: false };
-  const topicKey = (topic || 'general').toLowerCase();
+  const topicKey = normalizeTopicKey(topic);
   const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(person.pidHash));
   const suggestions = [];
   for (const group of groups) {
     const policy = getGroupPolicy(state, group.id);
-    const match = (group.delegates || []).find((d) => d.topic === topicKey) || (group.delegates || []).find((d) => d.topic === 'general');
-    if (match) {
-      suggestions.push({
-        groupId: group.id,
-        delegateHash: match.delegateHash,
-        priority: Number(match.priority) || 0,
-        provider: match.provider || 'local',
-        conflictRule: policy.conflictRule || 'highest_priority',
-        electionMode: policy.electionMode || 'priority',
-      });
-    }
+    const electionMode = policy.electionMode || 'priority';
+    const electionWinner = electionMode === 'vote' ? findLatestElectionWinner(state, group, topicKey) : null;
+    const match =
+      electionWinner ||
+      (group.delegates || []).find((d) => d.topic === topicKey) ||
+      (group.delegates || []).find((d) => d.topic === 'general');
+    if (!match) continue;
+    suggestions.push({
+      groupId: group.id,
+      delegateHash: match.delegateHash,
+      priority: Number(match.priority) || 0,
+      provider: match.provider || 'local',
+      conflictRule: policy.conflictRule || 'highest_priority',
+      electionMode,
+      electionId: match.electionId || null,
+      electionMethod: match.electionMethod || null,
+    });
   }
   if (!suggestions.length) return { suggestions, conflict: false };
   suggestions.sort((a, b) => b.priority - a.priority);
@@ -127,4 +134,50 @@ export function recommendDelegationForPerson(person, topic, state) {
   const conflictRule = top.some((s) => s.conflictRule === 'prompt_user') ? 'prompt_user' : 'highest_priority';
   const chosen = conflict && conflictRule === 'prompt_user' ? null : top[0];
   return { suggestions, conflict, chosen, conflictRule };
+}
+
+function findLatestElectionWinner(state, group, topicKey) {
+  const elections = filterVisibleEntries(state.groupElections || [], state).filter(
+    (entry) => entry.groupId === group.id && entry.status === 'closed',
+  );
+  if (!elections.length) return null;
+
+  const exactMatches = elections.filter((entry) => normalizeTopicKey(entry.topic) === topicKey);
+  const generalMatches = elections.filter((entry) => normalizeTopicKey(entry.topic) === 'general');
+  const candidates = exactMatches.length ? exactMatches : generalMatches;
+  if (!candidates.length) return null;
+
+  const latest = candidates
+    .slice()
+    .sort((a, b) => compareTimestamp(b.closedAt || b.createdAt, a.closedAt || a.createdAt))[0];
+  if (!latest) return null;
+
+  const winner = pickWinner(latest, state);
+  if (!winner) return null;
+  return {
+    delegateHash: winner.candidateHash,
+    provider: 'group-election',
+    priority: 10,
+    electionId: latest.id,
+    electionMethod: winner.method,
+  };
+}
+
+function normalizeTopicKey(value) {
+  return String(value || 'general').toLowerCase();
+}
+
+function compareTimestamp(left, right) {
+  const leftTime = parseTimestamp(left);
+  const rightTime = parseTimestamp(right);
+  if (leftTime && rightTime) return leftTime - rightTime;
+  if (leftTime && !rightTime) return 1;
+  if (!leftTime && rightTime) return -1;
+  return 0;
+}
+
+function parseTimestamp(value) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }

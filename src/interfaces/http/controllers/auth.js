@@ -7,6 +7,7 @@ import { getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { deriveBaseUrl } from '../../../shared/utils/request.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { persistActors, persistLedger, persistSessions } from '../../../infra/persistence/storage.js';
+import { getActorLabels } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 
 export async function startAuth({ req, res, state, wantsPartial }) {
@@ -16,6 +17,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
   const existing = resumeId ? state.sessions.get(resumeId) : null;
   const person = getPerson(req, state);
   const policy = getCirclePolicyState(state);
+  const actorLabels = getActorLabels(state);
 
   if (existing && existing.status === 'verified') {
     const html = await renderPage(
@@ -25,7 +27,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
       },
-      { wantsPartial, title: 'Person Verified', state },
+      { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
     );
     const cookie = buildSessionCookie(existing.id);
     return sendHtml(res, html, { 'Set-Cookie': cookie });
@@ -122,10 +124,11 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   await persistSessions(state);
 
   const ledgerNote = alreadyKnown ? 'Ledger entry already present (peer sync).' : 'New entry added to the Uniqueness Ledger.';
+  const actorLabels = getActorLabels(state);
   const html = await renderPage(
     'verification-complete',
     { pidHashShort: pidHash.slice(0, 8), ledgerNote, actorId: actor.id },
-    { wantsPartial, title: 'Person Verified', state },
+    { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
   );
 
   const cookie = buildSessionCookie(sessionId);

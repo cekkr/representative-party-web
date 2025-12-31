@@ -41,7 +41,7 @@
     <div class="form-grid">
       <label class="field">
         <span>Handle</span>
-        <input name="handle" placeholder="person-1234" required />
+        <input name="handle" placeholder="{{actorLabel}}-1234" required />
       </label>
       <label class="field">
         <span>Follow type</span>
@@ -56,7 +56,7 @@
     <div class="form-grid">
       <label class="field">
         <span>Handle to unfollow</span>
-        <input name="handle" placeholder="person-1234" required />
+        <input name="handle" placeholder="{{actorLabel}}-1234" required />
       </label>
     </div>
     <div class="cta-row">
@@ -73,7 +73,7 @@
 
 <section class="panel">
   <p class="eyebrow">Feed</p>
-  <h3>Posts from the people you follow</h3>
+  <h3>Posts from the {{actorLabelPlural}} you follow</h3>
   <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
     <label class="field">
       <span>Filter by follow type</span>

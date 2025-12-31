@@ -30,6 +30,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Deep link / QR duality: desktop shows QR + copyable link; mobile prioritizes direct handoff.
 - Accountability cues: show verified handle/person badge, ledger count, and Circle policy status on every page frame.
 - Error/edge flows: graceful partial responses for session issues; offline-friendly offer preview and retry CTA.
+- Actor labels: UI copy switches between “user” and “person” based on Circle enforcement (person only when civic/party mode is strict).
 - Accessibility: keyboard-friendly forms, high-contrast defaults, and no client-side blocking for SSR-first paths.
 
 ## Adoption & Extension stance
@@ -49,7 +50,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Expose manual delegation preferences (per-topic overrides) alongside conflict resolution so recommendations remain non-binding.
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
 - Gate gossip ingest on policy id/version mismatches and track peer health/quarantine scoring.
-- Expose peer health summaries in `/health` and reset actions in `/admin` for ops workflows.
+- Expose peer health summaries plus vote gossip updated counts in `/health` and reset actions in `/admin` for ops workflows.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
 - Federation stays stubbed (ActivityPub actor/outbox/inbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
@@ -59,7 +60,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (people when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
-- **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection.
+- **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection, and vote-mode recommendations should prefer the latest closed election winner.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
 
 ### Phase 3 — Decision Engine (Months 8-11)

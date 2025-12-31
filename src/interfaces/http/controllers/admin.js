@@ -535,7 +535,11 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
   } else if (gossipState.lastSummary) {
     const ledger = gossipState.lastSummary.ledger || {};
     const votes = gossipState.lastSummary.votes || {};
-    const voteLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
+    const voteCounts = [];
+    if (Number.isFinite(votes.added) && votes.added > 0) voteCounts.push(`+${votes.added}`);
+    if (Number.isFinite(votes.updated) && votes.updated > 0) voteCounts.push(`~${votes.updated}`);
+    const voteTail = voteCounts.length ? ` (${voteCounts.join(', ')})` : '';
+    const voteLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok${voteTail}`;
     lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok · ${voteLine}`);
   }
   if (gossipState.lastError) {

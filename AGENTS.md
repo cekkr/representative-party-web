@@ -17,7 +17,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second/third-choice picks with multi-round transfers for person elections (Alaska-style).
+- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second/third-choice picks with multi-round transfers for person elections (Alaska-style). When electionMode=vote, delegation recommendations should prefer the latest closed election winner.
 - Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
 - Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
 
@@ -46,6 +46,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.
 - Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
 - Layout must show Circle policy flag, verified handle when present, ledger/actor/discussion counts for accountability cues, and gossip ingest state.
+- UI copy should use “user” vs “person” labels based on Circle enforcement (person only when civic/party mode is strict).
 - Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash.
 - Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
 
@@ -71,7 +72,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
 - Testing: run `npm test` for the node:test suite (hashing, migrations, module toggles, Circle policy gates, Puppeteer UI role flows, ring gossip consistency); `npm run test:ui` is the stable UI-only entry point.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
-- Ops cues: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions for audit snapshots; `/health` includes peer health summaries for ops dashboards.
+- Ops cues: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions for audit snapshots; `/health` includes peer health summaries plus vote gossip added/updated counts for ops dashboards.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Module toggles: `/admin` lets operators disable optional modules (petitions/votes/delegation/groups/federation/topic gardener/social) for messaging-only deployments; navigation and endpoints honor the settings to avoid dead ends.

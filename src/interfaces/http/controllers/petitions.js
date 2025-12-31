@@ -19,6 +19,7 @@ import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js'
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
+import { getActorLabels } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -202,7 +203,11 @@ export async function castVote({ req, res, state, wantsPartial }) {
 
   const policy = getEffectivePolicy(state);
   if (policy.enforceCircle && (!person || !person.pidHash)) {
-    return sendJson(res, 401, { error: 'strict_requires_verification', message: 'Strict Circle: only verified people may vote.' });
+    const actorLabelPlural = getActorLabels(state).actorLabelPlural;
+    return sendJson(res, 401, {
+      error: 'strict_requires_verification',
+      message: `Strict Circle: only verified ${actorLabelPlural} may vote.`,
+    });
   }
 
   const authorHash = person?.pidHash || 'anonymous';
