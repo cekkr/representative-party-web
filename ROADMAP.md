@@ -46,6 +46,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Add core module toggles in `/admin` so petitions/votes/delegation/groups/federation/topic gardener/social can be disabled for messaging-only deployments; nav and endpoints respect disabled modules.
 - Add ledger digests to gossip envelopes and reject mismatched ledgers; centralized mode disables gossip ingest to avoid unintended replication.
 - Add scheduled gossip push/pull and admin controls for manual sync runs.
+- Treat module-disabled/gossip-disabled peers as skipped (no peer-health penalty), and disable gossip controls in `/admin` when data mode is centralized.
 - Add Puppeteer UI flows and ring gossip smoke tests to validate role gates, module toggles, and P2P consistency.
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs (discussions/forum/social/group actions plus petition signatures/comments; petitions/votes can stay disabled in messaging-only deployments).
 - Expose manual delegation preferences (per-topic overrides) alongside conflict resolution so recommendations remain non-binding.
