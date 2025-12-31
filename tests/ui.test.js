@@ -193,6 +193,22 @@ test('UI shows gossip controls and preview/provenance pills', { timeout: 60000 }
         issuer: 'peer-node',
       },
     ],
+    transactionSummaries: [
+      {
+        id: 'tx-summary-1',
+        issuer: 'peer-node',
+        summary: 'deadbeefcafebabe',
+        entryCount: 3,
+        entries: [],
+        policy: { id: 'party-circle-alpha', version: 1 },
+        profile: { mode: 'hybrid', adapter: 'kv' },
+        status: 'validated',
+        validationStatus: 'validated',
+        verification: { valid: true, skipped: false },
+        receivedAt: now,
+        issuedAt: now,
+      },
+    ],
     settings: { initialized: true },
     meta: { schemaVersion: LATEST_SCHEMA_VERSION, migrations: [] },
   };
@@ -211,6 +227,7 @@ test('UI shows gossip controls and preview/provenance pills', { timeout: 60000 }
   const page = await browser.newPage();
   await configurePage(page, server.baseUrl);
   await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.body.textContent.includes('deadbeefcafe'));
 
   const pushDisabled = await page.$eval('button[data-gossip="push"]', (el) => el.hasAttribute('disabled'));
   const pullDisabled = await page.$eval('button[data-gossip="pull"]', (el) => el.hasAttribute('disabled'));
@@ -451,4 +468,59 @@ test('UI admin can update rate limits and session overrides', { timeout: 60000 }
     (el) => el.selected,
   );
   assert.equal(roleSelected, true);
+});
+
+test('UI admin module toggles update navigation and access', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const adminSession = await createVerifiedSession(server.baseUrl, { pidHash: 'admin-ui-modules' });
+
+  await postForm(
+    `${server.baseUrl}/admin`,
+    { intent: 'session', sessionId: adminSession.sessionId, sessionRole: 'admin' },
+    { partial: true },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, adminSession.sessionId);
+  await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+
+  const modulesForm = await getAdminForm(page, 'modules');
+  const socialToggle = await modulesForm.$('input[name="module_social"]');
+  const petitionsToggle = await modulesForm.$('input[name="module_petitions"]');
+  assert.ok(socialToggle);
+  assert.ok(petitionsToggle);
+  if (await socialToggle.evaluate((el) => el.checked)) {
+    await socialToggle.click();
+  }
+  if (await petitionsToggle.evaluate((el) => el.checked)) {
+    await petitionsToggle.click();
+  }
+
+  const modulesResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const modulesButton = await modulesForm.$('button[type="submit"]');
+  await modulesButton.click();
+  await modulesResponse;
+  await page.waitForFunction(() => document.body.textContent.includes('Module toggles updated'));
+
+  await page.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await page.$('a[data-nav="social"]'), null);
+  assert.equal(await page.$('a[data-nav="petitions"]'), null);
+
+  await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await page.$('[data-module-disabled="social"]'));
+
+  await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await page.$('[data-module-disabled="petitions"]'));
 });
