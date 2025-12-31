@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { persistSignatures, persistPetitions } from '../../infra/persistence/storage.js';
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
+import { logTransaction } from '../transactions/registry.js';
 
 export function countSignatures(petitionId, state) {
   return filterVisibleEntries(state.signatures, state).filter((s) => s.petitionId === petitionId).length;
@@ -24,12 +25,24 @@ export async function signPetition({ petition, person, state }) {
   const stamped = stampLocalEntry(state, entry);
   state.signatures.unshift(stamped);
   await persistSignatures(state);
+  await logTransaction(state, {
+    type: 'petition_signed',
+    actorHash: person.pidHash,
+    petitionId: petition.id,
+    payload: { petitionId: petition.id },
+  });
   const count = countSignatures(petition.id, state);
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {
     const advanceStage = getQuorumAdvanceStage(state);
     petition.status = advanceStage === 'vote' ? 'open' : 'discussion';
     await persistPetitions(state);
     const nextLabel = advanceStage === 'vote' ? 'vote' : 'discussion';
+    await logTransaction(state, {
+      type: 'petition_quorum',
+      actorHash: person.pidHash,
+      petitionId: petition.id,
+      payload: { petitionId: petition.id, status: petition.status, signatures: count },
+    });
     await createNotificationWithOutbound(
       state,
       {

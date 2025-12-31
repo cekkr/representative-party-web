@@ -340,6 +340,12 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
+  await logTransaction(state, {
+    type: 'petition_comment',
+    actorHash: person?.pidHash || 'anonymous',
+    petitionId,
+    payload: { petitionId },
+  });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
   if (wantsPartial) {

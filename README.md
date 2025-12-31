@@ -38,6 +38,7 @@ This project takes the opposite stance:
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals, signatures/quorum, deliberation feed, vote envelopes (signable).
+- **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, and group actions with exportable summaries.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Federation stubs + redundancy knobs**: gossip endpoints and signed envelopes for auditability.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
