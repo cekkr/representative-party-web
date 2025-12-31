@@ -4,13 +4,15 @@ import { filterVisibleEntries } from '../../../modules/federation/replication.js
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
+import { getActorLabels } from '../views/actorLabel.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
-  const gateSummary = summarizeGateSnapshot(buildPolicyGates(state));
+  const actorLabels = getActorLabels(state);
+  const gateSummary = summarizeGateSnapshot(buildPolicyGates(state), actorLabels);
   const extensionsSummary = summarizeExtensions(state);
   const visibleDiscussions = filterVisibleEntries(state.discussions, state);
   const visiblePetitions = filterVisibleEntries(state.petitions, state);
@@ -42,10 +44,12 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   return sendHtml(res, html);
 }
 
-function summarizeGateSnapshot(gates) {
+function summarizeGateSnapshot(gates, actorLabels) {
+  const actorLabel = actorLabels?.actorLabel || 'person';
+  const actorGate = gates[actorLabel] || gates.person;
   const describe = (label, gate) =>
     `${label} post:${gate.post.allowed ? 'allow' : 'block'} petition:${gate.petition.allowed ? 'allow' : 'block'} vote:${gate.vote.allowed ? 'allow' : 'block'}`;
-  return [describe('guest', gates.guest), describe('person', gates.person), describe('delegate', gates.delegate)].join(' | ');
+  return [describe('guest', gates.guest), describe(actorLabel, actorGate), describe('delegate', gates.delegate)].join(' | ');
 }
 
 function summarizeExtensions(state) {

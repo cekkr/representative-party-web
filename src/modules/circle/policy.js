@@ -1,7 +1,7 @@
 import { POLICIES } from '../../config.js';
 import { getPrivilegesForPerson } from '../identity/privileges.js';
 
-const ROLE_ORDER = ['guest', 'person', 'delegate', 'moderator', 'admin'];
+const ROLE_ORDER = ['guest', 'user', 'person', 'delegate', 'moderator', 'admin'];
 
 const BASE_ACTION_RULES = {
   post: { capability: 'canPost', minRole: 'person', requireVerification: undefined, allowGuestWhenOpen: true },
@@ -26,6 +26,11 @@ export function getEffectivePolicy(state) {
   };
 }
 
+export function resolveDefaultActorRole(state) {
+  const policy = getEffectivePolicy(state);
+  return policy.enforceCircle ? 'person' : 'user';
+}
+
 export function getCirclePolicyState(state) {
   const effective = getEffectivePolicy(state);
   return {
@@ -44,6 +49,7 @@ export function evaluateAction(state, person, action = 'post') {
   const policy = getEffectivePolicy(state);
   const rules = resolveActionRules(state);
   const rule = rules[action] || rules.post;
+  const minRole = resolveMinRole(rule.minRole, policy);
   const enforcement = policy.enforceCircle ? 'strict' : 'observing';
   const verificationRequired = rule.requireVerification ?? policy.requireVerification;
 
@@ -91,7 +97,7 @@ export function evaluateAction(state, person, action = 'post') {
     });
   }
 
-  if (rule.minRole && rankRole(privileges.role) < rankRole(rule.minRole)) {
+  if (minRole && rankRole(privileges.role) < rankRole(minRole)) {
     return decorateDecision(state, {
       allowed: false,
       reason: 'insufficient_privileges',
@@ -131,6 +137,7 @@ export function summarizeGates(state, person) {
 export function buildPolicyGates(state) {
   return {
     guest: summarizeGates(state, null),
+    user: summarizeGates(state, { role: 'user', sessionId: 'sample', pidHash: 'sample' }),
     person: summarizeGates(state, { role: 'person', sessionId: 'sample', pidHash: 'sample' }),
     delegate: summarizeGates(state, { role: 'delegate', sessionId: 'sample', pidHash: 'sample' }),
   };
@@ -153,6 +160,14 @@ function resolveActionRules(state) {
     }
   }
   return rules;
+}
+
+function resolveMinRole(minRole, policy) {
+  if (!minRole) return null;
+  if (!policy?.enforceCircle && minRole === 'person') {
+    return 'user';
+  }
+  return minRole;
 }
 
 function decorateDecision(state, decision) {

@@ -8,7 +8,12 @@ import {
   persistSessions,
   persistSettings,
 } from '../../../infra/persistence/storage.js';
-import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
+import {
+  evaluateAction,
+  getCirclePolicyState,
+  getEffectivePolicy,
+  resolveDefaultActorRole,
+} from '../../../modules/circle/policy.js';
 import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
@@ -239,7 +244,8 @@ function dedupe(list) {
 
 async function updateSession(state, body) {
   const sessionId = sanitizeText(body.sessionId || '', 72);
-  const role = sanitizeText(body.sessionRole || 'person', 32) || 'person';
+  const defaultRole = resolveDefaultActorRole(state);
+  const role = sanitizeText(body.sessionRole || defaultRole, 32) || defaultRole;
   const banned = parseBoolean(body.sessionBanned, false);
   const handle = sanitizeText(body.sessionHandle || '', 64);
   if (!sessionId) {
@@ -352,9 +358,10 @@ function buildAdminViewModel(
 ) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
+  const defaultRole = resolveDefaultActorRole(state);
   const postingGate = evaluateAction(state, null, 'post');
   const extensions = state.extensions?.active || [];
-  const roleFlags = roleSelectFlags(sessionForm.sessionRole || 'person');
+  const roleFlags = roleSelectFlags(sessionForm.sessionRole || defaultRole);
   const extensionsList = renderExtensions(availableExtensions);
   const moduleToggles = listModuleToggles(state);
   const modulesList = renderModules(moduleToggles);
@@ -419,6 +426,7 @@ function buildAdminViewModel(
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',
     sessionBannedChecked: sessionForm.banned ? 'checked' : '',
+    sessionRoleUser: roleFlags.user,
     sessionRolePerson: roleFlags.person,
     sessionRoleDelegate: roleFlags.delegate,
     sessionRoleModerator: roleFlags.moderator,
@@ -654,6 +662,7 @@ function formatGossipFlash(summary) {
 
 function roleSelectFlags(role) {
   return {
+    user: role === 'user' ? 'selected' : '',
     person: role === 'person' ? 'selected' : '',
     delegate: role === 'delegate' ? 'selected' : '',
     moderator: role === 'moderator' ? 'selected' : '',

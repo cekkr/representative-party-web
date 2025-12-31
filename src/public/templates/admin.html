@@ -303,13 +303,14 @@
       </label>
       <label class="field">
         <span>Handle override (optional)</span>
-        <input name="sessionHandle" value="{{sessionHandleValue}}" placeholder="person-abcd1234" />
+        <input name="sessionHandle" value="{{sessionHandleValue}}" placeholder="{{actorLabel}}-abcd1234" />
       </label>
     </div>
     <div class="form-grid">
       <label class="field">
         <span>Role</span>
         <select name="sessionRole">
+          <option value="user" {{sessionRoleUser}}>user</option>
           <option value="person" {{sessionRolePerson}}>person</option>
           <option value="delegate" {{sessionRoleDelegate}}>delegate</option>
           <option value="moderator" {{sessionRoleModerator}}>moderator</option>

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { sanitizeText } from '../../shared/utils/text.js';
 
-export const DEFAULT_FOLLOW_TYPES = ['circle', 'friends', 'info', 'alerts', 'politics', 'engineers', 'work'];
+export const DEFAULT_FOLLOW_TYPES = ['circle', 'interest', 'info', 'alerts'];
 
 export function normalizeFollowType(rawType = 'circle') {
   const cleaned = sanitizeText(rawType, 32).toLowerCase() || 'circle';

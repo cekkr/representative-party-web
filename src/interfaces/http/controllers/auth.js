@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createActor } from '../../../modules/federation/activitypub.js';
 import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../../modules/identity/auth.js';
 import { getPerson } from '../../../modules/identity/person.js';
-import { getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { getCirclePolicyState, resolveDefaultActorRole } from '../../../modules/circle/policy.js';
 import { deriveBaseUrl } from '../../../shared/utils/request.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { persistActors, persistLedger, persistSessions } from '../../../infra/persistence/storage.js';
@@ -18,6 +18,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
   const policy = getCirclePolicyState(state);
   const actorLabels = getActorLabels(state);
+  const defaultRole = resolveDefaultActorRole(state);
 
   if (existing && existing.status === 'verified') {
     const html = await renderPage(
@@ -44,7 +45,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
     issuedAt: shouldResume ? existing.issuedAt : Date.now(),
     salt,
     offer,
-    role: existing?.role || 'person',
+    role: existing?.role || defaultRole,
     banned: existing?.banned || false,
   });
   await persistSessions(state);
@@ -107,8 +108,10 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   state.actors.set(pidHash, actor);
   await persistActors(state);
 
-  const handle = session.handle || `person-${pidHash.slice(0, 8)}`;
-  const role = session.role || 'person';
+  const defaultRole = resolveDefaultActorRole(state);
+  const role = session.role || defaultRole;
+  const handlePrefix = role === 'user' || role === 'person' ? role : defaultRole;
+  const handle = session.handle || `${handlePrefix}-${pidHash.slice(0, 8)}`;
   const banned = Boolean(session.banned);
 
   state.sessions.set(sessionId, {
