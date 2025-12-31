@@ -3,14 +3,14 @@ import { stampLocalEntry } from '../federation/replication.js';
 
 export function getGroupPolicy(state, groupId) {
   const found = (state.groupPolicies || []).find((p) => p.groupId === groupId);
-  return (
-    found || {
-      groupId,
-      electionMode: 'priority', // or 'vote'
-      conflictRule: 'highest_priority', // or 'prompt_user'
-      categoryWeighted: false,
-    }
-  );
+  if (found) return found;
+  const defaults = state?.settings?.groupPolicy || {};
+  return {
+    groupId,
+    electionMode: defaults.electionMode || 'priority', // or 'vote'
+    conflictRule: defaults.conflictRule || 'highest_priority', // or 'prompt_user'
+    categoryWeighted: false,
+  };
 }
 
 export async function setGroupPolicy(state, policy) {

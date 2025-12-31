@@ -12,6 +12,7 @@ import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../
 import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
@@ -328,7 +329,7 @@ function buildAdminViewModel(
   const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
-  const transactionsList = renderTransactionsList(state.transactions || []);
+  const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
 
   return {
     circleName: effective.circleName,

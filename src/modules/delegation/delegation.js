@@ -20,14 +20,14 @@ export function resolveDelegation(person, topic, state, { notify } = {}) {
   }
 
   const groupRec = recommendDelegationForPerson(person, topicKey, state);
+  if (groupRec.conflict && typeof notify === 'function') {
+    notify({
+      type: 'delegation_conflict',
+      recipientHash: person.pidHash,
+      message: `Delegation conflict on topic "${topicKey}" between group suggestions.`,
+    });
+  }
   if (groupRec.chosen) {
-    if (groupRec.conflict && typeof notify === 'function') {
-      notify({
-        type: 'delegation_conflict',
-        recipientHash: person.pidHash,
-        message: `Delegation conflict on topic "${topicKey}" between group suggestions.`,
-      });
-    }
     return {
       ownerHash: person.pidHash,
       delegateHash: groupRec.chosen.delegateHash,

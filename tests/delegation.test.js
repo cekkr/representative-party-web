@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { setDelegation } from '../src/modules/delegation/delegation.js';
+import { resolveDelegation } from '../src/modules/delegation/delegation.js';
 
 test('delegation set logs transaction', async () => {
   const state = {
@@ -24,4 +25,40 @@ test('delegation set logs transaction', async () => {
   const tx = state.transactions[0];
   assert.equal(tx.type, 'delegation_set');
   assert.equal(tx.payload.delegateHash, 'delegate-1');
+});
+
+test('delegation conflict with prompt_user does not auto-resolve', () => {
+  let notified = false;
+  const state = {
+    issuer: 'local',
+    delegations: [],
+    groupPolicies: [{ groupId: 'g1', electionMode: 'priority', conflictRule: 'prompt_user', categoryWeighted: false }],
+    groups: [
+      {
+        id: 'g1',
+        members: ['person-1'],
+        delegates: [{ topic: 'general', delegateHash: 'delegate-a', priority: 10, provider: 'local' }],
+        validationStatus: 'validated',
+      },
+      {
+        id: 'g2',
+        members: ['person-1'],
+        delegates: [{ topic: 'general', delegateHash: 'delegate-b', priority: 10, provider: 'local' }],
+        validationStatus: 'validated',
+      },
+    ],
+    extensions: { active: [] },
+    dataConfig: { mode: 'centralized', adapter: 'memory', validationLevel: 'strict', allowPreviews: false },
+    settings: { groupPolicy: { electionMode: 'priority', conflictRule: 'highest_priority' } },
+  };
+
+  const person = { pidHash: 'person-1' };
+  const result = resolveDelegation(person, 'general', state, {
+    notify: () => {
+      notified = true;
+    },
+  });
+
+  assert.equal(result, null);
+  assert.equal(notified, true);
 });

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { persistGroups } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
+import { getGroupPolicy } from './groupPolicy.js';
 
 export function listGroups(state) {
   return filterVisibleEntries(state.groups, state);
@@ -73,6 +74,7 @@ export function recommendDelegationForPerson(person, topic, state) {
   const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(person.pidHash));
   const suggestions = [];
   for (const group of groups) {
+    const policy = getGroupPolicy(state, group.id);
     const match = (group.delegates || []).find((d) => d.topic === topicKey) || (group.delegates || []).find((d) => d.topic === 'general');
     if (match) {
       suggestions.push({
@@ -80,6 +82,8 @@ export function recommendDelegationForPerson(person, topic, state) {
         delegateHash: match.delegateHash,
         priority: Number(match.priority) || 0,
         provider: match.provider || 'local',
+        conflictRule: policy.conflictRule || 'highest_priority',
+        electionMode: policy.electionMode || 'priority',
       });
     }
   }
@@ -88,6 +92,7 @@ export function recommendDelegationForPerson(person, topic, state) {
   const topPriority = suggestions[0].priority;
   const top = suggestions.filter((s) => s.priority === topPriority);
   const conflict = new Set(top.map((s) => s.delegateHash)).size > 1;
-  const chosen = top[0];
-  return { suggestions, conflict, chosen };
+  const conflictRule = top.some((s) => s.conflictRule === 'prompt_user') ? 'prompt_user' : 'highest_priority';
+  const chosen = conflict && conflictRule === 'prompt_user' ? null : top[0];
+  return { suggestions, conflict, chosen, conflictRule };
 }

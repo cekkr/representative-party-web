@@ -85,6 +85,9 @@ function renderSuggestions(person, state) {
   if (!person) return 'Login to see group delegate suggestions.';
   const rec = recommendDelegationForPerson(person, 'general', state);
   if (!rec.suggestions || !rec.suggestions.length) return 'No suggestions.';
+  const conflictNote = rec.conflict
+    ? `<p class="muted small">Conflict detected (${rec.conflictRule || 'highest_priority'}). Choose a delegate to resolve.</p>`
+    : '';
   return `
     <form data-enhance="delegation-conflict" action="/delegation/conflict" method="post" class="stack">
       <label>Select delegate for topic "general"</label>
@@ -93,6 +96,7 @@ function renderSuggestions(person, state) {
           .map((s) => `<option value="${s.delegateHash}">${s.delegateHash} (prio ${s.priority} via group ${s.groupId || ''})</option>`)
           .join('')}
       </select>
+      ${conflictNote}
       <input type="hidden" name="topic" value="general" />
       <button class="ghost" type="submit">Use delegate</button>
     </form>
