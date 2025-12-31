@@ -52,9 +52,19 @@ export function resolveTopicPath(state, topicId) {
   const path = [];
   const seen = new Set();
   let current = byId.get(topicId) || null;
-  while (current && !seen.has(current.id)) {
-    path.unshift(current);
+  let safety = 0;
+  while (current && current.mergedIntoId && safety < 8) {
+    if (seen.has(current.id)) break;
     seen.add(current.id);
+    const next = byId.get(current.mergedIntoId);
+    if (!next) break;
+    current = next;
+    safety += 1;
+  }
+  const pathSeen = new Set();
+  while (current && !pathSeen.has(current.id)) {
+    path.unshift(current);
+    pathSeen.add(current.id);
     current = current.parentId ? byId.get(current.parentId) : null;
   }
   return path;
@@ -116,6 +126,130 @@ export function applyTopicRename(state, topicId, { label, reason = 'manual', sou
     toKey: newPathKey,
   });
   return { updated: true, topic };
+}
+
+export function applyTopicMerge(state, fromTopicId, toTopicId, { reason = 'manual', source = 'admin' } = {}) {
+  if (!state) return { updated: false, reason: 'missing_state' };
+  if (!state.topics) state.topics = [];
+  if (!fromTopicId || !toTopicId || fromTopicId === toTopicId) {
+    return { updated: false, reason: 'invalid_target' };
+  }
+  const fromTopic = findTopicById(state, fromTopicId);
+  const toTopic = findTopicById(state, toTopicId);
+  if (!fromTopic || !toTopic) return { updated: false, reason: 'not_found' };
+  if (fromTopic.mergedIntoId === toTopicId) {
+    fromTopic.pendingMerge = null;
+    return { updated: false, reason: 'already_merged' };
+  }
+  const now = new Date().toISOString();
+  const aliases = new Set(Array.isArray(toTopic.aliases) ? toTopic.aliases : []);
+  if (fromTopic.label) aliases.add(fromTopic.label);
+  toTopic.aliases = [...aliases];
+  toTopic.updatedAt = now;
+  fromTopic.mergedIntoId = toTopicId;
+  fromTopic.pendingMerge = null;
+  fromTopic.archivedAt = now;
+  fromTopic.updatedAt = now;
+  appendTopicHistory(fromTopic, {
+    at: now,
+    action: 'merge',
+    source,
+    reason,
+    fromLabel: fromTopic.label,
+    toLabel: toTopic.label,
+    fromKey: fromTopic.pathKey || fromTopic.key,
+    toKey: toTopic.pathKey || toTopic.key,
+  });
+  appendTopicHistory(toTopic, {
+    at: now,
+    action: 'merge_into',
+    source,
+    reason,
+    fromLabel: fromTopic.label,
+    toLabel: toTopic.label,
+    fromKey: fromTopic.pathKey || fromTopic.key,
+    toKey: toTopic.pathKey || toTopic.key,
+  });
+  return { updated: true, fromTopic, toTopic };
+}
+
+export async function applyTopicSplit(
+  state,
+  topicId,
+  { labels = [], reason = 'manual', source = 'admin', persist = true } = {},
+) {
+  if (!state) return { updated: false, reason: 'missing_state' };
+  if (!state.topics) state.topics = [];
+  const topic = findTopicById(state, topicId);
+  if (!topic) return { updated: false, reason: 'not_found' };
+  const cleaned = Array.from(
+    new Set(
+      labels
+        .map((entry) => normalizeTopicLabel(entry))
+        .filter(Boolean),
+    ),
+  );
+  if (!cleaned.length) {
+    topic.pendingSplit = null;
+    return { updated: false, reason: 'empty_labels' };
+  }
+
+  const now = new Date().toISOString();
+  let created = 0;
+  let skipped = 0;
+  for (const label of cleaned) {
+    const key = normalizeTopicKey(label);
+    const pathKey = topic.pathKey ? `${topic.pathKey}/${key}` : key;
+    const exists = findTopicByPathKey(state, pathKey);
+    if (exists) {
+      skipped += 1;
+      continue;
+    }
+    const entry = stampLocalEntry(state, {
+      id: randomUUID(),
+      key,
+      label,
+      slug: key,
+      parentId: topic.id,
+      pathKey,
+      depth: (topic.depth || 0) + 1,
+      aliases: [],
+      history: [],
+      source,
+      createdAt: now,
+      updatedAt: now,
+    });
+    state.topics.unshift(entry);
+    appendTopicHistory(entry, {
+      at: now,
+      action: 'split_child',
+      source,
+      reason,
+      fromLabel: topic.label,
+      toLabel: label,
+      fromKey: topic.pathKey || topic.key,
+      toKey: pathKey,
+    });
+    created += 1;
+  }
+
+  topic.pendingSplit = null;
+  topic.updatedAt = now;
+  appendTopicHistory(topic, {
+    at: now,
+    action: 'split',
+    source,
+    reason,
+    fromLabel: topic.label,
+    toLabel: cleaned.join(', '),
+    fromKey: topic.pathKey || topic.key,
+    toKey: cleaned.map((label) => `${topic.pathKey || topic.key}/${normalizeTopicKey(label)}`).join(', '),
+  });
+
+  if (created && persist && state?.store?.saveTopics) {
+    await persistTopics(state);
+  }
+  return { updated: created > 0, created, skipped };
 }
 
 export function appendTopicHistory(topic, entry, { limit = 20 } = {}) {

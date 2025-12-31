@@ -2,7 +2,14 @@ import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, norma
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
-import { appendTopicHistory, applyTopicRename, findTopicById } from '../../../modules/topics/registry.js';
+import {
+  appendTopicHistory,
+  applyTopicMerge,
+  applyTopicRename,
+  applyTopicSplit,
+  findTopicById,
+  findTopicByPathKey,
+} from '../../../modules/topics/registry.js';
 import {
   persistPeers,
   persistProfileAttributes,
@@ -134,6 +141,46 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'topic-rename-dismiss') {
     const result = await dismissTopicRename(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-merge-accept') {
+    const result = await acceptTopicMerge(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-merge-dismiss') {
+    const result = await dismissTopicMerge(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-split-accept') {
+    const result = await acceptTopicSplit(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-split-dismiss') {
+    const result = await dismissTopicSplit(state, body);
     const availableExtensions = await listAvailableExtensions(state);
     const html = await renderPage(
       'admin',
@@ -466,8 +513,15 @@ function buildAdminViewModel(
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
   const topicRenames = listPendingTopicRenames(state);
+  const topicMerges = listPendingTopicMerges(state);
+  const topicSplits = listPendingTopicSplits(state);
   const topicRenameList = renderTopicRenameList(topicRenames);
+  const topicMergeList = renderTopicMergeList(topicMerges);
+  const topicSplitList = renderTopicSplitList(topicSplits);
   const topicRenameCount = topicRenames.length;
+  const topicMergeCount = topicMerges.length;
+  const topicSplitCount = topicSplits.length;
+  const topicHistoryList = renderTopicHistoryList(listTopicHistory(state));
   const topicGardenerSyncAt = topicConfig.lastSyncAt ? formatTimestamp(topicConfig.lastSyncAt) : 'Not yet';
   const topicGardenerLastOperationAt = topicConfig.lastOperationAt
     ? formatTimestamp(new Date(Number(topicConfig.lastOperationAt) * 1000).toISOString())
@@ -546,6 +600,11 @@ function buildAdminViewModel(
     topicPinned,
     topicRenameList,
     topicRenameCount,
+    topicMergeList,
+    topicMergeCount,
+    topicSplitList,
+    topicSplitCount,
+    topicHistoryList,
     topicGardenerSyncAt,
     topicGardenerLastOperationAt,
     dataProfile: describeProfile(replicationProfile),
@@ -601,6 +660,30 @@ function listPendingTopicRenames(state) {
   return (state?.topics || []).filter((topic) => topic?.pendingRename);
 }
 
+function listPendingTopicMerges(state) {
+  return (state?.topics || []).filter((topic) => topic?.pendingMerge);
+}
+
+function listPendingTopicSplits(state) {
+  return (state?.topics || []).filter((topic) => topic?.pendingSplit);
+}
+
+function listTopicHistory(state, { limit = 24 } = {}) {
+  const entries = [];
+  for (const topic of state?.topics || []) {
+    const history = Array.isArray(topic.history) ? topic.history : [];
+    for (const entry of history) {
+      entries.push({
+        ...entry,
+        topicId: topic.id,
+        topicLabel: topic.label || topic.key || 'topic',
+      });
+    }
+  }
+  entries.sort((a, b) => Date.parse(b.at || 0) - Date.parse(a.at || 0));
+  return entries.slice(0, limit);
+}
+
 function renderTopicRenameList(topics = []) {
   if (!topics.length) {
     return '<p class="muted small">No pending topic renames.</p>';
@@ -641,6 +724,112 @@ function renderTopicRenameList(topics = []) {
     .join('\n');
 }
 
+function renderTopicMergeList(topics = []) {
+  if (!topics.length) {
+    return '<p class="muted small">No pending topic merges.</p>';
+  }
+  return topics
+    .map((topic) => {
+      const pending = topic.pendingMerge || {};
+      const suggestedLabel = pending.toLabel || '';
+      const suggestedKey = pending.toKey || '';
+      const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
+      const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">Merge</span>
+            <span class="pill ghost">${escapeHtml(topic.label || topic.key || 'topic')}</span>
+            ${reason}
+            ${requestedAt}
+          </div>
+          <form class="stack" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-merge-accept" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <label class="field">
+              <span>Merge into topic key</span>
+              <input name="mergeTargetKey" value="${escapeHtml(String(suggestedKey))}" placeholder="parent/topic-key" />
+            </label>
+            <p class="muted small">Suggested: ${escapeHtml(String(suggestedLabel || suggestedKey || 'unknown'))}</p>
+            <div class="cta-row">
+              <button class="ghost" type="submit">Accept merge</button>
+            </div>
+          </form>
+          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-merge-dismiss" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <button class="ghost" type="submit">Dismiss</button>
+          </form>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function renderTopicSplitList(topics = []) {
+  if (!topics.length) {
+    return '<p class="muted small">No pending topic splits.</p>';
+  }
+  return topics
+    .map((topic) => {
+      const pending = topic.pendingSplit || {};
+      const suggestions = Array.isArray(pending.suggested) ? pending.suggested : [];
+      const [first, second] = suggestions;
+      const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
+      const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">Split</span>
+            <span class="pill ghost">${escapeHtml(topic.label || topic.key || 'topic')}</span>
+            ${reason}
+            ${requestedAt}
+          </div>
+          <form class="stack" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-split-accept" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <label class="field">
+              <span>Split label A</span>
+              <input name="splitLabelA" value="${escapeHtml(String(first || ''))}" placeholder="Subtopic label" />
+            </label>
+            <label class="field">
+              <span>Split label B</span>
+              <input name="splitLabelB" value="${escapeHtml(String(second || ''))}" placeholder="Subtopic label" />
+            </label>
+            <div class="cta-row">
+              <button class="ghost" type="submit">Accept split</button>
+            </div>
+          </form>
+          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-split-dismiss" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <button class="ghost" type="submit">Dismiss</button>
+          </form>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function renderTopicHistoryList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No topic history recorded yet.</p>';
+  }
+  const items = entries
+    .map((entry) => {
+      const when = entry.at ? formatTimestamp(entry.at) : '';
+      const action = entry.action || 'update';
+      const topicLabel = entry.topicLabel || 'topic';
+      const fromLabel = entry.fromLabel || entry.from || '';
+      const toLabel = entry.toLabel || entry.to || '';
+      const diff = fromLabel && toLabel ? `${fromLabel} → ${toLabel}` : '';
+      const reason = entry.reason ? ` · ${entry.reason}` : '';
+      return `<li>${escapeHtml(when)} · ${escapeHtml(topicLabel)} · ${escapeHtml(action)}${diff ? ` · ${escapeHtml(diff)}` : ''}${escapeHtml(reason)}</li>`;
+    })
+    .join('\n');
+  return `<ul class="plain">${items}</ul>`;
+}
+
 async function acceptTopicRename(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const renameLabel = sanitizeText(body.renameLabel || '', 64);
@@ -679,6 +868,106 @@ async function dismissTopicRename(state, body) {
   topic.updatedAt = now;
   await persistTopics(state);
   return { flash: 'Topic rename dismissed.' };
+}
+
+async function acceptTopicMerge(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const mergeTargetKey = sanitizeText(body.mergeTargetKey || '', 120);
+  const topic = findTopicById(state, topicId);
+  if (!topic) {
+    return { flash: 'Topic not found.' };
+  }
+  const pending = topic.pendingMerge || {};
+  let target = null;
+  if (mergeTargetKey) {
+    target = findTopicByPathKey(state, mergeTargetKey);
+  }
+  if (!target && pending.toId) {
+    target = findTopicById(state, pending.toId);
+  }
+  if (!target && pending.toKey) {
+    target = findTopicByPathKey(state, pending.toKey);
+  }
+  if (!target) {
+    return { flash: 'Merge target not found.' };
+  }
+  const result = applyTopicMerge(state, topic.id, target.id, {
+    reason: pending.reason || 'admin_accept',
+    source: 'admin',
+  });
+  if (!result.updated) {
+    return { flash: `Merge skipped (${result.reason || 'no_change'}).` };
+  }
+  await persistTopics(state);
+  return { flash: `Merged "${topic.label}" into "${target.label}".` };
+}
+
+async function dismissTopicMerge(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const topic = findTopicById(state, topicId);
+  if (!topic?.pendingMerge) {
+    return { flash: 'No pending merge to dismiss.' };
+  }
+  const now = new Date().toISOString();
+  appendTopicHistory(topic, {
+    at: now,
+    action: 'merge_dismissed',
+    source: 'admin',
+    reason: topic.pendingMerge?.reason || 'dismissed',
+    from: topic.label,
+    to: topic.pendingMerge?.toLabel || null,
+  });
+  topic.pendingMerge = null;
+  topic.updatedAt = now;
+  await persistTopics(state);
+  return { flash: 'Topic merge dismissed.' };
+}
+
+async function acceptTopicSplit(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const labelA = sanitizeText(body.splitLabelA || '', 64);
+  const labelB = sanitizeText(body.splitLabelB || '', 64);
+  const topic = findTopicById(state, topicId);
+  if (!topic) {
+    return { flash: 'Topic not found.' };
+  }
+  const pending = topic.pendingSplit || {};
+  const labels = [labelA, labelB].filter(Boolean);
+  if (!labels.length && Array.isArray(pending.suggested)) {
+    labels.push(...pending.suggested);
+  }
+  const result = await applyTopicSplit(state, topic.id, {
+    labels,
+    reason: pending.reason || 'admin_accept',
+    source: 'admin',
+    persist: false,
+  });
+  if (!result.updated && result.reason) {
+    return { flash: `Split skipped (${result.reason}).` };
+  }
+  await persistTopics(state);
+  return { flash: `Created ${result.created || 0} split topic(s).` };
+}
+
+async function dismissTopicSplit(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const topic = findTopicById(state, topicId);
+  if (!topic?.pendingSplit) {
+    return { flash: 'No pending split to dismiss.' };
+  }
+  const now = new Date().toISOString();
+  appendTopicHistory(topic, {
+    at: now,
+    action: 'split_dismissed',
+    source: 'admin',
+    reason: topic.pendingSplit?.reason || 'dismissed',
+    from: topic.label,
+    to: Array.isArray(topic.pendingSplit?.suggested) ? topic.pendingSplit.suggested.join(', ') : null,
+  });
+  topic.pendingSplit = null;
+  topic.updatedAt = now;
+  await persistTopics(state);
+  return { flash: 'Topic split dismissed.' };
 }
 
 function recordAdminAudit(state, { action, summary }) {
@@ -1036,8 +1325,10 @@ function formatTopicGardenerFlash(summary = {}) {
   }
   const updated = Number(summary.updatedTopics || 0);
   const renames = Number(summary.pendingRenames || 0);
+  const merges = Number(summary.pendingMerges || 0);
+  const splits = Number(summary.pendingSplits || 0);
   const processed = Number(summary.processed || 0);
-  return `Topic gardener synced ${processed} ops (${updated} topic updates, ${renames} rename suggestions).`;
+  return `Topic gardener synced ${processed} ops (${updated} topic updates, ${renames} rename, ${merges} merge, ${splits} split suggestions).`;
 }
 
 function roleSelectFlags(role) {

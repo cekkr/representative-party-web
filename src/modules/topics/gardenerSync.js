@@ -66,6 +66,8 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
   if (!operations.length) return { updatedTopics: 0, pendingRenames: 0, processed: 0 };
   let updatedTopics = 0;
   let pendingRenames = 0;
+  let pendingMerges = 0;
+  let pendingSplits = 0;
 
   for (const operation of operations) {
     const type = String(operation?.type || '').toLowerCase();
@@ -104,6 +106,16 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
         toTopic.updatedAt = timestamp;
         updatedTopics += 1;
       }
+      const pending = {
+        toKey,
+        toLabel: toTopic?.label || labelFromKey(toKey),
+        toId: toTopic?.id || null,
+        at: timestamp,
+        reason,
+        source,
+      };
+      fromTopic.pendingMerge = pending;
+      pendingMerges += 1;
     }
 
     if (type === 'rename' && toKey) {
@@ -119,9 +131,20 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
       pendingRenames += 1;
     }
 
+    if (type === 'split' && suggested.length) {
+      const pendingSplit = {
+        suggested: suggested.map((entry) => labelFromKey(entry)),
+        at: timestamp,
+        reason,
+        source,
+      };
+      fromTopic.pendingSplit = pendingSplit;
+      pendingSplits += 1;
+    }
+
     fromTopic.updatedAt = timestamp;
     updatedTopics += 1;
   }
 
-  return { updatedTopics, pendingRenames, processed: operations.length };
+  return { updatedTopics, pendingRenames, pendingMerges, pendingSplits, processed: operations.length };
 }
