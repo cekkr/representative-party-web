@@ -20,7 +20,7 @@
     <div class="form-grid">
       <label class="field">
         <span>Topic</span>
-        <input name="topic" placeholder="Energy transition" required />
+        <input name="topic" list="topics-list" placeholder="Energy transition" required />
       </label>
       <label class="field">
         <span>Stance</span>
@@ -41,10 +41,43 @@
       <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
     </div>
   </form>
+  <datalist id="topics-list">
+    {{topicDatalist}}
+  </datalist>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Topics</p>
+  <h3>Pick your top categories</h3>
+  <p class="muted small">Your list stays local to this provider and helps tune suggested topics.</p>
+  <form class="stack" method="post" action="/discussion" data-enhance="discussion-preferences">
+    <input type="hidden" name="intent" value="topic-preferences" />
+    <label class="field">
+      <span>Top categories (comma separated)</span>
+      <input name="topics" list="topics-list" value="{{topicPreferencesValue}}" placeholder="general, economy, health" />
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Save topics</button>
+    </div>
+  </form>
+  <p class="muted small">Anchors: {{topicAnchors}}</p>
+  <p class="muted small">Pinned: {{topicPinned}}</p>
 </section>
 
 <section class="panel">
   <p class="eyebrow">Latest contributions</p>
+  <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
+    <label class="field">
+      <span>Filter by topic</span>
+      <select name="topic">
+        <option value="" {{topicFilterSelectedAll}}>All topics</option>
+        {{topicFilterOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
   <div class="discussion-list">
     {{discussionList}}
   </div>

@@ -6,6 +6,8 @@ import { decideStatus, getReplicationProfile } from './replication.js';
 import { normalizePeerUrl } from './peers.js';
 import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess, resolvePeerKey } from './quarantine.js';
 
+const MAX_PEER_HINTS = 25;
+
 export async function ingestLedgerGossip({ state, envelope, hashes, peerHint, statusHint } = {}) {
   const peerKey = resolvePeerKey(peerHint, envelope?.issuer);
   const quarantine = isPeerQuarantined(state, peerKey);
@@ -95,8 +97,26 @@ export async function ingestLedgerGossip({ state, envelope, hashes, peerHint, st
 
   const hint = peerHint || envelope?.issuer;
   const normalizedPeer = normalizePeerUrl(hint);
-  if (normalizedPeer && !state.peers.has(normalizedPeer)) {
-    state.peers.add(normalizedPeer);
+  const discoveredPeers = new Set();
+  if (normalizedPeer) {
+    discoveredPeers.add(normalizedPeer);
+  }
+  const selfPeer = normalizePeerUrl(state.issuer);
+  const envelopePeers = Array.isArray(envelope?.peers) ? envelope.peers.slice(0, MAX_PEER_HINTS) : [];
+  for (const peer of envelopePeers) {
+    const candidate = normalizePeerUrl(peer);
+    if (!candidate) continue;
+    if (selfPeer && candidate === selfPeer) continue;
+    discoveredPeers.add(candidate);
+  }
+  let peersAdded = 0;
+  for (const peer of discoveredPeers) {
+    if (!state.peers.has(peer)) {
+      state.peers.add(peer);
+      peersAdded += 1;
+    }
+  }
+  if (peersAdded > 0) {
     await persistPeers(state);
   }
   if (added > 0) {

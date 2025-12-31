@@ -1,10 +1,11 @@
 import { POLICIES } from '../../config.js';
+import { persistSettings } from '../../infra/persistence/storage.js';
 import { buildLedgerEnvelope } from '../circle/federation.js';
 import { isModuleEnabled } from '../circle/modules.js';
 import { buildVoteEnvelope } from '../votes/voteEnvelope.js';
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
 import { collectGossipPeers } from './peers.js';
-import { isPeerQuarantined } from './quarantine.js';
+import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess } from './quarantine.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './replication.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -52,6 +53,7 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     );
     const finishedAt = new Date().toISOString();
     summary = summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload });
+    await updatePeerHealthFromPush(state, peerResults);
     state.gossipState = updateGossipState(state.gossipState, { summary, peerResults, startedAt, finishedAt });
     return summary;
   } catch (error) {
@@ -423,4 +425,44 @@ function updateGossipState(current, { summary, peerResults, startedAt, finishedA
     next.lastError = summary.errors[0].error;
   }
   return next;
+}
+
+async function updatePeerHealthFromPush(state, peerResults = []) {
+  let updated = false;
+  for (const result of peerResults) {
+    if (!result?.peer) continue;
+    const outcome = classifyPeerOutcome(result);
+    if (!outcome) continue;
+    if (outcome.ok) {
+      updated = recordPeerSuccess(state, result.peer).updated || updated;
+    } else {
+      updated = recordPeerFailure(state, result.peer, { reason: outcome.reason, penalty: 1 }).updated || updated;
+    }
+  }
+  if (updated) {
+    await persistSettings(state);
+  }
+}
+
+function classifyPeerOutcome(result) {
+  const ledger = result.ledger || {};
+  const votes = result.votes || {};
+  if (ledger.skipped && votes.skipped) return null;
+
+  if (!ledger.skipped && !ledger.ok) {
+    return { ok: false, reason: describeFailure('ledger', ledger) };
+  }
+  if (!votes.skipped && !votes.ok) {
+    return { ok: false, reason: describeFailure('votes', votes) };
+  }
+  if (ledger.skipped && !votes.skipped) {
+    return votes.ok ? { ok: true } : { ok: false, reason: describeFailure('votes', votes) };
+  }
+  return { ok: true };
+}
+
+function describeFailure(scope, status) {
+  if (status?.error) return `${scope}_${status.error}`;
+  if (status?.status) return `${scope}_status_${status.status}`;
+  return `${scope}_failed`;
 }
