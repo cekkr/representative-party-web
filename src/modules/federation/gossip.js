@@ -243,6 +243,7 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
         ok: true,
         status: votesResponse.status,
         added: ingest.added,
+        updated: ingest.updated,
       };
     }
   }

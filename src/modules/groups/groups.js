@@ -8,6 +8,26 @@ export function listGroups(state) {
   return filterVisibleEntries(state.groups, state);
 }
 
+export function findGroupById(state, groupId) {
+  if (!groupId) return null;
+  return (state.groups || []).find((group) => group.id === groupId) || null;
+}
+
+export function getGroupMemberRole(group, memberHash) {
+  if (!group || !memberHash) return null;
+  const roleEntry = (group.roles || []).find((entry) => entry.hash === memberHash);
+  if (roleEntry) return roleEntry.role || 'member';
+  return (group.members || []).includes(memberHash) ? 'member' : null;
+}
+
+export function isGroupMember(group, memberHash) {
+  return Boolean(getGroupMemberRole(group, memberHash));
+}
+
+export function isGroupAdmin(group, memberHash) {
+  return getGroupMemberRole(group, memberHash) === 'admin';
+}
+
 export async function createGroup({ name, description, topics, creatorHash, state }) {
   const group = {
     id: randomUUID(),
@@ -30,22 +50,34 @@ export function getGroupRoles(group) {
 }
 
 export async function joinGroup({ groupId, person, state }) {
-  const group = (state.groups || []).find((g) => g.id === groupId);
+  const group = findGroupById(state, groupId);
   if (!group || !person?.pidHash) return null;
+  let changed = false;
   if (!group.members.includes(person.pidHash)) {
     group.members.push(person.pidHash);
-    group.roles = group.roles || [];
+    changed = true;
+  }
+  group.roles = group.roles || [];
+  if (!group.roles.some((entry) => entry.hash === person.pidHash)) {
     group.roles.push({ hash: person.pidHash, role: 'member', joinedAt: new Date().toISOString() });
+    changed = true;
+  }
+  if (changed) {
     await persistGroups(state);
   }
   return group;
 }
 
 export async function leaveGroup({ groupId, person, state }) {
-  const group = (state.groups || []).find((g) => g.id === groupId);
+  const group = findGroupById(state, groupId);
   if (!group || !person?.pidHash) return null;
+  const beforeMembers = group.members.length;
   group.members = group.members.filter((m) => m !== person.pidHash);
-  await persistGroups(state);
+  const beforeRoles = (group.roles || []).length;
+  group.roles = (group.roles || []).filter((entry) => entry.hash !== person.pidHash);
+  if (beforeMembers !== group.members.length || beforeRoles !== group.roles.length) {
+    await persistGroups(state);
+  }
   return group;
 }
 

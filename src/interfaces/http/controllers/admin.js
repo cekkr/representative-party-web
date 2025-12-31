@@ -604,8 +604,12 @@ function formatGossipStatus(status = {}) {
   if (status.skipped) return 'skipped';
   if (status.ok) {
     const added = Number.isFinite(status.added) ? status.added : null;
-    if (added !== null) {
-      return status.status ? `ok (${status.status}, +${added})` : `ok (+${added})`;
+    const updated = Number.isFinite(status.updated) ? status.updated : null;
+    if (added !== null || updated !== null) {
+      const counts = [added !== null ? `+${added}` : null, updated !== null ? `~${updated}` : null]
+        .filter(Boolean)
+        .join(', ');
+      return status.status ? `ok (${status.status}, ${counts})` : `ok (${counts})`;
     }
     return status.status ? `ok (${status.status})` : 'ok';
   }

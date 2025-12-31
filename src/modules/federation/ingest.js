@@ -157,6 +157,7 @@ export async function ingestVoteGossip({ state, envelopes = [], statusHint, peer
   const profile = getReplicationProfile(state);
   const policy = getEffectivePolicy(state);
   let added = 0;
+  let updated = 0;
   let rejected = 0;
   let hardFailure = false;
   const errors = [];
@@ -189,16 +190,23 @@ export async function ingestVoteGossip({ state, envelopes = [], statusHint, peer
       continue;
     }
     const voteKey = `${envelope.petitionId}:${envelope.authorHash}`;
-    const exists = state.votes.some((vote) => `${vote.petitionId}:${vote.authorHash}` === voteKey);
-    if (exists) continue;
-    state.votes.push({
+    const existingIndex = state.votes.findIndex((vote) => `${vote.petitionId}:${vote.authorHash}` === voteKey);
+    const nextEntry = {
       petitionId: envelope.petitionId,
       authorHash: envelope.authorHash,
       choice: envelope.choice,
-      createdAt: envelope.createdAt,
+      createdAt: envelope.createdAt || new Date().toISOString(),
       validationStatus: replicationStatus.status,
       envelope: { ...envelope, status: replicationStatus.status },
-    });
+    };
+    if (existingIndex >= 0) {
+      const existing = state.votes[existingIndex];
+      if (!shouldReplaceVote(existing, nextEntry, replicationStatus.status)) continue;
+      state.votes[existingIndex] = nextEntry;
+      updated += 1;
+      continue;
+    }
+    state.votes.push(nextEntry);
     added += 1;
   }
 
@@ -206,16 +214,41 @@ export async function ingestVoteGossip({ state, envelopes = [], statusHint, peer
     if (hardFailure) {
       const updated = recordPeerFailure(state, peerKey, { reason: errors[0]?.error || 'invalid_vote' }).updated;
       if (updated) await persistSettings(state);
-    } else if (added > 0) {
+    } else if (added > 0 || updated > 0) {
       const updated = recordPeerSuccess(state, peerKey).updated;
       if (updated) await persistSettings(state);
     }
   }
 
-  if (added > 0) {
+  if (added > 0 || updated > 0) {
     await persistVotes(state);
   }
-  return { statusCode: 200, added, rejected, total: state.votes.length, errors, profile };
+  return { statusCode: 200, added, updated, rejected, total: state.votes.length, errors, profile };
+}
+
+function shouldReplaceVote(existing, incoming, incomingStatus) {
+  const existingStatus = existing?.validationStatus || existing?.envelope?.status || 'validated';
+  const normalizedIncoming = incomingStatus || incoming?.validationStatus || incoming?.envelope?.status || 'validated';
+  if (existingStatus === 'validated' && normalizedIncoming === 'preview') return false;
+
+  const existingTime = parseTimestamp(existing?.createdAt || existing?.envelope?.createdAt);
+  const incomingTime = parseTimestamp(incoming?.createdAt || incoming?.envelope?.createdAt);
+  if (incomingTime && existingTime) {
+    if (incomingTime > existingTime) return true;
+    if (incomingTime === existingTime && existingStatus === 'preview' && normalizedIncoming === 'validated') {
+      return true;
+    }
+    return false;
+  }
+  if (incomingTime && !existingTime) return true;
+  if (!incomingTime && existingStatus === 'preview' && normalizedIncoming === 'validated') return true;
+  return false;
+}
+
+function parseTimestamp(value) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
 }
 
 function validatePolicy(localPolicy, envelopePolicy) {

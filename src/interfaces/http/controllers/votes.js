@@ -37,6 +37,7 @@ export async function gossipVotes({ req, res, state }) {
   const statusCode = result.statusCode || 200;
   return sendJson(res, statusCode, {
     added: result.added,
+    updated: result.updated,
     rejected: result.rejected,
     total: result.total,
     replication: profile,

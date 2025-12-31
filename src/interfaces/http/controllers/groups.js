@@ -1,7 +1,16 @@
 import { getPerson } from '../../../modules/identity/person.js';
 import { evaluateAction } from '../../../modules/circle/policy.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from '../../../modules/groups/groups.js';
+import {
+  createGroup,
+  findGroupById,
+  isGroupAdmin,
+  isGroupMember,
+  joinGroup,
+  leaveGroup,
+  listGroups,
+  setGroupDelegate,
+} from '../../../modules/groups/groups.js';
 import { createNotification } from '../../../modules/messaging/notifications.js';
 import { getGroupPolicy, setGroupPolicy } from '../../../modules/groups/groupPolicy.js';
 import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../../modules/groups/groupElections.js';
@@ -52,6 +61,10 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
       return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group join blocked.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
+    const groupRef = findGroupById(state, groupId);
+    if (!groupRef) {
+      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    }
     const group = await joinGroup({ groupId, person, state });
     if (group) {
       await logTransaction(state, {
@@ -72,6 +85,10 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
       return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group leave blocked.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
+    const groupRef = findGroupById(state, groupId);
+    if (!groupRef) {
+      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    }
     const group = await leaveGroup({ groupId, person, state });
     if (group) {
       await logTransaction(state, {
@@ -84,11 +101,18 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   }
 
   if (action === 'startElection') {
-    const permission = evaluateAction(state, person, 'moderate');
-    if (!permission.allowed) {
-      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to start election.' });
+    if (!person) {
+      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to start elections.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
+    const group = findGroupById(state, groupId);
+    if (!group) {
+      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    }
+    const permission = evaluateAction(state, person, 'moderate');
+    if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+      return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    }
     const topic = sanitizeText(body.topic || 'general', 64);
     const candidates = (body.candidates || '').split(',').map((v) => sanitizeText(v, 80)).filter(Boolean);
     const election = await startElection({ groupId, topic, candidates, state });
@@ -111,6 +135,17 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
       return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Election voting blocked.' });
     }
     const electionId = sanitizeText(body.electionId || '', 80);
+    const electionRef = (state.groupElections || []).find((entry) => entry.id === electionId);
+    if (!electionRef) {
+      return sendJson(res, 404, { error: 'election_not_found', message: 'Election not found.' });
+    }
+    const group = findGroupById(state, electionRef.groupId);
+    if (!group) {
+      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    }
+    if (!isGroupMember(group, person.pidHash)) {
+      return sendJson(res, 401, { error: 'group_membership_required', message: 'Join the group to vote in its elections.' });
+    }
     const candidateHash = sanitizeText(body.candidateHash || '', 80);
     const secondChoiceHash = sanitizeText(body.secondChoiceHash || '', 80);
     const thirdChoiceHash = sanitizeText(body.thirdChoiceHash || '', 80);
@@ -126,11 +161,22 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   }
 
   if (action === 'closeElection') {
-    const permission = evaluateAction(state, person, 'moderate');
-    if (!permission.allowed) {
-      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to close election.' });
+    if (!person) {
+      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to close elections.' });
     }
     const electionId = sanitizeText(body.electionId || '', 80);
+    const electionRef = (state.groupElections || []).find((entry) => entry.id === electionId);
+    if (!electionRef) {
+      return sendJson(res, 404, { error: 'election_not_found', message: 'Election not found.' });
+    }
+    const group = findGroupById(state, electionRef.groupId);
+    if (!group) {
+      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    }
+    const permission = evaluateAction(state, person, 'moderate');
+    if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+      return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    }
     const election = await closeElection({ electionId, state });
     let winner = null;
     if (election) {
@@ -183,12 +229,19 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
     return sendModuleDisabledJson({ res, moduleKey: 'groups' });
   }
   const person = getPerson(req, state);
-  const permission = evaluateAction(state, person, 'moderate');
-  if (!permission.allowed) {
-    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to set delegates.' });
-  }
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
+  const group = findGroupById(state, groupId);
+  if (!group) {
+    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+  }
+  if (!person) {
+    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set delegates.' });
+  }
+  const permission = evaluateAction(state, person, 'moderate');
+  if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+  }
   const topic = sanitizeText(body.topic || 'general', 64);
   const delegateHash = sanitizeText(body.delegateHash || '', 80);
   const priority = Number(body.priority || 0);
@@ -211,12 +264,19 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
     return sendModuleDisabledJson({ res, moduleKey: 'groups' });
   }
   const person = getPerson(req, state);
-  const permission = evaluateAction(state, person, 'moderate');
-  if (!permission.allowed) {
-    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to set policies.' });
-  }
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
+  const group = findGroupById(state, groupId);
+  if (!group) {
+    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+  }
+  if (!person) {
+    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to update group policy.' });
+  }
+  const permission = evaluateAction(state, person, 'moderate');
+  if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+  }
   const electionMode = sanitizeText(body.electionMode || 'priority', 32);
   const conflictRule = sanitizeText(body.conflictRule || 'highest_priority', 32);
   const categoryWeighted = Boolean(body.categoryWeighted);
