@@ -214,3 +214,24 @@ test('UI shows gossip controls and preview/provenance pills', { timeout: 60000 }
   await page.waitForFunction(() => document.body.textContent.includes('Preview'));
   await page.waitForFunction(() => document.body.textContent.includes('peer-node'));
 });
+
+test('UI renders delegation form when module enabled', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await page.goto(`${server.baseUrl}/delegation`, { waitUntil: 'networkidle0' });
+
+  const form = await page.$('form[action="/delegation"]');
+  assert.ok(form);
+  const delegateField = await page.$('input[name="delegateHash"]');
+  assert.ok(delegateField);
+});
