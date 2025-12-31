@@ -10,7 +10,7 @@ export function renderDiscussionList(entries) {
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(entry.topic)}</span>
+            <span class="pill">${escapeHtml(formatTopicBreadcrumb(entry))}</span>
             <span class="pill ghost">${escapeHtml(entry.stance)}</span>
             ${entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(entry)}
@@ -22,6 +22,14 @@ export function renderDiscussionList(entries) {
       `;
     })
     .join('\n');
+}
+
+function formatTopicBreadcrumb(entry) {
+  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+    return entry.topicPath.join(' / ');
+  }
+  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry.topic || 'general';
 }
 
 function renderIssuerPill(entry) {

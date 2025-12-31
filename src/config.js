@@ -52,6 +52,7 @@ export const FILES = {
   votes: join(PATHS.DATA_ROOT, 'votes.json'),
   delegations: join(PATHS.DATA_ROOT, 'delegations.json'),
   notifications: join(PATHS.DATA_ROOT, 'notifications.json'),
+  topics: join(PATHS.DATA_ROOT, 'topics.json'),
   groups: join(PATHS.DATA_ROOT, 'groups.json'),
   groupPolicies: join(PATHS.DATA_ROOT, 'group-policies.json'),
   groupElections: join(PATHS.DATA_ROOT, 'group-elections.json'),

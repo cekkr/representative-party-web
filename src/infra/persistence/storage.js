@@ -60,6 +60,10 @@ export async function persistNotifications(state) {
   await state.store.saveNotifications(state.notifications);
 }
 
+export async function persistTopics(state) {
+  await state.store.saveTopics(state.topics || []);
+}
+
 export async function persistSocialFollows(state) {
   await state.store.saveSocialFollows(state.socialFollows);
 }
@@ -116,6 +120,7 @@ function hydrateState(data) {
     votes: data.votes,
     delegations: data.delegations,
     notifications: data.notifications,
+    topics: data.topics || [],
     groups: data.groups,
     groupPolicies: data.groupPolicies,
     groupElections: data.groupElections,

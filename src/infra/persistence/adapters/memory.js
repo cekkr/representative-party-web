@@ -68,6 +68,10 @@ class MemoryStateStore {
     this._data.notifications = clone(entries || []);
   }
 
+  async saveTopics(entries) {
+    this._data.topics = clone(entries || []);
+  }
+
   async saveGroups(entries) {
     this._data.groups = clone(entries || []);
   }
@@ -128,6 +132,7 @@ function getEmptyData() {
     votes: [],
     delegations: [],
     notifications: [],
+    topics: [],
     groups: [],
     groupPolicies: [],
     groupElections: [],

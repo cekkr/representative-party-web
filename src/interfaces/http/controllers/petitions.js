@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { getPerson } from '../../../modules/identity/person.js';
 import { classifyTopic } from '../../../modules/topics/classification.js';
+import { ensureTopicPath } from '../../../modules/topics/registry.js';
 import { resolveDelegation } from '../../../modules/delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../../modules/groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../../modules/circle/policy.js';
@@ -131,7 +132,10 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const title = sanitizeText(body.title || '', 120);
   const summary = sanitizeText(body.summary || '', 800);
   const proposalText = sanitizeText(body.body || '', 4000);
-  const topic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
+  const classifiedTopic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
+  const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
+  const topic = topicResult.topic?.label || classifiedTopic || 'general';
+  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
 
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
@@ -147,6 +151,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     status: 'draft',
     quorum: Number(body.quorum || 0),
     topic,
+    topicId: topicResult.topic?.id || null,
+    topicPath,
   };
 
   const stamped = stampLocalEntry(state, petition);
@@ -358,10 +364,19 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   if (petition.status === 'closed') {
     return sendJson(res, 400, { error: 'petition_closed', message: 'Discussion closed for this proposal.' });
   }
+  let topicId = petition.topicId || null;
+  let topicPath = Array.isArray(petition.topicPath) ? petition.topicPath : [];
+  if (!topicId) {
+    const fallback = await ensureTopicPath(state, petition.topic || 'general', { source: 'petition' });
+    topicId = fallback.topic?.id || null;
+    topicPath = fallback.path?.length ? fallback.path.map((entry) => entry.label) : topicPath;
+  }
   const entry = {
     id: randomUUID(),
     petitionId,
     topic: petition.topic || 'general',
+    topicId,
+    topicPath,
     stance: 'comment',
     content,
     authorHash: person?.pidHash || 'anonymous',

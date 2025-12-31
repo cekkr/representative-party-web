@@ -1,7 +1,9 @@
+import { randomUUID } from 'node:crypto';
+
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 15;
+export const LATEST_SCHEMA_VERSION = 16;
 
 const MIGRATIONS = [
   {
@@ -284,6 +286,79 @@ const MIGRATIONS = [
       };
     },
   },
+  {
+    version: 16,
+    description: 'Add topic registry scaffold and stamp topic ids.',
+    up: (data) => {
+      const now = new Date().toISOString();
+      const topics = Array.isArray(data.topics) ? data.topics : [];
+      const topicIndex = new Map();
+
+      for (const [index, topic] of topics.entries()) {
+        const label = stringOrFallback(topic?.label, `topic-${index}`);
+        const key = normalizeTopicKey(topic?.key || label);
+        const pathKey = topic?.pathKey || key;
+        topic.id = topic.id || randomUUID();
+        topic.label = label;
+        topic.key = key;
+        topic.slug = topic.slug || key;
+        topic.pathKey = pathKey;
+        topic.validationStatus = topic.validationStatus || 'validated';
+        topic.createdAt = topic.createdAt || now;
+        topic.updatedAt = topic.updatedAt || now;
+        topicIndex.set(pathKey, topic);
+      }
+
+      const ensureTopicPath = (rawTopic) => {
+        const labels = parseTopicPath(rawTopic);
+        let parentId = null;
+        let parentPathKey = '';
+        const pathLabels = [];
+        for (let depth = 0; depth < labels.length; depth += 1) {
+          const label = labels[depth];
+          const key = normalizeTopicKey(label);
+          const pathKey = parentPathKey ? `${parentPathKey}/${key}` : key;
+          let topic = topicIndex.get(pathKey);
+          if (!topic) {
+            topic = {
+              id: randomUUID(),
+              key,
+              label,
+              slug: key,
+              parentId,
+              pathKey,
+              depth,
+              aliases: [],
+              history: [],
+              validationStatus: 'validated',
+              createdAt: now,
+              updatedAt: now,
+            };
+            topics.push(topic);
+            topicIndex.set(pathKey, topic);
+          }
+          pathLabels.push(topic.label || label);
+          parentId = topic.id;
+          parentPathKey = pathKey;
+        }
+        return { topicId: parentId, pathLabels };
+      };
+
+      const withTopic = (entry) => {
+        if (!entry) return entry;
+        if (entry.topicId || entry.topicPath) return entry;
+        const { topicId, pathLabels } = ensureTopicPath(entry.topic || 'general');
+        return { ...entry, topicId, topicPath: pathLabels };
+      };
+
+      return {
+        ...data,
+        topics,
+        discussions: (data.discussions || []).map(withTopic),
+        petitions: (data.petitions || []).map(withTopic),
+      };
+    },
+  },
 ];
 
 export function runMigrations({ data, meta }) {
@@ -398,6 +473,22 @@ function stringOrEmpty(value) {
 function stringOrFallback(value, fallback) {
   const text = stringOrEmpty(value);
   return text || fallback;
+}
+
+function normalizeTopicKey(value) {
+  const text = String(value || '').trim().toLowerCase();
+  const slug = text.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  return slug || 'general';
+}
+
+function parseTopicPath(rawTopic) {
+  const text = stringOrEmpty(rawTopic);
+  if (!text) return ['general'];
+  const parts = text
+    .split(/[>/]/)
+    .map((entry) => stringOrEmpty(entry))
+    .filter(Boolean);
+  return parts.length ? parts : ['general'];
 }
 
 function uniqueStrings(values) {

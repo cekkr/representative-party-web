@@ -26,6 +26,7 @@ async function main() {
         signatures: state.signatures?.length || 0,
         groups: state.groups?.length || 0,
         notifications: state.notifications?.length || 0,
+        topics: state.topics?.length || 0,
       },
     };
     console.log(JSON.stringify(summary, null, 2));

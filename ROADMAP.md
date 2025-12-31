@@ -47,7 +47,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Petitions/signatures/votes pipeline exists with vote envelopes, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Persistence adapters (json/memory/sql/kv), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
-- Structure manager UI for provider-local fields and attributes is available; topic preferences + gardener stub are wired.
+- Structure manager UI for provider-local fields and attributes is available; topic preferences + topic registry/breadcrumbs + gardener stub are wired.
 
 ## Near-term next steps (Phase 2 focus)
 - Replace the topic gardener stub with a real worker (merge/split/rename scheduling), persist topic IDs/history, and surface topic breadcrumbs across discussion/forum/petitions.

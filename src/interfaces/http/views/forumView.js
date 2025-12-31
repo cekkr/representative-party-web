@@ -20,7 +20,7 @@ function renderThreads(threads, comments, person) {
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(thread.topic || 'general')}</span>
+            <span class="pill">${escapeHtml(formatTopicBreadcrumb(thread))}</span>
             <span class="pill ghost">Article</span>
             ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(thread)}
@@ -44,6 +44,14 @@ function renderThreads(threads, comments, person) {
       `;
     })
     .join('\n');
+}
+
+function formatTopicBreadcrumb(entry) {
+  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+    return entry.topicPath.join(' / ');
+  }
+  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry.topic || 'general';
 }
 
 function renderComments(comments) {

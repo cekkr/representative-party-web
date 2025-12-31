@@ -38,7 +38,7 @@ export function renderPetitionList(
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(petition)}
             <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
-            <span class="pill ghost">Topic: ${escapeHtml(petition.topic || 'general')}</span>
+            <span class="pill ghost">Topic: ${escapeHtml(formatTopicBreadcrumb(petition))}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
             <span class="pill ghost">Signatures: ${signatureCount}</span>
             <span class="pill ghost">Discussion: ${comments.length}</span>
@@ -82,6 +82,14 @@ export function renderPetitionList(
       `;
     })
     .join('\n');
+}
+
+function formatTopicBreadcrumb(entry) {
+  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+    return entry.topicPath.join(' / ');
+  }
+  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry.topic || 'general';
 }
 
 function buildVoteBuckets(votes) {

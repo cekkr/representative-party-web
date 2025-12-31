@@ -22,6 +22,7 @@ export function renderHealth({ res, state }) {
     votes: state.votes.length,
     delegations: state.delegations.length,
     notifications: state.notifications.length,
+    topics: state.topics?.length || 0,
     groups: state.groups.length,
     visible: {
       discussions: filterVisibleEntries(state.discussions, state).length,

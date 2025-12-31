@@ -14,6 +14,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Module toggles: core modules (petitions/votes/delegation/groups/federation/topic gardener/social) are admin-configurable; navigation/endpoints must respect disabled modules, returning a module-disabled page or 403 JSON.
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
 - Topic stewardship & gardening: users (people in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
+- Topic registry: persist topic ids/path metadata for discussions, forum threads, and petitions so SSR views can render breadcrumbs and future renames can be tracked.
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).

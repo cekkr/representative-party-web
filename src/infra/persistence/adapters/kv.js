@@ -13,6 +13,7 @@ const KEYS = [
   'votes',
   'delegations',
   'notifications',
+  'topics',
   'groups',
   'groupPolicies',
   'groupElections',
@@ -106,6 +107,10 @@ class KeyValueStateStore {
 
   async saveNotifications(entries) {
     await this.saveKey('notifications', entries);
+  }
+
+  async saveTopics(entries) {
+    await this.saveKey('topics', entries);
   }
 
   async saveGroups(entries) {

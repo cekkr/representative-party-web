@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { getPerson } from '../../../modules/identity/person.js';
 import { classifyTopic } from '../../../modules/topics/classification.js';
+import { ensureTopicPath } from '../../../modules/topics/registry.js';
 import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions } from '../../../infra/persistence/storage.js';
@@ -53,10 +54,15 @@ export async function postThread({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
   const policy = getCirclePolicyState(state);
-  const topic = await classifyTopic(`${title} ${content}`, state);
+  const classifiedTopic = await classifyTopic(`${title} ${content}`, state);
+  const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'forum' });
+  const topic = topicResult.topic?.label || classifiedTopic || 'general';
+  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
   const entry = {
     id: randomUUID(),
     topic,
+    topicId: topicResult.topic?.id || null,
+    topicPath,
     stance: 'article',
     title,
     content,
@@ -110,9 +116,18 @@ export async function postComment({ req, res, state, wantsPartial }) {
     return sendJson(res, 404, { error: 'thread_not_found' });
   }
   const policy = getCirclePolicyState(state);
+  let topicId = parent.topicId || null;
+  let topicPath = Array.isArray(parent.topicPath) ? parent.topicPath : [];
+  if (!topicId) {
+    const fallback = await ensureTopicPath(state, parent.topic || 'general', { source: 'forum' });
+    topicId = fallback.topic?.id || null;
+    topicPath = fallback.path?.length ? fallback.path.map((entry) => entry.label) : topicPath;
+  }
   const entry = {
     id: randomUUID(),
     topic: parent.topic,
+    topicId,
+    topicPath,
     stance: 'comment',
     title: '',
     content,

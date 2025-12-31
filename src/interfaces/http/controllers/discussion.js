@@ -4,6 +4,7 @@ import { getPerson } from '../../../modules/identity/person.js';
 import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { getTopicConfig } from '../../../modules/topics/topicGardenerClient.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey, storeTopicPreferences } from '../../../modules/topics/preferences.js';
+import { ensureTopicPath } from '../../../modules/topics/registry.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
@@ -60,7 +61,10 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
     });
   }
 
-  const topic = sanitizeText(body.topic || 'General', 80);
+  const topicInput = sanitizeText(body.topic || 'General', 80);
+  const topicResult = await ensureTopicPath(state, topicInput, { source: 'discussion' });
+  const topic = topicResult.topic?.label || topicInput || 'general';
+  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
   const stance = sanitizeText(body.stance || 'neutral', 40);
   const content = sanitizeText(body.content || '', 800);
   const policy = getCirclePolicyState(state);
@@ -72,6 +76,8 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
   const entry = {
     id: randomUUID(),
     topic,
+    topicId: topicResult.topic?.id || null,
+    topicPath,
     stance,
     content,
     authorHash: person?.pidHash || 'anonymous',

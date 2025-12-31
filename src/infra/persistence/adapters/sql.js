@@ -13,6 +13,7 @@ const KEYS = [
   'votes',
   'delegations',
   'notifications',
+  'topics',
   'groups',
   'groupPolicies',
   'groupElections',
@@ -102,6 +103,10 @@ class SqlStateStore {
 
   async saveNotifications(entries) {
     await this.writeJson('notifications', entries);
+  }
+
+  async saveTopics(entries) {
+    await this.writeJson('topics', entries);
   }
 
   async saveGroups(entries) {
