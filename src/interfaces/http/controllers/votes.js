@@ -1,8 +1,8 @@
-import { buildVoteEnvelope, verifyVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
-import { persistVotes } from '../../../infra/persistence/storage.js';
+import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
 import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { decideStatus, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { ingestVoteGossip } from '../../../modules/federation/ingest.js';
+import { getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -31,33 +31,6 @@ export async function gossipVotes({ req, res, state }) {
   }
   const body = await readRequestBody(req);
   const envelopes = Array.isArray(body.entries) ? body.entries : [];
-  let added = 0;
-
-  for (const envelope of envelopes) {
-    const verification = verifyVoteEnvelope(envelope);
-    if (verification && !verification.valid && !verification.skipped) {
-      continue;
-    }
-    const replicationStatus = decideStatus(profile, envelope?.status || body.status || 'validated');
-    if (replicationStatus.status === 'rejected') {
-      continue;
-    }
-    const voteKey = `${envelope.petitionId}:${envelope.authorHash}`;
-    const exists = state.votes.some((vote) => `${vote.petitionId}:${vote.authorHash}` === voteKey);
-    if (exists) continue;
-    state.votes.push({
-      petitionId: envelope.petitionId,
-      authorHash: envelope.authorHash,
-      choice: envelope.choice,
-      createdAt: envelope.createdAt,
-      validationStatus: replicationStatus.status,
-      envelope: { ...envelope, status: replicationStatus.status },
-    });
-    added += 1;
-  }
-
-  if (added > 0) {
-    await persistVotes(state);
-  }
-  return sendJson(res, 200, { added, total: state.votes.length, replication: profile });
+  const result = await ingestVoteGossip({ state, envelopes, statusHint: body.status });
+  return sendJson(res, 200, { added: result.added, total: result.total, replication: profile });
 }

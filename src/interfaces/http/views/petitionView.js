@@ -36,6 +36,7 @@ export function renderPetitionList(
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderIssuerPill(petition)}
             <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
             <span class="pill ghost">Topic: ${escapeHtml(petition.topic || 'general')}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
@@ -167,6 +168,7 @@ function renderPetitionComments(comments) {
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
           </div>
           <p>${escapeHtml(comment.content)}</p>
@@ -193,6 +195,7 @@ export function renderProposalDiscussionFeed(items) {
             <span class="pill">${escapeHtml(statusLabel)}</span>
             <span class="pill ghost">Proposal</span>
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
             ${permalink}
           </div>
@@ -226,4 +229,10 @@ function getLastCommentAt(comments) {
     }
   }
   return latest ? new Date(latest).toLocaleString() : '';
+}
+
+function renderIssuerPill(entry) {
+  const issuer = entry?.issuer || entry?.provenance?.issuer;
+  if (!issuer) return '';
+  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }

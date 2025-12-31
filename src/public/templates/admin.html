@@ -147,19 +147,34 @@
 
 <section class="panel">
   <p class="eyebrow">Federation</p>
-  <h2>Outbound gossip</h2>
-  <p class="muted small">Push ledger and vote envelopes to peers on a schedule or manually.</p>
+  <h2>Gossip sync</h2>
+  <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>
   <div class="stack">
-    {{gossipSummary}}
-    {{gossipPeers}}
-  </div>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
-    <input type="hidden" name="intent" value="gossip-push" />
-    <div class="cta-row">
-      <button class="cta" type="submit">Push gossip now</button>
-      <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+    <div class="callout">
+      <p class="muted small">Outbound push</p>
+      {{gossipPushSummary}}
+      {{gossipPushPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-push" />
+        <div class="cta-row">
+          <button class="cta" type="submit">Push gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
     </div>
-  </form>
+    <div class="callout">
+      <p class="muted small">Inbound pull</p>
+      {{gossipPullSummary}}
+      {{gossipPullPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-pull" />
+        <div class="cta-row">
+          <button class="cta" type="submit">Pull gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
+    </div>
+  </div>
 </section>
 
 <section class="panel">

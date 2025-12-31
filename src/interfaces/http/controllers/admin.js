@@ -11,7 +11,8 @@ import {
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
-import { normalizePeerUrl, pushGossipNow } from '../../../modules/federation/gossip.js';
+import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
+import { normalizePeerUrl } from '../../../modules/federation/peers.js';
 import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
@@ -87,6 +88,16 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { flash: formatGossipFlash(summary), availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'gossip-pull') {
+    const summary = await pullGossipNow(state, { reason: 'admin' });
     const availableExtensions = await listAvailableExtensions(state);
     const html = await renderPage(
       'admin',
@@ -344,8 +355,10 @@ function buildAdminViewModel(
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
   const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
-  const gossipSummary = renderGossipSummary(state.gossipState);
-  const gossipPeers = renderGossipPeers(state.gossipState);
+  const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
+  const gossipPushPeers = renderGossipPeers(state.gossipState, { emptyLabel: 'No outbound peer results recorded yet.' });
+  const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
+  const gossipPullPeers = renderGossipPeers(state.gossipPullState, { emptyLabel: 'No inbound peer results recorded yet.' });
 
   return {
     circleName: effective.circleName,
@@ -407,8 +420,10 @@ function buildAdminViewModel(
     attributesPayloadValue: attributesPayloadValueRendered,
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
-    gossipSummary,
-    gossipPeers,
+    gossipPushSummary,
+    gossipPushPeers,
+    gossipPullSummary,
+    gossipPullPeers,
   };
 }
 
@@ -465,9 +480,9 @@ function renderTransactionsList(entries = []) {
   return `<ul class="stack small">${items}</ul>`;
 }
 
-function renderGossipSummary(gossipState = {}) {
+function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs yet.' } = {}) {
   if (!gossipState.lastAttemptAt) {
-    return '<p class="muted small">No outbound gossip runs yet.</p>';
+    return `<p class="muted small">${escapeHtml(emptyLabel)}</p>`;
   }
   const lines = [];
   if (gossipState.running) {
@@ -491,10 +506,10 @@ function renderGossipSummary(gossipState = {}) {
   return lines.map((line) => `<p class="muted small">${escapeHtml(line)}</p>`).join('');
 }
 
-function renderGossipPeers(gossipState = {}) {
+function renderGossipPeers(gossipState = {}, { emptyLabel = 'No peer results recorded yet.' } = {}) {
   const results = gossipState.peerResults || [];
   if (!results.length) {
-    return '<p class="muted small">No peer results recorded yet.</p>';
+    return `<p class="muted small">${escapeHtml(emptyLabel)}</p>`;
   }
   const items = results
     .slice(0, 8)
@@ -512,7 +527,13 @@ function renderGossipPeers(gossipState = {}) {
 function formatGossipStatus(status = {}) {
   if (!status) return 'unknown';
   if (status.skipped) return 'skipped';
-  if (status.ok) return status.status ? `ok (${status.status})` : 'ok';
+  if (status.ok) {
+    const added = Number.isFinite(status.added) ? status.added : null;
+    if (added !== null) {
+      return status.status ? `ok (${status.status}, +${added})` : `ok (+${added})`;
+    }
+    return status.status ? `ok (${status.status})` : 'ok';
+  }
   if (status.error) return truncateText(status.error, 80);
   if (status.status) return `status ${status.status}`;
   return 'failed';
@@ -534,18 +555,18 @@ function truncateText(value, max) {
 }
 
 function formatGossipFlash(summary) {
-  if (!summary) return 'Gossip push skipped.';
+  if (!summary) return 'Gossip sync skipped.';
   if (summary.skipped) {
-    return `Gossip push skipped (${summary.skipped}).`;
+    return `Gossip sync skipped (${summary.skipped}).`;
   }
   const ledger = summary.ledger || {};
   const votes = summary.votes || {};
   const ledgerLine = `ledger ${ledger.ok || 0}/${ledger.sent || 0} ok`;
   const votesLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
   if (summary.errors?.length) {
-    return `Gossip push completed with errors: ${ledgerLine}, ${votesLine}.`;
+    return `Gossip sync completed with errors: ${ledgerLine}, ${votesLine}.`;
   }
-  return `Gossip push complete: ${ledgerLine}, ${votesLine}.`;
+  return `Gossip sync complete: ${ledgerLine}, ${votesLine}.`;
 }
 
 function roleSelectFlags(role) {

@@ -6,23 +6,8 @@ import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
   const replication = getReplicationProfile(state);
-  const gossipState = state.gossipState || {};
-  const outboundSummary = gossipState.lastSummary
-    ? {
-        lastAttemptAt: gossipState.lastAttemptAt || null,
-        lastSuccessAt: gossipState.lastSuccessAt || null,
-        lastErrorAt: gossipState.lastErrorAt || null,
-        lastError: gossipState.lastError || null,
-        running: Boolean(gossipState.running),
-        summary: {
-          peers: gossipState.lastSummary.peers,
-          ledger: gossipState.lastSummary.ledger,
-          votes: gossipState.lastSummary.votes,
-          skipped: gossipState.lastSummary.skipped || null,
-          reason: gossipState.lastSummary.reason,
-        },
-      }
-    : null;
+  const outboundSummary = formatGossipState(state.gossipState);
+  const pullSummary = formatGossipState(state.gossipPullState);
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -48,6 +33,7 @@ export function renderHealth({ res, state }) {
     gossip: {
       ingestEnabled: isGossipEnabled(replication),
       outbound: outboundSummary,
+      pull: pullSummary,
     },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
@@ -59,4 +45,22 @@ export function renderHealth({ res, state }) {
       recent: (state.transactions || []).slice(0, 5).map((t) => ({ id: t.id, type: t.type, digest: t.digest, at: t.createdAt })),
     },
   });
+}
+
+function formatGossipState(gossipState = {}) {
+  if (!gossipState || !gossipState.lastSummary) return null;
+  return {
+    lastAttemptAt: gossipState.lastAttemptAt || null,
+    lastSuccessAt: gossipState.lastSuccessAt || null,
+    lastErrorAt: gossipState.lastErrorAt || null,
+    lastError: gossipState.lastError || null,
+    running: Boolean(gossipState.running),
+    summary: {
+      peers: gossipState.lastSummary.peers,
+      ledger: gossipState.lastSummary.ledger,
+      votes: gossipState.lastSummary.votes,
+      skipped: gossipState.lastSummary.skipped || null,
+      reason: gossipState.lastSummary.reason,
+    },
+  };
 }

@@ -23,6 +23,7 @@ function renderThreads(threads, comments, person) {
             <span class="pill">${escapeHtml(thread.topic || 'general')}</span>
             <span class="pill ghost">Article</span>
             ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderIssuerPill(thread)}
             <span class="muted small">${new Date(thread.createdAt).toLocaleString()}</span>
           </div>
           <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
@@ -56,6 +57,7 @@ function renderComments(comments) {
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
           </div>
           <p>${escapeHtml(comment.content)}</p>
@@ -64,4 +66,10 @@ function renderComments(comments) {
       `;
     })
     .join('\n');
+}
+
+function renderIssuerPill(entry) {
+  const issuer = entry?.issuer || entry?.provenance?.issuer;
+  if (!issuer) return '';
+  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
