@@ -7,7 +7,7 @@ import path from 'node:path';
 import puppeteer from 'puppeteer';
 
 import { createVerifiedSession } from './helpers/auth.js';
-import { postForm } from './helpers/http.js';
+import { fetchText, postForm } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { LATEST_SCHEMA_VERSION } from '../src/infra/persistence/migrations.js';
 
@@ -32,6 +32,11 @@ async function setSessionCookie(page, baseUrl, sessionId) {
     httpOnly: true,
     sameSite: 'Lax',
   });
+}
+
+function deriveHandle(pidHash, role = 'user') {
+  const prefix = role === 'user' || role === 'person' ? role : 'user';
+  return `${prefix}-${pidHash.slice(0, 8)}`;
 }
 
 async function expectDialog(page, action, matcher) {
@@ -234,4 +239,148 @@ test('UI renders delegation form when module enabled', { timeout: 60000 }, async
   assert.ok(form);
   const delegateField = await page.$('input[name="delegateHash"]');
   assert.ok(delegateField);
+});
+
+test('UI social feed supports follows, filters, and reshares', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const aliceSession = await createVerifiedSession(server.baseUrl, { pidHash: 'alice-ui-social' });
+  const bobSession = await createVerifiedSession(server.baseUrl, { pidHash: 'bob-ui-social' });
+  const bobHandle = deriveHandle(bobSession.pidHash);
+
+  await postForm(
+    `${server.baseUrl}/social/post`,
+    { content: 'Bob update for follow', visibility: 'public' },
+    { cookie: bobSession.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, aliceSession.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+
+  await page.type('form[action="/social/follow"] input[name="handle"]', bobHandle);
+  await page.type('form[action="/social/follow"] input[name="type"]', 'interest');
+  await page.click('form[action="/social/follow"] button[type="submit"]');
+  await page.waitForFunction((handle) => document.body.textContent.includes(handle), {}, bobHandle);
+  await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
+  await page.waitForFunction(() => document.body.textContent.includes('Follow: interest'));
+
+  await page.select('form[action="/social/feed"] select[name="type"]', 'alerts');
+  await page.click('form[action="/social/feed"] button[type="submit"]');
+  await page.waitForFunction(() => document.body.textContent.includes('No posts yet'));
+
+  await page.select('form[action="/social/feed"] select[name="type"]', 'interest');
+  await page.click('form[action="/social/feed"] button[type="submit"]');
+  await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
+
+  const reshareForm = await page.$('form[data-enhance="social-reshare"]');
+  assert.ok(reshareForm);
+  const reshareTextarea = await reshareForm.$('textarea[name="content"]');
+  if (reshareTextarea) {
+    await reshareTextarea.type('Passing this along');
+  }
+  const reshareButton = await reshareForm.$('button[type="submit"]');
+  await reshareButton.click();
+  await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
+});
+
+test('UI notifications surface mentions and persist preferences', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const authorSession = await createVerifiedSession(server.baseUrl, { pidHash: 'author-ui-note' });
+  const commenterSession = await createVerifiedSession(server.baseUrl, { pidHash: 'commenter-ui-note' });
+  const authorHandle = deriveHandle(authorSession.pidHash);
+
+  await postForm(
+    `${server.baseUrl}/petitions`,
+    { title: 'Notify Petition', summary: 'Testing notifications', body: '' },
+    { cookie: authorSession.cookie },
+  );
+
+  const { text } = await fetchText(`${server.baseUrl}/petitions`, {
+    headers: { Cookie: authorSession.cookie },
+  });
+  const petitionMatch = text.match(/id="petition-([^"]+)"/);
+  assert.ok(petitionMatch, 'expected petition id in HTML');
+  const petitionId = petitionMatch[1];
+
+  await postForm(
+    `${server.baseUrl}/petitions/comment`,
+    { petitionId, content: `@${authorHandle} Looks good.` },
+    { cookie: commenterSession.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
+  await page.goto(`${server.baseUrl}/notifications`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.body.textContent.includes('Mention in proposal'));
+
+  const initiallyChecked = await page.$eval('input[name="notifyProposalComments"]', (el) => el.checked);
+  assert.equal(initiallyChecked, true);
+
+  await page.click('input[name="notifyProposalComments"]');
+  const prefResponse = page.waitForResponse((response) => response.url().endsWith('/notifications/preferences'));
+  await page.click('form[action="/notifications/preferences"] button[type="submit"]');
+  await prefResponse;
+
+  await page.goto(`${server.baseUrl}/notifications`, { waitUntil: 'networkidle0' });
+  const checkedAfter = await page.$eval('input[name="notifyProposalComments"]', (el) => el.checked);
+  assert.equal(checkedAfter, false);
+
+  const readResponse = page.waitForResponse((response) => response.url().endsWith('/notifications/read'));
+  await page.click('form[action="/notifications/read"] button[type="submit"]');
+  await readResponse;
+  await page.waitForFunction(() =>
+    Array.from(document.querySelectorAll('span.pill.ghost')).some((el) => el.textContent.trim() === 'read'),
+  );
+});
+
+test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const memberSession = await createVerifiedSession(server.baseUrl, { pidHash: 'member-ui-group' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, memberSession.sessionId);
+  await page.goto(`${server.baseUrl}/groups`, { waitUntil: 'networkidle0' });
+
+  await page.type('form[action="/groups"] input[name="name"]', 'Energy Circle');
+  await page.type('form[action="/groups"] input[name="topics"]', 'energy,climate');
+  await page.type('form[action="/groups"] textarea[name="description"]', 'Group for UI coverage.');
+  await page.click('form[action="/groups"] button.cta[type="submit"]');
+  await page.waitForFunction(() => document.body.textContent.includes('Energy Circle'));
+
+  const leaveAction = await page.$('form[action="/groups"] input[name="action"][value="leave"]');
+  assert.ok(leaveAction);
+  const leaveForm = await leaveAction.evaluateHandle((node) => node.closest('form'));
+  const leaveButton = await leaveForm.$('button[type="submit"]');
+  await leaveButton.click();
+  await page.waitForFunction(() => document.querySelector('form[action="/groups"] input[name="action"][value="join"]'));
 });
