@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { getPerson } from '../../../modules/identity/person.js';
 import { classifyTopic } from '../../../modules/topics/classification.js';
-import { evaluateAction } from '../../../modules/circle/policy.js';
+import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
@@ -38,6 +39,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
   if (!title || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
+  const policy = getCirclePolicyState(state);
   const topic = await classifyTopic(`${title} ${content}`, state);
   const entry = {
     id: randomUUID(),
@@ -48,10 +50,17 @@ export async function postThread({ req, res, state, wantsPartial }) {
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     parentId: null,
+    policyId: policy.id,
+    policyVersion: policy.version,
   };
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
+  await logTransaction(state, {
+    type: 'forum_thread',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { threadId: entry.id, topic },
+  });
   if (wantsPartial) {
     const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum', state });
     return sendHtml(res, html);
@@ -75,6 +84,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   if (!parent) {
     return sendJson(res, 404, { error: 'thread_not_found' });
   }
+  const policy = getCirclePolicyState(state);
   const entry = {
     id: randomUUID(),
     topic: parent.topic,
@@ -84,10 +94,17 @@ export async function postComment({ req, res, state, wantsPartial }) {
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     parentId,
+    policyId: policy.id,
+    policyVersion: policy.version,
   };
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
+  await logTransaction(state, {
+    type: 'forum_comment',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { threadId: parentId },
+  });
   if (wantsPartial) {
     const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum', state });
     return sendHtml(res, html);

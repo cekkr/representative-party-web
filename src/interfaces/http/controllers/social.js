@@ -13,6 +13,7 @@ import {
 } from '../../../modules/social/followGraph.js';
 import { buildFeed, createPost, findPost } from '../../../modules/social/posts.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
@@ -121,6 +122,16 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
     });
     await persistSocialPosts(state);
     await notifySocialParticipants(state, { post, author: person, targetSession });
+    await logTransaction(state, {
+      type: 'social_post',
+      actorHash: person?.pidHash || 'anonymous',
+      payload: {
+        postId: post.id,
+        visibility: post.visibility,
+        replyTo: post.replyTo || null,
+        reshareOf: post.reshareOf || null,
+      },
+    });
   } catch (error) {
     if (error.code === 'missing_content') {
       return sendJson(res, 400, { error: 'missing_content' });
@@ -174,6 +185,11 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
     type: followType,
   });
   await persistSocialFollows(state);
+  await logTransaction(state, {
+    type: 'social_follow',
+    actorHash: person.pidHash,
+    payload: { targetHash: targetSession.pidHash, type: followType },
+  });
 
   if (wantsPartial) {
     return renderSocialFeed({ req, res, state, wantsPartial, url });
@@ -203,6 +219,11 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
     targetHash: targetSession.pidHash,
   });
   await persistSocialFollows(state);
+  await logTransaction(state, {
+    type: 'social_unfollow',
+    actorHash: person.pidHash,
+    payload: { targetHash: targetSession.pidHash },
+  });
 
   if (wantsPartial) {
     return renderSocialFeed({ req, res, state, wantsPartial, url });

@@ -1,4 +1,5 @@
 import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
+import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import {
   persistPeers,
@@ -10,7 +11,7 @@ import {
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
-import { describeProfile, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import {
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
@@ -21,7 +22,7 @@ import {
 } from '../../../modules/structure/structureManager.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
@@ -325,6 +326,9 @@ function buildAdminViewModel(
   const attributesSessionIdValue = attributesSessionId || '';
   const attributesPayloadValueRendered = attributesPayloadValue || '';
   const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
+  const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
+  const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
+  const transactionsList = renderTransactionsList(state.transactions || []);
 
   return {
     circleName: effective.circleName,
@@ -366,6 +370,8 @@ function buildAdminViewModel(
     dataAdapter: replicationProfile.adapter,
     dataValidation: replicationProfile.validationLevel,
     dataPreview: replicationProfile.allowPreviews ? 'on' : 'off',
+    ledgerHash,
+    gossipIngest,
     dataModeCentralized: dataConfig.mode === 'centralized' ? 'selected' : '',
     dataModeHybrid: dataConfig.mode === 'hybrid' ? 'selected' : '',
     dataModeP2P: dataConfig.mode === 'p2p' ? 'selected' : '',
@@ -383,6 +389,7 @@ function buildAdminViewModel(
     attributesSessionId: attributesSessionIdValue,
     attributesPayloadValue: attributesPayloadValueRendered,
     auditLog: renderAuditLog(auditEntries),
+    transactionsList,
   };
 }
 
@@ -417,6 +424,26 @@ function renderAuditLog(entries = []) {
         .join('')}
     </ul>
   `;
+}
+
+function renderTransactionsList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No transactions logged yet.</p>';
+  }
+  const items = entries
+    .slice(0, 8)
+    .map((entry) => {
+      const type = escapeHtml(String(entry.type || 'unknown'));
+      const digest = escapeHtml(String(entry.digest || '').slice(0, 12));
+      const actor = escapeHtml(String(entry.actorHash || 'anonymous').slice(0, 12));
+      const petitionId = entry.petitionId ? escapeHtml(String(entry.petitionId).slice(0, 12)) : '';
+      const time = escapeHtml(new Date(entry.createdAt || Date.now()).toLocaleString());
+      return `<li><strong>${type}</strong> ${digest ? `· ${digest}` : ''} · actor ${actor}${
+        petitionId ? ` · petition ${petitionId}` : ''
+      } <span class="muted">${time}</span></li>`;
+    })
+    .join('');
+  return `<ul class="stack small">${items}</ul>`;
 }
 
 function roleSelectFlags(role) {

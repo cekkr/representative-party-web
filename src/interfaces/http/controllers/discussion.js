@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { getPerson } from '../../../modules/identity/person.js';
 import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
@@ -28,6 +29,7 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
   const topic = sanitizeText(body.topic || 'General', 80);
   const stance = sanitizeText(body.stance || 'neutral', 40);
   const content = sanitizeText(body.content || '', 800);
+  const policy = getCirclePolicyState(state);
 
   if (!content) {
     return sendJson(res, 400, { error: 'missing_content' });
@@ -40,10 +42,17 @@ export async function postDiscussion({ req, res, state, wantsPartial }) {
     content,
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
+    policyId: policy.id,
+    policyVersion: policy.version,
   };
   const stamped = stampLocalEntry(state, entry);
   state.discussions.unshift(stamped);
   await persistDiscussions(state);
+  await logTransaction(state, {
+    type: 'discussion_post',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { discussionId: entry.id, topic, stance },
+  });
 
   if (wantsPartial) {
     const html = await renderDiscussionShell({ state, person, wantsPartial });

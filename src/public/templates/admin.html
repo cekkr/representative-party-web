@@ -7,7 +7,9 @@
     <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
     <p class="muted small">Posting gate: {{postingGate}}</p>
     <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
+    <p class="muted small">Ledger hash: {{ledgerHash}}</p>
     <p class="muted small">Data: {{dataProfile}}</p>
+    <p class="muted small">Gossip ingest: {{gossipIngest}}</p>
     <p class="muted small">Extensions: {{extensionsSummary}}</p>
     <p class="muted small">{{modulesSummary}}</p>
     <p class="muted small">Initialized: {{initialized}}</p>
@@ -204,6 +206,19 @@
   <p class="muted small">Last 10 actions are listed; older entries roll off for privacy. Includes schema and profile updates.</p>
   <div class="stack">
     {{auditLog}}
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Transactions</p>
+  <h2>Recent ledgered actions</h2>
+  <p class="muted small">Append-only log for sensitive actions (petitions, votes, delegations, social, groups). Export JSON for audits.</p>
+  <div class="stack">
+    {{transactionsList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions" target="_blank" rel="noreferrer">Open JSON log</a>
+    <a class="ghost" href="/transactions/export" target="_blank" rel="noreferrer">Export signed summary</a>
   </div>
 </section>
 

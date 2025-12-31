@@ -5,6 +5,7 @@ import { createGroup, joinGroup, leaveGroup, listGroups, setGroupDelegate } from
 import { createNotification } from '../../../modules/messaging/notifications.js';
 import { getGroupPolicy, setGroupPolicy } from '../../../modules/groups/groupPolicy.js';
 import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../../modules/groups/groupElections.js';
+import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
@@ -44,13 +45,27 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
 
   if (action === 'join') {
     const groupId = sanitizeText(body.groupId || '', 80);
-    await joinGroup({ groupId, person, state });
+    const group = await joinGroup({ groupId, person, state });
+    if (group) {
+      await logTransaction(state, {
+        type: 'group_join',
+        actorHash: person?.pidHash || 'anonymous',
+        payload: { groupId },
+      });
+    }
     return renderGroups({ req, res, state, wantsPartial });
   }
 
   if (action === 'leave') {
     const groupId = sanitizeText(body.groupId || '', 80);
-    await leaveGroup({ groupId, person, state });
+    const group = await leaveGroup({ groupId, person, state });
+    if (group) {
+      await logTransaction(state, {
+        type: 'group_leave',
+        actorHash: person?.pidHash || 'anonymous',
+        payload: { groupId },
+      });
+    }
     return renderGroups({ req, res, state, wantsPartial });
   }
 
@@ -62,7 +77,14 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     const groupId = sanitizeText(body.groupId || '', 80);
     const topic = sanitizeText(body.topic || 'general', 64);
     const candidates = (body.candidates || '').split(',').map((v) => sanitizeText(v, 80)).filter(Boolean);
-    await startElection({ groupId, topic, candidates, state });
+    const election = await startElection({ groupId, topic, candidates, state });
+    if (election) {
+      await logTransaction(state, {
+        type: 'group_election_start',
+        actorHash: person?.pidHash || 'anonymous',
+        payload: { groupId, electionId: election.id, topic, candidates: candidates.length },
+      });
+    }
     return renderGroups({ req, res, state, wantsPartial });
   }
 
@@ -71,7 +93,14 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     const candidateHash = sanitizeText(body.candidateHash || '', 80);
     const secondChoiceHash = sanitizeText(body.secondChoiceHash || '', 80);
     const thirdChoiceHash = sanitizeText(body.thirdChoiceHash || '', 80);
-    await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, secondChoiceHash, thirdChoiceHash, state });
+    const election = await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, secondChoiceHash, thirdChoiceHash, state });
+    if (election) {
+      await logTransaction(state, {
+        type: 'group_election_vote',
+        actorHash: person?.pidHash || 'anonymous',
+        payload: { electionId, candidateHash, secondChoiceHash: secondChoiceHash || null, thirdChoiceHash: thirdChoiceHash || null },
+      });
+    }
     return renderGroups({ req, res, state, wantsPartial });
   }
 
@@ -82,8 +111,9 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     }
     const electionId = sanitizeText(body.electionId || '', 80);
     const election = await closeElection({ electionId, state });
+    let winner = null;
     if (election) {
-      const winner = pickWinner(election, state);
+      winner = pickWinner(election, state);
       if (winner) {
         await setGroupDelegate({
           groupId: election.groupId,
@@ -94,6 +124,13 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
           state,
         });
       }
+    }
+    if (election) {
+      await logTransaction(state, {
+        type: 'group_election_close',
+        actorHash: person?.pidHash || 'anonymous',
+        payload: { electionId, groupId: election.groupId, winner: winner?.candidateHash || null },
+      });
     }
     return renderGroups({ req, res, state, wantsPartial });
   }
@@ -111,6 +148,11 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     type: 'group_created',
     recipientHash: person?.pidHash || 'broadcast',
     message: `Group "${group.name}" created.`,
+  });
+  await logTransaction(state, {
+    type: 'group_create',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { groupId: group.id, name: group.name },
   });
   return renderGroups({ req, res, state, wantsPartial });
 }
@@ -135,6 +177,11 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
     recipientHash: person?.pidHash || 'broadcast',
     message: `Updated delegate for topic "${topic}" in group.`,
   });
+  await logTransaction(state, {
+    type: 'group_delegate_set',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { groupId, topic, delegateHash, priority },
+  });
   return renderGroups({ req, res, state, wantsPartial });
 }
 
@@ -153,6 +200,11 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
   const conflictRule = sanitizeText(body.conflictRule || 'highest_priority', 32);
   const categoryWeighted = Boolean(body.categoryWeighted);
   await setGroupPolicy(state, { groupId, electionMode, conflictRule, categoryWeighted });
+  await logTransaction(state, {
+    type: 'group_policy_set',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { groupId, electionMode, conflictRule, categoryWeighted },
+  });
   return renderGroups({ req, res, state, wantsPartial });
 }
 
