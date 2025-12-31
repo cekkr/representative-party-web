@@ -446,11 +446,15 @@ function buildAdminViewModel(
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
   const gossipPullPeers = renderGossipPeers(state.gossipPullState, { emptyLabel: 'No inbound peer results recorded yet.' });
   const federationEnabled = isModuleEnabled(state, 'federation');
-  const gossipDisabledNote = federationEnabled
-    ? ''
-    : 'Federation module disabled. Gossip sync controls are unavailable.';
-  const gossipPushDisabledAttr = federationEnabled ? '' : 'disabled';
-  const gossipPullDisabledAttr = federationEnabled ? '' : 'disabled';
+  const gossipAllowed = federationEnabled && isGossipEnabled(replicationProfile);
+  let gossipDisabledNote = '';
+  if (!federationEnabled) {
+    gossipDisabledNote = 'Federation module disabled. Gossip sync controls are unavailable.';
+  } else if (!isGossipEnabled(replicationProfile)) {
+    gossipDisabledNote = 'Gossip ingest disabled in centralized data mode. Switch to hybrid or p2p to enable sync.';
+  }
+  const gossipPushDisabledAttr = gossipAllowed ? '' : 'disabled';
+  const gossipPullDisabledAttr = gossipAllowed ? '' : 'disabled';
   const peerHealth = listPeerHealth(state);
   const peerHealthList = renderPeerHealthList(peerHealth);
     const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);

@@ -11,6 +11,7 @@ import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess } from './quara
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './replication.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
+const SKIPPABLE_ERRORS = new Set(['module_disabled', 'gossip_disabled']);
 
 export { collectGossipPeers, normalizePeerUrl } from './peers.js';
 
@@ -213,7 +214,8 @@ async function sendPayload(peer, path, payload, timeoutMs) {
         error = null;
       }
     }
-    return { ok: response.ok, status: response.status, error: error || undefined };
+    const skipped = shouldSkipResponse(response.status, error);
+    return { ok: response.ok, status: response.status, error: error || undefined, skipped };
   } catch (error) {
     return { ok: false, error: error?.message || String(error) };
   } finally {
@@ -224,7 +226,9 @@ async function sendPayload(peer, path, payload, timeoutMs) {
 async function pullFromPeer(state, peer, { timeoutMs }) {
   const ledgerResponse = await fetchJson(`${peer}/circle/ledger`, timeoutMs);
   let ledger = { ok: false, status: ledgerResponse.status, error: ledgerResponse.error };
-  if (ledgerResponse.ok && ledgerResponse.payload) {
+  if (shouldSkipResponse(ledgerResponse.status, ledgerResponse.error)) {
+    ledger = { skipped: true, status: ledgerResponse.status, error: ledgerResponse.error };
+  } else if (ledgerResponse.ok && ledgerResponse.payload) {
     const payload = ledgerResponse.payload;
     const envelope = payload.envelope || buildEnvelopeFromPayload(payload, peer);
     if (envelope || Array.isArray(payload.entries)) {
@@ -245,7 +249,9 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   if (isModuleEnabled(state, 'votes')) {
     const votesResponse = await fetchJson(`${peer}/votes/ledger`, timeoutMs);
     votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
-    if (votesResponse.ok && votesResponse.payload) {
+    if (shouldSkipResponse(votesResponse.status, votesResponse.error)) {
+      votes = { skipped: true, status: votesResponse.status, error: votesResponse.error };
+    } else if (votesResponse.ok && votesResponse.payload) {
       const entries = Array.isArray(votesResponse.payload.entries) ? votesResponse.payload.entries : [];
       const ingest = await ingestVoteGossip({
         state,
@@ -266,7 +272,9 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   if (isModuleEnabled(state, 'federation')) {
     const transactionsResponse = await fetchJson(`${peer}/transactions/ledger`, timeoutMs);
     transactions = { ok: false, status: transactionsResponse.status, error: transactionsResponse.error };
-    if (transactionsResponse.ok && transactionsResponse.payload) {
+    if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error)) {
+      transactions = { skipped: true, status: transactionsResponse.status, error: transactionsResponse.error };
+    } else if (transactionsResponse.ok && transactionsResponse.payload) {
       const envelope = transactionsResponse.payload.envelope || transactionsResponse.payload;
       const ingest = await ingestTransactionsSummary({
         state,
@@ -337,12 +345,13 @@ async function fetchJson(url, timeoutMs) {
 }
 
 function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload }) {
+  const hasVotesPayload = Boolean(votesPayload);
   const ledger = { sent: peers.length, ok: 0, failed: 0 };
   const votes = {
-    sent: votesPayload ? peers.length : 0,
+    sent: hasVotesPayload ? peers.length : 0,
     ok: 0,
     failed: 0,
-    skipped: !votesPayload,
+    skipped: !hasVotesPayload,
     added: 0,
     updated: 0,
   };
@@ -367,6 +376,10 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
     }
 
     if (result.votes?.skipped) {
+      if (hasVotesPayload) {
+        votes.sent -= 1;
+      }
+      votes.skipped = true;
       continue;
     }
     if (result.votes?.ok) {
@@ -572,4 +585,14 @@ function describeFailure(scope, status) {
   if (status?.error) return `${scope}_${status.error}`;
   if (status?.status) return `${scope}_status_${status.status}`;
   return `${scope}_failed`;
+}
+
+function shouldSkipResponse(status, error) {
+  if (status !== 403) return false;
+  const normalized = String(error || '').trim().toLowerCase();
+  if (!normalized) return false;
+  if (SKIPPABLE_ERRORS.has(normalized)) return true;
+  if (normalized.includes('module disabled') || normalized.includes('gossip disabled')) return true;
+  if (normalized.includes('gossip ingestion is disabled')) return true;
+  return false;
 }
