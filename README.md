@@ -256,7 +256,7 @@ If you want to contribute, start by reading `AGENTS.md` and keep changes aligned
 - Liquid representation: topic-scoped delegation with revocable overrides.
 - Personalizable structure manager: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded identity) are fixed across a party ring; provider-local optional fields (contact email, personal details, notification preferences) live in a schema/data-table editor and never gossip.
 - Messaging-first adoption: discussion and notifications work alone; petitions/votes/delegation/federation are opt-in.
-- Federation resilience: peers gossip ledger/vote hashes and can quarantine toxic providers; ActivityPub actors expose public presence.
+- Federation resilience: peers gossip ledger/vote hashes, reject policy id/version mismatches, and can quarantine toxic providers (peer health visible in `/admin`); ActivityPub actors expose public presence.
 - Human-ready maintenance: small modules, plain SSR templates, env-driven knobs, documented flows.
 
 ## System map

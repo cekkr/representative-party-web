@@ -1,11 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
 import puppeteer from 'puppeteer';
 
 import { createVerifiedSession } from './helpers/auth.js';
 import { postForm } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
+import { LATEST_SCHEMA_VERSION } from '../src/infra/persistence/migrations.js';
 
 async function configurePage(page, baseUrl) {
   await page.setRequestInterception(true);
@@ -139,4 +143,74 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
 
   await guestPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
   assert.ok(await guestPage.$('[data-module-disabled="petitions"]'));
+});
+
+test('UI shows gossip controls and preview/provenance pills', { timeout: 60000 }, async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'rpw-ui-preview-'));
+  const kvFile = path.join(tempDir, 'state.json');
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const now = new Date().toISOString();
+  const seed = {
+    discussions: [
+      {
+        id: 'preview-discussion',
+        topic: 'Preview',
+        stance: 'neutral',
+        content: 'Preview content for provenance pills.',
+        authorHash: 'peer-hash',
+        createdAt: now,
+        validationStatus: 'preview',
+        issuer: 'peer-node',
+      },
+    ],
+    petitions: [
+      {
+        id: 'preview-petition',
+        title: 'Preview Petition',
+        summary: 'Preview summary',
+        body: '',
+        authorHash: 'peer-hash',
+        createdAt: now,
+        status: 'draft',
+        quorum: 0,
+        topic: 'general',
+        validationStatus: 'preview',
+        issuer: 'peer-node',
+      },
+    ],
+    settings: { initialized: true },
+    meta: { schemaVersion: LATEST_SCHEMA_VERSION, migrations: [] },
+  };
+  await writeFile(kvFile, JSON.stringify(seed, null, 2));
+
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'kv', dataMode: 'hybrid', allowPreviews: true, kvFile });
+  t.after(async () => server.stop());
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+
+  const pushDisabled = await page.$eval('button[data-gossip="push"]', (el) => el.hasAttribute('disabled'));
+  const pullDisabled = await page.$eval('button[data-gossip="pull"]', (el) => el.hasAttribute('disabled'));
+  assert.equal(pushDisabled, false);
+  assert.equal(pullDisabled, false);
+
+  await postForm(`${server.baseUrl}/admin`, { intent: 'modules' }, { partial: true });
+  await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  const pushDisabledAfter = await page.$eval('button[data-gossip="push"]', (el) => el.hasAttribute('disabled'));
+  assert.equal(pushDisabledAfter, true);
+
+  await page.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.body.textContent.includes('Preview'));
+  await page.waitForFunction(() => document.body.textContent.includes('peer-node'));
 });

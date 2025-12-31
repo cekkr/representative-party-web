@@ -9,10 +9,11 @@ import {
   persistSettings,
 } from '../../../infra/persistence/storage.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
+import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
 import { normalizePeerUrl } from '../../../modules/federation/peers.js';
+import { listPeerHealth } from '../../../modules/federation/quarantine.js';
 import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
@@ -359,6 +360,13 @@ function buildAdminViewModel(
   const gossipPushPeers = renderGossipPeers(state.gossipState, { emptyLabel: 'No outbound peer results recorded yet.' });
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
   const gossipPullPeers = renderGossipPeers(state.gossipPullState, { emptyLabel: 'No inbound peer results recorded yet.' });
+  const federationEnabled = isModuleEnabled(state, 'federation');
+  const gossipDisabledNote = federationEnabled
+    ? ''
+    : 'Federation module disabled. Gossip sync controls are unavailable.';
+  const gossipPushDisabledAttr = federationEnabled ? '' : 'disabled';
+  const gossipPullDisabledAttr = federationEnabled ? '' : 'disabled';
+  const peerHealthList = renderPeerHealthList(listPeerHealth(state));
 
   return {
     circleName: effective.circleName,
@@ -424,6 +432,10 @@ function buildAdminViewModel(
     gossipPushPeers,
     gossipPullSummary,
     gossipPullPeers,
+    gossipDisabledNote,
+    gossipPushDisabledAttr,
+    gossipPullDisabledAttr,
+    peerHealthList,
   };
 }
 
@@ -518,6 +530,26 @@ function renderGossipPeers(gossipState = {}, { emptyLabel = 'No peer results rec
       const votesStatus = formatGossipStatus(result.votes);
       return `<li><strong>${escapeHtml(result.peer)}</strong> · ledger ${escapeHtml(ledgerStatus)} · votes ${escapeHtml(
         votesStatus,
+      )}</li>`;
+    })
+    .join('');
+  return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderPeerHealthList(peerHealth = {}) {
+  const entries = Object.entries(peerHealth || {});
+  if (!entries.length) {
+    return '<p class="muted small">No peer health records yet.</p>';
+  }
+  const items = entries
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([peer, entry]) => {
+      const score = Number(entry.score) || 0;
+      const quarantined = entry.quarantineUntil && Date.parse(entry.quarantineUntil) > Date.now();
+      const status = quarantined ? `quarantined until ${formatTimestamp(entry.quarantineUntil)}` : 'active';
+      const lastFailure = entry.lastFailureReason ? `last failure: ${entry.lastFailureReason}` : 'no failures';
+      return `<li><strong>${escapeHtml(peer)}</strong> · score ${score} · ${escapeHtml(status)} · ${escapeHtml(
+        lastFailure,
       )}</li>`;
     })
     .join('');

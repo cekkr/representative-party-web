@@ -4,6 +4,7 @@ import { isModuleEnabled } from '../circle/modules.js';
 import { buildVoteEnvelope } from '../votes/voteEnvelope.js';
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
 import { collectGossipPeers } from './peers.js';
+import { isPeerQuarantined } from './quarantine.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './replication.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -32,7 +33,7 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     return summary;
   }
 
-  const peers = collectGossipPeers(state);
+  const peers = collectGossipPeers(state).filter((peer) => !isPeerQuarantined(state, peer).quarantined);
   if (!peers.length) {
     const summary = buildSkippedSummary({ reason, startedAt, finishedAt: startedAt, skip: 'no_peers' });
     state.gossipState = { ...initial, lastAttemptAt: startedAt, lastSummary: summary };
@@ -96,7 +97,7 @@ export async function pullGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     return summary;
   }
 
-  const peers = collectGossipPeers(state);
+  const peers = collectGossipPeers(state).filter((peer) => !isPeerQuarantined(state, peer).quarantined);
   if (!peers.length) {
     const summary = buildSkippedSummary({ reason, startedAt, finishedAt: startedAt, skip: 'no_peers' });
     state.gossipPullState = { ...initial, lastAttemptAt: startedAt, lastSummary: summary };
@@ -225,7 +226,12 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
     votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
     if (votesResponse.ok && votesResponse.payload) {
       const entries = Array.isArray(votesResponse.payload.entries) ? votesResponse.payload.entries : [];
-      const ingest = await ingestVoteGossip({ state, envelopes: entries, statusHint: votesResponse.payload.status });
+      const ingest = await ingestVoteGossip({
+        state,
+        envelopes: entries,
+        statusHint: votesResponse.payload.status,
+        peerHint: peer,
+      });
       votes = {
         ok: true,
         status: votesResponse.status,

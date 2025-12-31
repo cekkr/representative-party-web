@@ -31,6 +31,14 @@ export async function gossipVotes({ req, res, state }) {
   }
   const body = await readRequestBody(req);
   const envelopes = Array.isArray(body.entries) ? body.entries : [];
-  const result = await ingestVoteGossip({ state, envelopes, statusHint: body.status });
-  return sendJson(res, 200, { added: result.added, total: result.total, replication: profile });
+  const result = await ingestVoteGossip({ state, envelopes, statusHint: body.status, peerHint: body.peer });
+  const statusCode = result.statusCode || 200;
+  return sendJson(res, statusCode, {
+    added: result.added,
+    rejected: result.rejected,
+    total: result.total,
+    replication: profile,
+    errors: result.errors,
+    error: result.error,
+  });
 }

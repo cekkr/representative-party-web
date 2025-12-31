@@ -47,6 +47,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Add Puppeteer UI flows and ring gossip smoke tests to validate role gates, module toggles, and P2P consistency.
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs (discussions/forum/social/group actions plus petition signatures/comments; petitions/votes can stay disabled in messaging-only deployments).
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
+- Gate gossip ingest on policy id/version mismatches and track peer health/quarantine scoring.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
 - Federation stays stubbed (ActivityPub actor/outbox/inbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
