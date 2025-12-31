@@ -49,6 +49,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - UI copy should use “user” vs “person” labels based on Circle enforcement (person only when civic/party mode is strict).
 - Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash.
 - Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
+- Delegation UI: group recommendations show election-winner metadata so users can see why a suggestion was picked.
 
 ## Endpoints
 - `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`, `/public/*`.

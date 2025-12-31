@@ -160,6 +160,8 @@ function findLatestElectionWinner(state, group, topicKey) {
     priority: 10,
     electionId: latest.id,
     electionMethod: winner.method,
+    electionClosedAt: latest.closedAt || latest.createdAt || null,
+    electionTopic: latest.topic || topicKey,
   };
 }
 

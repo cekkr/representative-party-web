@@ -31,6 +31,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Accountability cues: show verified handle/person badge, ledger count, and Circle policy status on every page frame.
 - Error/edge flows: graceful partial responses for session issues; offline-friendly offer preview and retry CTA.
 - Actor labels: UI copy switches between “user” and “person” based on Circle enforcement (person only when civic/party mode is strict).
+- Delegation UI: show election-winner metadata next to group recommendations so users understand why a suggestion was picked.
 - Accessibility: keyboard-friendly forms, high-contrast defaults, and no client-side blocking for SSR-first paths.
 
 ## Adoption & Extension stance

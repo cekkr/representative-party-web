@@ -1,6 +1,7 @@
 import { getPerson } from '../../../modules/identity/person.js';
 import { evaluateAction } from '../../../modules/circle/policy.js';
 import { chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../../modules/delegation/delegation.js';
+import { recommendDelegationForPerson } from '../../../modules/groups/groups.js';
 import { getTopicConfig } from '../../../modules/topics/topicGardenerClient.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../../modules/topics/preferences.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
@@ -44,6 +45,13 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
     preferences: topicPreferences,
     entries: delegations,
   });
+  const suggestionTopics = topicOptions.length ? topicOptions : ['general'];
+  const delegationSuggestions = renderDelegationSuggestions({
+    person,
+    state,
+    topics: suggestionTopics,
+    delegations,
+  });
 
   const html = await renderPage(
     'delegation',
@@ -52,6 +60,7 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       roleLabel: person?.role || 'guest',
       delegationStatus: permission.allowed ? 'Delegation preferences enabled.' : permission.message || 'Delegation blocked.',
       delegationReason: permission.allowed ? '' : permission.reason,
+      delegationSuggestions,
       delegationList: renderDelegationList(delegations),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
@@ -139,4 +148,126 @@ function renderDelegationList(delegations = []) {
     })
     .join('\n');
   return `<div class="list-stack">${items}</div>`;
+}
+
+function renderDelegationSuggestions({ person, state, topics = [], delegations = [] } = {}) {
+  if (!person) {
+    return '<p class="muted">Login to see group delegate recommendations.</p>';
+  }
+  const topicList = dedupeTopics(topics);
+  if (!topicList.length) {
+    return '<p class="muted">No topic anchors yet. Add preferences to see group suggestions.</p>';
+  }
+
+  const cards = [];
+  for (const topicLabel of topicList) {
+    const topicKey = normalizeTopicKey(topicLabel);
+    const rec = recommendDelegationForPerson(person, topicKey, state);
+    if (!rec?.suggestions?.length) continue;
+    const manual = delegations.find((entry) => normalizeTopicKey(entry.topic) === topicKey);
+    cards.push(renderSuggestionCard({ topicLabel, topicKey, rec, manual }));
+  }
+
+  if (!cards.length) {
+    return '<p class="muted">No group recommendations yet.</p>';
+  }
+  return `<div class="list-stack">${cards.join('\n')}</div>`;
+}
+
+function renderSuggestionCard({ topicLabel, topicKey, rec, manual }) {
+  const conflictPill = rec.conflict ? '<span class="pill warning">Conflict</span>' : '<span class="pill ghost">Suggested</span>';
+  const manualNote = manual
+    ? `<p class="muted small">Manual override set: ${escapeHtml(manual.delegateHash)}.</p>`
+    : '';
+  const conflictNote = rec.conflict
+    ? `<p class="muted small">Conflict rule: ${escapeHtml(rec.conflictRule || 'highest_priority')}. Choose a delegate.</p>`
+    : '';
+  const rows = rec.suggestions
+    .map((suggestion) => renderSuggestionRow({ suggestion, topicKey, chosen: rec.chosen }))
+    .join('\n');
+
+  return `
+    <article class="discussion">
+      <div class="discussion__meta">
+        <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
+        ${conflictPill}
+      </div>
+      ${manualNote}
+      ${conflictNote}
+      <div class="list-stack">
+        ${rows}
+      </div>
+    </article>
+  `;
+}
+
+function renderSuggestionRow({ suggestion, topicKey, chosen }) {
+  const isChosen = chosen && chosen.delegateHash === suggestion.delegateHash;
+  const meta = formatSuggestionMeta(suggestion);
+  const chosenPill = isChosen ? '<span class="pill">Chosen</span>' : '';
+  return `
+    <div class="list-row">
+      <div>
+        <p class="small">${escapeHtml(suggestion.delegateHash)}</p>
+        <p class="muted tiny">${escapeHtml(meta)}</p>
+      </div>
+      <div>
+        ${chosenPill}
+        <form class="form-inline" method="post" action="/delegation/conflict" data-enhance="delegation-conflict">
+          <input type="hidden" name="topic" value="${escapeHtml(topicKey)}" />
+          <input type="hidden" name="delegateHash" value="${escapeHtml(suggestion.delegateHash)}" />
+          <button type="submit" class="ghost">Use delegate</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function formatSuggestionMeta(suggestion = {}) {
+  const parts = [];
+  if (suggestion.groupId) {
+    parts.push(`Group ${suggestion.groupId}`);
+  }
+  const isElection = suggestion.provider === 'group-election' || suggestion.electionId;
+  if (isElection) {
+    const electionBits = ['Election winner'];
+    if (suggestion.electionMethod) {
+      electionBits.push(`method ${suggestion.electionMethod}`);
+    }
+    if (suggestion.electionClosedAt) {
+      electionBits.push(`closed ${formatTimestamp(suggestion.electionClosedAt)}`);
+    }
+    if (suggestion.electionId) {
+      electionBits.push(`id ${String(suggestion.electionId).slice(0, 8)}`);
+    }
+    parts.push(electionBits.join(' · '));
+  } else {
+    const priority = Number.isFinite(suggestion.priority) ? suggestion.priority : 0;
+    parts.push(`Priority ${priority}`);
+    if (suggestion.provider) {
+      parts.push(`source ${suggestion.provider}`);
+    }
+  }
+  return parts.join(' · ');
+}
+
+function formatTimestamp(value) {
+  if (!value) return '';
+  const parsed = Date.parse(value);
+  if (Number.isNaN(parsed)) return '';
+  return new Date(parsed).toLocaleString();
+}
+
+function dedupeTopics(topics = []) {
+  const seen = new Set();
+  const output = [];
+  for (const topic of topics || []) {
+    const label = sanitizeText(String(topic || '').trim(), 48);
+    if (!label) continue;
+    const key = normalizeTopicKey(label);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    output.push(label);
+  }
+  return output.slice(0, 12);
 }
