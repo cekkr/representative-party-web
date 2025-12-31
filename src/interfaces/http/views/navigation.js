@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true },
   { key: 'forum', label: 'Forum', href: '/forum', partial: true },
   { key: 'petitions', label: 'Proposals/Vote', href: '/petitions', module: 'petitions', partial: true },
+  { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true },
   { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true },
   { key: 'notifications', label: 'Notifications', href: '/notifications', partial: true },
   { key: 'admin', label: 'Admin', href: '/admin', partial: true },

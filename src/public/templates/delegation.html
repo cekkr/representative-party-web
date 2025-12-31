@@ -1,0 +1,51 @@
+<section class="panel">
+  <p class="eyebrow">Delegation</p>
+  <h2>Manual delegation preferences</h2>
+  <p class="muted small">Handle: {{personHandle}} · Role: {{roleLabel}}</p>
+  <p class="muted small">{{delegationStatus}}</p>
+  <p class="muted small">{{delegationReason}}</p>
+  <div class="callout">
+    <p class="muted small">Delegations are advisory. You can override per topic at any time.</p>
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Set preference</p>
+  <h3>Pick a delegate by topic</h3>
+  <form class="stack" method="post" action="/delegation" data-enhance="delegation">
+    <input type="hidden" name="intent" value="set" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Topic</span>
+        <input name="topic" list="delegation-topics" placeholder="general" />
+      </label>
+      <label class="field">
+        <span>Delegate hash</span>
+        <input name="delegateHash" placeholder="delegate-hash" required />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save delegation</button>
+      <a class="ghost" href="/groups" data-partial>Find delegates</a>
+    </div>
+  </form>
+  <form class="stack" method="post" action="/delegation" data-enhance="delegation-clear">
+    <input type="hidden" name="intent" value="clear" />
+    <label class="field">
+      <span>Clear topic</span>
+      <input name="topic" list="delegation-topics" placeholder="general" />
+    </label>
+    <button class="ghost" type="submit">Clear delegation</button>
+  </form>
+  <datalist id="delegation-topics">
+    {{topicDatalist}}
+  </datalist>
+  <p class="muted small">Anchors: {{topicAnchors}}</p>
+  <p class="muted small">Pinned: {{topicPinned}}</p>
+  <p class="muted small">Your topics: {{topicPreferencesValue}}</p>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Current preferences</p>
+  {{delegationList}}
+</section>

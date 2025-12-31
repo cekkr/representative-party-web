@@ -57,7 +57,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - `/notifications` (GET) list internal notifications; `/notifications/read` marks all read; `/notifications/preferences` stores per-user alert toggles (proposal comments).
 - `/forum` (GET/POST) publish articles; `/forum/comment` post comments.
 - `/groups` (GET/POST) list/create/join groups; `/groups/delegate` set group-level preferred delegates.
-- `/delegation/conflict` resolve delegation conflicts by user choice.
+- `/delegation` (GET/POST) manage manual delegation preferences; `/delegation/conflict` resolve delegation conflicts by user choice.
 - `/groups` actions also start/close/vote delegate elections per topic.
 
 ## Near-term implementation focus

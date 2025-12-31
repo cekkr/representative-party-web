@@ -7,6 +7,7 @@ const BASE_ACTION_RULES = {
   post: { capability: 'canPost', minRole: 'person', requireVerification: undefined, allowGuestWhenOpen: true },
   petition: { capability: 'canPetition', minRole: 'person', requireVerification: true },
   vote: { capability: 'canVote', minRole: 'person', requireVerification: true },
+  delegate: { capability: 'canDelegate', minRole: 'person', requireVerification: true },
   moderate: { capability: 'canModerate', allowedRoles: ['moderator', 'admin'], requireVerification: true },
 };
 

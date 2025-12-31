@@ -32,6 +32,13 @@ test('delegates may petition and vote once verified', () => {
   assert.equal(evaluateAction(state, delegate, 'vote').allowed, true);
 });
 
+test('delegation action requires verification', () => {
+  const state = buildState({ requireVerification: true });
+  assert.equal(evaluateAction(state, null, 'delegate').allowed, false);
+  const person = { sessionId: 'sess-5', pidHash: 'hash-5', role: 'person', banned: false };
+  assert.equal(evaluateAction(state, person, 'delegate').allowed, true);
+});
+
 test('extensions can tighten action rules', () => {
   const extension = {
     id: 'tighten',

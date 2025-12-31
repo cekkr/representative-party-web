@@ -1,12 +1,14 @@
 import { persistDelegations } from '../../infra/persistence/storage.js';
 import { logTransaction } from '../transactions/registry.js';
+import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { recommendDelegationForPerson } from '../groups/groups.js';
 
 // Resolve delegation choice for a topic using stored delegations or extension hooks.
 export function resolveDelegation(person, topic, state, { notify } = {}) {
   if (!person || !person.pidHash) return null;
   const topicKey = normalizeTopic(topic);
-  const direct = (state.delegations || []).find(
+  const delegations = filterVisibleEntries(state.delegations || [], state);
+  const direct = delegations.find(
     (entry) => entry.ownerHash === person.pidHash && entry.topic === topicKey,
   );
   if (direct) return direct;
@@ -53,13 +55,13 @@ export async function setDelegation({ person, topic, delegateHash, provider, sta
   const filtered = (state.delegations || []).filter(
     (entry) => !(entry.ownerHash === person.pidHash && entry.topic === topicKey),
   );
-  const entry = {
+  const entry = stampLocalEntry(state, {
     ownerHash: person.pidHash,
     delegateHash,
     provider: provider || 'local',
     topic: topicKey,
     createdAt: new Date().toISOString(),
-  };
+  });
   filtered.unshift(entry);
   state.delegations = filtered;
   await persistDelegations(state);
@@ -68,6 +70,27 @@ export async function setDelegation({ person, topic, delegateHash, provider, sta
     actorHash: person.pidHash,
     payload: { topic: topicKey, delegateHash, provider },
   });
+}
+
+export async function clearDelegation({ person, topic, state }) {
+  if (!person?.pidHash) return { removed: false };
+  const topicKey = normalizeTopic(topic);
+  const before = state.delegations || [];
+  const after = before.filter((entry) => !(entry.ownerHash === person.pidHash && entry.topic === topicKey));
+  if (after.length === before.length) return { removed: false };
+  state.delegations = after;
+  await persistDelegations(state);
+  await logTransaction(state, {
+    type: 'delegation_clear',
+    actorHash: person.pidHash,
+    payload: { topic: topicKey },
+  });
+  return { removed: true };
+}
+
+export function listDelegationsForPerson(state, person) {
+  if (!person?.pidHash) return [];
+  return filterVisibleEntries(state.delegations || [], state).filter((entry) => entry.ownerHash === person.pidHash);
 }
 
 export function normalizeTopic(topic) {

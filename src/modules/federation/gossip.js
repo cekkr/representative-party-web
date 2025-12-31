@@ -53,7 +53,7 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     );
     const finishedAt = new Date().toISOString();
     summary = summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload });
-    await updatePeerHealthFromPush(state, peerResults);
+    await updatePeerHealthFromResults(state, peerResults);
     state.gossipState = updateGossipState(state.gossipState, { summary, peerResults, startedAt, finishedAt });
     return summary;
   } catch (error) {
@@ -117,6 +117,7 @@ export async function pullGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     }
     const finishedAt = new Date().toISOString();
     summary = summarizePullResults({ peerResults, peers, reason, startedAt, finishedAt });
+    await updatePeerHealthFromResults(state, peerResults);
     state.gossipPullState = updateGossipState(state.gossipPullState, { summary, peerResults, startedAt, finishedAt });
     return summary;
   } catch (error) {
@@ -427,7 +428,7 @@ function updateGossipState(current, { summary, peerResults, startedAt, finishedA
   return next;
 }
 
-async function updatePeerHealthFromPush(state, peerResults = []) {
+async function updatePeerHealthFromResults(state, peerResults = []) {
   let updated = false;
   for (const result of peerResults) {
     if (!result?.peer) continue;
