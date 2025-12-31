@@ -100,6 +100,10 @@ export async function persistTransactions(state) {
   await state.store.saveTransactions(state.transactions || []);
 }
 
+export async function persistTransactionSummaries(state) {
+  await state.store.saveTransactionSummaries(state.transactionSummaries || []);
+}
+
 function hydrateState(data) {
   const settings = data.settings || { initialized: false };
   return {
@@ -119,6 +123,7 @@ function hydrateState(data) {
     socialFollows: data.socialFollows || [],
     socialPosts: data.socialPosts || [],
     transactions: data.transactions || [],
+    transactionSummaries: data.transactionSummaries || [],
     profileStructures: data.profileStructures || [],
     profileAttributes: data.profileAttributes || [],
     settings,

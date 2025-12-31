@@ -543,12 +543,20 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
   } else if (gossipState.lastSummary) {
     const ledger = gossipState.lastSummary.ledger || {};
     const votes = gossipState.lastSummary.votes || {};
+    const transactions = gossipState.lastSummary.transactions || {};
     const voteCounts = [];
     if (Number.isFinite(votes.added) && votes.added > 0) voteCounts.push(`+${votes.added}`);
     if (Number.isFinite(votes.updated) && votes.updated > 0) voteCounts.push(`~${votes.updated}`);
     const voteTail = voteCounts.length ? ` (${voteCounts.join(', ')})` : '';
     const voteLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok${voteTail}`;
-    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok · ${voteLine}`);
+    const transactionCounts = [];
+    if (Number.isFinite(transactions.added) && transactions.added > 0) transactionCounts.push(`+${transactions.added}`);
+    if (Number.isFinite(transactions.updated) && transactions.updated > 0) transactionCounts.push(`~${transactions.updated}`);
+    const transactionTail = transactionCounts.length ? ` (${transactionCounts.join(', ')})` : '';
+    const transactionLine = transactions.skipped
+      ? 'transactions skipped'
+      : `transactions ${transactions.ok || 0}/${transactions.sent || 0} ok${transactionTail}`;
+    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok · ${voteLine} · ${transactionLine}`);
   }
   if (gossipState.lastError) {
     lines.push(`Last error: ${gossipState.lastError}`);
@@ -566,9 +574,10 @@ function renderGossipPeers(gossipState = {}, { emptyLabel = 'No peer results rec
     .map((result) => {
       const ledgerStatus = formatGossipStatus(result.ledger);
       const votesStatus = formatGossipStatus(result.votes);
+      const transactionsStatus = formatGossipStatus(result.transactions);
       return `<li><strong>${escapeHtml(result.peer)}</strong> · ledger ${escapeHtml(ledgerStatus)} · votes ${escapeHtml(
         votesStatus,
-      )}</li>`;
+      )} · transactions ${escapeHtml(transactionsStatus)}</li>`;
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
@@ -652,12 +661,16 @@ function formatGossipFlash(summary) {
   }
   const ledger = summary.ledger || {};
   const votes = summary.votes || {};
+  const transactions = summary.transactions || {};
   const ledgerLine = `ledger ${ledger.ok || 0}/${ledger.sent || 0} ok`;
   const votesLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
+  const transactionsLine = transactions.skipped
+    ? 'transactions skipped'
+    : `transactions ${transactions.ok || 0}/${transactions.sent || 0} ok`;
   if (summary.errors?.length) {
-    return `Gossip sync completed with errors: ${ledgerLine}, ${votesLine}.`;
+    return `Gossip sync completed with errors: ${ledgerLine}, ${votesLine}, ${transactionsLine}.`;
   }
-  return `Gossip sync complete: ${ledgerLine}, ${votesLine}.`;
+  return `Gossip sync complete: ${ledgerLine}, ${votesLine}, ${transactionsLine}.`;
 }
 
 function roleSelectFlags(role) {

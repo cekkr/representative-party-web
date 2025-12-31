@@ -96,6 +96,10 @@ class MemoryStateStore {
     this._data.transactions = clone(entries || []);
   }
 
+  async saveTransactionSummaries(entries) {
+    this._data.transactionSummaries = clone(entries || []);
+  }
+
   async saveSettings(settings) {
     this._data.settings = clone(settings || { initialized: false });
   }
@@ -131,6 +135,7 @@ function getEmptyData() {
     socialFollows: [],
     socialPosts: [],
     transactions: [],
+    transactionSummaries: [],
     profileStructures: [],
     profileAttributes: [],
     settings: { initialized: false },

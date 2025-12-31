@@ -45,6 +45,7 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(Array.isArray(data.socialFollows));
   assert.ok(Array.isArray(data.socialPosts));
   assert.ok(Array.isArray(data.transactions));
+  assert.ok(Array.isArray(data.transactionSummaries));
   assert.ok(Array.isArray(data.profileStructures));
   assert.ok(Array.isArray(data.profileAttributes));
   assert.deepEqual(data.settings.extensions, []);

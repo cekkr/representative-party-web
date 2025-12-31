@@ -1,7 +1,7 @@
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 14;
+export const LATEST_SCHEMA_VERSION = 15;
 
 const MIGRATIONS = [
   {
@@ -271,6 +271,16 @@ const MIGRATIONS = [
           ...settings,
           modules: normalizeModuleSettings(settings.modules || {}),
         },
+      };
+    },
+  },
+  {
+    version: 15,
+    description: 'Add transaction summary gossip scaffold.',
+    up: (data) => {
+      return {
+        ...data,
+        transactionSummaries: Array.isArray(data.transactionSummaries) ? data.transactionSummaries : [],
       };
     },
   },

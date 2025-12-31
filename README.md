@@ -120,6 +120,7 @@ Testing notes:
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts and follows
 - `/admin` settings and policy toggles, `/extensions` extension toggles
+- `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
 - `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub stubs (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`)
 
 ---
@@ -220,7 +221,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 
 - **No raw PID/PII**: persist only blinded hashes. Treat any provider‑local optional fields (email, personal details) as *local only* and never gossip them.
 - **Peers are hints, not trust anchors**: federation tooling should assume peers can be wrong or malicious; strict validation and quarantine are part of the intended hardening path.
-- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions; `/transactions` and `/transactions/export` provide JSON and signed summaries. `/health` exposes peer health summaries plus vote gossip added/updated counts for ops dashboards.
+- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts for ops dashboards.
 - **Backups**: if you run with JSON/KV storage, schedule backups of `src/data/` (or your DB/KV file), especially before migrations.
 
 ---
@@ -307,7 +308,7 @@ sequenceDiagram
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; `/notifications/preferences` stores per-user proposal comment alert preferences; backing store handled by `src/modules/messaging/notifications.js`.
 - **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, core modules (petitions/votes/delegation/groups/federation/topic gardener/social), default group policy, topic gardener, gossip sync controls, and session overrides without editing JSON.
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors and `/ap/actors/{hash}/outbox` serves per-actor posts via `src/modules/federation/activitypub.js`; `/ap/outbox` serves a global collection; `/ap/inbox` is the placeholder for inbound federation payloads.
-- **Transactions registry:** `/transactions` lists local, stamped entries for sensitive actions (petition drafts/status changes, votes, delegation overrides); `/transactions/export` emits a signed digest envelope when keys are configured for cross-provider reconciliation.
+- **Transactions registry:** `/transactions` lists local, stamped entries for sensitive actions (petition drafts/status changes, votes, delegation overrides); `/transactions/export` emits a signed digest envelope, `/transactions/ledger` serves the envelope to peers, and `/transactions/gossip` ingests summaries for cross-provider reconciliation.
 
 ## UI & templating (extension-aware)
 - SSR-first shell lives in `src/public/templates/` with `layout.html` wrapping page templates; status strip surfaces Circle enforcement + validation/preview state so users see why content is gated. Styles/JS in `src/public/app.css` and `src/public/app.js`.
@@ -317,10 +318,10 @@ sequenceDiagram
 - Extension UI hooks: use light-touch badges or info strips to signal tightened policies (extension-driven gate changes) instead of new flows; policy messages come from `circle/policy` so custom extensions display automatically. Notifications and social mentions reuse the same renderer to keep UX coherent across modules.
 
 ## Data management profiles, signing, and redundancy
-- Storage adapters: defaults live under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `social-follows.json`, `social-posts.json`, `settings.json`, `meta.json`). `adapters/memory.js` is ephemeral; `adapters/sql.js` uses SQLite (`DATA_SQLITE_URL|FILE`, needs `sqlite3`); `adapters/kv.js` stores everything in a single KV JSON file. `src/infra/persistence/storage.js` routes through `src/infra/persistence/store.js` to pick the adapter.
+- Storage adapters: defaults live under `src/data/` (`ledger.json`, `sessions.json`, `peers.json`, `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`, `groups.json`, `group-policies.json`, `group-elections.json`, `actors.json`, `social-follows.json`, `social-posts.json`, `transactions.json`, `transaction-summaries.json`, `settings.json`, `meta.json`). `adapters/memory.js` is ephemeral; `adapters/sql.js` uses SQLite (`DATA_SQLITE_URL|FILE`, needs `sqlite3`); `adapters/kv.js` stores everything in a single KV JSON file. `src/infra/persistence/storage.js` routes through `src/infra/persistence/store.js` to pick the adapter.
 - Data management priorities: provider-local contact fields stay local (no gossip), previews are gated by `DATA_PREVIEW` + validation level, redundancy is chosen via `DATA_MODE` (centralized/hybrid/p2p) and adapter, and signatures/validation state decide what can be rendered or replicated.
-- Main transactions registry: append-only log (type, petitionId, actorHash, digest) stored locally in `transactions.json` (or adapter equivalent) for sensitive operations (e.g., petition drafts, votes). Entries are stamped with issuer/mode/adapter and validation status; `/transactions` exposes recent entries for audit, `/health` surfaces counts/digests.
-- Transactions export: `/transactions/export` emits a summary envelope (issuer/mode/adapter, digests) signed when `CIRCLE_PRIVATE_KEY` is set so peers can reconcile against envelopes; use gossip carefully with strict validation.
+- Main transactions registry: append-only log (type, petitionId, actorHash, digest) stored locally in `transactions.json` (or adapter equivalent) for sensitive operations (e.g., petition drafts, votes). Entries are stamped with issuer/mode/adapter and validation status; `/transactions` exposes recent entries for audit, `/health` surfaces counts/digests plus summary gossip totals.
+- Transactions summary gossip: `/transactions/export` emits a summary envelope (issuer/mode/adapter, digests) signed when `CIRCLE_PRIVATE_KEY` is set; `/transactions/ledger` serves the envelope to peers and `/transactions/gossip` ingests summary envelopes into `transaction-summaries.json` for reconciliation. Use gossip carefully with strict validation.
 - Centralized profile: `DATA_MODE=centralized` with any adapter; gossip is off (no ingest), all writes go to the chosen store. Best for single-provider deployments and local dev. Back up `src/data/` (or the DB/KV file) regularly.
 - Hybrid profile: `DATA_MODE=hybrid` keeps a canonical adapter (JSON/SQL/KV) while accepting gossip for redundancy/audit. Pair with `DATA_VALIDATION_LEVEL=observe|strict` to decide if gossip is stored as preview or rejected; `DATA_PREVIEW=true` allows staging until validated. Control push/pull frequency with `GOSSIP_INTERVAL_SECONDS`.
 - P2P profile: `DATA_MODE=p2p` treats gossip as primary, with an optional local cache. Combine with `DATA_PREVIEW=false` and `DATA_VALIDATION_LEVEL=strict` to only accept signed, validated envelopes. Peers listed in `/circle/peers` seed synchronization; replication logic lives in `src/modules/federation/replication.js`.

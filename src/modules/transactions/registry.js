@@ -5,6 +5,7 @@ import { ISSUER } from '../../config.js';
 import { persistTransactions } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { getReplicationProfile } from '../federation/replication.js';
+import { getEffectivePolicy } from '../circle/policy.js';
 
 export function hashPayload(payload) {
   const serialized = JSON.stringify(payload || {});
@@ -37,7 +38,10 @@ export function listTransactions(state, { type, limit = 50 } = {}) {
 
 export function exportTransactionsEnvelope(state, { limit = 100 } = {}) {
   const profile = getReplicationProfile(state);
+  const policy = getEffectivePolicy(state);
   const entries = listTransactions(state, { limit });
+  const hasPreview = entries.some((entry) => entry.validationStatus === 'preview');
+  const status = hasPreview ? 'preview' : 'validated';
   const digestList = entries.map((t) => t.digest);
   const summary = hashPayload({ digests: digestList, issuer: state.issuer || ISSUER });
   const payload = {
@@ -45,6 +49,11 @@ export function exportTransactionsEnvelope(state, { limit = 100 } = {}) {
     issuer: state.issuer || ISSUER,
     issuedAt: new Date().toISOString(),
     profile,
+    policy: {
+      id: policy.id,
+      version: policy.version,
+    },
+    status,
     summary,
     entries: entries.map((t) => ({
       id: t.id,

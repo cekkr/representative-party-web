@@ -109,4 +109,17 @@ test('p2p ring gossips ledger and votes without conflicts', { timeout: 90000 }, 
   const voteRepeat = await postJson(`${nodeB.baseUrl}/votes/gossip`, { entries: voteExport.entries });
   const voteRepeatPayload = await voteRepeat.json();
   assert.equal(voteRepeatPayload.added, 0);
+
+  const { payload: txExport } = await fetchJson(`${nodeA.baseUrl}/transactions/ledger`);
+  const txGossipB = await postJson(`${nodeB.baseUrl}/transactions/gossip`, { envelope: txExport.envelope });
+  const txPayloadB = await txGossipB.json();
+  const txGossipC = await postJson(`${nodeC.baseUrl}/transactions/gossip`, { envelope: txExport.envelope });
+  const txPayloadC = await txGossipC.json();
+  assert.equal(txPayloadB.added, 1);
+  assert.equal(txPayloadC.added, 1);
+
+  const { payload: healthBTx } = await fetchJson(`${nodeB.baseUrl}/health`);
+  const { payload: healthCTx } = await fetchJson(`${nodeC.baseUrl}/health`);
+  assert.equal(healthBTx.transactions.summaries, 1);
+  assert.equal(healthCTx.transactions.summaries, 1);
 });

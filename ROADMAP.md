@@ -50,6 +50,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs (discussions/forum/social/group actions plus petition signatures/comments; petitions/votes can stay disabled in messaging-only deployments).
 - Expose manual delegation preferences (per-topic overrides) alongside conflict resolution so recommendations remain non-binding.
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
+- Add transactions summary gossip endpoints (`/transactions/ledger`, `/transactions/gossip`) to exchange signed audit digests for cross-provider reconciliation.
 - Gate gossip ingest on policy id/version mismatches and track peer health/quarantine scoring.
 - Expose peer health summaries plus vote gossip updated counts in `/health` and reset actions in `/admin` for ops workflows.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.

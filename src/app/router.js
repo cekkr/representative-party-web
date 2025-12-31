@@ -29,7 +29,7 @@ import {
   unfollowHandle,
   listRelationships,
 } from '../interfaces/http/controllers/social.js';
-import { renderTransactions, exportTransactions } from '../interfaces/http/controllers/transactions.js';
+import { renderTransactions, exportTransactions, exportTransactionsLedger, gossipTransactions } from '../interfaces/http/controllers/transactions.js';
 import { sendNotFound } from '../shared/utils/http.js';
 
 const routes = [
@@ -77,6 +77,8 @@ const routes = [
   { method: 'GET', path: '/admin/audit', action: exportAuditLog },
   { method: 'GET', path: '/transactions', action: renderTransactions },
   { method: 'GET', path: '/transactions/export', action: exportTransactions },
+  { method: 'GET', path: '/transactions/ledger', action: exportTransactionsLedger },
+  { method: 'POST', path: '/transactions/gossip', action: gossipTransactions },
   {
     method: 'GET',
     prefix: '/ap/actors/',
