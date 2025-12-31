@@ -39,6 +39,7 @@ This project takes the opposite stance:
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals, signatures/quorum, deliberation feed, vote envelopes (signable).
 - **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, and group actions with exportable summaries.
+- **Identity throttles**: per-handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Federation stubs + redundancy knobs**: gossip endpoints and signed envelopes for auditability.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
@@ -119,7 +120,7 @@ Testing notes:
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts and follows
-- `/admin` settings and policy toggles, `/extensions` extension toggles
+- `/admin` settings, policy toggles, rate‑limit overrides, and audit summaries; `/extensions` extension toggles
 - `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
 - `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub stubs (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`)
 
@@ -200,6 +201,7 @@ This allows deployments to experiment with helpers (topic gardeners, classificat
   - `DATA_ADAPTER` (`json|memory|sql|kv`)
   - `DATA_VALIDATION_LEVEL` (`strict|observe|off`)
   - `DATA_PREVIEW` (`true|false`)
+- Rate limits: per-action overrides via `/admin` (stored in `settings.rateLimits`)
   - SQL: `DATA_SQLITE_URL` / `DATA_SQLITE_FILE`
   - KV: `DATA_KV_FILE`
 

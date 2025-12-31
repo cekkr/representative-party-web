@@ -17,7 +17,7 @@ import { startElection, listElections, castElectionVote, pickWinner, closeElecti
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -296,29 +296,38 @@ function renderGroupList(groups, person) {
       const member = person?.pidHash ? group.members?.includes(person.pidHash) : false;
       const policy = group.policy || {};
       const delegates = (group.delegates || [])
-        .map((d) => `<li>${d.topic} → ${d.delegateHash} (prio ${d.priority})</li>`)
+        .map((d) => {
+          const topic = escapeHtml(String(d.topic || 'general'));
+          const delegate = escapeHtml(String(d.delegateHash || 'unknown'));
+          const priority = Number(d.priority) || 0;
+          return `<li>${topic} → ${delegate} (prio ${priority})</li>`;
+        })
         .join('');
       const elections = renderElections(group.elections || [], person);
+      const topicLabel = group.topics?.length ? escapeHtml(group.topics.join(', ')) : 'general';
+      const name = escapeHtml(group.name || 'Group');
+      const description = escapeHtml(group.description || '');
+      const groupId = escapeHtml(group.id || '');
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">Group</span>
             ${group.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
-            <span class="muted small">${group.topics?.join(', ') || 'general'}</span>
+            <span class="muted small">${topicLabel}</span>
           </div>
-          <h3>${group.name}</h3>
-          <p>${group.description}</p>
+          <h3>${name}</h3>
+          <p>${description}</p>
           <p class="muted small">Members: ${group.members?.length || 0}</p>
           <div class="muted small">Delegates:<ul>${delegates || '<li>None</li>'}</ul></div>
           <form class="form-inline" method="post" action="/groups" data-enhance="groups">
-            <input type="hidden" name="groupId" value="${group.id}" />
+            <input type="hidden" name="groupId" value="${groupId}" />
             <input type="hidden" name="action" value="${member ? 'leave' : 'join'}" />
             <button type="submit" class="ghost">${member ? 'Leave' : 'Join'}</button>
           </form>
           <details class="note">
             <summary>Group policy</summary>
             <form class="form-inline" method="post" action="/groups/policy" data-enhance="groups">
-              <input type="hidden" name="groupId" value="${group.id}" />
+              <input type="hidden" name="groupId" value="${groupId}" />
               <label>Election mode
                 <select name="electionMode">
                   <option value="priority" ${policy.electionMode === 'priority' ? 'selected' : ''}>Priority</option>
@@ -341,7 +350,7 @@ function renderGroupList(groups, person) {
           <details class="note">
             <summary>Set preferred delegate</summary>
             <form class="form-inline" method="post" action="/groups/delegate" data-enhance="groups">
-              <input type="hidden" name="groupId" value="${group.id}" />
+              <input type="hidden" name="groupId" value="${groupId}" />
               <label>Topic <input name="topic" placeholder="general" /></label>
               <label>Delegate hash <input name="delegateHash" placeholder="delegate-hash" required /></label>
               <label>Priority <input name="priority" type="number" value="0" size="4" /></label>
@@ -352,7 +361,7 @@ function renderGroupList(groups, person) {
             <summary>Delegate election</summary>
             <form class="stack" method="post" action="/groups" data-enhance="groups">
               <input type="hidden" name="action" value="startElection" />
-              <input type="hidden" name="groupId" value="${group.id}" />
+              <input type="hidden" name="groupId" value="${groupId}" />
               <label class="field">
                 <span>Topic</span>
                 <input name="topic" placeholder="energy" />
@@ -376,29 +385,41 @@ function renderElections(elections, person) {
   return elections
     .map((election) => {
       const tally = election.votes || [];
+      const previewPill = election.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const issuerPill = renderIssuerPill(election);
+      const topicLabel = escapeHtml(election.topic || 'general');
+      const statusLabel = escapeHtml(election.status || 'open');
+      const electionId = escapeHtml(election.id || '');
+      const candidates = (election.candidates || []).map((c) => escapeHtml(String(c)));
       return `
         <div class="muted small">
-          <p>Election ${election.topic} · Status: ${election.status}</p>
+          <div class="discussion__meta">
+            <span class="pill ghost">Election</span>
+            <span class="pill">${topicLabel}</span>
+            ${previewPill}
+            ${issuerPill}
+            <span class="muted tiny">Status: ${statusLabel}</span>
+          </div>
           ${
             election.status === 'open'
               ? `
             <form class="form-inline" method="post" action="/groups" data-enhance="groups">
               <input type="hidden" name="action" value="voteElection" />
-              <input type="hidden" name="electionId" value="${election.id}" />
+              <input type="hidden" name="electionId" value="${electionId}" />
               <select name="candidateHash">
-                ${election.candidates
+                ${candidates
                   .map((c) => `<option value="${c}">${c}</option>`)
                   .join('')}
               </select>
               <select name="secondChoiceHash">
                 <option value="">Second choice (optional)</option>
-                ${election.candidates
+                ${candidates
                   .map((c) => `<option value="${c}">${c}</option>`)
                   .join('')}
               </select>
               <select name="thirdChoiceHash">
                 <option value="">Third choice (optional)</option>
-                ${election.candidates
+                ${candidates
                   .map((c) => `<option value="${c}">${c}</option>`)
                   .join('')}
               </select>
@@ -406,7 +427,7 @@ function renderElections(elections, person) {
             </form>
             <form class="form-inline" method="post" action="/groups" data-enhance="groups">
               <input type="hidden" name="action" value="closeElection" />
-              <input type="hidden" name="electionId" value="${election.id}" />
+              <input type="hidden" name="electionId" value="${electionId}" />
               <button type="submit" class="ghost">Close and pick winner</button>
             </form>
           `
@@ -417,4 +438,10 @@ function renderElections(elections, person) {
       `;
     })
     .join('\n');
+}
+
+function renderIssuerPill(entry) {
+  const issuer = entry?.issuer || entry?.provenance?.issuer;
+  if (!issuer) return '';
+  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }

@@ -19,7 +19,13 @@ import { listAvailableExtensions } from '../../../modules/extensions/registry.js
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
 import { normalizePeerUrl } from '../../../modules/federation/peers.js';
 import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../../modules/federation/quarantine.js';
-import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import {
+  describeProfile,
+  filterVisibleEntries,
+  getReplicationProfile,
+  isGossipEnabled,
+} from '../../../modules/federation/replication.js';
+import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
 import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
   describeCanonicalProfile,
@@ -84,6 +90,16 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'modules') {
     const result = await updateModules(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'rate-limits') {
+    const result = await updateRateLimits(state, body);
     const availableExtensions = await listAvailableExtensions(state);
     const html = await renderPage(
       'admin',
@@ -352,9 +368,49 @@ async function updateModules(state, body) {
   return { flash: 'Module toggles updated. Reload to refresh navigation.' };
 }
 
+async function updateRateLimits(state, body) {
+  const raw = body.rateLimitOverrides ?? '';
+  const { overrides, errors } = parseRateLimitOverrides(raw);
+  const hasOverrides = Object.keys(overrides).length > 0;
+
+  if (!hasOverrides && errors.length) {
+    return {
+      flash: 'Rate limits not saved. Fix the errors below.',
+      rateLimitOverridesValue: String(raw || ''),
+      rateLimitErrors: renderRateLimitErrors(errors),
+    };
+  }
+
+  state.settings = { ...(state.settings || {}), rateLimits: overrides };
+  recordAdminAudit(state, {
+    action: 'rate_limits.update',
+    summary: `overrides=${Object.keys(overrides).length}`,
+  });
+  await persistSettings(state);
+
+  const flash = errors.length
+    ? `Rate limits saved with warnings (${errors.length} entries ignored).`
+    : 'Rate limits saved.';
+
+  return {
+    flash,
+    rateLimitOverridesValue: formatRateLimitOverrides(overrides),
+    rateLimitErrors: renderRateLimitErrors(errors),
+  };
+}
+
 function buildAdminViewModel(
   state,
-  { flash, sessionForm = {}, availableExtensions = [], providerFieldsValue, attributesSessionId, attributesPayloadValue } = {},
+  {
+    flash,
+    sessionForm = {},
+    availableExtensions = [],
+    providerFieldsValue,
+    attributesSessionId,
+    attributesPayloadValue,
+    rateLimitOverridesValue,
+    rateLimitErrors,
+  } = {},
 ) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
@@ -382,6 +438,9 @@ function buildAdminViewModel(
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
   const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
+  const transactionSummariesList = renderTransactionSummariesList(
+    filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),
+  );
   const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
   const gossipPushPeers = renderGossipPeers(state.gossipState, { emptyLabel: 'No outbound peer results recorded yet.' });
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
@@ -397,6 +456,9 @@ function buildAdminViewModel(
     const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);
     const peerHealthCount = Object.keys(peerHealth || {}).length;
     const peerHealthResetDisabledAttr = peerHealthCount ? '' : 'disabled';
+  const rateLimitOverrides = rateLimitOverridesValue ?? formatRateLimitOverrides(state.settings?.rateLimits || {});
+  const rateLimitDefaults = renderRateLimitDefaults(DEFAULT_RATE_LIMITS);
+  const rateLimitErrorsRendered = rateLimitErrors || '';
 
   return {
     circleName: effective.circleName,
@@ -459,6 +521,7 @@ function buildAdminViewModel(
     attributesPayloadValue: attributesPayloadValueRendered,
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
+    transactionSummariesList,
     gossipPushSummary,
     gossipPushPeers,
     gossipPullSummary,
@@ -470,6 +533,9 @@ function buildAdminViewModel(
     peerHealthOptions,
     peerHealthResetDisabledAttr,
     peerHealthCount,
+    rateLimitOverridesValue: rateLimitOverrides,
+    rateLimitDefaults,
+    rateLimitErrors: rateLimitErrorsRendered,
   };
 }
 
@@ -524,6 +590,160 @@ function renderTransactionsList(entries = []) {
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderTransactionSummariesList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No inbound summaries yet.</p>';
+  }
+  const items = entries
+    .map((entry) => {
+      const issuer = escapeHtml(String(entry.issuer || 'unknown'));
+      const summary = escapeHtml(String(entry.summary || '').slice(0, 12));
+      const policyLabel = entry.policy?.id ? `${entry.policy.id} v${entry.policy.version}` : 'policy unknown';
+      const profileLabel = entry.profile?.mode ? `${entry.profile.mode}/${entry.profile.adapter || ''}` : 'profile unknown';
+      const countLabel = Number.isFinite(entry.entryCount) ? `${entry.entryCount} digests` : 'digest count unknown';
+      const receivedAt = escapeHtml(
+        new Date(entry.receivedAt || entry.issuedAt || Date.now()).toLocaleString(),
+      );
+      const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const signaturePill = entry.verification?.skipped ? '<span class="pill ghost">unsigned</span>' : '';
+      const peerLabel = entry.peer ? `Peer ${escapeHtml(String(entry.peer))}` : '';
+      return `
+        <div class="list-row">
+          <div>
+            <p class="small">${issuer} · ${summary || 'summary'}</p>
+            <p class="muted tiny">${escapeHtml(countLabel)} · ${escapeHtml(policyLabel)} · ${escapeHtml(profileLabel)}</p>
+            ${peerLabel ? `<p class="muted tiny">${peerLabel}</p>` : ''}
+          </div>
+          <div>
+            ${previewPill}
+            ${signaturePill}
+            <span class="muted tiny">${receivedAt}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join('\n');
+  return `<div class="list-stack">${items}</div>`;
+}
+
+function renderRateLimitDefaults(defaults = {}) {
+  const entries = Object.entries(defaults || {}).sort((a, b) => a[0].localeCompare(b[0]));
+  if (!entries.length) return '<p class="muted small">No defaults available.</p>';
+  const items = entries
+    .map(([key, limit]) => {
+      const windowSeconds = Math.round((limit.windowMs || 0) / 1000);
+      return `<li><strong>${escapeHtml(key)}</strong> — ${limit.max} per ${windowSeconds}s</li>`;
+    })
+    .join('');
+  return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderRateLimitErrors(errors = []) {
+  if (!errors || !errors.length) return '';
+  const items = errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('');
+  return `<ul class="stack small">${items}</ul>`;
+}
+
+function formatRateLimitOverrides(overrides = {}) {
+  const entries = Object.entries(overrides || {}).sort((a, b) => a[0].localeCompare(b[0]));
+  if (!entries.length) return '';
+  return entries
+    .map(([key, limit]) => {
+      const windowSeconds = Math.round((limit.windowMs || 0) / 1000);
+      return `${key}:${windowSeconds}:${limit.max}`;
+    })
+    .join('\n');
+}
+
+function parseRateLimitOverrides(raw) {
+  const text = raw === undefined || raw === null ? '' : String(raw).trim();
+  const overrides = {};
+  const errors = [];
+  if (!text) return { overrides, errors };
+
+  const parsed = tryParseJson(text);
+  if (parsed && typeof parsed === 'object') {
+    if (Array.isArray(parsed)) {
+      for (const entry of parsed) {
+        const key = sanitizeText(entry?.key || '', 64).toLowerCase();
+        if (!key) {
+          errors.push('Rate limit entry missing key.');
+          continue;
+        }
+        const normalized = normalizeLimit(entry);
+        if (!normalized) {
+          errors.push(`Rate limit "${key}" is invalid.`);
+          continue;
+        }
+        overrides[key] = normalized;
+      }
+      return { overrides, errors };
+    }
+    for (const [keyRaw, value] of Object.entries(parsed)) {
+      const key = sanitizeText(keyRaw, 64).toLowerCase();
+      if (!key) {
+        errors.push('Rate limit entry missing key.');
+        continue;
+      }
+      const normalized = normalizeLimit(value);
+      if (!normalized) {
+        errors.push(`Rate limit "${key}" is invalid.`);
+        continue;
+      }
+      overrides[key] = normalized;
+    }
+    return { overrides, errors };
+  }
+
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    const parsedLine = parseRateLimitLine(line);
+    if (!parsedLine) {
+      errors.push(`Invalid rate limit line: "${line}". Expected key:windowSeconds:max.`);
+      continue;
+    }
+    const { key, windowSeconds, max } = parsedLine;
+    const normalized = normalizeLimit({ windowSeconds, max });
+    if (!normalized) {
+      errors.push(`Rate limit "${key}" is invalid.`);
+      continue;
+    }
+    overrides[key] = normalized;
+  }
+  return { overrides, errors };
+}
+
+function parseRateLimitLine(line) {
+  const parts = line.split(':').map((part) => part.trim());
+  if (parts.length < 3) {
+    return null;
+  }
+  const key = sanitizeText(parts[0], 64).toLowerCase();
+  const windowSeconds = parseRateNumber(parts[1]);
+  const max = parseRateNumber(parts[2]);
+  if (!key || !Number.isFinite(windowSeconds) || !Number.isFinite(max)) return null;
+  return { key, windowSeconds, max };
+}
+
+function parseRateNumber(value) {
+  if (value === undefined || value === null) return NaN;
+  const text = String(value).trim().toLowerCase();
+  if (!text) return NaN;
+  const cleaned = text.replace(/seconds?|secs?|s$/g, '');
+  return Number(cleaned);
+}
+
+function tryParseJson(text) {
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    return null;
+  }
 }
 
 function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs yet.' } = {}) {

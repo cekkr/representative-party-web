@@ -215,6 +215,30 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Rate limits</p>
+  <h2>Identity throttles</h2>
+  <p class="muted small">Throttle write-heavy actions per verified handle/session (IP fallback) to curb spam without CAPTCHA.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="rate-limits" />
+    <label class="field">
+      <span>Overrides (key:windowSeconds:max)</span>
+      <textarea name="rateLimitOverrides" rows="5" placeholder="discussion_post:60:6">{{rateLimitOverridesValue}}</textarea>
+    </label>
+    <p class="muted small">JSON object or one entry per line. Leave blank to clear overrides.</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save rate limits</button>
+    </div>
+  </form>
+  <div class="stack">
+    {{rateLimitErrors}}
+  </div>
+  <div class="callout">
+    <p class="muted small">Defaults</p>
+    {{rateLimitDefaults}}
+  </div>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Structure manager</p>
   <h2>Profile schema (canonical + provider-local)</h2>
   <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
@@ -274,6 +298,18 @@
   <div class="cta-row">
     <a class="ghost" href="/transactions" target="_blank" rel="noreferrer">Open JSON log</a>
     <a class="ghost" href="/transactions/export" target="_blank" rel="noreferrer">Export signed summary</a>
+  </div>
+</section>
+
+<section class="panel">
+  <p class="eyebrow">Transactions gossip</p>
+  <h2>Inbound summaries</h2>
+  <p class="muted small">Signed summaries received from peers (digest lists + policy/profile).</p>
+  <div class="stack">
+    {{transactionSummariesList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions/ledger" target="_blank" rel="noreferrer">Open local summary feed</a>
   </div>
 </section>
 

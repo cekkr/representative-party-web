@@ -133,6 +133,8 @@ function renderDelegationList(delegations = []) {
   const items = delegations
     .map((entry) => {
       const createdAt = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+      const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const issuerPill = renderIssuerPill(entry);
       return `
         <div class="list-row">
           <div>
@@ -141,6 +143,8 @@ function renderDelegationList(delegations = []) {
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(entry.provider || 'manual')}</span>
+            ${previewPill}
+            ${issuerPill}
             ${createdAt ? `<span class="muted tiny">${createdAt}</span>` : ''}
           </div>
         </div>
@@ -270,4 +274,10 @@ function dedupeTopics(topics = []) {
     output.push(label);
   }
   return output.slice(0, 12);
+}
+
+function renderIssuerPill(entry) {
+  const issuer = entry?.issuer || entry?.provenance?.issuer;
+  if (!issuer) return '';
+  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }

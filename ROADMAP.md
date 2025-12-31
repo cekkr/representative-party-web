@@ -51,8 +51,10 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Expose manual delegation preferences (per-topic overrides) alongside conflict resolution so recommendations remain non-binding.
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
 - Add transactions summary gossip endpoints (`/transactions/ledger`, `/transactions/gossip`) to exchange signed audit digests for cross-provider reconciliation.
+- Surface inbound transaction summaries in `/admin` so operators can verify gossip reconciliation at a glance.
 - Gate gossip ingest on policy id/version mismatches and track peer health/quarantine scoring.
 - Expose peer health summaries plus vote gossip updated counts in `/health` and reset actions in `/admin` for ops workflows.
+- Identity-based rate limiting (per handle/session with IP fallback) configured in `/admin` to avoid CAPTCHA.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
 - Federation stays stubbed (ActivityPub actor/outbox/inbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
