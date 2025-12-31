@@ -178,6 +178,24 @@
     <div class="callout">
       <p class="muted small">Peer health</p>
       {{peerHealthList}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <label class="field">
+          <span>Reset peer health entry</span>
+          <select name="peerKey">
+            {{peerHealthOptions}}
+          </select>
+        </label>
+        <div class="cta-row">
+          <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset selected</button>
+          <span class="muted small">Entries: {{peerHealthCount}}</span>
+        </div>
+      </form>
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <input type="hidden" name="resetAll" value="true" />
+        <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset all peer health</button>
+      </form>
     </div>
   </div>
 </section>

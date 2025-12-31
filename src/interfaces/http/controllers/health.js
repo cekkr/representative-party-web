@@ -1,6 +1,7 @@
 import { POLICIES } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { sendJson } from '../../../shared/utils/http.js';
 
@@ -8,6 +9,7 @@ export function renderHealth({ res, state }) {
   const replication = getReplicationProfile(state);
   const outboundSummary = formatGossipState(state.gossipState);
   const pullSummary = formatGossipState(state.gossipPullState);
+  const peerHealthSummary = summarizePeerHealth(listPeerHealth(state), { limit: 20 });
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -34,6 +36,7 @@ export function renderHealth({ res, state }) {
       ingestEnabled: isGossipEnabled(replication),
       outbound: outboundSummary,
       pull: pullSummary,
+      peerHealth: peerHealthSummary,
     },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,

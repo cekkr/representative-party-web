@@ -73,6 +73,55 @@ export function listPeerHealth(state) {
   return state?.settings?.peerHealth || {};
 }
 
+export function resetPeerHealth(state, peerKey) {
+  if (!state?.settings?.peerHealth) return { updated: false };
+  const key = resolvePeerKey(peerKey);
+  if (!key) return { updated: false };
+  if (!Object.prototype.hasOwnProperty.call(state.settings.peerHealth, key)) {
+    return { updated: false };
+  }
+  const next = { ...state.settings.peerHealth };
+  delete next[key];
+  state.settings.peerHealth = next;
+  return { updated: true, removed: key };
+}
+
+export function clearPeerHealth(state) {
+  if (!state?.settings?.peerHealth) return { updated: false, removed: [] };
+  const keys = Object.keys(state.settings.peerHealth);
+  if (!keys.length) return { updated: false, removed: [] };
+  state.settings.peerHealth = {};
+  return { updated: true, removed: keys };
+}
+
+export function summarizePeerHealth(peerHealth = {}, { limit = 20, now = Date.now() } = {}) {
+  const entries = Object.entries(peerHealth || {}).map(([peer, entry]) => {
+    const score = Number(entry.score) || 0;
+    const quarantineUntil = entry.quarantineUntil || null;
+    const quarantined = quarantineUntil ? Date.parse(quarantineUntil) > now : false;
+    return {
+      peer,
+      score,
+      quarantined,
+      quarantineUntil,
+      strikes: Number(entry.strikes) || 0,
+      successes: Number(entry.successes) || 0,
+      lastFailureAt: entry.lastFailureAt || null,
+      lastFailureReason: entry.lastFailureReason || null,
+      lastSuccessAt: entry.lastSuccessAt || null,
+    };
+  });
+  const quarantinedCount = entries.filter((entry) => entry.quarantined).length;
+  const worstScore = entries.length ? Math.min(...entries.map((entry) => entry.score)) : 0;
+  entries.sort((a, b) => a.score - b.score || a.peer.localeCompare(b.peer));
+  return {
+    total: entries.length,
+    quarantined: quarantinedCount,
+    worstScore,
+    entries: entries.slice(0, limit),
+  };
+}
+
 function normalizePeerEntry(entry) {
   if (!entry) {
     return {

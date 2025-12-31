@@ -13,7 +13,7 @@ import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeMod
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
 import { normalizePeerUrl } from '../../../modules/federation/peers.js';
-import { listPeerHealth } from '../../../modules/federation/quarantine.js';
+import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../../modules/federation/quarantine.js';
 import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
@@ -103,6 +103,25 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const html = await renderPage(
       'admin',
       buildAdminViewModel(state, { flash: formatGossipFlash(summary), availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'peer-health-reset') {
+    const resetAll = parseBoolean(body.resetAll, false);
+    const peerKey = sanitizeText(body.peerKey || '', 200);
+    const result = resetAll ? clearPeerHealth(state) : resetPeerHealth(state, peerKey);
+    let flash = 'Peer health reset skipped.';
+    if (result.updated) {
+      const summary = resetAll ? 'all peers' : `peer=${result.removed}`;
+      recordAdminAudit(state, { action: 'peer.health.reset', summary });
+      await persistSettings(state);
+      flash = resetAll ? 'Peer health reset for all peers.' : `Peer health reset for ${result.removed}.`;
+    }
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { flash, availableExtensions }),
       { wantsPartial, title: 'Admin · Circle Settings', state },
     );
     return sendHtml(res, html);
@@ -366,7 +385,11 @@ function buildAdminViewModel(
     : 'Federation module disabled. Gossip sync controls are unavailable.';
   const gossipPushDisabledAttr = federationEnabled ? '' : 'disabled';
   const gossipPullDisabledAttr = federationEnabled ? '' : 'disabled';
-  const peerHealthList = renderPeerHealthList(listPeerHealth(state));
+  const peerHealth = listPeerHealth(state);
+  const peerHealthList = renderPeerHealthList(peerHealth);
+    const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);
+    const peerHealthCount = Object.keys(peerHealth || {}).length;
+    const peerHealthResetDisabledAttr = peerHealthCount ? '' : 'disabled';
 
   return {
     circleName: effective.circleName,
@@ -436,6 +459,9 @@ function buildAdminViewModel(
     gossipPushDisabledAttr,
     gossipPullDisabledAttr,
     peerHealthList,
+    peerHealthOptions,
+    peerHealthResetDisabledAttr,
+    peerHealthCount,
   };
 }
 
@@ -554,6 +580,23 @@ function renderPeerHealthList(peerHealth = {}) {
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderPeerHealthOptions(peerHealth = {}, peers = new Set()) {
+  const keys = new Set();
+  for (const key of Object.keys(peerHealth || {})) {
+    if (key) keys.add(key);
+  }
+  if (peers) {
+    for (const peer of peers) {
+      if (peer) keys.add(peer);
+    }
+  }
+  const list = [...keys].sort((a, b) => a.localeCompare(b));
+  if (!list.length) {
+    return '<option value="">No peers recorded</option>';
+  }
+  return list.map((key) => `<option value="${escapeHtml(key)}">${escapeHtml(key)}</option>`).join('');
 }
 
 function formatGossipStatus(status = {}) {
