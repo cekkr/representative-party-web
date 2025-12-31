@@ -7,8 +7,11 @@ import {
   applyTopicMerge,
   applyTopicRename,
   applyTopicSplit,
+  formatTopicBreadcrumb,
   findTopicById,
   findTopicByPathKey,
+  normalizeTopicKey,
+  normalizeTopicLabel,
 } from '../../../modules/topics/registry.js';
 import {
   persistPeers,
@@ -516,8 +519,8 @@ function buildAdminViewModel(
   const topicMerges = listPendingTopicMerges(state);
   const topicSplits = listPendingTopicSplits(state);
   const topicRenameList = renderTopicRenameList(topicRenames);
-  const topicMergeList = renderTopicMergeList(topicMerges);
-  const topicSplitList = renderTopicSplitList(topicSplits);
+  const topicMergeList = renderTopicMergeList(topicMerges, state);
+  const topicSplitList = renderTopicSplitList(topicSplits, state);
   const topicRenameCount = topicRenames.length;
   const topicMergeCount = topicMerges.length;
   const topicSplitCount = topicSplits.length;
@@ -724,7 +727,7 @@ function renderTopicRenameList(topics = []) {
     .join('\n');
 }
 
-function renderTopicMergeList(topics = []) {
+function renderTopicMergeList(topics = [], state) {
   if (!topics.length) {
     return '<p class="muted small">No pending topic merges.</p>';
   }
@@ -733,8 +736,17 @@ function renderTopicMergeList(topics = []) {
       const pending = topic.pendingMerge || {};
       const suggestedLabel = pending.toLabel || '';
       const suggestedKey = pending.toKey || '';
+      const targetTopic = pending.toId
+        ? findTopicById(state, pending.toId)
+        : suggestedKey
+          ? findTopicByPathKey(state, suggestedKey)
+          : null;
       const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
       const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
+      const sourcePreview = renderTopicPreview(state, topic, { title: 'Source topic' });
+      const targetPreview = renderTopicPreview(state, targetTopic, {
+        title: targetTopic ? 'Target topic' : 'Target topic (not found)',
+      });
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -743,6 +755,12 @@ function renderTopicMergeList(topics = []) {
             ${reason}
             ${requestedAt}
           </div>
+          <details class="note">
+            <summary>Preview merge</summary>
+            ${sourcePreview}
+            ${targetPreview}
+            <p class="muted small">Merging archives the source topic and redirects breadcrumbs to the target.</p>
+          </details>
           <form class="stack" method="post" action="/admin" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-merge-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
@@ -751,6 +769,10 @@ function renderTopicMergeList(topics = []) {
               <input name="mergeTargetKey" value="${escapeHtml(String(suggestedKey))}" placeholder="parent/topic-key" />
             </label>
             <p class="muted small">Suggested: ${escapeHtml(String(suggestedLabel || suggestedKey || 'unknown'))}</p>
+            <label class="field">
+              <span>Confirm merge</span>
+              <input type="checkbox" name="confirm" value="yes" />
+            </label>
             <div class="cta-row">
               <button class="ghost" type="submit">Accept merge</button>
             </div>
@@ -766,7 +788,7 @@ function renderTopicMergeList(topics = []) {
     .join('\n');
 }
 
-function renderTopicSplitList(topics = []) {
+function renderTopicSplitList(topics = [], state) {
   if (!topics.length) {
     return '<p class="muted small">No pending topic splits.</p>';
   }
@@ -775,6 +797,8 @@ function renderTopicSplitList(topics = []) {
       const pending = topic.pendingSplit || {};
       const suggestions = Array.isArray(pending.suggested) ? pending.suggested : [];
       const [first, second] = suggestions;
+      const sourcePreview = renderTopicPreview(state, topic, { title: 'Source topic' });
+      const splitPreview = renderTopicSplitPreview(topic, suggestions);
       const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
       const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
       return `
@@ -785,6 +809,12 @@ function renderTopicSplitList(topics = []) {
             ${reason}
             ${requestedAt}
           </div>
+          <details class="note">
+            <summary>Preview split</summary>
+            ${sourcePreview}
+            ${splitPreview}
+            <p class="muted small">Splitting creates child topics under the current topic path.</p>
+          </details>
           <form class="stack" method="post" action="/admin" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-split-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
@@ -795,6 +825,10 @@ function renderTopicSplitList(topics = []) {
             <label class="field">
               <span>Split label B</span>
               <input name="splitLabelB" value="${escapeHtml(String(second || ''))}" placeholder="Subtopic label" />
+            </label>
+            <label class="field">
+              <span>Confirm split</span>
+              <input type="checkbox" name="confirm" value="yes" />
             </label>
             <div class="cta-row">
               <button class="ghost" type="submit">Accept split</button>
@@ -820,14 +854,98 @@ function renderTopicHistoryList(entries = []) {
       const when = entry.at ? formatTimestamp(entry.at) : '';
       const action = entry.action || 'update';
       const topicLabel = entry.topicLabel || 'topic';
-      const fromLabel = entry.fromLabel || entry.from || '';
-      const toLabel = entry.toLabel || entry.to || '';
-      const diff = fromLabel && toLabel ? `${fromLabel} → ${toLabel}` : '';
-      const reason = entry.reason ? ` · ${entry.reason}` : '';
-      return `<li>${escapeHtml(when)} · ${escapeHtml(topicLabel)} · ${escapeHtml(action)}${diff ? ` · ${escapeHtml(diff)}` : ''}${escapeHtml(reason)}</li>`;
+      const diffBlock = renderTopicHistoryDiff(entry);
+      return `
+        <li>
+          <div>${escapeHtml(when)} · ${escapeHtml(topicLabel)} · ${escapeHtml(action)}</div>
+          ${diffBlock}
+        </li>
+      `;
     })
     .join('\n');
   return `<ul class="plain">${items}</ul>`;
+}
+
+function renderTopicHistoryDiff(entry = {}) {
+  const lines = [];
+  const fromLabel = entry.fromLabel || entry.from || '';
+  const toLabel = entry.toLabel || entry.to || '';
+  const fromKey = entry.fromKey || '';
+  const toKey = entry.toKey || '';
+  const suggested = Array.isArray(entry.suggested) ? entry.suggested : [];
+
+  if (fromLabel || fromKey) {
+    const before = [fromLabel, fromKey ? `(${fromKey})` : ''].filter(Boolean).join(' ');
+    lines.push(`- before: ${before}`);
+  }
+  if (toLabel || toKey) {
+    const after = [toLabel, toKey ? `(${toKey})` : ''].filter(Boolean).join(' ');
+    lines.push(`+ after: ${after}`);
+  }
+  if (suggested.length) {
+    lines.push(`* suggested: ${suggested.join(', ')}`);
+  }
+  if (entry.label) {
+    lines.push(`+ alias: ${entry.label}`);
+  }
+  if (entry.reason) {
+    lines.push(`reason: ${entry.reason}`);
+  }
+
+  if (!lines.length) return '';
+  return `
+    <details class="note">
+      <summary>Diff</summary>
+      <pre>${escapeHtml(lines.join('\n'))}</pre>
+    </details>
+  `;
+}
+
+function renderTopicPreview(state, topic, { title = 'Topic preview' } = {}) {
+  if (!topic) {
+    return `<div class="callout"><p class="muted small">${escapeHtml(title)}</p><p class="muted small">Preview unavailable.</p></div>`;
+  }
+  const breadcrumb = formatTopicBreadcrumb(state, topic.id) || topic.label || topic.key || 'topic';
+  const pathKey = topic.pathKey || topic.key || '';
+  const aliases = Array.isArray(topic.aliases) ? topic.aliases.slice(0, 3) : [];
+  const aliasLine = aliases.length ? `Aliases: ${aliases.join(', ')}` : 'Aliases: none';
+  const updatedAt = topic.updatedAt ? formatTimestamp(topic.updatedAt) : '';
+  const mergedNote = topic.mergedIntoId ? 'Merged into another topic.' : '';
+  return `
+    <div class="callout">
+      <p class="muted small">${escapeHtml(title)}</p>
+      <p><strong>${escapeHtml(String(breadcrumb))}</strong></p>
+      <p class="muted small">Path: ${escapeHtml(String(pathKey))}</p>
+      <p class="muted small">${escapeHtml(aliasLine)}</p>
+      ${updatedAt ? `<p class="muted small">Updated: ${escapeHtml(updatedAt)}</p>` : ''}
+      ${mergedNote ? `<p class="muted small">${escapeHtml(mergedNote)}</p>` : ''}
+    </div>
+  `;
+}
+
+function renderTopicSplitPreview(topic, suggestions = []) {
+  if (!topic) {
+    return `<div class="callout"><p class="muted small">Split preview unavailable.</p></div>`;
+  }
+  if (!suggestions.length) {
+    return `<div class="callout"><p class="muted small">No suggested split labels available.</p></div>`;
+  }
+  const parentPathKey = topic.pathKey || topic.key || '';
+  const lines = suggestions
+    .map((label) => normalizeTopicLabel(label))
+    .filter(Boolean)
+    .map((label) => {
+      const key = normalizeTopicKey(label);
+      const pathKey = parentPathKey ? `${parentPathKey}/${key}` : key;
+      return `${label} (${pathKey})`;
+    });
+  const rendered = escapeHtml(lines.join('\n')).replace(/\n/g, '<br />');
+  return `
+    <div class="callout">
+      <p class="muted small">Suggested child topics</p>
+      <div class="muted small">${rendered}</div>
+    </div>
+  `;
 }
 
 async function acceptTopicRename(state, body) {
@@ -873,9 +991,13 @@ async function dismissTopicRename(state, body) {
 async function acceptTopicMerge(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const mergeTargetKey = sanitizeText(body.mergeTargetKey || '', 120);
+  const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
     return { flash: 'Topic not found.' };
+  }
+  if (!confirmed) {
+    return { flash: 'Confirm the merge after reviewing the previews.' };
   }
   const pending = topic.pendingMerge || {};
   let target = null;
@@ -927,9 +1049,13 @@ async function acceptTopicSplit(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const labelA = sanitizeText(body.splitLabelA || '', 64);
   const labelB = sanitizeText(body.splitLabelB || '', 64);
+  const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
     return { flash: 'Topic not found.' };
+  }
+  if (!confirmed) {
+    return { flash: 'Confirm the split after reviewing the previews.' };
   }
   const pending = topic.pendingSplit || {};
   const labels = [labelA, labelB].filter(Boolean);
