@@ -3,7 +3,7 @@ import { getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { ingestVoteGossip } from '../../../modules/federation/ingest.js';
-import { getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -12,7 +12,8 @@ export function exportVotes({ res, state }) {
     return sendModuleDisabledJson({ res, moduleKey: 'votes' });
   }
   const policy = getEffectivePolicy(state);
-  const envelopes = state.votes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
+  const visibleVotes = filterVisibleEntries(state.votes, state);
+  const envelopes = visibleVotes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
   return sendJson(res, 200, { entries: envelopes, replication: getReplicationProfile(state) });
 }
 

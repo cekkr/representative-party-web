@@ -184,12 +184,12 @@ function buildVotesPayload(state) {
 
 async function pushToPeer(peer, { ledgerPayload, votesPayload, transactionsPayload, timeoutMs }) {
   const ledger = await sendPayload(peer, '/circle/gossip', ledgerPayload, timeoutMs);
-  const votes = await sendPayload(peer, '/votes/gossip', votesPayload, timeoutMs);
-  const transactions = await sendPayload(peer, '/transactions/gossip', transactionsPayload, timeoutMs);
+  const votes = await sendPayload(peer, '/votes/gossip', votesPayload, timeoutMs, { skipNotFound: true });
+  const transactions = await sendPayload(peer, '/transactions/gossip', transactionsPayload, timeoutMs, { skipNotFound: true });
   return { peer, ledger, votes, transactions };
 }
 
-async function sendPayload(peer, path, payload, timeoutMs) {
+async function sendPayload(peer, path, payload, timeoutMs, { skipNotFound = false } = {}) {
   if (!payload) {
     return { skipped: true };
   }
@@ -214,7 +214,7 @@ async function sendPayload(peer, path, payload, timeoutMs) {
         error = null;
       }
     }
-    const skipped = shouldSkipResponse(response.status, error);
+    const skipped = shouldSkipResponse(response.status, error, { skipNotFound });
     return { ok: response.ok, status: response.status, error: error || undefined, skipped };
   } catch (error) {
     return { ok: false, error: error?.message || String(error) };
@@ -249,7 +249,7 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   if (isModuleEnabled(state, 'votes')) {
     const votesResponse = await fetchJson(`${peer}/votes/ledger`, timeoutMs);
     votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
-    if (shouldSkipResponse(votesResponse.status, votesResponse.error)) {
+    if (shouldSkipResponse(votesResponse.status, votesResponse.error, { skipNotFound: true })) {
       votes = { skipped: true, status: votesResponse.status, error: votesResponse.error };
     } else if (votesResponse.ok && votesResponse.payload) {
       const entries = Array.isArray(votesResponse.payload.entries) ? votesResponse.payload.entries : [];
@@ -272,7 +272,7 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   if (isModuleEnabled(state, 'federation')) {
     const transactionsResponse = await fetchJson(`${peer}/transactions/ledger`, timeoutMs);
     transactions = { ok: false, status: transactionsResponse.status, error: transactionsResponse.error };
-    if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error)) {
+    if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error, { skipNotFound: true })) {
       transactions = { skipped: true, status: transactionsResponse.status, error: transactionsResponse.error };
     } else if (transactionsResponse.ok && transactionsResponse.payload) {
       const envelope = transactionsResponse.payload.envelope || transactionsResponse.payload;
@@ -587,7 +587,8 @@ function describeFailure(scope, status) {
   return `${scope}_failed`;
 }
 
-function shouldSkipResponse(status, error) {
+function shouldSkipResponse(status, error, { skipNotFound = false } = {}) {
+  if (skipNotFound && status === 404) return true;
   if (status !== 403) return false;
   const normalized = String(error || '').trim().toLowerCase();
   if (!normalized) return false;

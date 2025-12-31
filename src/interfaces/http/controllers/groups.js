@@ -34,7 +34,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'groups',
     {
-      groups: renderGroupList(groups, person),
+      groups: renderGroupList(groups, person, state),
       personHandle: person?.handle || 'Guest',
       personHash: person?.pidHash || '',
       circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
@@ -289,7 +289,7 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
   return renderGroups({ req, res, state, wantsPartial });
 }
 
-function renderGroupList(groups, person) {
+function renderGroupList(groups, person, state) {
   if (!groups.length) return '<p class="muted">No groups yet.</p>';
   return groups
     .map((group) => {
@@ -303,7 +303,7 @@ function renderGroupList(groups, person) {
           return `<li>${topic} → ${delegate} (prio ${priority})</li>`;
         })
         .join('');
-      const elections = renderElections(group.elections || [], person);
+      const elections = renderElections(group.elections || [], person, state);
       const topicLabel = group.topics?.length ? escapeHtml(group.topics.join(', ')) : 'general';
       const name = escapeHtml(group.name || 'Group');
       const description = escapeHtml(group.description || '');
@@ -380,7 +380,7 @@ function renderGroupList(groups, person) {
     .join('\n');
 }
 
-function renderElections(elections, person) {
+function renderElections(elections, person, state) {
   if (!elections.length) return '<p class="muted small">No elections.</p>';
   return elections
     .map((election) => {
@@ -391,6 +391,14 @@ function renderElections(elections, person) {
       const statusLabel = escapeHtml(election.status || 'open');
       const electionId = escapeHtml(election.id || '');
       const candidates = (election.candidates || []).map((c) => escapeHtml(String(c)));
+      const winner = election.status === 'closed' ? pickWinner(election, state) : null;
+      const winnerHash = winner?.candidateHash ? escapeHtml(winner.candidateHash) : '';
+      const winnerMethod = winner?.method ? escapeHtml(winner.method) : '';
+      const winnerRounds = Number.isFinite(winner?.rounds) ? winner.rounds : null;
+      const winnerLabel = winnerHash
+        ? `Winner: ${winnerHash}${winnerMethod ? ` (method ${winnerMethod}${winnerRounds ? `, rounds ${winnerRounds}` : ''})` : ''}`
+        : '';
+      const closedAt = election.closedAt ? new Date(election.closedAt).toLocaleString() : '';
       return `
         <div class="muted small">
           <div class="discussion__meta">
@@ -434,6 +442,8 @@ function renderElections(elections, person) {
               : ''
           }
           <p>Votes: ${tally.length}</p>
+          ${winnerLabel ? `<p>${winnerLabel}</p>` : ''}
+          ${closedAt ? `<p class="muted tiny">Closed: ${closedAt}</p>` : ''}
         </div>
       `;
     })

@@ -40,6 +40,23 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Implementation Roadmap
 
+## Current status snapshot (Phase 1 largely shipped)
+- Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
+- Social feed ships typed follows plus replies/mentions/tags/reshare, gated by the same role/ban checks.
+- Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
+- Petitions/signatures/votes pipeline exists with vote envelopes, transactions log + gossip summaries, and admin controls.
+- Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
+- Persistence adapters (json/memory/sql/kv), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
+- Structure manager UI for provider-local fields and attributes is available; topic preferences + gardener stub are wired.
+
+## Near-term next steps (Phase 2 focus)
+- Replace the topic gardener stub with a real worker (merge/split/rename scheduling), persist topic IDs/history, and surface topic breadcrumbs across discussion/forum/petitions.
+- Add collaborative petition drafting with version history, stage gating, and richer quorum/discussion UX (diffs, review prompts, stage badges).
+- Expand the structure manager: schema versioning, inline validation errors, and a per-session attributes editor that respects provider-only storage and consent.
+- Wire outbound transports (email/SMS) with delivery logs and opt-in enforcement using provider-local preferences.
+- Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
+- Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
+
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
 - Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
