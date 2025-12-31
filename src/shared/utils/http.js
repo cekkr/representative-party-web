@@ -8,6 +8,15 @@ export function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
+export function sendRateLimit(res, payload = {}) {
+  const headers = { 'Content-Type': 'application/json; charset=utf-8' };
+  if (payload.retryAfter) {
+    headers['Retry-After'] = String(payload.retryAfter);
+  }
+  res.writeHead(429, headers);
+  res.end(JSON.stringify({ error: 'rate_limited', ...payload }, null, 2));
+}
+
 export function sendNotFound(res) {
   res.writeHead(404, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({ error: 'not_found' }));

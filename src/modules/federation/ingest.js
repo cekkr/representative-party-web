@@ -8,7 +8,7 @@ import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess, resolvePeerKey
 
 const MAX_PEER_HINTS = 25;
 
-export async function ingestLedgerGossip({ state, envelope, hashes, peerHint, statusHint } = {}) {
+export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, peerHint, statusHint } = {}) {
   const peerKey = resolvePeerKey(peerHint, envelope?.issuer);
   const quarantine = isPeerQuarantined(state, peerKey);
   if (quarantine.quarantined) {
@@ -70,9 +70,10 @@ export async function ingestLedgerGossip({ state, envelope, hashes, peerHint, st
     : Array.isArray(hashes)
       ? hashes
       : [];
-  if (envelope?.ledgerHash) {
+  const digestHint = envelope?.ledgerHash || ledgerHash;
+  if (digestHint) {
     const expected = computeLedgerHash(entries);
-    if (expected !== envelope.ledgerHash) {
+    if (expected !== digestHint) {
       const updated = recordPeerFailure(state, peerKey, { reason: 'ledger_hash_mismatch', penalty: 2 }).updated;
       if (updated) await persistSettings(state);
       return {

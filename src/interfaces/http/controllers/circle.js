@@ -23,6 +23,7 @@ export async function handleGossip({ req, res, state }) {
     state,
     envelope: body.envelope,
     hashes: body.hashes,
+    ledgerHash: body.ledgerHash,
     peerHint: body.peer,
     statusHint: body.status,
   });

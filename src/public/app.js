@@ -50,12 +50,12 @@
       }
       const response = await fetch(url, options);
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401 || response.status === 403 || response.status === 429) {
           try {
             const payload = await response.json();
             alert(payload.message || payload.error || 'Not allowed for this role.');
           } catch (_error) {
-            alert('Not allowed for this role.');
+            alert('Action blocked.');
           }
           return;
         }

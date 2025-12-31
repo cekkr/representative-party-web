@@ -15,13 +15,14 @@ import { findSessionByHandle } from '../../../modules/social/followGraph.js';
 import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
-import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { getActorLabels } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -112,6 +113,18 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const permission = evaluateAction(state, person, 'petition');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Proposal drafting not allowed.' });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'petition_draft', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'petition_draft',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
   }
 
   const body = await readRequestBody(req);
@@ -319,6 +332,18 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'petition_comment', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'petition_comment',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
   }
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);

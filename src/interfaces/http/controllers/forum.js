@@ -6,11 +6,12 @@ import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/po
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderForum } from '../views/forumView.js';
 import { renderPage } from '../views/templates.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -32,6 +33,18 @@ export async function postThread({ req, res, state, wantsPartial }) {
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'forum_thread', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'forum_thread',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
   }
   const body = await readRequestBody(req);
   const title = sanitizeText(body.title || '', 160);
@@ -73,6 +86,18 @@ export async function postComment({ req, res, state, wantsPartial }) {
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Posting not allowed.' });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'forum_comment', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'forum_comment',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
   }
   const body = await readRequestBody(req);
   const parentId = sanitizeText(body.parentId || '', 120);

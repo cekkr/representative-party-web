@@ -7,9 +7,10 @@ import { formatTopicList, getTopicPreferences, normalizeTopicKey, storeTopicPref
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { renderDiscussionList } from '../views/discussionView.js';
 import { getActorLabels } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
@@ -45,6 +46,18 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 401, { error: permission.reason, message: permission.message });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'discussion_post', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'discussion_post',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
   }
 
   const topic = sanitizeText(body.topic || 'General', 80);
