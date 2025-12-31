@@ -1,12 +1,14 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 
-export function renderSocialPosts(posts, { enableReplies = false } = {}) {
+export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash } = {}) {
   if (!posts || posts.length === 0) {
     return '<p class="muted">No posts yet. Follow someone and start the conversation.</p>';
   }
 
   return posts
     .map((post) => {
+      const followType = followTypeByHash?.get?.(post.authorHash);
+      const followTypePill = followType ? `<span class="pill ghost">Follow: ${escapeHtml(followType)}</span>` : '';
       const visibilityPill =
         post.visibility === 'direct'
           ? '<span class="pill warning">Direct</span>'
@@ -26,6 +28,7 @@ export function renderSocialPosts(posts, { enableReplies = false } = {}) {
             ${replyPill}
             ${resharePill}
             ${previewPill}
+            ${followTypePill}
             ${renderIssuerPill(post)}
             <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
           </div>

@@ -4,6 +4,7 @@ import { sanitizeText } from '../../shared/utils/text.js';
 import { stampLocalEntry, filterVisibleEntries } from '../federation/replication.js';
 import { createSocialNote, wrapCreateActivity } from '../federation/activitypub.js';
 import { listFollowsFor, normalizeFollowType } from './followGraph.js';
+import { getEffectivePolicy } from '../circle/policy.js';
 
 const MAX_POST_LENGTH = 560;
 const MENTION_REGEX = /@([a-zA-Z0-9._-]{2,64})/g;
@@ -67,6 +68,7 @@ export function createPost(
 
   const mentions = extractMentions(body);
   const tags = extractTags(body);
+  const policy = getEffectivePolicy(state);
   const entry = stampLocalEntry(state, {
     id: randomUUID(),
     authorHash: person?.pidHash || 'anonymous',
@@ -81,8 +83,8 @@ export function createPost(
     visibility: normalizedVisibility,
     targetHash: normalizedVisibility === 'direct' ? targetHash : '',
     targetHandle: normalizedVisibility === 'direct' ? targetHandle : '',
-    policyId: state?.settings?.policyId || 'party-circle-alpha',
-    policyVersion: state?.settings?.policyVersion || 1,
+    policyId: policy.id,
+    policyVersion: policy.version,
   });
 
   const note = createSocialNote({ post: entry, baseUrl });

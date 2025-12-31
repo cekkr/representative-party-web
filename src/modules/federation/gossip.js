@@ -199,7 +199,18 @@ async function sendPayload(peer, path, payload, timeoutMs) {
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
-    return { ok: response.ok, status: response.status };
+    let error = null;
+    if (!response.ok) {
+      try {
+        const body = await response.json();
+        if (body && typeof body === 'object') {
+          error = body.error || body.message || null;
+        }
+      } catch (_error) {
+        error = null;
+      }
+    }
+    return { ok: response.ok, status: response.status, error: error || undefined };
   } catch (error) {
     return { ok: false, error: error?.message || String(error) };
   } finally {
@@ -289,7 +300,11 @@ async function fetchJson(url, timeoutMs) {
     } catch (error) {
       payload = null;
     }
-    return { ok: response.ok, status: response.status, payload };
+    let error = null;
+    if (!response.ok && payload && typeof payload === 'object') {
+      error = payload.error || payload.message || null;
+    }
+    return { ok: response.ok, status: response.status, payload, error: error || undefined };
   } catch (error) {
     return { ok: false, status: 0, error: error?.message || String(error) };
   } finally {

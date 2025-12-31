@@ -31,6 +31,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined });
   const follows = person ? listFollowsFor(state, person.pidHash, followTypeFilter || undefined) : [];
   const followers = person ? listFollowersOf(state, person.pidHash) : [];
+  const followTypeByHash = new Map(follows.map((edge) => [edge.targetHash, edge.type]));
   const permission = evaluateAction(state, person, 'post');
   const statusMeta = deriveStatusMeta(state);
 
@@ -44,7 +45,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followCount: follows.length,
       followerCount: followers.length,
       followList: renderFollowList(follows),
-      feedList: renderSocialPosts(feed, { enableReplies: Boolean(person) }),
+      feedList: renderSocialPosts(feed, { enableReplies: Boolean(person), followTypeByHash }),
       followTypeOptions: renderFollowTypeOptions(followTypeFilter),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
