@@ -41,7 +41,7 @@ async function expectDialog(page, action, matcher) {
   assert.match(message, matcher);
 }
 
-test('UI respects roles, privileges, and background styling', { timeout: 60000 }, async (t) => {
+test('UI respects roles, privileges, module toggles, and background styling', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
   t.after(async () => server.stop());
@@ -122,4 +122,21 @@ test('UI respects roles, privileges, and background styling', { timeout: 60000 }
     () => bannedPage.click('button[type="submit"]'),
     /banned/i,
   );
+
+  await postForm(
+    `${server.baseUrl}/admin`,
+    { intent: 'modules', module_delegation: 'on', module_federation: 'on', module_topicGardener: 'on' },
+    { partial: true },
+  );
+
+  await guestPage.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await guestPage.$('a[data-nav="social"]'), null);
+  assert.equal(await guestPage.$('a[data-nav="petitions"]'), null);
+  assert.equal(await guestPage.$('a[data-nav="groups"]'), null);
+
+  await guestPage.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await guestPage.$('[data-module-disabled="social"]'));
+
+  await guestPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await guestPage.$('[data-module-disabled="petitions"]'));
 });

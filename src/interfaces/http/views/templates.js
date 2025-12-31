@@ -3,15 +3,17 @@ import { join } from 'node:path';
 
 import { DEFAULT_PAGE_TITLE, PATHS } from '../../../config.js';
 import { renderNav } from './navigation.js';
+import { deriveStatusMeta, renderStatusStrip } from './status.js';
 
 const templateCache = new Map();
 
 export async function renderPage(templateName, data = {}, { wantsPartial = false, title = DEFAULT_PAGE_TITLE, state } = {}) {
   const bodyTemplate = await loadTemplate(templateName);
   const body = applyTemplate(bodyTemplate, data);
-  if (wantsPartial) return body;
+  const statusStrip = data.statusStrip !== undefined ? data.statusStrip : renderStatusStrip(deriveStatusMeta(state));
+  if (wantsPartial) return `${statusStrip}${body}`;
   const layout = await loadTemplate('layout');
-  const layoutData = { ...data, body, title };
+  const layoutData = { ...data, body, title, statusStrip };
   if (!layoutData.personHandle) {
     layoutData.personHandle = 'Guest session';
   }
