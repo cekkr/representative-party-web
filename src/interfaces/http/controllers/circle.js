@@ -3,6 +3,7 @@ import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { buildLedgerEnvelope, computeLedgerHash, verifyLedgerEnvelope } from '../../../modules/circle/federation.js';
 import { decideStatus, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { normalizePeerUrl } from '../../../modules/federation/gossip.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -60,8 +61,9 @@ export async function handleGossip({ req, res, state }) {
   }
 
   const peerHint = envelope?.issuer || body.peer;
-  if (peerHint) {
-    state.peers.add(String(peerHint));
+  const normalizedPeer = normalizePeerUrl(peerHint);
+  if (normalizedPeer && !state.peers.has(normalizedPeer)) {
+    state.peers.add(normalizedPeer);
     await persistPeers(state);
   }
   if (added > 0) {
@@ -103,8 +105,9 @@ export async function registerPeer({ req, res, state }) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation' });
   }
   const body = await readRequestBody(req);
-  if (body.peer) {
-    state.peers.add(String(body.peer));
+  const normalizedPeer = normalizePeerUrl(body.peer);
+  if (normalizedPeer && !state.peers.has(normalizedPeer)) {
+    state.peers.add(normalizedPeer);
     await persistPeers(state);
   }
   return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });

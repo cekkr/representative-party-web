@@ -6,6 +6,23 @@ import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
   const replication = getReplicationProfile(state);
+  const gossipState = state.gossipState || {};
+  const outboundSummary = gossipState.lastSummary
+    ? {
+        lastAttemptAt: gossipState.lastAttemptAt || null,
+        lastSuccessAt: gossipState.lastSuccessAt || null,
+        lastErrorAt: gossipState.lastErrorAt || null,
+        lastError: gossipState.lastError || null,
+        running: Boolean(gossipState.running),
+        summary: {
+          peers: gossipState.lastSummary.peers,
+          ledger: gossipState.lastSummary.ledger,
+          votes: gossipState.lastSummary.votes,
+          skipped: gossipState.lastSummary.skipped || null,
+          reason: gossipState.lastSummary.reason,
+        },
+      }
+    : null;
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -30,6 +47,7 @@ export function renderHealth({ res, state }) {
     data: replication,
     gossip: {
       ingestEnabled: isGossipEnabled(replication),
+      outbound: outboundSummary,
     },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,

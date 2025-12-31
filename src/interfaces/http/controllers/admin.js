@@ -11,6 +11,7 @@ import {
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
+import { normalizePeerUrl, pushGossipNow } from '../../../modules/federation/gossip.js';
 import { describeProfile, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listTransactions } from '../../../modules/transactions/registry.js';
 import {
@@ -84,12 +85,25 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     );
     return sendHtml(res, html);
   }
+  if (intent === 'gossip-push') {
+    const summary = await pushGossipNow(state, { reason: 'admin' });
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { flash: formatGossipFlash(summary), availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
 
   const prev = state.settings || {};
   const enforceCircle = parseBoolean(body.enforceCircle, false);
   const requireVerification = parseBoolean(body.requireVerification, false);
-  const newPeer = sanitizeText(body.peerJoin || '', 200);
-  const preferredPeer = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
+  const newPeerRaw = sanitizeText(body.peerJoin || '', 200);
+  const preferredPeerRaw = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
+  const newPeer = normalizePeerUrl(newPeerRaw);
+  const preferredPeerNormalized = normalizePeerUrl(preferredPeerRaw);
+  const preferredPeer = preferredPeerNormalized || preferredPeerRaw;
   const defaultElectionMode = sanitizeText(body.defaultElectionMode || prev.groupPolicy?.electionMode || 'priority', 32);
   const defaultConflictRule = sanitizeText(body.defaultConflictRule || prev.groupPolicy?.conflictRule || 'highest_priority', 32);
   const petitionQuorumAdvance = normalizeQuorumAdvance(body.petitionQuorumAdvance || prev.petitionQuorumAdvance || 'discussion');
@@ -133,7 +147,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   state.dataConfig = state.settings.data;
 
   let peersAdded = 0;
-  const peersToAdd = Array.from(new Set([newPeer, preferredPeer].filter(Boolean)));
+  const peersToAdd = Array.from(new Set([newPeer, preferredPeerNormalized].filter(Boolean)));
   for (const peer of peersToAdd) {
     if (!state.peers.has(peer)) {
       state.peers.add(peer);
@@ -330,6 +344,8 @@ function buildAdminViewModel(
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
   const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
+  const gossipSummary = renderGossipSummary(state.gossipState);
+  const gossipPeers = renderGossipPeers(state.gossipState);
 
   return {
     circleName: effective.circleName,
@@ -391,6 +407,8 @@ function buildAdminViewModel(
     attributesPayloadValue: attributesPayloadValueRendered,
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
+    gossipSummary,
+    gossipPeers,
   };
 }
 
@@ -445,6 +463,89 @@ function renderTransactionsList(entries = []) {
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderGossipSummary(gossipState = {}) {
+  if (!gossipState.lastAttemptAt) {
+    return '<p class="muted small">No outbound gossip runs yet.</p>';
+  }
+  const lines = [];
+  if (gossipState.running) {
+    lines.push('Outbound gossip in progress.');
+  }
+  lines.push(`Last attempt: ${formatTimestamp(gossipState.lastAttemptAt)}`);
+  if (gossipState.lastSuccessAt) {
+    lines.push(`Last success: ${formatTimestamp(gossipState.lastSuccessAt)}`);
+  }
+  if (gossipState.lastSummary?.skipped) {
+    lines.push(`Last run skipped: ${gossipState.lastSummary.skipped}.`);
+  } else if (gossipState.lastSummary) {
+    const ledger = gossipState.lastSummary.ledger || {};
+    const votes = gossipState.lastSummary.votes || {};
+    const voteLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
+    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok · ${voteLine}`);
+  }
+  if (gossipState.lastError) {
+    lines.push(`Last error: ${gossipState.lastError}`);
+  }
+  return lines.map((line) => `<p class="muted small">${escapeHtml(line)}</p>`).join('');
+}
+
+function renderGossipPeers(gossipState = {}) {
+  const results = gossipState.peerResults || [];
+  if (!results.length) {
+    return '<p class="muted small">No peer results recorded yet.</p>';
+  }
+  const items = results
+    .slice(0, 8)
+    .map((result) => {
+      const ledgerStatus = formatGossipStatus(result.ledger);
+      const votesStatus = formatGossipStatus(result.votes);
+      return `<li><strong>${escapeHtml(result.peer)}</strong> · ledger ${escapeHtml(ledgerStatus)} · votes ${escapeHtml(
+        votesStatus,
+      )}</li>`;
+    })
+    .join('');
+  return `<ul class="stack small">${items}</ul>`;
+}
+
+function formatGossipStatus(status = {}) {
+  if (!status) return 'unknown';
+  if (status.skipped) return 'skipped';
+  if (status.ok) return status.status ? `ok (${status.status})` : 'ok';
+  if (status.error) return truncateText(status.error, 80);
+  if (status.status) return `status ${status.status}`;
+  return 'failed';
+}
+
+function formatTimestamp(value) {
+  if (!value) return '';
+  try {
+    return new Date(value).toLocaleString();
+  } catch (error) {
+    return String(value);
+  }
+}
+
+function truncateText(value, max) {
+  const text = String(value || '');
+  if (text.length <= max) return text;
+  return `${text.slice(0, Math.max(0, max - 3))}...`;
+}
+
+function formatGossipFlash(summary) {
+  if (!summary) return 'Gossip push skipped.';
+  if (summary.skipped) {
+    return `Gossip push skipped (${summary.skipped}).`;
+  }
+  const ledger = summary.ledger || {};
+  const votes = summary.votes || {};
+  const ledgerLine = `ledger ${ledger.ok || 0}/${ledger.sent || 0} ok`;
+  const votesLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
+  if (summary.errors?.length) {
+    return `Gossip push completed with errors: ${ledgerLine}, ${votesLine}.`;
+  }
+  return `Gossip push complete: ${ledgerLine}, ${votesLine}.`;
 }
 
 function roleSelectFlags(role) {

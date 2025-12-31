@@ -146,6 +146,23 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Federation</p>
+  <h2>Outbound gossip</h2>
+  <p class="muted small">Push ledger and vote envelopes to peers on a schedule or manually.</p>
+  <div class="stack">
+    {{gossipSummary}}
+    {{gossipPeers}}
+  </div>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="gossip-push" />
+    <div class="cta-row">
+      <button class="cta" type="submit">Push gossip now</button>
+      <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Modules</p>
   <h2>Core feature toggles</h2>
   <p class="muted small">Disable optional modules for messaging-only deployments.</p>
