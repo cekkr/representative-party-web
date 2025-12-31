@@ -50,6 +50,13 @@ async function expectDialog(page, action, matcher) {
   assert.match(message, matcher);
 }
 
+async function getAdminForm(page, intent) {
+  const intentSelector = `form[action="/admin"] input[name="intent"][value="${intent}"]`;
+  const intentField = await page.$(intentSelector);
+  assert.ok(intentField, `expected admin form for ${intent}`);
+  return intentField.evaluateHandle((node) => node.closest('form'));
+}
+
 test('UI respects roles, privileges, module toggles, and background styling', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
@@ -383,4 +390,65 @@ test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async 
   const leaveButton = await leaveForm.$('button[type="submit"]');
   await leaveButton.click();
   await page.waitForFunction(() => document.querySelector('form[action="/groups"] input[name="action"][value="join"]'));
+});
+
+test('UI admin can update rate limits and session overrides', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const adminSession = await createVerifiedSession(server.baseUrl, { pidHash: 'admin-ui' });
+  const targetSession = await createVerifiedSession(server.baseUrl, { pidHash: 'target-ui' });
+
+  await postForm(
+    `${server.baseUrl}/admin`,
+    { intent: 'session', sessionId: adminSession.sessionId, sessionRole: 'admin' },
+    { partial: true },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, adminSession.sessionId);
+  await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.body.textContent.includes('Circle settings and policy'));
+
+  const rateLimitForm = await getAdminForm(page, 'rate-limits');
+  const overrides = 'discussion_post:60:1';
+  const rateTextarea = await rateLimitForm.$('textarea[name="rateLimitOverrides"]');
+  await rateTextarea.click({ clickCount: 3 });
+  await rateTextarea.type(overrides);
+  const rateResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const rateButton = await rateLimitForm.$('button[type="submit"]');
+  await rateButton.click();
+  await rateResponse;
+  await page.waitForFunction(() => document.body.textContent.includes('Rate limits saved'));
+  const overridesSaved = await page.$eval('textarea[name="rateLimitOverrides"]', (el) => el.value.trim());
+  assert.equal(overridesSaved, overrides);
+
+  const sessionForm = await getAdminForm(page, 'session');
+  const sessionIdInput = await sessionForm.$('input[name="sessionId"]');
+  await sessionIdInput.click({ clickCount: 3 });
+  await sessionIdInput.type(targetSession.sessionId);
+  const roleSelect = await sessionForm.$('select[name="sessionRole"]');
+  await roleSelect.select('moderator');
+  const sessionResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const sessionButton = await sessionForm.$('button[type="submit"]');
+  await sessionButton.click();
+  await sessionResponse;
+  await page.waitForFunction((sessionId) => document.body.textContent.includes(sessionId), {}, targetSession.sessionId);
+  const roleSelected = await page.$eval(
+    'select[name="sessionRole"] option[value="moderator"]',
+    (el) => el.selected,
+  );
+  assert.equal(roleSelected, true);
 });
