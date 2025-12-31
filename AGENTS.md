@@ -25,10 +25,12 @@ This file captures the essential implementation directives. Keep it in sync with
 - Central vs p2p is not feature creep: the codebase must stay storage-agnostic so providers and Circles can choose centralized storage, p2p-first, or hybrid redundancy/validation without forking domain logic.
 - Data management priorities: provider-local contact/profile fields never gossip; previews are gated by `DATA_PREVIEW` + validation level; redundancy is selected via `DATA_MODE` (centralized/hybrid/p2p) + adapter; signatures/validation status decide what can render or replicate.
 - Main transactions registry: append-only log of sensitive operations (votes, petition drafts/status changes, delegation overrides) with digest + issuer/mode/adapter, stored locally per provider (`transactions` store) for audit and cross-provider validation against signed envelopes; export signed summaries for cross-provider reconciliation.
+- Transactions coverage: discussion/forum/social/group actions emit transactions so audit trails match user-facing activity feeds; admin UI surfaces recent entries plus export links.
 - Structure manager + schema editor: canonical tables/fields (sessions, handles, roles/banned, blinded PID or credential binding) stay fixed; provider-defined optional fields/tables are registered through a structure manager with an admin UI data-table editor, persisted via adapters with versioned metadata. Provider-only fields (contact email/personal info) never gossip; providers own notification delivery/consent that relies on those fields.
 - Split persistence/transport into adapters: `src/infra/persistence/storage.js` remains the interface; adapter drivers live under `src/infra/persistence/adapters/{json,sql,kv}` and replication/validation helpers under `src/modules/federation/replication.js` (gossip fetch + signature/ban checks) so domain modules call a single abstraction. SQL uses SQLite (optional `sqlite3`, file path via `DATA_SQLITE_URL|FILE`), KV is file-backed; JSON/memory are defaults.
 - Keep preview vs certified states explicit: adapters return `status: preview|validated` with provenance; UI and shared clients (especially within the same social/party ring) must avoid rendering uncertified data where policy forbids it, and clearly label previews when allowed.
 - Settings drive combinations instead of code forks: `DATA_MODE=centralized` (single adapter, no gossip), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache); `DATA_VALIDATION_LEVEL` and `DATA_PREVIEW` toggles gate when previews are stored/surfaced.
+- Gossip gating: when `DATA_MODE=centralized`, gossip ingest is disabled (403) to prevent unintended replication; `hybrid` and `p2p` keep gossip enabled.
 - Roadmap alignment: Phase 1 delivers adapterized interfaces + JSON driver and stub gossip validator; Phase 2 adds SQL/kv drivers and hybrid mode wiring; Phase 4 hardens replication (quarantine, redundancy targets, cross-ring audits).
 
 ## Code map (Phase 1 kernel)
@@ -43,12 +45,12 @@ This file captures the essential implementation directives. Keep it in sync with
 ## UX contract (Phase 1)
 - SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.
 - Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
-- Layout must show Circle policy flag, verified handle when present, and ledger/actor/discussion counts for accountability cues.
+- Layout must show Circle policy flag, verified handle when present, ledger/actor/discussion counts for accountability cues, and gossip ingest state.
 - Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash.
 - Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
 
 ## Endpoints
-- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/inbox`, `/public/*`.
+- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`, `/public/*`.
 - `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle.
 - `/petitions` (GET/POST) drafts proposals with summary + optional full text; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.
@@ -69,6 +71,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
 - Testing: run `npm test` for the node:test suite (hashing, migrations, module toggles, Circle policy gates, Puppeteer UI role flows, ring gossip consistency); `npm run test:ui` is the stable UI-only entry point.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
+- Ops cues: `/admin` surfaces ledger hash, gossip ingest state, and recent transactions for audit snapshots.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, discussion notes, quorum → discussion (or admin-configured vote), and vote tallies; UI surfaces gate errors per role.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Module toggles: `/admin` lets operators disable optional modules (petitions/votes/delegation/groups/federation/topic gardener/social) for messaging-only deployments; navigation and endpoints honor the settings to avoid dead ends.
@@ -76,7 +79,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications` with per-user preferences for proposal comment alerts.
 - Topic gardener helper: build DynamicTopicCategorization as a Python helper in `src/infra/workers/topic-gardener/` (online ingestion + scheduled refactor) with a stable API consumed by `src/modules/topics/classification.js`. Respect user/person-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. A stub HTTP helper sits in `src/infra/workers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`.
 - Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
-- Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules; provider policy remains about data/validation.
+- Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules (defaults inherit admin settings); provider policy remains about data/validation.
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
 
 ## Possible next steps:

@@ -13,15 +13,15 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “person” for civic Circles to enforce natural-person guarantees.
 - **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded hash) stay fixed across a party ring; provider-local optional fields (contact email, personal info, notification preferences) are modeled via a schema/data-table editor and stored locally to power provider-owned notifications/consent.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
-- **Federation seeds**: ActivityPub actor emitter, inbox placeholder, gossip endpoints for peer/ledger sync.
+- **Federation seeds**: ActivityPub actor emitter, outbox/inbox placeholders, gossip endpoints for peer/ledger sync.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares for small talk/info; kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
-- **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
+- **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state, ledger/actor/discussion counts, and gossip ingest state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
 
 ## Data topology & adapters
-- Modes: `DATA_MODE=centralized` (single adapter, no gossip writes), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
+- Modes: `DATA_MODE=centralized` (single adapter, no gossip writes/ingest), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
 - Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQLite-backed SQL and file-based KV adapters exist (SQL requires optional `sqlite3`); JSON/memory remain defaults.
 - Phase alignment: Phase 1 ships the adapterized interface + JSON driver + replication profile stub; Phase 2 adds SQL/kv drivers and hybrid-mode wiring; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
 
@@ -42,19 +42,20 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
 - Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
 - Add core module toggles in `/admin` so petitions/votes/delegation/groups/federation/topic gardener/social can be disabled for messaging-only deployments; nav and endpoints respect disabled modules.
+- Add ledger digests to gossip envelopes and reject mismatched ledgers; centralized mode disables gossip ingest to avoid unintended replication.
 - Add Puppeteer UI flows and ring gossip smoke tests to validate role gates, module toggles, and P2P consistency.
 - Model and validate data exchanges: persisted discussions/petitions/votes tied to session hashes, with rate limits, quorum/ban checks, and audit-friendly logs (petitions/votes can stay disabled in messaging-only deployments).
 - Add signed vote envelopes and gossip endpoints (`/votes/ledger`, `/votes/gossip`) so auto-delegated votes are verifiable across providers and resistant to injection/replay when the petitions/votes module is enabled.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
-- Federation stays stubbed (ActivityPub actor/inbox/outbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
+- Federation stays stubbed (ActivityPub actor/outbox/inbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
 
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (people when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
-- **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override.
+- **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
 
 ### Phase 3 — Decision Engine (Months 8-11)
@@ -145,8 +146,8 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * Keep verifier enforcement behind a policy toggle so messaging-only deployments can run without civic proof while still supporting the exclusion principle when enabled.
 2.  **Federated Identity Registry:**
       * Build the `UserHash` table.
-      * Implement the **ActivityPub Actor**: Every user is an Actor (`@hash@server.party`).
-      * **Uniqueness Sync:** Create a "Gossip Protocol" where servers exchange hashes of new users to enforce uniqueness constraints when Circle mode is enabled.
+      * Implement the **ActivityPub Actor**: Every user is an Actor (`@hash@server.party`) with outbox/inbox stubs.
+      * **Uniqueness Sync:** Create a "Gossip Protocol" where servers exchange hashes of new users (with ledger digests) to enforce uniqueness constraints when Circle mode is enabled.
 3.  **Frontend Framework (SSR + Vanilla):**
       * Set up the template engine (EJS/Pug).
       * Build the "Deep Link" handler: A generic JS module that detects `openid-credential-offer://` links and triggers the user's installed EUDI Wallet app (or displays a QR code on desktop).
