@@ -524,7 +524,7 @@ function buildAdminViewModel(
   const topicRenameCount = topicRenames.length;
   const topicMergeCount = topicMerges.length;
   const topicSplitCount = topicSplits.length;
-  const topicHistoryList = renderTopicHistoryList(listTopicHistory(state));
+  const topicHistoryList = renderTopicHistoryList(listTopicHistory(state), state);
   const topicGardenerSyncAt = topicConfig.lastSyncAt ? formatTimestamp(topicConfig.lastSyncAt) : 'Not yet';
   const topicGardenerLastOperationAt = topicConfig.lastOperationAt
     ? formatTimestamp(new Date(Number(topicConfig.lastOperationAt) * 1000).toISOString())
@@ -741,11 +741,15 @@ function renderTopicMergeList(topics = [], state) {
         : suggestedKey
           ? findTopicByPathKey(state, suggestedKey)
           : null;
+      const warning = !targetTopic && suggestedKey
+        ? `Target key "${suggestedKey}" is missing; select a valid topic to proceed.`
+        : '';
       const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
       const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
       const sourcePreview = renderTopicPreview(state, topic, { title: 'Source topic' });
       const targetPreview = renderTopicPreview(state, targetTopic, {
         title: targetTopic ? 'Target topic' : 'Target topic (not found)',
+        warning,
       });
       return `
         <article class="discussion">
@@ -798,7 +802,7 @@ function renderTopicSplitList(topics = [], state) {
       const suggestions = Array.isArray(pending.suggested) ? pending.suggested : [];
       const [first, second] = suggestions;
       const sourcePreview = renderTopicPreview(state, topic, { title: 'Source topic' });
-      const splitPreview = renderTopicSplitPreview(topic, suggestions);
+      const splitPreview = renderTopicSplitPreview(state, topic, suggestions);
       const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
       const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
       return `
@@ -845,7 +849,7 @@ function renderTopicSplitList(topics = [], state) {
     .join('\n');
 }
 
-function renderTopicHistoryList(entries = []) {
+function renderTopicHistoryList(entries = [], state) {
   if (!entries.length) {
     return '<p class="muted small">No topic history recorded yet.</p>';
   }
@@ -854,7 +858,7 @@ function renderTopicHistoryList(entries = []) {
       const when = entry.at ? formatTimestamp(entry.at) : '';
       const action = entry.action || 'update';
       const topicLabel = entry.topicLabel || 'topic';
-      const diffBlock = renderTopicHistoryDiff(entry);
+      const diffBlock = renderTopicHistoryDiff(entry, state);
       return `
         <li>
           <div>${escapeHtml(when)} · ${escapeHtml(topicLabel)} · ${escapeHtml(action)}</div>
@@ -866,13 +870,14 @@ function renderTopicHistoryList(entries = []) {
   return `<ul class="plain">${items}</ul>`;
 }
 
-function renderTopicHistoryDiff(entry = {}) {
+function renderTopicHistoryDiff(entry = {}, state) {
   const lines = [];
   const fromLabel = entry.fromLabel || entry.from || '';
   const toLabel = entry.toLabel || entry.to || '';
   const fromKey = entry.fromKey || '';
   const toKey = entry.toKey || '';
   const suggested = Array.isArray(entry.suggested) ? entry.suggested : [];
+  const topic = entry.topicId ? findTopicById(state, entry.topicId) : null;
 
   if (fromLabel || fromKey) {
     const before = [fromLabel, fromKey ? `(${fromKey})` : ''].filter(Boolean).join(' ');
@@ -888,6 +893,19 @@ function renderTopicHistoryDiff(entry = {}) {
   if (entry.label) {
     lines.push(`+ alias: ${entry.label}`);
   }
+  if (topic) {
+    const breadcrumb = formatTopicBreadcrumb(state, topic.id);
+    const { discussionCount, petitionCount, descendantCount } = describeTopicUsage(state, topic);
+    if (breadcrumb) {
+      lines.push(`current: ${breadcrumb}`);
+    }
+    if (topic.mergedIntoId) {
+      const mergedTarget = findTopicById(state, topic.mergedIntoId);
+      const targetLabel = mergedTarget?.label || mergedTarget?.key || topic.mergedIntoId;
+      lines.push(`mergedInto: ${targetLabel}`);
+    }
+    lines.push(`usage: discussions ${discussionCount} · petitions ${petitionCount} · descendants ${descendantCount}`);
+  }
   if (entry.reason) {
     lines.push(`reason: ${entry.reason}`);
   }
@@ -901,9 +919,10 @@ function renderTopicHistoryDiff(entry = {}) {
   `;
 }
 
-function renderTopicPreview(state, topic, { title = 'Topic preview' } = {}) {
+function renderTopicPreview(state, topic, { title = 'Topic preview', warning = '' } = {}) {
   if (!topic) {
-    return `<div class="callout"><p class="muted small">${escapeHtml(title)}</p><p class="muted small">Preview unavailable.</p></div>`;
+    const warningLine = warning ? `<p class="muted small">Warning: ${escapeHtml(warning)}</p>` : '';
+    return `<div class="callout"><p class="muted small">${escapeHtml(title)}</p><p class="muted small">Preview unavailable.</p>${warningLine}</div>`;
   }
   const breadcrumb = formatTopicBreadcrumb(state, topic.id) || topic.label || topic.key || 'topic';
   const pathKey = topic.pathKey || topic.key || '';
@@ -911,19 +930,24 @@ function renderTopicPreview(state, topic, { title = 'Topic preview' } = {}) {
   const aliasLine = aliases.length ? `Aliases: ${aliases.join(', ')}` : 'Aliases: none';
   const updatedAt = topic.updatedAt ? formatTimestamp(topic.updatedAt) : '';
   const mergedNote = topic.mergedIntoId ? 'Merged into another topic.' : '';
+  const usage = describeTopicUsage(state, topic);
+  const usageLine = `Usage: ${usage.discussionCount} discussions · ${usage.petitionCount} petitions · ${usage.descendantCount} descendants`;
+  const warningLine = warning ? `<p class="muted small">Warning: ${escapeHtml(warning)}</p>` : '';
   return `
     <div class="callout">
       <p class="muted small">${escapeHtml(title)}</p>
       <p><strong>${escapeHtml(String(breadcrumb))}</strong></p>
       <p class="muted small">Path: ${escapeHtml(String(pathKey))}</p>
       <p class="muted small">${escapeHtml(aliasLine)}</p>
+      <p class="muted small">${escapeHtml(usageLine)}</p>
       ${updatedAt ? `<p class="muted small">Updated: ${escapeHtml(updatedAt)}</p>` : ''}
       ${mergedNote ? `<p class="muted small">${escapeHtml(mergedNote)}</p>` : ''}
+      ${warningLine}
     </div>
   `;
 }
 
-function renderTopicSplitPreview(topic, suggestions = []) {
+function renderTopicSplitPreview(state, topic, suggestions = []) {
   if (!topic) {
     return `<div class="callout"><p class="muted small">Split preview unavailable.</p></div>`;
   }
@@ -937,7 +961,9 @@ function renderTopicSplitPreview(topic, suggestions = []) {
     .map((label) => {
       const key = normalizeTopicKey(label);
       const pathKey = parentPathKey ? `${parentPathKey}/${key}` : key;
-      return `${label} (${pathKey})`;
+      const exists = findTopicByPathKey(state, pathKey);
+      const status = exists ? 'exists' : 'new';
+      return `${status.toUpperCase()} ${label} (${pathKey})`;
     });
   const rendered = escapeHtml(lines.join('\n')).replace(/\n/g, '<br />');
   return `
@@ -946,6 +972,24 @@ function renderTopicSplitPreview(topic, suggestions = []) {
       <div class="muted small">${rendered}</div>
     </div>
   `;
+}
+
+function describeTopicUsage(state, topic) {
+  if (!topic) {
+    return { discussionCount: 0, petitionCount: 0, descendantCount: 0, warning: 'Topic not found' };
+  }
+  const discussions = filterVisibleEntries(state.discussions || [], state);
+  const petitions = filterVisibleEntries(state.petitions || [], state);
+  const discussionCount = discussions.filter((entry) => entry.topicId === topic.id).length;
+  const petitionCount = petitions.filter((entry) => entry.topicId === topic.id).length;
+  const descendantCount = countTopicDescendants(state, topic);
+  return { discussionCount, petitionCount, descendantCount, warning: '' };
+}
+
+function countTopicDescendants(state, topic) {
+  if (!topic?.pathKey) return 0;
+  const prefix = `${topic.pathKey}/`;
+  return (state?.topics || []).filter((entry) => entry?.pathKey?.startsWith(prefix)).length;
 }
 
 async function acceptTopicRename(state, body) {
