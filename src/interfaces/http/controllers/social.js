@@ -166,6 +166,10 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
   if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to follow.' });
   }
+  const permission = evaluateAction(state, person, 'post');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Follow action blocked.' });
+  }
 
   const body = await readRequestBody(req);
   const handle = sanitizeText(body.handle || '', 64);
@@ -205,6 +209,10 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
   if (!person) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to unfollow.' });
+  }
+  const permission = evaluateAction(state, person, 'post');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Unfollow action blocked.' });
   }
 
   const body = await readRequestBody(req);

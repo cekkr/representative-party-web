@@ -1,4 +1,5 @@
 import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
+import { getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { ingestVoteGossip } from '../../../modules/federation/ingest.js';
@@ -10,7 +11,8 @@ export function exportVotes({ res, state }) {
   if (!isModuleEnabled(state, 'votes')) {
     return sendModuleDisabledJson({ res, moduleKey: 'votes' });
   }
-  const envelopes = state.votes.map((vote) => vote.envelope || buildVoteEnvelope(vote));
+  const policy = getEffectivePolicy(state);
+  const envelopes = state.votes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
   return sendJson(res, 200, { entries: envelopes, replication: getReplicationProfile(state) });
 }
 

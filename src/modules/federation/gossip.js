@@ -1,6 +1,7 @@
 import { POLICIES } from '../../config.js';
 import { persistSettings } from '../../infra/persistence/storage.js';
 import { buildLedgerEnvelope } from '../circle/federation.js';
+import { getEffectivePolicy } from '../circle/policy.js';
 import { isModuleEnabled } from '../circle/modules.js';
 import { buildVoteEnvelope } from '../votes/voteEnvelope.js';
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
@@ -170,7 +171,10 @@ export function startGossipScheduler(state) {
 
 function buildVotesPayload(state) {
   if (!isModuleEnabled(state, 'votes')) return null;
-  const entries = filterVisibleEntries(state.votes || [], state).map((vote) => vote.envelope || buildVoteEnvelope(vote));
+  const policy = getEffectivePolicy(state);
+  const entries = filterVisibleEntries(state.votes || [], state).map(
+    (vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }),
+  );
   if (!entries.length) return null;
   return { entries };
 }

@@ -213,7 +213,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
     createdAt: new Date().toISOString(),
   };
   const stamped = stampLocalEntry(state, vote);
-  vote.envelope = buildVoteEnvelope({ ...stamped, ...vote });
+  vote.envelope = buildVoteEnvelope({ ...stamped, ...vote }, { policy, issuer: state.issuer });
 
   // Replace previous vote by same author on the same petition
   const filtered = state.votes.filter((entry) => !(entry.petitionId === petitionId && entry.authorHash === authorHash));

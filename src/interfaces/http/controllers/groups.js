@@ -44,6 +44,13 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   const action = body.action || 'create';
 
   if (action === 'join') {
+    if (!person) {
+      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to join a group.' });
+    }
+    const permission = evaluateAction(state, person, 'post');
+    if (!permission.allowed) {
+      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group join blocked.' });
+    }
     const groupId = sanitizeText(body.groupId || '', 80);
     const group = await joinGroup({ groupId, person, state });
     if (group) {
@@ -57,6 +64,13 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   }
 
   if (action === 'leave') {
+    if (!person) {
+      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to leave a group.' });
+    }
+    const permission = evaluateAction(state, person, 'post');
+    if (!permission.allowed) {
+      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group leave blocked.' });
+    }
     const groupId = sanitizeText(body.groupId || '', 80);
     const group = await leaveGroup({ groupId, person, state });
     if (group) {
@@ -89,6 +103,13 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   }
 
   if (action === 'voteElection') {
+    if (!person) {
+      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to vote in a group election.' });
+    }
+    const permission = evaluateAction(state, person, 'vote');
+    if (!permission.allowed) {
+      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Election voting blocked.' });
+    }
     const electionId = sanitizeText(body.electionId || '', 80);
     const candidateHash = sanitizeText(body.candidateHash || '', 80);
     const secondChoiceHash = sanitizeText(body.secondChoiceHash || '', 80);

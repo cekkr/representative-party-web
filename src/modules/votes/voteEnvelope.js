@@ -1,16 +1,16 @@
 import { createSign, createVerify } from 'node:crypto';
 
-import { POLICIES } from '../../config.js';
+import { ISSUER, POLICIES } from '../../config.js';
 
-const ISSUER = process.env.CIRCLE_ISSUER || 'local-circle';
-
-export function buildVoteEnvelope(vote) {
+export function buildVoteEnvelope(vote, { policy, issuer } = {}) {
   const status = vote.validationStatus === 'preview' ? 'preview' : 'validated';
+  const resolvedPolicy = policy || { id: POLICIES.id, version: POLICIES.version };
+  const resolvedIssuer = issuer || vote.issuer || ISSUER;
   const payload = {
-    issuer: ISSUER,
+    issuer: resolvedIssuer,
     policy: {
-      id: POLICIES.id,
-      version: POLICIES.version,
+      id: resolvedPolicy.id || POLICIES.id,
+      version: resolvedPolicy.version || POLICIES.version,
     },
     petitionId: vote.petitionId,
     authorHash: vote.authorHash,
