@@ -1,10 +1,17 @@
-import { createSign, createVerify } from 'node:crypto';
+import { createHash, createSign, createVerify } from 'node:crypto';
 
 import { POLICIES } from '../../config.js';
 
 const ISSUER = process.env.CIRCLE_ISSUER || 'local-circle';
 
+export function computeLedgerHash(entries = []) {
+  const normalized = [...(entries || [])].map((entry) => String(entry));
+  normalized.sort();
+  return createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
+}
+
 export function buildLedgerEnvelope(state) {
+  const entries = [...state.uniquenessLedger].map((entry) => String(entry)).sort();
   const envelope = {
     id: `ledger-${Date.now()}`,
     issuer: ISSUER,
@@ -15,7 +22,8 @@ export function buildLedgerEnvelope(state) {
       version: POLICIES.version,
       enforcement: POLICIES.enforceCircle ? 'strict' : 'observing',
     },
-    entries: [...state.uniquenessLedger],
+    entries,
+    ledgerHash: computeLedgerHash(entries),
     peers: [...state.peers],
   };
 

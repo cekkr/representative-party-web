@@ -36,7 +36,13 @@ export function describeProfile(profile) {
   const adapter = profile?.adapter || DATA.adapter;
   const validation = profile?.validationLevel || DATA.validationLevel;
   const preview = profile?.allowPreviews ?? DATA.allowPreviews;
-  return `${mode}/${adapter} (${validation}${preview ? ', previews on' : ''})`;
+  const gossip = mode === 'centralized' ? ', gossip off' : '';
+  return `${mode}/${adapter} (${validation}${preview ? ', previews on' : ''}${gossip})`;
+}
+
+export function isGossipEnabled(profile) {
+  const mode = profile?.mode || DATA.mode;
+  return mode !== 'centralized';
 }
 
 export function stampLocalEntry(state, entry = {}) {

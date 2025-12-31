@@ -1,12 +1,15 @@
 import { POLICIES } from '../../../config.js';
-import { filterVisibleEntries, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { computeLedgerHash } from '../../../modules/circle/federation.js';
+import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
+  const replication = getReplicationProfile(state);
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
+    ledgerHash: computeLedgerHash([...state.uniquenessLedger]),
     sessions: state.sessions.size,
     peers: state.peers.size,
     actors: state.actors.size,
@@ -24,7 +27,10 @@ export function renderHealth({ res, state }) {
     },
     policy: getCirclePolicyState(state),
     gates: buildPolicyGates(state),
-    data: getReplicationProfile(state),
+    data: replication,
+    gossip: {
+      ingestEnabled: isGossipEnabled(replication),
+    },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
     schemaVersion: state.meta?.schemaVersion || 0,

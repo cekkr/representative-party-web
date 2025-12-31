@@ -1,7 +1,7 @@
 import { URL } from 'node:url';
 
 import { renderAdmin, updateAdmin, exportAuditLog } from '../interfaces/http/controllers/admin.js';
-import { serveActor, inbox } from '../interfaces/http/controllers/activitypub.js';
+import { serveActor, serveOutbox, serveOutboxCollection, inbox } from '../interfaces/http/controllers/activitypub.js';
 import { completeAuth, startAuth } from '../interfaces/http/controllers/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../interfaces/http/controllers/circle.js';
 import { renderDiscussion, postDiscussion } from '../interfaces/http/controllers/discussion.js';
@@ -80,10 +80,21 @@ const routes = [
     prefix: '/ap/actors/',
     buildParams: (pathname) => {
       const segments = pathname.split('/').filter(Boolean);
-      return { hash: segments[segments.length - 1] };
+      if (!segments.length) return { hash: '', outbox: false };
+      const last = segments[segments.length - 1];
+      if (last === 'outbox') {
+        return { hash: segments[segments.length - 2] || '', outbox: true };
+      }
+      return { hash: last, outbox: false };
     },
-    action: ({ res, state, params }) => serveActor({ res, state, hash: params.hash }),
+    action: ({ req, res, state, params }) => {
+      if (params.outbox) {
+        return serveOutbox({ req, res, state, hash: params.hash });
+      }
+      return serveActor({ res, state, hash: params.hash });
+    },
   },
+  { method: 'GET', path: '/ap/outbox', action: serveOutboxCollection },
   { method: 'POST', path: '/ap/inbox', action: inbox },
   {
     method: 'GET',

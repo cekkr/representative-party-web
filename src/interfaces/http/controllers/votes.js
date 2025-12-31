@@ -2,7 +2,7 @@ import { buildVoteEnvelope, verifyVoteEnvelope } from '../../../modules/votes/vo
 import { persistVotes } from '../../../infra/persistence/storage.js';
 import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { decideStatus, getReplicationProfile } from '../../../modules/federation/replication.js';
+import { decideStatus, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -21,10 +21,17 @@ export async function gossipVotes({ req, res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation' });
   }
+  const profile = getReplicationProfile(state);
+  if (!isGossipEnabled(profile)) {
+    return sendJson(res, 403, {
+      error: 'gossip_disabled',
+      message: 'Gossip ingestion is disabled in centralized data mode.',
+      replication: profile,
+    });
+  }
   const body = await readRequestBody(req);
   const envelopes = Array.isArray(body.entries) ? body.entries : [];
   let added = 0;
-  const profile = getReplicationProfile(state);
 
   for (const envelope of envelopes) {
     const verification = verifyVoteEnvelope(envelope);

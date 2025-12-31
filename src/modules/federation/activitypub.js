@@ -6,7 +6,7 @@ export function createActor({ pidHash, baseUrl }) {
     type: 'Person',
     preferredUsername: pidHash.slice(0, 12),
     inbox: `${baseUrl}/ap/inbox`,
-    outbox: `${baseUrl}/ap/outbox`,
+    outbox: `${baseUrl}/ap/actors/${pidHash}/outbox`,
     hash: pidHash,
     published: new Date().toISOString(),
   };
