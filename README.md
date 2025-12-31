@@ -37,7 +37,7 @@ This project takes the opposite stance:
 - **Messaging‑first kernel**: discussion + forum + notifications work alone.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
-- **Petitions → votes pipeline**: proposals, signatures/quorum, deliberation feed, vote envelopes (signable).
+- **Petitions → votes pipeline**: proposals, collaborative revisions + version history, signatures/quorum, deliberation feed, vote envelopes (signable).
 - **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, and group actions with exportable summaries.
 - **Identity throttles**: per-handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
@@ -69,7 +69,7 @@ UI copy follows the same rule: “person” labels appear only when Circle enfor
 - Store only **blinded** identity hashes for uniqueness + session roles
 
 ### 3) Turn on proposals, votes, delegation, federation incrementally
-- Petitions and signatures (quorum gates)
+- Petitions, collaborative drafts, and signatures (quorum gates)
 - Signed vote envelopes and exports
 - Topic‑scoped delegation and group‑level recommendations
 - Peer gossip endpoints and quarantine hooks (stubbed)
@@ -160,7 +160,7 @@ sequenceDiagram
 - **Social feed**: micro‑post lane with typed follows (circle/interest/info/alerts) kept separate from petitions/votes.
 
 **Optional governance tools**
-- **Petitions**: draft proposals, signatures/quorum, stage transitions, discussion feed.
+- **Petitions**: draft proposals, collaborative revisions with history, signatures/quorum, stage transitions, discussion feed.
 - **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
 - **Delegation**: topic‑scoped delegation with conflict resolution UI.
 - **Groups/elections**: group‑level delegate preferences and elections (advisory by design, with optional conflict prompts); in `electionMode=vote`, recommendations prefer the latest closed election winner.
@@ -306,10 +306,10 @@ sequenceDiagram
 - **Policy gates:** role-aware checks (person/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
 - **Social feed & follows:** `/social/*` handles short posts + replies + reshares driven by typed follows (circle/interest/info/alerts). Follow edges and micro-posts persist through `src/infra/persistence/storage.js`; UX keeps this lane scoped to small talk/info so petitions/votes remain distinct.
-- **Petitions + votes:** `/petitions` drafts proposals with summary + optional full text; quorum moves proposals into discussion (or straight to vote when configured), and `/petitions/status` advances them to vote/closed. Signatures at `/petitions/sign`, discussion notes at `/petitions/comment`, and `/petitions/vote` records one vote per person and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes. The proposals page includes a discussion feed and stage filter with per-proposal anchors to jump between feed items and the list.
+- **Petitions + votes:** `/petitions` drafts proposals with summary + optional full text; `/petitions/update` records collaborative revisions and version history; quorum moves proposals into discussion (or straight to vote when configured), and `/petitions/status` advances them to vote/closed. Signatures at `/petitions/sign`, discussion notes at `/petitions/comment`, and `/petitions/vote` records one vote per person and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes. The proposals page includes a discussion feed and stage filter with per-proposal anchors to jump between feed items and the list.
 - **Delegation & groups:** `src/modules/delegation/delegation.js` stores per-topic delegates with auto-resolution; `/delegation` manages manual preferences and `/delegation/conflict` prompts when cachets clash. `src/modules/groups/*` publishes delegate preferences and runs elections with optional second/third-choice ballots and multi-round transfers; group policy (priority vs vote, conflict rules) is stored independently, vote-mode recommendations prefer the latest closed election winner, and the delegation UI surfaces election-winner metadata.
 - **Groups UI**: closed elections surface the winner, method, and round count directly in the group panel, and closing an election auto-updates the delegate cachet for that topic.
-- **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. A topic registry persists ids/path metadata so SSR views can render breadcrumbs. Configure anchors/pins + optional helper URL via `/admin`; a stub helper lives in `src/infra/workers/topic-gardener/server.py`.
+- **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. A topic registry persists ids/path metadata so SSR views can render breadcrumbs. Configure anchors/pins + optional helper URL via `/admin`; the helper runs from `src/infra/workers/topic-gardener/server.py` with scheduled refactor operations.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; `/notifications/preferences` stores per-user proposal comment alert preferences; backing store handled by `src/modules/messaging/notifications.js`.
 - **Admin & settings:** `/admin` toggles Circle policy, verification requirement, peers, extensions, core modules (petitions/votes/delegation/groups/federation/topic gardener/social), default group policy, topic gardener, gossip sync controls, and session overrides without editing JSON. Gossip push/pull controls disable when federation is off or data mode is centralized.
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors and `/ap/actors/{hash}/outbox` serves per-actor posts via `src/modules/federation/activitypub.js`; `/ap/outbox` serves a global collection; `/ap/inbox` is the placeholder for inbound federation payloads.

@@ -4,6 +4,7 @@ const DEFAULT_RATE_LIMITS = {
   forum_comment: { windowMs: 60_000, max: 10 },
   social_post: { windowMs: 60_000, max: 12 },
   petition_draft: { windowMs: 600_000, max: 2 },
+  petition_update: { windowMs: 300_000, max: 4 },
   petition_comment: { windowMs: 60_000, max: 6 },
 };
 
@@ -13,6 +14,7 @@ const RATE_LIMIT_LABELS = {
   forum_comment: 'forum comments',
   social_post: 'social posts',
   petition_draft: 'petition drafts',
+  petition_update: 'petition revisions',
   petition_comment: 'petition comments',
 };
 

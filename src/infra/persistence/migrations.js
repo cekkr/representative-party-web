@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 16;
+export const LATEST_SCHEMA_VERSION = 17;
 
 const MIGRATIONS = [
   {
@@ -23,6 +23,7 @@ const MIGRATIONS = [
         .filter(Boolean);
 
       return {
+        ...data,
         ledger: uniqueStrings(data.ledger),
         sessions: normalizedSessions,
         peers: uniqueStrings(data.peers),
@@ -359,6 +360,46 @@ const MIGRATIONS = [
       };
     },
   },
+  {
+    version: 17,
+    description: 'Add petition revision history and update stamps.',
+    up: (data) => {
+      const now = new Date().toISOString();
+      const petitions = (data.petitions || []).map((petition, index) => {
+        const petitionId = petition.id || `legacy-petition-${index}`;
+        const createdAt = petition.createdAt || now;
+        const updatedAt = petition.updatedAt || createdAt;
+        const updatedBy = petition.updatedBy || petition.authorHash || 'anonymous';
+        const baseRevision = {
+          id: randomUUID(),
+          petitionId,
+          title: petition.title || 'Untitled petition',
+          summary: petition.summary || '',
+          body: petition.body || petition.text || '',
+          note: 'Initial draft',
+          authorHash: petition.authorHash || 'anonymous',
+          authorHandle: petition.authorHandle || null,
+          topic: petition.topic || 'general',
+          topicId: petition.topicId || null,
+          topicPath: Array.isArray(petition.topicPath) ? petition.topicPath : [],
+          createdAt,
+        };
+        const existingRevisions = Array.isArray(petition.versions) ? petition.versions : [];
+        const versions = existingRevisions.length
+          ? existingRevisions.map((revision, revIndex) => normalizeRevision(revision, petition, revIndex, now))
+          : [baseRevision];
+        return {
+          ...petition,
+          id: petitionId,
+          createdAt,
+          updatedAt,
+          updatedBy,
+          versions,
+        };
+      });
+      return { ...data, petitions };
+    },
+  },
 ];
 
 export function runMigrations({ data, meta }) {
@@ -479,6 +520,25 @@ function normalizeTopicKey(value) {
   const text = String(value || '').trim().toLowerCase();
   const slug = text.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   return slug || 'general';
+}
+
+function normalizeRevision(revision, petition, index, fallbackTime) {
+  const createdAt = revision?.createdAt || petition.updatedAt || petition.createdAt || fallbackTime;
+  const authorHash = revision?.authorHash || petition.updatedBy || petition.authorHash || 'anonymous';
+  return {
+    id: revision?.id || randomUUID(),
+    petitionId: revision?.petitionId || petition.id || `legacy-petition-${index}`,
+    title: revision?.title || petition.title || 'Untitled petition',
+    summary: revision?.summary || petition.summary || '',
+    body: revision?.body || petition.body || petition.text || '',
+    note: revision?.note || '',
+    authorHash,
+    authorHandle: revision?.authorHandle || null,
+    topic: revision?.topic || petition.topic || 'general',
+    topicId: revision?.topicId || petition.topicId || null,
+    topicPath: Array.isArray(revision?.topicPath) ? revision.topicPath : petition.topicPath || [],
+    createdAt,
+  };
 }
 
 function parseTopicPath(rawTopic) {

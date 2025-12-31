@@ -1,16 +1,18 @@
+import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 
-export function renderDiscussionList(entries) {
+export function renderDiscussionList(entries, state) {
   if (!entries.length) {
     return '<p class="muted">No contributions yet. Be the first to start the debate.</p>';
   }
 
   return entries
     .map((entry) => {
+      const topicLabel = resolveTopicBreadcrumb(entry, state);
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(formatTopicBreadcrumb(entry))}</span>
+            <span class="pill">${escapeHtml(topicLabel)}</span>
             <span class="pill ghost">${escapeHtml(entry.stance)}</span>
             ${entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(entry)}
@@ -24,12 +26,16 @@ export function renderDiscussionList(entries) {
     .join('\n');
 }
 
-function formatTopicBreadcrumb(entry) {
-  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+function resolveTopicBreadcrumb(entry, state) {
+  if (entry?.topicId && state) {
+    const live = formatTopicBreadcrumbFromRegistry(state, entry.topicId);
+    if (live) return live;
+  }
+  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
     return entry.topicPath.join(' / ');
   }
-  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
-  return entry.topic || 'general';
+  if (entry?.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry?.topic || 'general';
 }
 
 function renderIssuerPill(entry) {

@@ -60,6 +60,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const petitionLookup = buildPetitionLookup(petitions);
   const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
   const stageFilterOptions = renderStageFilterOptions(stageFilter);
+  const actorLabels = getActorLabels(state);
   const html = await renderPage(
     'petitions',
     {
@@ -72,6 +73,10 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
         allowDelegation: delegationEnabled,
         allowVoting: modules.votes,
+        allowEditing: petitionGate.allowed,
+        editGate: petitionGate,
+        actorLabels,
+        state,
       }),
       conflictList: delegationEnabled ? conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected' : 'Delegation disabled.',
       delegationSuggestions: suggestions,
@@ -141,18 +146,36 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
   }
 
+  const createdAt = new Date().toISOString();
+  const petitionId = randomUUID();
   const petition = {
-    id: randomUUID(),
+    id: petitionId,
     title,
     summary,
     body: proposalText,
     authorHash: person?.pidHash || 'anonymous',
-    createdAt: new Date().toISOString(),
+    createdAt,
+    updatedAt: createdAt,
+    updatedBy: person?.pidHash || 'anonymous',
     status: 'draft',
     quorum: Number(body.quorum || 0),
     topic,
     topicId: topicResult.topic?.id || null,
     topicPath,
+    versions: [
+      buildPetitionRevision({
+        petitionId,
+        title,
+        summary,
+        body: proposalText,
+        person,
+        note: 'Initial draft',
+        topic,
+        topicId: topicResult.topic?.id || null,
+        topicPath,
+        createdAt,
+      }),
+    ],
   };
 
   const stamped = stampLocalEntry(state, petition);
@@ -173,6 +196,88 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
       expiresAt: null,
     });
   }
+
+  if (wantsPartial) {
+    return renderPetitions({ req, res, state, wantsPartial: true });
+  }
+
+  return sendRedirect(res, '/petitions');
+}
+
+export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+  }
+  const person = getPerson(req, state);
+  const permission = evaluateAction(state, person, 'petition');
+  if (!permission.allowed) {
+    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Proposal drafting not allowed.' });
+  }
+  const actorKey = resolveRateLimitActor({ person, req });
+  const rateLimit = consumeRateLimit(state, { key: 'petition_update', actorKey });
+  if (!rateLimit.allowed) {
+    return sendRateLimit(res, {
+      action: 'petition_update',
+      message: rateLimit.message,
+      retryAfter: rateLimit.retryAfter,
+      limit: rateLimit.limit,
+      remaining: rateLimit.remaining,
+      resetAt: rateLimit.resetAt,
+    });
+  }
+
+  const body = await readRequestBody(req);
+  const petitionId = sanitizeText(body.petitionId || '', 120);
+  const petition = state.petitions.find((p) => p.id === petitionId);
+  if (!petition) {
+    return sendJson(res, 404, { error: 'petition_not_found' });
+  }
+  if (!isEditableStage(petition.status)) {
+    return sendJson(res, 400, { error: 'petition_locked', message: 'Draft editing is closed once voting opens.' });
+  }
+
+  const title = sanitizeText(body.title || petition.title || '', 120);
+  const summary = sanitizeText(body.summary || petition.summary || '', 800);
+  const proposalText = sanitizeText(body.body || petition.body || '', 4000);
+  const note = sanitizeText(body.note || '', 240);
+  if (!title || !summary) {
+    return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
+  }
+
+  const classifiedTopic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
+  const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
+  const topic = topicResult.topic?.label || classifiedTopic || petition.topic || 'general';
+  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
+
+  const revision = buildPetitionRevision({
+    petitionId,
+    title,
+    summary,
+    body: proposalText,
+    person,
+    note: note || 'Draft update',
+    topic,
+    topicId: topicResult.topic?.id || petition.topicId || null,
+    topicPath,
+  });
+
+  petition.title = title;
+  petition.summary = summary;
+  petition.body = proposalText;
+  petition.topic = topic;
+  petition.topicId = topicResult.topic?.id || petition.topicId || null;
+  petition.topicPath = topicPath.length ? topicPath : petition.topicPath || [];
+  petition.updatedAt = revision.createdAt;
+  petition.updatedBy = revision.authorHash;
+  petition.versions = [revision, ...(Array.isArray(petition.versions) ? petition.versions : [])].slice(0, 50);
+
+  await persistPetitions(state);
+  await logTransaction(state, {
+    type: 'petition_revision',
+    actorHash: revision.authorHash,
+    petitionId,
+    payload: { revisionId: revision.id, note: revision.note || null, topic },
+  });
 
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
@@ -521,4 +626,37 @@ function buildDiscussionFeedItems(comments = [], petitionLookup, stageFilter) {
     items.push({ comment, petition });
   }
   return items.sort((a, b) => Date.parse(b.comment.createdAt) - Date.parse(a.comment.createdAt)).slice(0, 30);
+}
+
+function buildPetitionRevision({
+  petitionId,
+  title,
+  summary,
+  body,
+  person,
+  note,
+  topic,
+  topicId,
+  topicPath,
+  createdAt,
+} = {}) {
+  return {
+    id: randomUUID(),
+    petitionId,
+    title,
+    summary,
+    body,
+    note: note || '',
+    authorHash: person?.pidHash || 'anonymous',
+    authorHandle: person?.handle || null,
+    topic,
+    topicId: topicId || null,
+    topicPath: Array.isArray(topicPath) ? topicPath : [],
+    createdAt: createdAt || new Date().toISOString(),
+  };
+}
+
+function isEditableStage(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'draft' || normalized === 'discussion';
 }

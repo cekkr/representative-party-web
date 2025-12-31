@@ -44,14 +44,14 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
 - Social feed ships typed follows plus replies/mentions/tags/reshare, gated by the same role/ban checks.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
-- Petitions/signatures/votes pipeline exists with vote envelopes, transactions log + gossip summaries, and admin controls.
+- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Persistence adapters (json/memory/sql/kv), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
-- Structure manager UI for provider-local fields and attributes is available; topic preferences + topic registry/breadcrumbs + gardener stub are wired.
+- Structure manager UI for provider-local fields and attributes is available; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors are wired.
 
 ## Near-term next steps (Phase 2 focus)
-- Replace the topic gardener stub with a real worker (merge/split/rename scheduling), persist topic IDs/history, and surface topic breadcrumbs across discussion/forum/petitions.
-- Add collaborative petition drafting with version history, stage gating, and richer quorum/discussion UX (diffs, review prompts, stage badges).
+- Extend the topic gardener worker to persist merge/rename/split operations into topic history and surface admin review/accept flows for renamed topics.
+- Add petition revision diffs, review prompts, and pre-vote freeze UX so contributors can validate the final text before voting opens.
 - Expand the structure manager: schema versioning, inline validation errors, and a per-session attributes editor that respects provider-only storage and consent.
 - Wire outbound transports (email/SMS) with delivery logs and opt-in enforcement using provider-local preferences.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.

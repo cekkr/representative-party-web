@@ -1,26 +1,28 @@
+import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 
-export function renderForum(entries, person) {
+export function renderForum(entries, person, state) {
   const threads = entries.filter((e) => !e.parentId);
   const comments = entries.filter((e) => e.parentId);
   return {
-    threads: renderThreads(threads, comments, person),
+    threads: renderThreads(threads, comments, person, state),
     personHandle: person?.handle || 'Guest',
     roleLabel: person?.role || 'guest',
   };
 }
 
-function renderThreads(threads, comments, person) {
+function renderThreads(threads, comments, person, state) {
   if (!threads.length) {
     return '<p class="muted">No threads yet. Start a discussion.</p>';
   }
   return threads
     .map((thread) => {
+      const topicLabel = resolveTopicBreadcrumb(thread, state);
       const threadComments = comments.filter((c) => c.parentId === thread.id);
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(formatTopicBreadcrumb(thread))}</span>
+            <span class="pill">${escapeHtml(topicLabel)}</span>
             <span class="pill ghost">Article</span>
             ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(thread)}
@@ -46,12 +48,16 @@ function renderThreads(threads, comments, person) {
     .join('\n');
 }
 
-function formatTopicBreadcrumb(entry) {
-  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+function resolveTopicBreadcrumb(entry, state) {
+  if (entry?.topicId && state) {
+    const live = formatTopicBreadcrumbFromRegistry(state, entry.topicId);
+    if (live) return live;
+  }
+  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
     return entry.topicPath.join(' / ');
   }
-  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
-  return entry.topic || 'general';
+  if (entry?.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry?.topic || 'general';
 }
 
 function renderComments(comments) {

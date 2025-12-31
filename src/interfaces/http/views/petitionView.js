@@ -1,3 +1,4 @@
+import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 
 export function renderPetitionList(
@@ -11,6 +12,11 @@ export function renderPetitionList(
 ) {
   const allowDelegation = options.allowDelegation !== false;
   const allowVoting = options.allowVoting !== false;
+  const allowEditing = options.allowEditing === true;
+  const editGate = options.editGate || {};
+  const actorLabels = options.actorLabels || {};
+  const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
+  const state = options.state;
   if (!petitions.length) {
     return '<p class="muted">No proposals yet. Draft the first one.</p>';
   }
@@ -19,9 +25,12 @@ export function renderPetitionList(
 
   return petitions
     .map((petition) => {
+      const topicLabel = resolveTopicBreadcrumb(petition, state);
       const statusLabel = displayStatus(petition.status);
       const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
       const stageAllowsVoting = isVotingStage(petition.status);
+      const stageAllowsEditing = isEditableStage(petition.status);
+      const canEdit = allowEditing && stageAllowsEditing;
       const voteDisabled = !stageAllowsVoting || !allowVoting;
       const voteDisabledLabel = allowVoting
         ? 'Voting disabled while proposal is not in the vote stage.'
@@ -30,6 +39,7 @@ export function renderPetitionList(
       const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
       const comments = commentsByPetition.get(petition.id) || [];
       const lastCommentAt = getLastCommentAt(comments);
+      const revisions = Array.isArray(petition.versions) ? petition.versions : [];
       const anchorId = `petition-${petition.id}`;
       return `
         <article class="discussion" id="${escapeHtml(anchorId)}">
@@ -38,13 +48,16 @@ export function renderPetitionList(
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(petition)}
             <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
-            <span class="pill ghost">Topic: ${escapeHtml(formatTopicBreadcrumb(petition))}</span>
+            ${renderUpdatedMeta(petition)}
+            <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
             <span class="pill ghost">Signatures: ${signatureCount}</span>
             <span class="pill ghost">Discussion: ${comments.length}</span>
+            <span class="pill ghost">Revisions: ${revisions.length}</span>
             ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
             <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
           </div>
+          ${renderStageTimeline(petition)}
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
           ${renderProposalText(petition.body)}
@@ -77,6 +90,13 @@ export function renderPetitionList(
           `
           }
           ${renderDiscussionBlock(petition, comments)}
+          ${renderDraftUpdateForm(petition, {
+            canEdit,
+            allowEditing,
+            editGate,
+            actorLabelPlural,
+          })}
+          ${renderRevisionHistory(petition, state)}
           ${canModerate ? renderModerationForm(petition) : ''}
         </article>
       `;
@@ -84,12 +104,16 @@ export function renderPetitionList(
     .join('\n');
 }
 
-function formatTopicBreadcrumb(entry) {
-  if (Array.isArray(entry.topicPath) && entry.topicPath.length) {
+function resolveTopicBreadcrumb(entry, state) {
+  if (entry?.topicId && state) {
+    const live = formatTopicBreadcrumbFromRegistry(state, entry.topicId);
+    if (live) return live;
+  }
+  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
     return entry.topicPath.join(' / ');
   }
-  if (entry.topicBreadcrumb) return entry.topicBreadcrumb;
-  return entry.topic || 'general';
+  if (entry?.topicBreadcrumb) return entry.topicBreadcrumb;
+  return entry?.topic || 'general';
 }
 
 function buildVoteBuckets(votes) {
@@ -133,6 +157,90 @@ function renderProposalText(text) {
     <details class="note">
       <summary>Proposal text</summary>
       <pre>${escapeHtml(text)}</pre>
+    </details>
+  `;
+}
+
+function renderStageTimeline(petition) {
+  const stage = normalizeStage(petition.status);
+  const stages = ['draft', 'discussion', 'vote', 'closed'];
+  const pills = stages
+    .map((entry) => {
+      const label = formatStageLabel(entry);
+      const klass = stage === entry ? 'pill' : 'pill ghost';
+      return `<span class="${klass}">${escapeHtml(label)}</span>`;
+    })
+    .join('');
+  return `
+    <div class="discussion__meta">
+      <span class="pill ghost">Stage</span>
+      ${pills}
+    </div>
+  `;
+}
+
+function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, actorLabelPlural } = {}) {
+  if (!allowEditing) {
+    return '';
+  }
+  if (!canEdit) {
+    return '<p class="muted small">Draft editing closes once the vote stage opens.</p>';
+  }
+  const gateMessage = editGate?.allowed ? '' : editGate?.message || editGate?.reason || '';
+  const gateNotice = gateMessage ? `<p class="muted small">${escapeHtml(gateMessage)}</p>` : '';
+  return `
+    <details class="note">
+      <summary>Update draft (collaborative)</summary>
+      <p class="muted small">Verified ${escapeHtml(actorLabelPlural)} can refine this proposal while it is in draft or discussion.</p>
+      ${gateNotice}
+      <form class="stack" method="post" action="/petitions/update" data-enhance="petitions">
+        <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+        <label class="field">
+          <span>Title</span>
+          <input name="title" value="${escapeHtml(petition.title || '')}" required />
+        </label>
+        <label class="field">
+          <span>Summary</span>
+          <textarea name="summary" rows="3" required>${escapeHtml(petition.summary || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Proposal text (optional)</span>
+          <textarea name="body" rows="6">${escapeHtml(petition.body || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Revision note (optional)</span>
+          <input name="note" placeholder="What changed?" />
+        </label>
+        <button type="submit" class="ghost">Save revision</button>
+      </form>
+    </details>
+  `;
+}
+
+function renderRevisionHistory(petition, state) {
+  const versions = Array.isArray(petition.versions) ? petition.versions : [];
+  if (!versions.length) return '';
+  const items = versions
+    .map((revision) => {
+      const when = revision.createdAt ? new Date(revision.createdAt).toLocaleString() : '';
+      const author = String(revision.authorHandle || revision.authorHash || 'anonymous');
+      const note = revision.note ? `<div class="muted small">${escapeHtml(String(revision.note))}</div>` : '';
+      const topicLabel = resolveTopicBreadcrumb(revision, state);
+      return `
+        <li>
+          <div class="muted small">${escapeHtml(when)} · ${escapeHtml(author)} · Topic: ${escapeHtml(topicLabel)}</div>
+          <div>${escapeHtml(revision.title || petition.title || 'Untitled')}</div>
+          ${note}
+        </li>
+      `;
+    })
+    .join('');
+  return `
+    <details class="note">
+      <summary>Version history (${versions.length})</summary>
+      <ul class="plain">
+        ${items}
+      </ul>
     </details>
   `;
 }
@@ -227,6 +335,25 @@ function isVotingStage(status = '') {
   return normalized === 'open' || normalized === 'vote';
 }
 
+function isEditableStage(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  return normalized === 'draft' || normalized === 'discussion';
+}
+
+function normalizeStage(status = '') {
+  const normalized = String(status || '').toLowerCase();
+  if (normalized === 'open') return 'vote';
+  if (normalized === 'vote') return 'vote';
+  if (normalized === 'discussion') return 'discussion';
+  if (normalized === 'closed') return 'closed';
+  return 'draft';
+}
+
+function formatStageLabel(stage) {
+  if (!stage) return '';
+  return stage.charAt(0).toUpperCase() + stage.slice(1);
+}
+
 function getLastCommentAt(comments) {
   if (!comments.length) return '';
   let latest = 0;
@@ -237,6 +364,15 @@ function getLastCommentAt(comments) {
     }
   }
   return latest ? new Date(latest).toLocaleString() : '';
+}
+
+function renderUpdatedMeta(petition) {
+  const updatedAt = petition.updatedAt || '';
+  if (!updatedAt) return '';
+  if (petition.createdAt && petition.createdAt === updatedAt && !petition.updatedBy) return '';
+  const label = new Date(updatedAt).toLocaleString();
+  const author = petition.updatedBy ? ` by ${petition.updatedBy}` : '';
+  return `<span class="muted small">Updated ${escapeHtml(label)}${escapeHtml(author)}</span>`;
 }
 
 function renderIssuerPill(entry) {

@@ -8,6 +8,7 @@ import { renderDiscussion, postDiscussion } from '../interfaces/http/controllers
 import {
   renderPetitions,
   submitPetition,
+  updatePetitionDraft,
   castVote,
   updatePetitionStatus,
   signPetitionRoute,
@@ -44,6 +45,7 @@ const routes = [
   { method: 'POST', path: '/forum/comment', action: postComment },
   { method: 'GET', path: '/petitions', action: renderPetitions },
   { method: 'POST', path: '/petitions', action: submitPetition },
+  { method: 'POST', path: '/petitions/update', action: updatePetitionDraft },
   { method: 'POST', path: '/petitions/sign', action: signPetitionRoute },
   { method: 'POST', path: '/petitions/comment', action: postPetitionComment },
   { method: 'POST', path: '/petitions/vote', action: castVote },

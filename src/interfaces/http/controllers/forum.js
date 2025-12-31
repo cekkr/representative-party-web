@@ -23,7 +23,7 @@ export async function renderForumRoute({ req, res, state, wantsPartial }) {
   });
   const html = await renderPage(
     'forum',
-    renderForum(forumEntries, person),
+    renderForum(forumEntries, person, state),
     { wantsPartial, title: 'Forum', state },
   );
   return sendHtml(res, html);
@@ -81,7 +81,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
     payload: { threadId: entry.id, topic },
   });
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum', state });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person, state), { wantsPartial: true, title: 'Forum', state });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');
@@ -146,7 +146,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
     payload: { threadId: parentId },
   });
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person), { wantsPartial: true, title: 'Forum', state });
+    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person, state), { wantsPartial: true, title: 'Forum', state });
     return sendHtml(res, html);
   }
   return sendRedirect(res, '/forum');

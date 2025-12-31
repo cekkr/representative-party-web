@@ -138,7 +138,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       personStatus: person
         ? `Posting as verified ${actorLabels.actorLabel} bound to a blinded PID hash.`
         : 'Start the wallet flow to post with accountability.',
-      discussionList: renderDiscussionList(discussionEntries),
+      discussionList: renderDiscussionList(discussionEntries, state),
       verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
       circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
       policyId: policy.id,

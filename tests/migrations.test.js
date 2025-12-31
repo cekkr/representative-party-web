@@ -9,7 +9,19 @@ test('migrations normalize sessions and settings', () => {
     sessions: [{ sessionId: 'sess-123', pidHash: 'hash-a' }],
     peers: ['https://peer.example'],
     discussions: [],
-    petitions: [],
+    petitions: [
+      {
+        id: 'petition-1',
+        title: 'Test petition',
+        summary: 'Test summary',
+        body: 'Test body',
+        authorHash: 'hash-a',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        status: 'draft',
+        quorum: 0,
+        topic: 'general',
+      },
+    ],
     signatures: [],
     votes: [],
     delegations: [],
@@ -37,6 +49,9 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(data.settings.modules);
   assert.equal(data.settings.modules.petitions, true);
   assert.ok(Array.isArray(data.petitions));
+  assert.ok(data.petitions[0].versions?.length);
+  assert.equal(data.petitions[0].updatedAt, data.petitions[0].createdAt);
+  assert.equal(data.petitions[0].updatedBy, data.petitions[0].authorHash);
   assert.ok(Array.isArray(data.signatures));
   assert.ok(Array.isArray(data.votes));
   assert.ok(Array.isArray(data.delegations));
