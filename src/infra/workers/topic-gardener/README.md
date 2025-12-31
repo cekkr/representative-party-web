@@ -22,3 +22,4 @@ python server.py --port 8070 --refactor-seconds 90
 ```
 
 The Node side reads `topicGardenerUrl` and anchors/pins from `/admin` (persisted to `settings.json`) and calls this helper via `classifyWithGardener` in `src/modules/topics/topicGardenerClient.js`.
+Topic gardener operations are polled by the app scheduler (or via the `/admin` sync button) to populate topic history and pending rename reviews.

@@ -146,6 +146,23 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Topics</p>
+  <h2>Topic gardener review</h2>
+  <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>
+  <p class="muted small">Last operation: {{topicGardenerLastOperationAt}}</p>
+  <p class="muted small">Pending renames: {{topicRenameCount}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="topic-gardener-sync" />
+    <div class="cta-row">
+      <button class="ghost" type="submit">Sync topic gardener now</button>
+    </div>
+  </form>
+  <div class="discussion-list">
+    {{topicRenameList}}
+  </div>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Federation</p>
   <h2>Gossip sync</h2>
   <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>

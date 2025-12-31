@@ -29,6 +29,12 @@ export function normalizeTopicKey(value) {
   return slug || 'general';
 }
 
+export function labelFromKey(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'general';
+  return normalizeTopicLabel(text.replace(/-/g, ' '));
+}
+
 export function findTopicById(state, topicId) {
   if (!topicId) return null;
   return (state?.topics || []).find((topic) => topic.id === topicId) || null;
@@ -58,6 +64,64 @@ export function formatTopicBreadcrumb(state, topicId, { separator = ' / ' } = {}
   const path = resolveTopicPath(state, topicId);
   if (!path.length) return '';
   return path.map((topic) => topic.label || topic.key || 'general').join(separator);
+}
+
+export function applyTopicRename(state, topicId, { label, reason = 'manual', source = 'admin' } = {}) {
+  if (!state) return { updated: false, reason: 'missing_state' };
+  if (!state.topics) state.topics = [];
+  const topic = findTopicById(state, topicId);
+  if (!topic) return { updated: false, reason: 'not_found' };
+  const previousLabel = topic.label;
+  const previousKey = topic.key;
+  const previousPathKey = topic.pathKey || previousKey || 'general';
+  const nextLabel = normalizeTopicLabel(label || topic.pendingRename?.toLabel || previousLabel);
+  const nextKey = normalizeTopicKey(topic.pendingRename?.toKey || nextLabel);
+  const parent = topic.parentId ? findTopicById(state, topic.parentId) : null;
+  const parentPathKey = parent?.pathKey || '';
+  const newPathKey = parentPathKey ? `${parentPathKey}/${nextKey}` : nextKey;
+  if (newPathKey !== previousPathKey) {
+    const conflict = (state.topics || []).find((entry) => entry.id !== topic.id && entry.pathKey === newPathKey);
+    if (conflict) {
+      return { updated: false, reason: 'conflict', conflictId: conflict.id };
+    }
+  }
+
+  const now = new Date().toISOString();
+  const aliases = new Set(Array.isArray(topic.aliases) ? topic.aliases : []);
+  if (previousLabel) aliases.add(previousLabel);
+  topic.aliases = [...aliases];
+  topic.label = nextLabel;
+  topic.key = nextKey;
+  topic.slug = nextKey;
+  const oldPathPrefix = previousPathKey;
+  const newPathPrefix = newPathKey;
+  for (const entry of state.topics) {
+    if (!entry?.pathKey) continue;
+    if (entry.pathKey === oldPathPrefix) {
+      entry.pathKey = newPathPrefix;
+    } else if (entry.pathKey.startsWith(`${oldPathPrefix}/`)) {
+      entry.pathKey = `${newPathPrefix}${entry.pathKey.slice(oldPathPrefix.length)}`;
+    }
+  }
+  topic.updatedAt = now;
+  topic.pendingRename = null;
+  appendTopicHistory(topic, {
+    at: now,
+    action: 'rename',
+    source,
+    reason,
+    fromLabel: previousLabel,
+    toLabel: nextLabel,
+    fromKey: previousPathKey,
+    toKey: newPathKey,
+  });
+  return { updated: true, topic };
+}
+
+export function appendTopicHistory(topic, entry, { limit = 20 } = {}) {
+  if (!topic || !entry) return;
+  const history = Array.isArray(topic.history) ? topic.history : [];
+  topic.history = [...history, entry].slice(-limit);
 }
 
 export async function ensureTopicPath(state, rawTopic, { source = 'manual', persist = true } = {}) {

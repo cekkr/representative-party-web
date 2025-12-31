@@ -4,6 +4,7 @@ import { HOST, PORT } from '../config.js';
 import { loadExtensions } from '../modules/extensions/registry.js';
 import { startGossipScheduler } from '../modules/federation/gossip.js';
 import { loadOutboundTransports } from '../modules/messaging/transports.js';
+import { startTopicGardenerScheduler } from '../modules/topics/gardenerSync.js';
 import { initState } from '../infra/persistence/storage.js';
 import { sendJson } from '../shared/utils/http.js';
 import { routeRequest } from './router.js';
@@ -15,6 +16,7 @@ export async function startServer() {
   // wire outbound transports (email/SMS/webhook); defaults log-only if not configured
   state.outbound = await loadOutboundTransports();
   state.gossipStop = startGossipScheduler(state);
+  state.topicGardenerStop = startTopicGardenerScheduler(state);
 
   const server = http.createServer((req, res) => {
     routeRequest(req, res, state).catch((error) => {

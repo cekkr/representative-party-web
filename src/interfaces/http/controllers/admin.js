@@ -1,10 +1,13 @@
 import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
+import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
+import { appendTopicHistory, applyTopicRename, findTopicById } from '../../../modules/topics/registry.js';
 import {
   persistPeers,
   persistProfileAttributes,
   persistProfileStructures,
+  persistTopics,
   persistSessions,
   persistSettings,
 } from '../../../infra/persistence/storage.js';
@@ -108,6 +111,37 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     );
     return sendHtml(res, html);
   }
+  if (intent === 'topic-gardener-sync') {
+    const summary = await syncTopicGardenerOperations(state, { source: 'admin' });
+    const availableExtensions = await listAvailableExtensions(state);
+    const flash = formatTopicGardenerFlash(summary);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { flash, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-rename-accept') {
+    const result = await acceptTopicRename(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'topic-rename-dismiss') {
+    const result = await dismissTopicRename(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
     const availableExtensions = await listAvailableExtensions(state);
@@ -168,6 +202,13 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const dataValidation = normalizeValidationLevel(body.dataValidation || prev.data?.validationLevel || DATA_DEFAULTS.validationLevel);
   const dataPreview = parseBoolean(body.dataPreview, prev.data?.allowPreviews ?? DATA_DEFAULTS.allowPreviews);
 
+  const nextTopicGardener = {
+    ...(prev.topicGardener || {}),
+    url: topicGardenerUrl,
+    anchors: topicAnchors.length ? topicAnchors : DEFAULT_TOPIC_ANCHORS,
+    pinned: topicPinned,
+  };
+
   state.settings = {
     ...prev,
     initialized: true,
@@ -183,11 +224,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       electionMode: defaultElectionMode,
       conflictRule: defaultConflictRule,
     },
-    topicGardener: {
-      url: topicGardenerUrl,
-      anchors: topicAnchors.length ? topicAnchors : DEFAULT_TOPIC_ANCHORS,
-      pinned: topicPinned,
-    },
+    topicGardener: nextTopicGardener,
     modules,
     data: {
       mode: dataMode,
@@ -428,6 +465,13 @@ function buildAdminViewModel(
   const topicConfig = state.settings?.topicGardener || {};
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
+  const topicRenames = listPendingTopicRenames(state);
+  const topicRenameList = renderTopicRenameList(topicRenames);
+  const topicRenameCount = topicRenames.length;
+  const topicGardenerSyncAt = topicConfig.lastSyncAt ? formatTimestamp(topicConfig.lastSyncAt) : 'Not yet';
+  const topicGardenerLastOperationAt = topicConfig.lastOperationAt
+    ? formatTimestamp(new Date(Number(topicConfig.lastOperationAt) * 1000).toISOString())
+    : 'Not yet';
   const replicationProfile = getReplicationProfile(state);
   const dataConfig = state.settings?.data || DATA_DEFAULTS;
   const providerFields = normalizeProviderFields(state.profileStructures || []);
@@ -500,6 +544,10 @@ function buildAdminViewModel(
     topicGardenerUrl: topicConfig.url || '',
     topicAnchors,
     topicPinned,
+    topicRenameList,
+    topicRenameCount,
+    topicGardenerSyncAt,
+    topicGardenerLastOperationAt,
     dataProfile: describeProfile(replicationProfile),
     dataMode: replicationProfile.mode,
     dataAdapter: replicationProfile.adapter,
@@ -547,6 +595,90 @@ function renderAttributesPayload(provider = {}) {
   return Object.entries(provider || {})
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n');
+}
+
+function listPendingTopicRenames(state) {
+  return (state?.topics || []).filter((topic) => topic?.pendingRename);
+}
+
+function renderTopicRenameList(topics = []) {
+  if (!topics.length) {
+    return '<p class="muted small">No pending topic renames.</p>';
+  }
+  return topics
+    .map((topic) => {
+      const pending = topic.pendingRename || {};
+      const suggestedLabel = pending.toLabel || '';
+      const reason = pending.reason ? `<span class="muted small">${escapeHtml(String(pending.reason))}</span>` : '';
+      const requestedAt = pending.at ? `<span class="muted small">${escapeHtml(formatTimestamp(pending.at))}</span>` : '';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">Rename</span>
+            <span class="pill ghost">${escapeHtml(topic.label || topic.key || 'topic')}</span>
+            ${reason}
+            ${requestedAt}
+          </div>
+          <form class="stack" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-rename-accept" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <label class="field">
+              <span>Suggested label</span>
+              <input name="renameLabel" value="${escapeHtml(String(suggestedLabel))}" />
+            </label>
+            <div class="cta-row">
+              <button class="ghost" type="submit">Accept rename</button>
+            </div>
+          </form>
+          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-rename-dismiss" />
+            <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
+            <button class="ghost" type="submit">Dismiss</button>
+          </form>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+async function acceptTopicRename(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const renameLabel = sanitizeText(body.renameLabel || '', 64);
+  const topic = findTopicById(state, topicId);
+  if (!topic) {
+    return { flash: 'Topic not found.' };
+  }
+  const result = applyTopicRename(state, topicId, {
+    label: renameLabel || topic.pendingRename?.toLabel,
+    reason: topic.pendingRename?.reason || 'admin_accept',
+    source: 'admin',
+  });
+  if (!result.updated) {
+    return { flash: `Rename skipped (${result.reason || 'no_change'}).` };
+  }
+  await persistTopics(state);
+  return { flash: `Renamed topic to "${topic.label}".` };
+}
+
+async function dismissTopicRename(state, body) {
+  const topicId = sanitizeText(body.topicId || '', 120);
+  const topic = findTopicById(state, topicId);
+  if (!topic?.pendingRename) {
+    return { flash: 'No pending rename to dismiss.' };
+  }
+  const now = new Date().toISOString();
+  appendTopicHistory(topic, {
+    at: now,
+    action: 'rename_dismissed',
+    source: 'admin',
+    reason: topic.pendingRename?.reason || 'dismissed',
+    from: topic.label,
+    to: topic.pendingRename?.toLabel || null,
+  });
+  topic.pendingRename = null;
+  topic.updatedAt = now;
+  await persistTopics(state);
+  return { flash: 'Topic rename dismissed.' };
 }
 
 function recordAdminAudit(state, { action, summary }) {
@@ -895,6 +1027,17 @@ function formatGossipFlash(summary) {
     return `Gossip sync completed with errors: ${ledgerLine}, ${votesLine}, ${transactionsLine}.`;
   }
   return `Gossip sync complete: ${ledgerLine}, ${votesLine}, ${transactionsLine}.`;
+}
+
+function formatTopicGardenerFlash(summary = {}) {
+  if (!summary || summary.reason) {
+    const reason = summary?.reason ? ` (${summary.reason})` : '';
+    return `Topic gardener sync skipped${reason}.`;
+  }
+  const updated = Number(summary.updatedTopics || 0);
+  const renames = Number(summary.pendingRenames || 0);
+  const processed = Number(summary.processed || 0);
+  return `Topic gardener synced ${processed} ops (${updated} topic updates, ${renames} rename suggestions).`;
 }
 
 function roleSelectFlags(role) {

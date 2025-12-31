@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ensureTopicPath, formatTopicBreadcrumb, resolveTopicPath } from '../src/modules/topics/registry.js';
+import { applyTopicRename, ensureTopicPath, formatTopicBreadcrumb, resolveTopicPath } from '../src/modules/topics/registry.js';
 
 test('ensureTopicPath creates nested topics and reuses existing path', async () => {
   const state = { topics: [] };
@@ -19,4 +19,20 @@ test('ensureTopicPath creates nested topics and reuses existing path', async () 
 
   const resolved = resolveTopicPath(state, first.topic.id);
   assert.deepEqual(resolved.map((entry) => entry.label), ['Energy', 'Solar']);
+});
+
+test('applyTopicRename updates path keys for descendants', async () => {
+  const state = { topics: [] };
+  const result = await ensureTopicPath(state, 'Economy / Energy', { source: 'test', persist: false });
+  const path = resolveTopicPath(state, result.topic.id);
+  const parent = path[0];
+  const child = path[1];
+
+  const renamed = applyTopicRename(state, parent.id, { label: 'Finance', reason: 'test' });
+  assert.equal(renamed.updated, true);
+  const updatedParent = state.topics.find((topic) => topic.id === parent.id);
+  const updatedChild = state.topics.find((topic) => topic.id === child.id);
+  assert.equal(updatedParent.label, 'Finance');
+  assert.equal(updatedParent.pathKey, 'finance');
+  assert.equal(updatedChild.pathKey, 'finance/energy');
 });

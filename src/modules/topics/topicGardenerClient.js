@@ -63,6 +63,29 @@ export async function classifyWithGardener(text, state, { anchors, pinned } = {}
   return null;
 }
 
+export async function fetchGardenerOperations(state) {
+  const config = getTopicConfig(state);
+  if (state?.helpers?.topicGardener?.operations) {
+    try {
+      const result = await state.helpers.topicGardener.operations();
+      return Array.isArray(result) ? result : result?.operations || [];
+    } catch (error) {
+      console.warn(`[topic-gardener] helper operations failed: ${error.message}`);
+      return [];
+    }
+  }
+  if (!config.url) return [];
+  const operationsUrl = resolveGardenerEndpoint(config.url, '/operations');
+  if (!operationsUrl) return [];
+  try {
+    const response = await getJson(operationsUrl);
+    return Array.isArray(response?.operations) ? response.operations : [];
+  } catch (error) {
+    console.warn(`[topic-gardener] operations request failed: ${error.message}`);
+  }
+  return [];
+}
+
 function normalizeList(list) {
   if (!Array.isArray(list)) return [];
   const deduped = new Set(
@@ -80,6 +103,20 @@ function parseEnvList(value, fallback = []) {
     .map((entry) => entry.trim())
     .filter(Boolean);
   return parts.length ? parts : fallback;
+}
+
+function resolveGardenerEndpoint(urlString, endpoint) {
+  if (!urlString) return '';
+  try {
+    const url = new URL(urlString);
+    const trimmed = url.pathname.replace(/\/+$/, '');
+    const suffix = trimmed.endsWith('/classify') ? trimmed.slice(0, -'/classify'.length) : trimmed;
+    const base = suffix || '';
+    url.pathname = `${base}${endpoint}`;
+    return url.toString();
+  } catch (_error) {
+    return '';
+  }
 }
 
 function postJson(urlString, payload) {
@@ -116,6 +153,43 @@ function postJson(urlString, payload) {
       req.destroy(new Error('Topic gardener request timed out'));
     });
     req.write(JSON.stringify(payload));
+    req.end();
+  });
+}
+
+function getJson(urlString) {
+  const url = new URL(urlString);
+  const isHttps = url.protocol === 'https:';
+  const options = {
+    method: 'GET',
+    hostname: url.hostname,
+    port: url.port || (isHttps ? 443 : 80),
+    path: `${url.pathname}${url.search || ''}`,
+    headers: { Accept: 'application/json' },
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = (isHttps ? httpsRequest : httpRequest)(options, (res) => {
+      let raw = '';
+      res.setEncoding('utf8');
+      res.on('data', (chunk) => {
+        raw += chunk;
+      });
+      res.on('end', () => {
+        if (!raw) return resolve({});
+        try {
+          const parsed = JSON.parse(raw);
+          return resolve(parsed);
+        } catch (_error) {
+          return reject(new Error('Invalid JSON response from topic gardener'));
+        }
+      });
+    });
+
+    req.on('error', (error) => reject(error));
+    req.setTimeout(2000, () => {
+      req.destroy(new Error('Topic gardener request timed out'));
+    });
     req.end();
   });
 }

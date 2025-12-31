@@ -25,6 +25,8 @@ export const POLICIES = {
   gossipIntervalSeconds: Number(process.env.GOSSIP_INTERVAL_SECONDS || 300),
 };
 
+export const TOPIC_GARDENER_SYNC_SECONDS = Number(process.env.TOPIC_GARDENER_SYNC_SECONDS || 120);
+
 export const DATA_DEFAULTS = {
   mode: 'centralized',
   adapter: 'json',
