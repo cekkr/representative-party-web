@@ -2,3 +2,7 @@
 - The abstraction fever and feature creep: for an already existing organization the less traumatic approach is a "messagging platform" that can extends itself in base of structure and staff requirements and capabilities. This "representative party web framework", instead, tends to "force too much" an organization to adapt to its vision. The conceptual reality it's in the middle: this frameworks should born to be basically a "messagging platform", a very basic social network with decentralized providers optional support, and then be able to extend itself throgh personalized but cohesive policies and extensions inside a provider and, overall, inside a "social network circle" (or "party circle" in political context)
 
 - Remember to maintain the protocol concept: not only "shared data across providers", but also "possible shared client across providers" (especially in the same social-party circle-ring)
+
+Go ahead pre-cooked prompt:
+[AGENTS.md](AGENTS.md) 
+Continue with other roadmap implementations (and improvements/fixes where needed) in source code in various contexts (UX, features, data management and P2P protocol...). Remember to update README.md
