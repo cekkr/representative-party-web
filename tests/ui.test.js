@@ -482,6 +482,77 @@ test('UI notifications surface mentions and persist preferences', { timeout: 600
   );
 });
 
+test('UI petition revisions and freeze state update', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const authorSession = await createVerifiedSession(server.baseUrl, { pidHash: 'author-ui-revision' });
+  const moderatorSession = await createVerifiedSession(server.baseUrl, { pidHash: 'moderator-ui-revision' });
+
+  await postForm(
+    `${server.baseUrl}/admin`,
+    { intent: 'session', sessionId: moderatorSession.sessionId, sessionRole: 'moderator' },
+    { partial: true },
+  );
+
+  await postForm(
+    `${server.baseUrl}/petitions`,
+    { title: 'Revision Petition', summary: 'Initial summary', body: 'Initial body' },
+    { cookie: authorSession.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const authorPage = await browser.newPage();
+  await configurePage(authorPage, server.baseUrl);
+  await setSessionCookie(authorPage, server.baseUrl, authorSession.sessionId);
+  await authorPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+
+  await authorPage.evaluate(() => {
+    const details = Array.from(document.querySelectorAll('details.note')).find((node) =>
+      node.querySelector('summary')?.textContent?.includes('Update draft'),
+    );
+    if (details) details.open = true;
+  });
+
+  const updateForm = await authorPage.$('form[action="/petitions/update"]');
+  assert.ok(updateForm);
+  const summaryField = await updateForm.$('textarea[name="summary"]');
+  await summaryField.click({ clickCount: 3 });
+  await summaryField.type('Revised summary');
+  const noteField = await updateForm.$('input[name="note"]');
+  if (noteField) {
+    await noteField.type('Refined copy');
+  }
+  const updateButton = await updateForm.$('button[type="submit"]');
+  await updateButton.click();
+  await authorPage.waitForFunction(() => document.body.textContent.includes('Revisions: 2'));
+  await authorPage.waitForFunction(() => document.body.textContent.includes('Revised summary'));
+
+  const moderatorPage = await browser.newPage();
+  await configurePage(moderatorPage, server.baseUrl);
+  await setSessionCookie(moderatorPage, server.baseUrl, moderatorSession.sessionId);
+  await moderatorPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+
+  const statusForm = await moderatorPage.$('form[action="/petitions/status"]');
+  assert.ok(statusForm);
+  const statusSelect = await statusForm.$('select[name="status"]');
+  await statusSelect.select('vote');
+  const confirmFreeze = await statusForm.$('input[name="confirmFreeze"]');
+  await confirmFreeze.click();
+  const applyButton = await statusForm.$('button[type="submit"]');
+  await applyButton.click();
+  await moderatorPage.waitForFunction(() => document.body.textContent.includes('Frozen proposal text'));
+  await moderatorPage.waitForFunction(() =>
+    document.body.textContent.includes('Draft editing closes once the vote stage opens'),
+  );
+});
+
 test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
