@@ -84,7 +84,7 @@ test('p2p ring gossips ledger and votes without conflicts', { timeout: 90000 }, 
   );
   await postForm(
     `${nodeA.baseUrl}/petitions/status`,
-    { petitionId, status: 'vote', quorum: '0' },
+    { petitionId, status: 'vote', quorum: '0', confirmFreeze: 'yes' },
     { cookie: session.cookie, partial: true },
   );
   await postForm(

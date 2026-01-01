@@ -113,7 +113,7 @@ function readFirstMatchingPreference(provider, keys = []) {
 }
 
 async function logDelivery(state, contact, notification, result) {
-  if (!state) return;
+  if (!state?.store?.saveTransactions) return;
   try {
     await logTransaction(state, {
       type: 'outbound_delivery',

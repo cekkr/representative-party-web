@@ -7,9 +7,10 @@ import path from 'node:path';
 import puppeteer from 'puppeteer';
 
 import { createVerifiedSession } from './helpers/auth.js';
-import { fetchText, postForm } from './helpers/http.js';
+import { fetchText, postForm, postJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { LATEST_SCHEMA_VERSION } from '../src/infra/persistence/migrations.js';
+import { buildActivityPubCreateNote } from './helpers/activitypub.js';
 
 async function configurePage(page, baseUrl) {
   await page.setRequestInterception(true);
@@ -315,6 +316,36 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   const reshareButton = await reshareForm.$('button[type="submit"]');
   await reshareButton.click();
   await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
+});
+
+test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory', allowPreviews: true });
+  t.after(async () => server.stop());
+
+  const content = 'ActivityPub inbound note';
+  const payload = buildActivityPubCreateNote({
+    content,
+    activityId: 'https://remote.example/ap/activities/ui-1',
+    objectId: 'https://remote.example/ap/objects/ui-1',
+  });
+  const inboxResponse = await postJson(`${server.baseUrl}/ap/inbox`, payload);
+  assert.equal(inboxResponse.status, 202);
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction((text) => document.body.textContent.includes(text), {}, content);
+  const hasActivityPubPill = await page.evaluate(() =>
+    Array.from(document.querySelectorAll('.pill')).some((el) => el.textContent.trim() === 'ActivityPub'),
+  );
+  assert.equal(hasActivityPubPill, true);
 });
 
 test('UI social feed supports media uploads with locked view and report blocking', { timeout: 60000 }, async (t) => {

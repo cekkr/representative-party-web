@@ -49,7 +49,7 @@ test('standalone server keeps data consistent across restart', { timeout: 60000 
     );
     await postForm(
       `${baseUrl}/petitions/status`,
-      { petitionId, status: 'vote', quorum: '0' },
+      { petitionId, status: 'vote', quorum: '0', confirmFreeze: 'yes' },
       { cookie: session.cookie, partial: true },
     );
     await postForm(

@@ -55,7 +55,7 @@ test('gossip skips peers that disable votes without penalizing health', { timeou
 
   await postForm(
     `${nodeA.baseUrl}/petitions/status`,
-    { petitionId, status: 'vote', quorum: '0' },
+    { petitionId, status: 'vote', quorum: '0', confirmFreeze: 'yes' },
     { cookie: session.cookie, partial: true },
   );
   await postForm(
