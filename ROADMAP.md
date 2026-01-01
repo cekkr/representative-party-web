@@ -13,7 +13,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Identity & Sessions**: default user sessions with blinded PID hashing; OIDC4VP verifier scaffold (EUDI wallet offer/callback) marks a session as “person” for civic Circles to enforce natural-person guarantees.
 - **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded hash) stay fixed across a party ring; provider-local optional fields (contact email, personal info, notification preferences) are modeled via a schema/data-table editor and stored locally to power provider-owned notifications/consent.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
-- **Federation seeds**: ActivityPub actor emitter, outbox/inbox placeholders, gossip endpoints for peer/ledger sync.
+- **Federation seeds**: ActivityPub actor emitter, outbox plus inbox ingestion (preview-gated), gossip endpoints for peer/ledger sync.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
@@ -75,7 +75,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Identity-based rate limiting (per handle/session with IP fallback) configured in `/admin` to avoid CAPTCHA.
 - Extract persistence behind an interface (JSON today, pluggable DB tomorrow) with migrations for ledger/sessions/discussions/petitions/votes to keep user data durable.
 - Keep identity foundations minimal-but-real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; defer deeper protocol details until the user/data flows are reliable.
-- Federation stays stubbed (ActivityPub actor/outbox/inbox + ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
+- Federation stays stubbed (ActivityPub actor/outbox + inbox ingestion preview plus ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
 
 ### Phase 2 — Deliberation & Structure (Months 5-7)
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
@@ -173,7 +173,7 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * Keep verifier enforcement behind a policy toggle so messaging-only deployments can run without civic proof while still supporting the exclusion principle when enabled.
 2.  **Federated Identity Registry:**
       * Build the `UserHash` table.
-      * Implement the **ActivityPub Actor**: Every user is an Actor (`@hash@server.party`) with outbox/inbox stubs.
+      * Implement the **ActivityPub Actor**: Every user is an Actor (`@hash@server.party`) with outbox stubs plus preview-gated inbox ingestion.
       * **Uniqueness Sync:** Create a "Gossip Protocol" where servers exchange hashes of new users (with ledger digests) to enforce uniqueness constraints when Circle mode is enabled.
 3.  **Frontend Framework (SSR + Vanilla):**
       * Set up the template engine (EJS/Pug).

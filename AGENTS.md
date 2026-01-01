@@ -17,7 +17,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Topic registry: persist topic ids/path metadata for discussions, forum threads, and petitions so SSR views can render breadcrumbs and future renames can be tracked.
 - Topic gardener review: sync gardener operations into topic history and surface pending rename/merge/split suggestions in `/admin` with previews, confirmations, and a lightweight history diff view.
 - Collaborative petitions: drafts support revision history, revision diffs, stage-aware editing (draft/discussion only), and pre-vote freeze/review cues.
-- Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts.
+- Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts; outbound delivery attempts are logged to the transactions registry.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
 - Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
 - Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second/third-choice picks with multi-round transfers for person elections (Alaska-style). When electionMode=vote, delegation recommendations should prefer the latest closed election winner.
@@ -55,7 +55,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Delegation UI: group recommendations show election-winner metadata so users can see why a suggestion was picked.
 
 ## Endpoints
-- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`, `/public/*`.
+- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox` (ingests preview social notes), `/public/*`.
 - `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle; `/social/media/{id}` serves provider-gated media and `/social/media/report` records reports.
 - `/petitions` (GET/POST) drafts proposals with summary + optional full text; `/petitions/update` records collaborative revisions; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.

@@ -1,5 +1,6 @@
 import { normalizeProviderFields } from '../structure/structureManager.js';
 import { sanitizeText } from '../../shared/utils/text.js';
+import { logTransaction } from '../transactions/registry.js';
 
 const defaultTransport = {
   async sendEmail({ to, subject, body }) {
@@ -43,7 +44,11 @@ export function resolveContactChannels(state, { sessionId, handle } = {}) {
 
 export async function deliverOutbound(state, { contact, notification, transport = defaultTransport }) {
   if (!contact) return { delivered: false, channels: {} };
-  if (contact.notify === false) return { delivered: false, channels: {}, suppressed: true };
+  if (contact.notify === false) {
+    const suppressed = { delivered: false, channels: {}, suppressed: true };
+    await logDelivery(state, contact, notification, suppressed);
+    return suppressed;
+  }
   const circleName = sanitizeText(state?.settings?.circleName || 'Party Circle', 80) || 'Party Circle';
   const typeLabel = sanitizeText(notification?.type || 'Notification', 48) || 'Notification';
   const subject = sanitizeText(`${circleName} · ${typeLabel}`, 120);
@@ -55,7 +60,9 @@ export async function deliverOutbound(state, { contact, notification, transport 
   if (contact.phone && transport.sendSms) {
     channels.sms = await transport.sendSms({ to: contact.phone, body, notification });
   }
-  return { delivered: Boolean(channels.email || channels.sms), channels };
+  const result = { delivered: Boolean(channels.email || channels.sms), channels };
+  await logDelivery(state, contact, notification, result);
+  return result;
 }
 
 export function resolveNotificationPreferences(state, { sessionId, handle } = {}) {
@@ -103,4 +110,29 @@ function readFirstMatchingPreference(provider, keys = []) {
     }
   }
   return null;
+}
+
+async function logDelivery(state, contact, notification, result) {
+  if (!state) return;
+  try {
+    await logTransaction(state, {
+      type: 'outbound_delivery',
+      actorHash: notification?.recipientHash || null,
+      payload: {
+        notificationType: notification?.type || null,
+        recipientHash: notification?.recipientHash || null,
+        sessionId: contact?.sessionId || null,
+        handle: contact?.handle || null,
+        channels: {
+          email: Boolean(contact?.email),
+          sms: Boolean(contact?.phone),
+        },
+        results: result?.channels || {},
+        suppressed: Boolean(result?.suppressed),
+        delivered: Boolean(result?.delivered),
+      },
+    });
+  } catch (error) {
+    console.warn('[outbound] failed to log delivery', error);
+  }
 }

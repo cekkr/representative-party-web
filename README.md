@@ -38,10 +38,10 @@ This project takes the opposite stance:
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals, collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed, vote envelopes (signable).
-- **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, and group actions with exportable summaries.
+- **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per-handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
-- **Federation stubs + redundancy knobs**: gossip endpoints and signed envelopes for auditability.
+- **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview-gated) for auditability.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema-driven provider-local fields with a per-session editor; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
@@ -124,7 +124,7 @@ Testing notes:
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
 - `/admin` settings, policy toggles, rate‑limit overrides, and audit summaries; `/extensions` extension toggles
 - `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
-- `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub stubs (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox`)
+- `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub endpoints (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox` ingesting preview social notes)
 
 ---
 
@@ -170,7 +170,7 @@ sequenceDiagram
 
 **Circle & federation scaffolding**
 - **Uniqueness ledger + gossip**: exchange ledger hashes and peer hints.
-- **ActivityPub stubs**: actors + outbox/inbox placeholders to anchor federation work.
+- **ActivityPub scaffolding**: actors + outbox plus inbox ingestion that stores inbound notes as preview entries when allowed.
 
 ---
 
@@ -201,6 +201,7 @@ Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same previe
 - Topic gardener: `TOPIC_GARDENER_SYNC_SECONDS` (poll `/operations` for rename/merge/split suggestions)
 - Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`)
 - Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM)
+- Outbound delivery: `OUTBOUND_EMAIL_WEBHOOK`, `OUTBOUND_SMS_WEBHOOK`, `OUTBOUND_WEBHOOK_HEADERS`, `OUTBOUND_TRANSPORT_MODULE`
 - Persistence:
   - `DATA_MODE` (`centralized|hybrid|p2p`)
   - `DATA_ADAPTER` (`json|memory|sql|kv`)

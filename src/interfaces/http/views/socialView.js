@@ -17,6 +17,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
       const replyPill = post.replyTo ? `<span class="pill ghost">Reply</span>` : '';
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
       const previewPill = post.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const inboundPill = post.activityPub?.inbound ? '<span class="pill ghost">ActivityPub</span>' : '';
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
       const reshareBlock = renderReshare(post, mediaById);
       const mediaBlock = renderMediaAttachments(post.mediaIds || [], mediaById);
@@ -32,6 +33,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
             ${replyPill}
             ${resharePill}
             ${previewPill}
+            ${inboundPill}
             ${followTypePill}
             ${renderIssuerPill(post)}
             <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
