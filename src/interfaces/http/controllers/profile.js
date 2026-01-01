@@ -8,7 +8,8 @@ import {
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
-import { getActorLabels } from '../views/actorLabel.js';
+import { parseBoolean } from '../../../shared/utils/parse.js';
+import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import {
   buildProfileValues,
@@ -102,7 +103,7 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
   const html = await renderPage(
     'profile',
     {
-      personHandle: person?.handle || 'Guest',
+      personHandle: resolvePersonHandle(person),
       profileForm,
       profileSummary,
       profileFlash,
@@ -125,11 +126,4 @@ function listMissingRequired(fields = [], attributes = {}) {
     missing.push(field.key);
   }
   return missing;
-}
-
-function parseBoolean(value, fallback = false) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).toLowerCase();
-  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }

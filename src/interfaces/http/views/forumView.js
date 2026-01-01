@@ -1,12 +1,13 @@
-import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { resolvePersonHandle } from './actorLabel.js';
+import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderForum(entries, person, state) {
   const threads = entries.filter((e) => !e.parentId);
   const comments = entries.filter((e) => e.parentId);
   return {
     threads: renderThreads(threads, comments, person, state),
-    personHandle: person?.handle || 'Guest',
+    personHandle: resolvePersonHandle(person),
     roleLabel: person?.role || 'guest',
   };
 }
@@ -48,18 +49,6 @@ function renderThreads(threads, comments, person, state) {
     .join('\n');
 }
 
-function resolveTopicBreadcrumb(entry, state) {
-  if (entry?.topicId && state) {
-    const live = formatTopicBreadcrumbFromRegistry(state, entry.topicId);
-    if (live) return live;
-  }
-  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
-    return entry.topicPath.join(' / ');
-  }
-  if (entry?.topicBreadcrumb) return entry.topicBreadcrumb;
-  return entry?.topic || 'general';
-}
-
 function renderComments(comments) {
   if (!comments.length) {
     return '<p class="muted small">No comments yet.</p>';
@@ -80,10 +69,4 @@ function renderComments(comments) {
       `;
     })
     .join('\n');
-}
-
-function renderIssuerPill(entry) {
-  const issuer = entry?.issuer || entry?.provenance?.issuer;
-  if (!issuer) return '';
-  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }

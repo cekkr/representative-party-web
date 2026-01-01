@@ -20,6 +20,11 @@ export function getActorLabel(state, { plural = false, title = false } = {}) {
   return labels.actorLabel;
 }
 
+export function resolvePersonHandle(person, fallback = 'Guest session') {
+  if (person?.handle) return person.handle;
+  return fallback;
+}
+
 function capitalize(value) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1);

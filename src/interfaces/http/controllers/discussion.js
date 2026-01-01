@@ -10,12 +10,13 @@ import { persistDiscussions, persistProfileAttributes } from '../../../infra/per
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { sanitizeText } from '../../../shared/utils/text.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { renderDiscussionList } from '../views/discussionView.js';
-import { getActorLabels } from '../views/actorLabel.js';
+import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
+import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../views/topicHelpers.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
@@ -134,7 +135,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
     'discussion',
     {
       ledgerSize: state.uniquenessLedger.size,
-      personHandle: person?.handle || 'Not verified yet',
+      personHandle: resolvePersonHandle(person),
       personStatus: person
         ? `Posting as verified ${actorLabels.actorLabel} bound to a blinded PID hash.`
         : 'Start the wallet flow to post with accountability.',
@@ -164,38 +165,4 @@ function normalizeTopicFilter(value) {
   const normalized = normalizeTopicKey(value);
   if (!normalized || normalized === 'all') return 'all';
   return normalized;
-}
-
-function buildTopicOptions({ anchors = [], pinned = [], preferences = [], entries = [] } = {}, { limit = 18 } = {}) {
-  const topics = [];
-  const seen = new Set();
-  const pushTopic = (value) => {
-    const label = sanitizeText(String(value || '').trim(), 48);
-    if (!label) return;
-    const key = normalizeTopicKey(label);
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    topics.push(label);
-  };
-
-  for (const topic of preferences || []) pushTopic(topic);
-  for (const topic of pinned || []) pushTopic(topic);
-  for (const topic of anchors || []) pushTopic(topic);
-  for (const entry of entries || []) pushTopic(entry.topic);
-
-  return topics.slice(0, limit);
-}
-
-function renderTopicFilterOptions(topics = [], selectedKey = '') {
-  return (topics || [])
-    .map((topic) => {
-      const key = normalizeTopicKey(topic);
-      const selected = key === selectedKey ? ' selected' : '';
-      return `<option value="${escapeHtml(topic)}"${selected}>${escapeHtml(topic)}</option>`;
-    })
-    .join('\n');
-}
-
-function renderTopicDatalist(topics = []) {
-  return (topics || []).map((topic) => `<option value="${escapeHtml(topic)}"></option>`).join('\n');
 }

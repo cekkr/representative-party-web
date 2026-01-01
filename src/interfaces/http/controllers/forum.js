@@ -15,18 +15,7 @@ import { renderPage } from '../views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial }) {
-  const person = getPerson(req, state);
-  const forumEntries = filterVisibleEntries(state.discussions, state).filter((entry) => {
-    if (entry.petitionId) return false;
-    if (entry.stance === 'article' || entry.stance === 'comment') return true;
-    return Boolean(entry.parentId);
-  });
-  const html = await renderPage(
-    'forum',
-    renderForum(forumEntries, person, state),
-    { wantsPartial, title: 'Forum', state },
-  );
-  return sendHtml(res, html);
+  return renderForumPage({ req, res, state, wantsPartial });
 }
 
 export async function postThread({ req, res, state, wantsPartial }) {
@@ -81,8 +70,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
     payload: { threadId: entry.id, topic },
   });
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person, state), { wantsPartial: true, title: 'Forum', state });
-    return sendHtml(res, html);
+    return renderForumPage({ req, res, state, wantsPartial, person });
   }
   return sendRedirect(res, '/forum');
 }
@@ -146,8 +134,22 @@ export async function postComment({ req, res, state, wantsPartial }) {
     payload: { threadId: parentId },
   });
   if (wantsPartial) {
-    const html = await renderPage('forum', renderForum(filterVisibleEntries(state.discussions, state), person, state), { wantsPartial: true, title: 'Forum', state });
-    return sendHtml(res, html);
+    return renderForumPage({ req, res, state, wantsPartial, person });
   }
   return sendRedirect(res, '/forum');
+}
+
+async function renderForumPage({ req, res, state, wantsPartial, person }) {
+  const activePerson = person || getPerson(req, state);
+  const forumEntries = filterForumEntries(state);
+  const html = await renderPage('forum', renderForum(forumEntries, activePerson, state), { wantsPartial, title: 'Forum', state });
+  return sendHtml(res, html);
+}
+
+function filterForumEntries(state) {
+  return filterVisibleEntries(state.discussions, state).filter((entry) => {
+    if (entry.petitionId) return false;
+    if (entry.stance === 'article' || entry.stance === 'comment') return true;
+    return Boolean(entry.parentId);
+  });
 }

@@ -19,8 +19,9 @@ import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
+import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
-import { getActorLabels } from '../views/actorLabel.js';
+import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
@@ -64,7 +65,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const html = await renderPage(
     'petitions',
     {
-      personHandle: person?.handle || 'Not verified yet',
+      personHandle: resolvePersonHandle(person),
       petitionStatus: petitionGate.allowed ? 'You can draft proposals.' : petitionGate.message || petitionGate.reason,
       voteStatus: voteGate.allowed ? 'You can vote on proposals.' : voteGate.message || voteGate.reason,
       petitionGateReason: petitionGate.message || '',
@@ -701,11 +702,4 @@ function buildFreezeSnapshot(petition, person) {
         ? petition.topicPath
         : [],
   };
-}
-
-function parseBoolean(value, fallback = false) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).toLowerCase();
-  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }

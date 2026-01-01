@@ -3,6 +3,7 @@ import { persistSettings } from '../../../infra/persistence/storage.js';
 import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
+import { parseBoolean } from '../../../shared/utils/parse.js';
 
 export async function getExtensions({ res, state }) {
   const available = await listAvailableExtensions(state);
@@ -29,13 +30,6 @@ export async function toggleExtension({ req, res, state }) {
     enabled: nextList,
     active: (state.extensions?.active || []).map((ext) => ext.id),
   });
-}
-
-function parseBoolean(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).toLowerCase();
-  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }
 
 function normalizeList(body) {

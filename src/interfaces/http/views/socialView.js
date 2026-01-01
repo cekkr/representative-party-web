@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { renderIssuerPill } from './shared.js';
 
 export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
   if (!posts || posts.length === 0) {
@@ -143,12 +144,6 @@ function renderReshareForm(post) {
       <button class="ghost" type="submit">Reshare</button>
     </form>
   `;
-}
-
-function renderIssuerPill(post) {
-  const issuer = post.issuer || post.provenance?.issuer;
-  if (!issuer) return '';
-  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
 
 function renderMediaAttachments(mediaIds = [], mediaById) {

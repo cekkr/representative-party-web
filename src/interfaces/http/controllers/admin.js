@@ -53,16 +53,11 @@ import {
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
-  const availableExtensions = await listAvailableExtensions(state);
-  const html = await renderPage(
-    'admin',
-    buildAdminViewModel(state, { flash: null, availableExtensions }),
-    { wantsPartial, title: 'Admin · Circle Settings', state },
-  );
-  return sendHtml(res, html);
+  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null } });
 }
 
 export function exportAuditLog({ res, state }) {
@@ -75,154 +70,74 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const intent = body.intent || 'settings';
   if (intent === 'session') {
     const result = await updateSession(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'structure') {
     const result = await updateStructure(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'profile-attributes') {
     const result = await updateProfileAttributes(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'modules') {
     const result = await updateModules(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'rate-limits') {
     const result = await updateRateLimits(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'media-moderate') {
     const result = await moderateMedia(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-gardener-sync') {
     const summary = await syncTopicGardenerOperations(state, { source: 'admin' });
-    const availableExtensions = await listAvailableExtensions(state);
     const flash = formatTopicGardenerFlash(summary);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { flash, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: { flash } });
   }
   if (intent === 'topic-rename-accept') {
     const result = await acceptTopicRename(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-rename-dismiss') {
     const result = await dismissTopicRename(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-merge-accept') {
     const result = await acceptTopicMerge(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-merge-dismiss') {
     const result = await dismissTopicMerge(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-split-accept') {
     const result = await acceptTopicSplit(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'topic-split-dismiss') {
     const result = await dismissTopicSplit(state, body);
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { ...result, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { flash: formatGossipFlash(summary), availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({
+      res,
+      state,
+      wantsPartial,
+      viewModel: { flash: formatGossipFlash(summary) },
+    });
   }
   if (intent === 'gossip-pull') {
     const summary = await pullGossipNow(state, { reason: 'admin' });
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { flash: formatGossipFlash(summary), availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({
+      res,
+      state,
+      wantsPartial,
+      viewModel: { flash: formatGossipFlash(summary) },
+    });
   }
   if (intent === 'peer-health-reset') {
     const resetAll = parseBoolean(body.resetAll, false);
@@ -235,13 +150,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       await persistSettings(state);
       flash = resetAll ? 'Peer health reset for all peers.' : `Peer health reset for ${result.removed}.`;
     }
-    const availableExtensions = await listAvailableExtensions(state);
-    const html = await renderPage(
-      'admin',
-      buildAdminViewModel(state, { flash, availableExtensions }),
-      { wantsPartial, title: 'Admin · Circle Settings', state },
-    );
-    return sendHtml(res, html);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: { flash } });
   }
 
   const prev = state.settings || {};
@@ -322,20 +231,17 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     flashParts.push('Wallet verification required for posting.');
   }
 
-  const availableExtensions = await listAvailableExtensions(state);
-  const html = await renderPage('admin', buildAdminViewModel(state, { flash: flashParts.join(' '), availableExtensions }), {
-    wantsPartial,
-    title: 'Admin · Circle Settings',
-    state,
-  });
-  return sendHtml(res, html);
+  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: flashParts.join(' ') } });
 }
 
-function parseBoolean(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).toLowerCase();
-  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
+async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
+  const availableExtensions = await listAvailableExtensions(state);
+  const html = await renderPage(
+    'admin',
+    buildAdminViewModel(state, { ...viewModel, availableExtensions }),
+    { wantsPartial, title: 'Admin · Circle Settings', state },
+  );
+  return sendHtml(res, html);
 }
 
 function parseList(value, fallback = []) {

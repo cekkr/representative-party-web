@@ -6,7 +6,9 @@ import { upsertProviderAttributes } from '../../../modules/structure/structureMa
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
+import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
+import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function renderNotifications({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -16,7 +18,7 @@ export async function renderNotifications({ req, res, state, wantsPartial }) {
     'notifications',
     {
       notifications: renderNotificationList(notifications),
-      personHandle: person?.handle || 'Guest',
+      personHandle: resolvePersonHandle(person),
       preferencesPanel: preferencePanel,
     },
     { wantsPartial, title: 'Notifications', state },
@@ -96,11 +98,4 @@ function renderPreferencesPanel(state, person) {
       <p class="muted small">Preferences are stored locally and can be overridden by provider policy.</p>
     </section>
   `;
-}
-
-function parseBoolean(value, fallback) {
-  if (value === undefined || value === null || value === '') return fallback;
-  if (typeof value === 'boolean') return value;
-  const normalized = String(value).toLowerCase();
-  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }

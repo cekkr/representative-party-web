@@ -20,6 +20,8 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
+import { renderIssuerPill } from '../views/shared.js';
+import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
@@ -35,7 +37,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
     'groups',
     {
       groups: renderGroupList(groups, person, state),
-      personHandle: person?.handle || 'Guest',
+      personHandle: resolvePersonHandle(person),
       personHash: person?.pidHash || '',
       circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
     },
@@ -448,10 +450,4 @@ function renderElections(elections, person, state) {
       `;
     })
     .join('\n');
-}
-
-function renderIssuerPill(entry) {
-  const issuer = entry?.issuer || entry?.provenance?.issuer;
-  if (!issuer) return '';
-  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }

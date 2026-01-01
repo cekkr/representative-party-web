@@ -10,6 +10,9 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
+import { buildTopicOptions, renderTopicDatalist } from '../views/topicHelpers.js';
+import { renderIssuerPill } from '../views/shared.js';
+import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function resolveConflict({ req, res, state }) {
   if (!isModuleEnabled(state, 'delegation')) {
@@ -56,7 +59,7 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'delegation',
     {
-      personHandle: person?.handle || 'Guest',
+      personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       delegationStatus: permission.allowed ? 'Delegation preferences enabled.' : permission.message || 'Delegation blocked.',
       delegationReason: permission.allowed ? '' : permission.reason,
@@ -102,29 +105,6 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
   return sendRedirect(res, '/delegation');
 }
 
-function buildTopicOptions({ anchors = [], pinned = [], preferences = [], entries = [] } = {}, { limit = 18 } = {}) {
-  const topics = [];
-  const seen = new Set();
-  const pushTopic = (value) => {
-    const label = sanitizeText(String(value || '').trim(), 48);
-    if (!label) return;
-    const key = normalizeTopicKey(label);
-    if (!key || seen.has(key)) return;
-    seen.add(key);
-    topics.push(label);
-  };
-
-  for (const topic of preferences || []) pushTopic(topic);
-  for (const topic of pinned || []) pushTopic(topic);
-  for (const topic of anchors || []) pushTopic(topic);
-  for (const entry of entries || []) pushTopic(entry.topic);
-
-  return topics.slice(0, limit);
-}
-
-function renderTopicDatalist(topics = []) {
-  return (topics || []).map((topic) => `<option value="${escapeHtml(topic)}"></option>`).join('\n');
-}
 
 function renderDelegationList(delegations = []) {
   if (!delegations.length) {
@@ -274,10 +254,4 @@ function dedupeTopics(topics = []) {
     output.push(label);
   }
   return output.slice(0, 12);
-}
-
-function renderIssuerPill(entry) {
-  const issuer = entry?.issuer || entry?.provenance?.issuer;
-  if (!issuer) return '';
-  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
