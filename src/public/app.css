@@ -258,6 +258,31 @@ ul.plain li:last-child {
   margin-bottom: 0.35rem;
 }
 
+.media-stack {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0.6rem 0;
+}
+
+.media-card {
+  border: 1px dashed var(--border);
+  border-radius: 0.9rem;
+  padding: 0.75rem;
+  background: rgba(12, 19, 32, 0.7);
+}
+
+.media-card.blocked {
+  border-color: rgba(255, 120, 120, 0.6);
+  background: rgba(80, 20, 20, 0.35);
+}
+
+.media-embed {
+  width: 100%;
+  border-radius: 0.7rem;
+  display: block;
+  margin-top: 0.5rem;
+}
+
 .stack {
   display: flex;
   flex-direction: column;
@@ -334,6 +359,10 @@ button.cta {
 
 .small {
   font-size: 0.95rem;
+}
+
+.tiny {
+  font-size: 0.8rem;
 }
 
 code {

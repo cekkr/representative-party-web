@@ -20,6 +20,7 @@ import {
   persistTopics,
   persistSessions,
   persistSettings,
+  persistSocialMedia,
 } from '../../../infra/persistence/storage.js';
 import {
   evaluateAction,
@@ -39,7 +40,8 @@ import {
   isGossipEnabled,
 } from '../../../modules/federation/replication.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
-import { listTransactions } from '../../../modules/transactions/registry.js';
+import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
+import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
 import {
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
@@ -113,6 +115,16 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'rate-limits') {
     const result = await updateRateLimits(state, body);
+    const availableExtensions = await listAvailableExtensions(state);
+    const html = await renderPage(
+      'admin',
+      buildAdminViewModel(state, { ...result, availableExtensions }),
+      { wantsPartial, title: 'Admin · Circle Settings', state },
+    );
+    return sendHtml(res, html);
+  }
+  if (intent === 'media-moderate') {
+    const result = await moderateMedia(state, body);
     const availableExtensions = await listAvailableExtensions(state);
     const html = await renderPage(
       'admin',
@@ -486,6 +498,38 @@ async function updateRateLimits(state, body) {
   };
 }
 
+async function moderateMedia(state, body) {
+  const mediaId = sanitizeText(body.mediaId || '', 120);
+  const status = sanitizeText(body.status || '', 32);
+  const reason = sanitizeText(body.reason || '', 160);
+  if (!mediaId) {
+    return { flash: 'Media ID required to update status.' };
+  }
+  const media = findMedia(state, mediaId);
+  if (!media) {
+    return { flash: `Media "${mediaId}" not found.` };
+  }
+
+  const updated = updateMediaStatus(state, media, { status, reason, moderatorHash: 'admin' });
+  await persistSocialMedia(state);
+  recordAdminAudit(state, {
+    action: 'media.moderate',
+    summary: `media=${mediaId} status=${updated.status}`,
+  });
+  await persistSettings(state);
+  await logTransaction(state, {
+    type: updated.status === 'blocked' ? 'social_media_block' : 'social_media_unlock',
+    actorHash: 'admin',
+    payload: {
+      mediaId: updated.id,
+      postId: updated.postId,
+      reason: updated.blockedReason || reason || 'admin_update',
+    },
+  });
+
+  return { flash: `Media "${mediaId}" set to ${updated.status}.` };
+}
+
 function buildAdminViewModel(
   state,
   {
@@ -542,6 +586,8 @@ function buildAdminViewModel(
   const transactionSummariesList = renderTransactionSummariesList(
     filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),
   );
+  const socialMediaList = renderSocialMediaList(state.socialMedia || []);
+  const socialMediaCount = (state.socialMedia || []).length;
   const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
   const gossipPushPeers = renderGossipPeers(state.gossipState, { emptyLabel: 'No outbound peer results recorded yet.' });
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
@@ -636,6 +682,8 @@ function buildAdminViewModel(
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
     transactionSummariesList,
+    socialMediaList,
+    socialMediaCount,
     gossipPushSummary,
     gossipPushPeers,
     gossipPullSummary,
@@ -1185,6 +1233,65 @@ function renderTransactionsList(entries = []) {
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderSocialMediaList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No media uploads yet.</p>';
+  }
+  return entries
+    .slice(0, 10)
+    .map((entry) => {
+      const status = escapeHtml(String(entry.status || 'locked'));
+      const kind = escapeHtml(String(entry.kind || 'media'));
+      const created = formatTimestamp(entry.createdAt);
+      const reportCount = Number(entry.reportCount || 0);
+      const name = entry.originalName ? ` · ${escapeHtml(entry.originalName)}` : '';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">${kind}</span>
+            <span class="pill ghost">${status}</span>
+            <span class="muted small">${created}</span>
+            <span class="muted small">Reports: ${reportCount}</span>
+          </div>
+          <p class="muted small">Media ID: ${escapeHtml(entry.id)}</p>
+          <p class="muted small">Post ID: ${escapeHtml(entry.postId || 'n/a')}</p>
+          <p class="muted small">Type: ${escapeHtml(entry.contentType || 'unknown')} · ${formatBytes(entry.size || 0)}${name}</p>
+          <form class="stack" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="media-moderate" />
+            <input type="hidden" name="mediaId" value="${escapeHtml(entry.id)}" />
+            <div class="form-grid">
+              <label class="field">
+                <span>Status</span>
+                <select name="status">
+                  <option value="locked"${entry.status === 'locked' ? ' selected' : ''}>locked</option>
+                  <option value="blocked"${entry.status === 'blocked' ? ' selected' : ''}>blocked</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Reason (optional)</span>
+                <input name="reason" placeholder="policy violation" />
+              </label>
+            </div>
+            <div class="cta-row">
+              <button class="ghost" type="submit">Update media status</button>
+              <a class="ghost" href="/social/media/${escapeHtml(entry.id)}?view=1" target="_blank" rel="noreferrer">View media</a>
+            </div>
+          </form>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function formatBytes(bytes) {
+  if (!bytes || Number.isNaN(bytes)) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
 }
 
 function renderTransactionSummariesList(entries = []) {

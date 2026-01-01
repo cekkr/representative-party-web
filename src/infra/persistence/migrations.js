@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 17;
+export const LATEST_SCHEMA_VERSION = 18;
 
 const MIGRATIONS = [
   {
@@ -398,6 +398,25 @@ const MIGRATIONS = [
         };
       });
       return { ...data, petitions };
+    },
+  },
+  {
+    version: 18,
+    description: 'Add social media attachment scaffolds.',
+    up: (data) => {
+      const socialMedia = Array.isArray(data.socialMedia) ? data.socialMedia : [];
+      const socialPosts = (data.socialPosts || []).map((post) => {
+        const mediaIds = Array.isArray(post.mediaIds) ? post.mediaIds : [];
+        const reshare = post.reshare
+          ? { ...post.reshare, mediaIds: Array.isArray(post.reshare.mediaIds) ? post.reshare.mediaIds : [] }
+          : post.reshare;
+        return { ...post, mediaIds, reshare };
+      });
+      return {
+        ...data,
+        socialMedia,
+        socialPosts,
+      };
     },
   },
 ];

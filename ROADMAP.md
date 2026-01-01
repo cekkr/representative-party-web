@@ -16,7 +16,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Federation seeds**: ActivityPub actor emitter, outbox/inbox placeholders, gossip endpoints for peer/ledger sync.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
-- **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares for small talk/info; kept distinct from petitions/votes/forum flows so authority never derives from follows.
+- **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
 - **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state, ledger/actor/discussion counts, and gossip ingest state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
 
@@ -42,7 +42,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Current status snapshot (Phase 1 largely shipped)
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
-- Social feed ships typed follows plus replies/mentions/tags/reshare, gated by the same role/ban checks.
+- Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default, blockable after reports), gated by the same role/ban checks.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
 - Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
@@ -59,7 +59,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
-- Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
+- Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares plus optional provider-local media uploads; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
 - Add core module toggles in `/admin` so petitions/votes/delegation/groups/federation/topic gardener/social can be disabled for messaging-only deployments; nav and endpoints respect disabled modules.
 - Add ledger digests to gossip envelopes and reject mismatched ledgers; centralized mode disables gossip ingest to avoid unintended replication.
 - Add scheduled gossip push/pull and admin controls for manual sync runs.

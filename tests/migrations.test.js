@@ -32,6 +32,7 @@ test('migrations normalize sessions and settings', () => {
     settings: {},
     socialFollows: [],
     socialPosts: [],
+    socialMedia: [],
     topics: [],
   };
 
@@ -61,6 +62,7 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(Array.isArray(data.groupElections));
   assert.ok(Array.isArray(data.socialFollows));
   assert.ok(Array.isArray(data.socialPosts));
+  assert.ok(Array.isArray(data.socialMedia));
   assert.ok(Array.isArray(data.transactions));
   assert.ok(Array.isArray(data.transactionSummaries));
   assert.ok(Array.isArray(data.profileStructures));

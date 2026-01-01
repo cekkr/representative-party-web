@@ -271,6 +271,16 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Social media</p>
+  <h2>Media moderation</h2>
+  <p class="muted small">Uploads stay with this provider, lock by default, and can be blocked after mass reports or manual review.</p>
+  <p class="muted small">Total media entries: {{socialMediaCount}}</p>
+  <div class="stack">
+    {{socialMediaList}}
+  </div>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Structure manager</p>
   <h2>Profile schema (canonical + provider-local)</h2>
   <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>

@@ -20,6 +20,7 @@ const KEYS = [
   'actors',
   'socialFollows',
   'socialPosts',
+  'socialMedia',
   'transactions',
   'transactionSummaries',
   'profileStructures',
@@ -131,6 +132,10 @@ class SqlStateStore {
 
   async saveSocialPosts(entries) {
     await this.writeJson('socialPosts', entries);
+  }
+
+  async saveSocialMedia(entries) {
+    await this.writeJson('socialMedia', entries);
   }
 
   async saveTransactions(entries) {

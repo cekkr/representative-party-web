@@ -72,6 +72,10 @@ export async function persistSocialPosts(state) {
   await state.store.saveSocialPosts(state.socialPosts);
 }
 
+export async function persistSocialMedia(state) {
+  await state.store.saveSocialMedia(state.socialMedia || []);
+}
+
 export async function persistGroups(state) {
   await state.store.saveGroups(state.groups);
 }
@@ -127,6 +131,7 @@ function hydrateState(data) {
     actors: new Map(data.actors.map((actor) => [actor.hash, actor])),
     socialFollows: data.socialFollows || [],
     socialPosts: data.socialPosts || [],
+    socialMedia: data.socialMedia || [],
     transactions: data.transactions || [],
     transactionSummaries: data.transactionSummaries || [],
     profileStructures: data.profileStructures || [],

@@ -1,7 +1,7 @@
 <section class="panel">
   <p class="eyebrow">Social</p>
   <h2>Small talk & info feed</h2>
-  <p>Typed follows (circle, interest, info, alerts) drive a Twitter-like lane for casual updates, mentions (@handle), tags (#topic), and lightweight reshares. Direct posts act as minimal private messages between verified handles.</p>
+  <p>Typed follows (circle, interest, info, alerts) drive a Twitter-like lane for casual updates, mentions (@handle), tags (#topic), and lightweight reshares. Direct posts act as minimal private messages between verified handles. Photo/video uploads are provider-local and locked by default until viewers request access.</p>
   <div class="callout">
     <p class="muted small">Handle: {{personHandle}}</p>
     <p class="muted small">Role: {{roleLabel}}</p>
@@ -9,10 +9,15 @@
     <p class="muted small">{{postingReason}}</p>
     <p class="muted small">Following: {{followCount}} | Followers: {{followerCount}}</p>
   </div>
-  <form class="stack" method="post" action="/social/post" data-enhance="social-post">
+  <form class="stack" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">
     <label class="field">
       <span>Message (short)</span>
-      <textarea name="content" rows="3" placeholder="Share a quick thought or update" required></textarea>
+      <textarea name="content" rows="3" placeholder="Share a quick thought or update" required data-media-required></textarea>
+    </label>
+    <label class="field">
+      <span>Attach photo or video (locked by default)</span>
+      <input name="media" type="file" accept="image/*,video/*" data-media-toggle />
+      <span class="muted small">Uploads stay with this provider; viewers request access before viewing.</span>
     </label>
     <div class="form-grid">
       <label class="field">

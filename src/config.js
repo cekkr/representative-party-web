@@ -34,11 +34,17 @@ export const DATA_DEFAULTS = {
   allowPreviews: false,
 };
 
+export const MEDIA_DEFAULTS = {
+  maxBytes: 10 * 1024 * 1024,
+  reportThreshold: 3,
+};
+
 export const PATHS = {
   ROOT: ROOT_DIR,
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
+  MEDIA_ROOT: join(ROOT_DIR, 'data', 'media'),
   EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
   DATA_SQLITE: join(ROOT_DIR, 'data', 'state.sqlite'),
   DATA_KV: join(ROOT_DIR, 'data', 'kv-store.json'),
@@ -61,6 +67,7 @@ export const FILES = {
   actors: join(PATHS.DATA_ROOT, 'actors.json'),
   socialFollows: join(PATHS.DATA_ROOT, 'social-follows.json'),
   socialPosts: join(PATHS.DATA_ROOT, 'social-posts.json'),
+  socialMedia: join(PATHS.DATA_ROOT, 'social-media.json'),
   transactions: join(PATHS.DATA_ROOT, 'transactions.json'),
   transactionSummaries: join(PATHS.DATA_ROOT, 'transaction-summaries.json'),
   profileStructures: join(PATHS.DATA_ROOT, 'profile-structures.json'),
@@ -76,6 +83,11 @@ export const DATA = {
   allowPreviews: parseBooleanEnv(process.env.DATA_PREVIEW, DATA_DEFAULTS.allowPreviews),
   sqliteFile: resolveSqliteFilename(),
   kvFile: process.env.DATA_KV_FILE || PATHS.DATA_KV,
+};
+
+export const MEDIA = {
+  maxBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_MAX_BYTES, MEDIA_DEFAULTS.maxBytes),
+  reportThreshold: parseNumberEnv(process.env.SOCIAL_MEDIA_REPORT_THRESHOLD, MEDIA_DEFAULTS.reportThreshold),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';
@@ -104,6 +116,12 @@ function parseBooleanEnv(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
   const normalized = String(value).toLowerCase();
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'on';
+}
+
+function parseNumberEnv(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 function resolveSqliteFilename() {

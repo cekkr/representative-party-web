@@ -22,6 +22,16 @@
     }
   });
 
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.type !== 'file' || !input.hasAttribute('data-media-toggle')) return;
+    const form = input.closest('form');
+    const textarea = form?.querySelector('textarea[data-media-required]');
+    if (!textarea) return;
+    textarea.required = !(input.files && input.files.length > 0);
+  });
+
   document.addEventListener('submit', async (event) => {
     const form = event.target.closest('form[data-enhance]');
     if (!form) return;
@@ -36,6 +46,8 @@
     }
     try {
       const formData = new FormData(form);
+      const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
+      const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
       const method = (form.method || 'POST').toUpperCase();
       const headers = { 'X-Requested-With': 'partial' };
       let url = form.action;
@@ -46,7 +58,7 @@
         target.search = params.toString();
         url = target.toString();
       } else {
-        options.body = new URLSearchParams(formData);
+        options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
       }
       const response = await fetch(url, options);
       if (!response.ok) {

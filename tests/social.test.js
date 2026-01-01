@@ -25,6 +25,13 @@ test('createPost allows reshare without a comment', () => {
   assert.equal(reshare.reshare.authorHandle, original.authorHandle);
 });
 
+test('createPost allows media-only posts', () => {
+  const state = buildState();
+  const person = { pidHash: 'hash-1', handle: 'person-hash' };
+  const post = createPost(state, { person, content: '', mediaIds: ['media-1'], baseUrl: 'http://local' });
+  assert.deepEqual(post.mediaIds, ['media-1']);
+});
+
 test('createPost blocks reshare of direct posts', () => {
   const state = buildState();
   const person = { pidHash: 'hash-1', handle: 'person-hash' };

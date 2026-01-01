@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 
-export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash } = {}) {
+export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
   if (!posts || posts.length === 0) {
     return '<p class="muted">No posts yet. Follow someone and start the conversation.</p>';
   }
@@ -17,7 +17,10 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
       const previewPill = post.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
-      const reshareBlock = renderReshare(post);
+      const reshareBlock = renderReshare(post, mediaById);
+      const mediaBlock = renderMediaAttachments(post.mediaIds || [], mediaById);
+      const mediaHasBlocked =
+        hasBlockedMediaIds(post.mediaIds || [], mediaById) || hasBlockedMediaIds(post.reshare?.mediaIds || [], mediaById);
       const tagsLine = renderTags(post.tags || []);
       const mentionsLine = renderMentions(post.mentions || []);
       return `
@@ -33,6 +36,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
             <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
           </div>
           ${contentBlock}
+          ${mediaBlock}
           ${reshareBlock}
           ${
             post.visibility === 'direct' && post.targetHandle
@@ -44,7 +48,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           ${tagsLine}
           <p class="muted small">Author hash: ${escapeHtml(post.authorHash)}</p>
           ${enableReplies ? renderReplyForm(post) : ''}
-          ${enableReplies ? renderReshareForm(post) : ''}
+          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post) : ''}
         </article>
       `;
     })
@@ -101,15 +105,17 @@ function renderReplyForm(post) {
   `;
 }
 
-function renderReshare(post) {
+function renderReshare(post, mediaById) {
   if (!post.reshare) return '';
   const author = escapeHtml(post.reshare.authorHandle || post.reshare.authorHash || 'unknown');
   const content = escapeHtml(post.reshare.content || '');
   const created = post.reshare.createdAt ? new Date(post.reshare.createdAt).toLocaleString() : '';
+  const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], mediaById);
   return `
     <div class="callout">
       <p class="muted small">Reshared from ${author}${created ? ` · ${created}` : ''}</p>
       ${content ? `<p>${content}</p>` : '<p class="muted small">Original content hidden.</p>'}
+      ${mediaBlock}
     </div>
   `;
 }
@@ -143,4 +149,80 @@ function renderIssuerPill(post) {
   const issuer = post.issuer || post.provenance?.issuer;
   if (!issuer) return '';
   return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
+}
+
+function renderMediaAttachments(mediaIds = [], mediaById) {
+  if (!mediaIds.length) return '';
+  const cards = mediaIds
+    .map((mediaId) => {
+      const media = mediaById?.get?.(mediaId);
+      if (!media) {
+        return `
+          <div class="media-card locked">
+            <p class="muted small">Media unavailable.</p>
+          </div>
+        `;
+      }
+      const label = `${media.kind === 'video' ? 'Video' : 'Photo'} · ${formatBytes(media.size || 0)}`;
+      const name = media.originalName ? ` · ${escapeHtml(media.originalName)}` : '';
+      if (media.status === 'blocked') {
+        return `
+          <div class="media-card blocked">
+            <p class="muted small">Blocked media · ${label}${name}</p>
+            <p class="muted tiny">Provider policy prevents viewing or resharing.</p>
+          </div>
+        `;
+      }
+      if (media.status === 'locked') {
+        return `
+          <div class="media-card locked">
+            <p class="muted small">Locked media · ${label}${name}</p>
+            <p class="muted tiny">Viewing requires an explicit request.</p>
+            <div class="cta-row">
+              <a class="ghost" href="/social/media/${escapeHtml(media.id)}?view=1" target="_blank" rel="noreferrer">Request view</a>
+              ${renderMediaReportForm(media)}
+            </div>
+          </div>
+        `;
+      }
+      const src = `/social/media/${escapeHtml(media.id)}?view=1`;
+      const mediaTag =
+        media.kind === 'video'
+          ? `<video class="media-embed" controls preload="metadata" src="${src}"></video>`
+          : `<img class="media-embed" src="${src}" alt="Shared media" loading="lazy" />`;
+      return `
+        <div class="media-card">
+          <p class="muted small">${label}${name}</p>
+          ${mediaTag}
+          <div class="cta-row">
+            ${renderMediaReportForm(media)}
+          </div>
+        </div>
+      `;
+    })
+    .join('\n');
+  return `<div class="media-stack">${cards}</div>`;
+}
+
+function renderMediaReportForm(media) {
+  return `
+    <form method="post" action="/social/media/report" data-enhance="social-media-report">
+      <input type="hidden" name="mediaId" value="${escapeHtml(media.id)}" />
+      <button class="ghost" type="submit">Report media</button>
+    </form>
+  `;
+}
+
+function hasBlockedMediaIds(mediaIds = [], mediaById) {
+  if (!mediaIds.length || !mediaById) return false;
+  return mediaIds.some((mediaId) => mediaById.get(mediaId)?.status === 'blocked');
+}
+
+function formatBytes(bytes) {
+  if (!bytes || Number.isNaN(bytes)) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
 }

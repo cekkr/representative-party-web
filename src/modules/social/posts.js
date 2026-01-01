@@ -22,16 +22,20 @@ export function createPost(
     baseUrl,
     reshareOf = null,
     resharePost = null,
+    mediaIds = [],
+    id = null,
+    persist = true,
   },
 ) {
   const body = sanitizeText(content, MAX_POST_LENGTH);
   const wantsReshare = Boolean(reshareOf);
+  const normalizedMediaIds = Array.isArray(mediaIds) ? mediaIds.filter(Boolean) : [];
   if (replyTo && wantsReshare) {
     const error = new Error('conflicting_intent');
     error.code = 'conflicting_intent';
     throw error;
   }
-  if (!body && !wantsReshare) {
+  if (!body && !wantsReshare && normalizedMediaIds.length === 0) {
     const error = new Error('missing_content');
     error.code = 'missing_content';
     throw error;
@@ -63,6 +67,7 @@ export function createPost(
       authorHandle: source.authorHandle,
       content: source.content,
       createdAt: source.createdAt,
+      mediaIds: Array.isArray(source.mediaIds) ? source.mediaIds : [],
     };
   }
 
@@ -70,7 +75,7 @@ export function createPost(
   const tags = extractTags(body);
   const policy = getEffectivePolicy(state);
   const entry = stampLocalEntry(state, {
-    id: randomUUID(),
+    id: id || randomUUID(),
     authorHash: person?.pidHash || 'anonymous',
     authorHandle: person?.handle || 'guest',
     content: body,
@@ -83,6 +88,7 @@ export function createPost(
     visibility: normalizedVisibility,
     targetHash: normalizedVisibility === 'direct' ? targetHash : '',
     targetHandle: normalizedVisibility === 'direct' ? targetHandle : '',
+    mediaIds: normalizedMediaIds,
     policyId: policy.id,
     policyVersion: policy.version,
   });
@@ -91,7 +97,9 @@ export function createPost(
   const activity = wrapCreateActivity({ note, baseUrl });
   entry.activityPub = { note, activity };
 
-  state.socialPosts = [entry, ...(state.socialPosts || [])];
+  if (persist) {
+    state.socialPosts = [entry, ...(state.socialPosts || [])];
+  }
   return entry;
 }
 

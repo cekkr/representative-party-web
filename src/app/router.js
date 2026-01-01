@@ -29,6 +29,8 @@ import {
   followHandle,
   unfollowHandle,
   listRelationships,
+  serveSocialMedia,
+  reportSocialMedia,
 } from '../interfaces/http/controllers/social.js';
 import { renderTransactions, exportTransactions, exportTransactionsLedger, gossipTransactions } from '../interfaces/http/controllers/transactions.js';
 import { sendNotFound } from '../shared/utils/http.js';
@@ -64,6 +66,16 @@ const routes = [
   { method: 'POST', path: '/social/follow', action: followHandle },
   { method: 'POST', path: '/social/unfollow', action: unfollowHandle },
   { method: 'GET', path: '/social/relationships', action: listRelationships },
+  { method: 'POST', path: '/social/media/report', action: reportSocialMedia },
+  {
+    method: 'GET',
+    prefix: '/social/media/',
+    buildParams: (pathname) => {
+      const segments = pathname.split('/').filter(Boolean);
+      return { mediaId: segments[segments.length - 1] || '' };
+    },
+    action: ({ req, res, state, params }) => serveSocialMedia({ req, res, state, params }),
+  },
   { method: 'GET', path: '/admin', action: renderAdmin },
   { method: 'POST', path: '/admin', action: updateAdmin },
   { method: 'GET', path: '/notifications', action: renderNotifications },
