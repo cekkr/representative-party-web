@@ -317,6 +317,80 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
 });
 
+test('UI social feed supports media uploads with locked view and report blocking', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'rpw-ui-media-'));
+  const mediaPath = path.join(tempDir, 'sample.png');
+  await writeFile(
+    mediaPath,
+    Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO6sC2QAAAAASUVORK5CYII=',
+      'base64',
+    ),
+  );
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const server = await startServer({
+    port,
+    dataAdapter: 'memory',
+    extraEnv: { SOCIAL_MEDIA_REPORT_THRESHOLD: '1' },
+  });
+  t.after(async () => server.stop());
+
+  const authorSession = await createVerifiedSession(server.baseUrl, { pidHash: 'media-ui-author' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+
+  await page.type('form[action="/social/post"] textarea[name="content"]', 'Media post with locked view');
+  const fileInput = await page.$('form[action="/social/post"] input[name="media"]');
+  assert.ok(fileInput);
+  await fileInput.uploadFile(mediaPath);
+  await page.click('form[action="/social/post"] button[type="submit"]');
+  await page.waitForFunction(() => document.body.textContent.includes('Locked media'));
+
+  const requestHref = await page.$eval(
+    'a[href^="/social/media/"][href*="view=1"]',
+    (node) => node.getAttribute('href'),
+  );
+  assert.ok(requestHref);
+  const mediaId = requestHref.split('/').pop().split('?')[0];
+  assert.ok(mediaId);
+
+  const lockedStatus = await page.evaluate(async (id) => {
+    const response = await fetch(`/social/media/${id}`);
+    return response.status;
+  }, mediaId);
+  assert.equal(lockedStatus, 423);
+
+  const viewResult = await page.evaluate(async (href) => {
+    const response = await fetch(href);
+    return { status: response.status, type: response.headers.get('content-type') || '' };
+  }, requestHref);
+  assert.equal(viewResult.status, 200);
+  assert.ok(viewResult.type.includes('image/'));
+
+  await page.click('form[data-enhance="social-media-report"] button[type="submit"]');
+  await page.waitForFunction(() => document.body.textContent.includes('Blocked media'));
+  assert.equal(await page.$('form[data-enhance="social-reshare"]'), null);
+
+  const blockedStatus = await page.evaluate(async (id) => {
+    const response = await fetch(`/social/media/${id}?view=1`);
+    return response.status;
+  }, mediaId);
+  assert.equal(blockedStatus, 451);
+});
+
 test('UI notifications surface mentions and persist preferences', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
