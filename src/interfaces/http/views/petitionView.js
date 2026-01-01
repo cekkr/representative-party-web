@@ -41,6 +41,9 @@ export function renderPetitionList(
       const lastCommentAt = getLastCommentAt(comments);
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
       const anchorId = `petition-${petition.id}`;
+      const proposalText = petition.freeze?.body ?? petition.body;
+      const freezeNotice = renderFreezeNotice(petition);
+      const reviewPrompt = renderReviewPrompt(petition, revisions);
       return `
         <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
@@ -54,13 +57,16 @@ export function renderPetitionList(
             <span class="pill ghost">Signatures: ${signatureCount}</span>
             <span class="pill ghost">Discussion: ${comments.length}</span>
             <span class="pill ghost">Revisions: ${revisions.length}</span>
+            ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
             ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
             <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
           </div>
           ${renderStageTimeline(petition)}
+          ${reviewPrompt}
+          ${freezeNotice}
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
-          ${renderProposalText(petition.body)}
+          ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
           <p class="muted small">Author hash: ${escapeHtml(petition.authorHash || 'anonymous')}</p>
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
           ${
@@ -134,6 +140,9 @@ function buildVoteBuckets(votes) {
 
 function renderModerationForm(petition) {
   const status = petition.status === 'open' ? 'vote' : petition.status;
+  const frozenAt = petition.freeze?.frozenAt ? new Date(petition.freeze.frozenAt).toLocaleString() : '';
+  const frozenBy = petition.freeze?.frozenBy || '';
+  const freezeNote = frozenAt ? `<p class="muted small">Frozen at ${escapeHtml(frozenAt)} ${frozenBy ? `by ${escapeHtml(frozenBy)}` : ''}.</p>` : '';
   return `
     <form class="form-inline" method="post" action="/petitions/status" data-enhance="petitions">
       <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
@@ -146,16 +155,21 @@ function renderModerationForm(petition) {
         </select>
       </label>
       <label>Quorum <input name="quorum" value="${petition.quorum || 0}" size="4" /></label>
+      <label class="field checkbox">
+        <input type="checkbox" name="confirmFreeze" value="yes" />
+        <span>Confirm freeze before opening vote</span>
+      </label>
       <button type="submit" class="ghost">Apply</button>
     </form>
+    ${freezeNote}
   `;
 }
 
-function renderProposalText(text) {
+function renderProposalText(text, label = 'Proposal text') {
   if (!text) return '';
   return `
     <details class="note">
-      <summary>Proposal text</summary>
+      <summary>${escapeHtml(label)}</summary>
       <pre>${escapeHtml(text)}</pre>
     </details>
   `;
@@ -184,7 +198,7 @@ function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, acto
     return '';
   }
   if (!canEdit) {
-    return '<p class="muted small">Draft editing closes once the vote stage opens.</p>';
+    return '<p class="muted small">Draft editing closes once the vote stage opens. Review the frozen text before voting.</p>';
   }
   const gateMessage = editGate?.allowed ? '' : editGate?.message || editGate?.reason || '';
   const gateNotice = gateMessage ? `<p class="muted small">${escapeHtml(gateMessage)}</p>` : '';
@@ -221,16 +235,19 @@ function renderRevisionHistory(petition, state) {
   const versions = Array.isArray(petition.versions) ? petition.versions : [];
   if (!versions.length) return '';
   const items = versions
-    .map((revision) => {
+    .map((revision, index) => {
+      const previous = versions[index + 1];
       const when = revision.createdAt ? new Date(revision.createdAt).toLocaleString() : '';
       const author = String(revision.authorHandle || revision.authorHash || 'anonymous');
       const note = revision.note ? `<div class="muted small">${escapeHtml(String(revision.note))}</div>` : '';
       const topicLabel = resolveTopicBreadcrumb(revision, state);
+      const diffBlock = renderRevisionDiff(revision, previous, state);
       return `
         <li>
           <div class="muted small">${escapeHtml(when)} · ${escapeHtml(author)} · Topic: ${escapeHtml(topicLabel)}</div>
           <div>${escapeHtml(revision.title || petition.title || 'Untitled')}</div>
           ${note}
+          ${diffBlock}
         </li>
       `;
     })
@@ -379,4 +396,76 @@ function renderIssuerPill(entry) {
   const issuer = entry?.issuer || entry?.provenance?.issuer;
   if (!issuer) return '';
   return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
+}
+
+function renderFreezeNotice(petition) {
+  if (!petition?.freeze) return '';
+  const frozenAt = petition.freeze.frozenAt ? new Date(petition.freeze.frozenAt).toLocaleString() : '';
+  const frozenBy = petition.freeze.frozenBy ? `by ${petition.freeze.frozenBy}` : '';
+  const revisionId = petition.freeze.revisionId ? petition.freeze.revisionId.slice(0, 8) : '';
+  const revisionLine = revisionId ? `<p class="muted small">Revision: ${escapeHtml(revisionId)}</p>` : '';
+  return `
+    <div class="callout">
+      <p class="muted small">Draft frozen for voting ${frozenAt ? `at ${escapeHtml(frozenAt)}` : ''} ${escapeHtml(frozenBy)}.</p>
+      ${revisionLine}
+      <p class="muted small">Votes are recorded against the frozen text.</p>
+    </div>
+  `;
+}
+
+function renderReviewPrompt(petition, revisions) {
+  if (!petition) return '';
+  if (normalizeStage(petition.status) !== 'discussion') return '';
+  if (!Array.isArray(revisions) || revisions.length < 2) return '';
+  return `
+    <p class="muted small">Review the latest revision diff before moving this proposal to a vote.</p>
+  `;
+}
+
+function renderRevisionDiff(revision, previous, state) {
+  if (!previous) {
+    return '<p class="muted small">Initial draft.</p>';
+  }
+  const changes = [];
+  if ((revision.title || '') !== (previous.title || '')) {
+    changes.push({ label: 'Title', before: previous.title, after: revision.title });
+  }
+  if ((revision.summary || '') !== (previous.summary || '')) {
+    changes.push({ label: 'Summary', before: previous.summary, after: revision.summary });
+  }
+  if ((revision.body || '') !== (previous.body || '')) {
+    changes.push({ label: 'Body', before: previous.body, after: revision.body });
+  }
+  const topicBefore = resolveTopicBreadcrumb(previous, state);
+  const topicAfter = resolveTopicBreadcrumb(revision, state);
+  if (topicBefore !== topicAfter) {
+    changes.push({ label: 'Topic', before: topicBefore, after: topicAfter });
+  }
+  if (!changes.length) {
+    return '<p class="muted small">No changes recorded.</p>';
+  }
+  const lines = changes
+    .map((change) => {
+      const before = formatDiffValue(change.before);
+      const after = formatDiffValue(change.after);
+      return `- ${change.label}: ${before}\n+ ${change.label}: ${after}`;
+    })
+    .join('\n');
+  return `
+    <details class="note">
+      <summary>Diff vs previous revision</summary>
+      <pre>${escapeHtml(lines)}</pre>
+    </details>
+  `;
+}
+
+function formatDiffValue(value) {
+  const text = value === undefined || value === null ? '' : String(value);
+  return truncateText(text, 240);
+}
+
+function truncateText(text, limit = 240) {
+  if (!text) return '';
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit)}...`;
 }

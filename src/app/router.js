@@ -21,6 +21,7 @@ import { renderHome } from '../interfaces/http/controllers/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
 import { getExtensions, toggleExtension } from '../interfaces/http/controllers/extensions.js';
 import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../interfaces/http/controllers/notifications.js';
+import { renderProfile, updateProfileAttributes } from '../interfaces/http/controllers/profile.js';
 import { renderDelegation, resolveConflict, updateDelegation } from '../interfaces/http/controllers/delegation.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
@@ -81,6 +82,8 @@ const routes = [
   { method: 'GET', path: '/notifications', action: renderNotifications },
   { method: 'POST', path: '/notifications/read', action: markNotificationsRead },
   { method: 'POST', path: '/notifications/preferences', action: updateNotificationPreferences },
+  { method: 'GET', path: '/profile', action: renderProfile },
+  { method: 'POST', path: '/profile', action: updateProfileAttributes },
   { method: 'GET', path: '/delegation', action: renderDelegation },
   { method: 'POST', path: '/delegation', action: updateDelegation },
   { method: 'POST', path: '/delegation/conflict', action: resolveConflict },

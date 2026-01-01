@@ -394,6 +394,23 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   if (!petition) {
     return sendJson(res, 404, { error: 'petition_not_found' });
   }
+  const wasVoting = isVotingStage(petition.status);
+  const willVote = isVotingStage(status);
+  const willClose = status === 'closed';
+  if (willVote && !wasVoting) {
+    const confirmed = parseBoolean(body.confirmFreeze, false);
+    if (!confirmed) {
+      return sendJson(res, 400, {
+        error: 'vote_freeze_required',
+        message: 'Confirm the draft freeze before opening voting.',
+      });
+    }
+    petition.freeze = buildFreezeSnapshot(petition, person);
+  } else if (!willVote && !willClose && wasVoting) {
+    petition.freeze = null;
+  } else if (willVote && !petition.freeze) {
+    petition.freeze = buildFreezeSnapshot(petition, person);
+  }
   petition.status = status;
   petition.quorum = quorum;
   await persistPetitions(state);
@@ -401,7 +418,12 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
     type: 'petition_status',
     actorHash: person?.pidHash || 'anonymous',
     petitionId,
-    payload: { status, quorum },
+    payload: {
+      status,
+      quorum,
+      freezeRevisionId: petition.freeze?.revisionId || null,
+      frozenAt: petition.freeze?.frozenAt || null,
+    },
   });
 
   if (wantsPartial) {
@@ -659,4 +681,31 @@ function buildPetitionRevision({
 function isEditableStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'draft' || normalized === 'discussion';
+}
+
+function buildFreezeSnapshot(petition, person) {
+  const latest = Array.isArray(petition?.versions) ? petition.versions[0] : null;
+  const source = latest || petition || {};
+  return {
+    revisionId: latest?.id || null,
+    frozenAt: new Date().toISOString(),
+    frozenBy: person?.pidHash || 'anonymous',
+    title: source.title || petition.title || '',
+    summary: source.summary || petition.summary || '',
+    body: source.body || petition.body || '',
+    topic: source.topic || petition.topic || 'general',
+    topicId: source.topicId || petition.topicId || null,
+    topicPath: Array.isArray(source.topicPath)
+      ? source.topicPath
+      : Array.isArray(petition.topicPath)
+        ? petition.topicPath
+        : [],
+  };
+}
+
+function parseBoolean(value, fallback = false) {
+  if (value === undefined || value === null || value === '') return fallback;
+  if (typeof value === 'boolean') return value;
+  const normalized = String(value).toLowerCase();
+  return normalized === 'true' || normalized === 'on' || normalized === '1' || normalized === 'yes';
 }

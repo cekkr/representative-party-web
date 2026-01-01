@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true },
   { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true },
   { key: 'notifications', label: 'Notifications', href: '/notifications', partial: true },
+  { key: 'profile', label: 'Profile', href: '/profile', partial: true },
   { key: 'admin', label: 'Admin', href: '/admin', partial: true },
   { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer', partial: false },
 ];

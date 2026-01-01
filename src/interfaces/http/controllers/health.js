@@ -42,6 +42,11 @@ export function renderHealth({ res, state }) {
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
     schemaVersion: state.meta?.schemaVersion || 0,
+    profileSchema: {
+      version: state.settings?.profileSchema?.version || 0,
+      updatedAt: state.settings?.profileSchema?.updatedAt || null,
+      updatedBy: state.settings?.profileSchema?.updatedBy || null,
+    },
     now: new Date().toISOString(),
     auditLog: (state.settings?.auditLog || []).slice(-10),
     transactions: {

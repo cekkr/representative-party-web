@@ -388,9 +388,23 @@ async function updateSession(state, body) {
 }
 
 async function updateStructure(state, body) {
+  const previous = normalizeProviderFields(state.profileStructures || []);
   const { fields, errors } = parseProviderFieldInput(body.providerFields || '');
   const normalized = normalizeProviderFields(fields);
+  const changed = JSON.stringify(previous) !== JSON.stringify(normalized);
   state.profileStructures = normalized;
+  if (changed) {
+    const currentVersion = Number(state.settings?.profileSchema?.version || 0);
+    const now = new Date().toISOString();
+    state.settings = {
+      ...(state.settings || {}),
+      profileSchema: {
+        version: currentVersion + 1,
+        updatedAt: now,
+        updatedBy: 'admin',
+      },
+    };
+  }
   await persistProfileStructures(state);
   recordAdminAudit(state, {
     action: 'structure.update',
@@ -409,6 +423,7 @@ async function updateStructure(state, body) {
   return {
     flash: flashParts.join(' '),
     providerFieldsValue: formatProviderFieldsForTextarea(normalized),
+    providerFieldErrors: renderValidationErrors(errors, { title: 'Schema validation' }),
   };
 }
 
@@ -416,14 +431,28 @@ async function updateProfileAttributes(state, body) {
   const sessionId = sanitizeText(body.attributesSessionId || '', 72);
   const payload = body.attributesPayload || '';
   if (!sessionId) {
-    return { flash: 'Session ID required to persist profile attributes.', attributesPayloadValue: payload };
+    return {
+      flash: 'Session ID required to persist profile attributes.',
+      attributesPayloadValue: payload,
+      profileAttributeErrors: '',
+    };
   }
   const session = state.sessions.get(sessionId);
   if (!session) {
-    return { flash: `Session "${sessionId}" not found.`, attributesSessionId: sessionId, attributesPayloadValue: payload };
+    return {
+      flash: `Session "${sessionId}" not found.`,
+      attributesSessionId: sessionId,
+      attributesPayloadValue: payload,
+      profileAttributeErrors: '',
+    };
   }
   const providerFields = normalizeProviderFields(state.profileStructures || []);
   const { attributes, errors } = parseAttributePayloadWithValidation(payload, providerFields);
+  const existingEntry = findProfileAttributes(state, sessionId);
+  const missingRequired = listMissingRequired(providerFields, attributes, existingEntry?.provider || {});
+  if (missingRequired.length) {
+    errors.push(`Missing required fields: ${missingRequired.join(', ')}`);
+  }
   state.profileStructures = providerFields;
   const replace = Object.keys(attributes).length === 0;
   const entry = upsertProviderAttributes(state, { sessionId, handle: session.handle, attributes, replace });
@@ -445,6 +474,7 @@ async function updateProfileAttributes(state, body) {
     flash: flashParts.join(' '),
     attributesSessionId: sessionId,
     attributesPayloadValue: renderAttributesPayload(entry?.provider),
+    profileAttributeErrors: renderValidationErrors(errors, { title: 'Attribute validation' }),
   };
 }
 
@@ -537,8 +567,10 @@ function buildAdminViewModel(
     sessionForm = {},
     availableExtensions = [],
     providerFieldsValue,
+    providerFieldErrors,
     attributesSessionId,
     attributesPayloadValue,
+    profileAttributeErrors,
     rateLimitOverridesValue,
     rateLimitErrors,
   } = {},
@@ -576,9 +608,15 @@ function buildAdminViewModel(
   const replicationProfile = getReplicationProfile(state);
   const dataConfig = state.settings?.data || DATA_DEFAULTS;
   const providerFields = normalizeProviderFields(state.profileStructures || []);
+  const profileSchema = state.settings?.profileSchema || {};
+  const profileSchemaVersion = Number(profileSchema.version || 0);
+  const profileSchemaUpdatedAt = profileSchema.updatedAt ? formatTimestamp(profileSchema.updatedAt) : 'Not yet';
+  const profileSchemaUpdatedBy = profileSchema.updatedBy || '';
   const providerFieldsValueRendered = providerFieldsValue ?? formatProviderFieldsForTextarea(providerFields);
+  const providerFieldErrorsRendered = providerFieldErrors || '';
   const attributesSessionIdValue = attributesSessionId || '';
   const attributesPayloadValueRendered = attributesPayloadValue || '';
+  const profileAttributeErrorsRendered = profileAttributeErrors || '';
   const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
@@ -677,8 +715,13 @@ function buildAdminViewModel(
     canonicalProfileSummary: describeCanonicalProfile(),
     providerFieldsValue: providerFieldsValueRendered,
     providerFieldCount: providerFields.length,
+    providerFieldErrors: providerFieldErrorsRendered,
+    profileSchemaVersion,
+    profileSchemaUpdatedAt,
+    profileSchemaUpdatedBy,
     attributesSessionId: attributesSessionIdValue,
     attributesPayloadValue: attributesPayloadValueRendered,
+    profileAttributeErrors: profileAttributeErrorsRendered,
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
     transactionSummariesList,
@@ -705,6 +748,22 @@ function renderAttributesPayload(provider = {}) {
   return Object.entries(provider || {})
     .map(([key, value]) => `${key}: ${value}`)
     .join('\n');
+}
+
+function findProfileAttributes(state, sessionId) {
+  if (!state?.profileAttributes || !sessionId) return null;
+  return state.profileAttributes.find((entry) => entry.sessionId === sessionId) || null;
+}
+
+function listMissingRequired(fields = [], attributes = {}, existing = {}) {
+  const missing = [];
+  for (const field of fields) {
+    if (!field?.required) continue;
+    if (Object.prototype.hasOwnProperty.call(attributes, field.key)) continue;
+    if (Object.prototype.hasOwnProperty.call(existing, field.key)) continue;
+    missing.push(field.key);
+  }
+  return missing;
 }
 
 function listPendingTopicRenames(state) {
@@ -1540,6 +1599,17 @@ function renderPeerHealthOptions(peerHealth = {}, peers = new Set()) {
     return '<option value="">No peers recorded</option>';
   }
   return list.map((key) => `<option value="${escapeHtml(key)}">${escapeHtml(key)}</option>`).join('');
+}
+
+function renderValidationErrors(errors = [], { title = 'Validation issues' } = {}) {
+  if (!errors.length) return '';
+  const items = errors.map((error) => `<li>${escapeHtml(String(error))}</li>`).join('');
+  return `
+    <div class="callout">
+      <p class="muted small">${escapeHtml(title)}</p>
+      <ul class="plain">${items}</ul>
+    </div>
+  `;
 }
 
 function formatGossipStatus(status = {}) {

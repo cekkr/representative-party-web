@@ -284,6 +284,7 @@
   <p class="eyebrow">Structure manager</p>
   <h2>Profile schema (canonical + provider-local)</h2>
   <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
+  <p class="muted small">Schema version: {{profileSchemaVersion}} · Updated: {{profileSchemaUpdatedAt}} {{profileSchemaUpdatedBy}}</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">
     <input type="hidden" name="intent" value="structure" />
     <label class="field">
@@ -296,6 +297,7 @@
       <span class="muted small">Fields saved: {{providerFieldCount}}</span>
     </div>
   </form>
+  {{providerFieldErrors}}
 </section>
 
 <section class="panel">
@@ -319,6 +321,7 @@
       <button class="cta" type="submit">Save provider attributes</button>
     </div>
   </form>
+  {{profileAttributeErrors}}
 </section>
 
 <section class="panel">

@@ -37,12 +37,13 @@ This project takes the opposite stance:
 - **Messaging‑first kernel**: discussion + forum + notifications work alone.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
-- **Petitions → votes pipeline**: proposals, collaborative revisions + version history, signatures/quorum, deliberation feed, vote envelopes (signable).
+- **Petitions → votes pipeline**: proposals, collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed, vote envelopes (signable).
 - **Audit trails**: append-only transactions for discussions, petitions (signatures/comments), social, and group actions with exportable summaries.
 - **Identity throttles**: per-handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Federation stubs + redundancy knobs**: gossip endpoints and signed envelopes for auditability.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
+- **Profile attributes**: schema-driven provider-local fields with a per-session editor; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
 
 ---
@@ -118,6 +119,7 @@ Testing notes:
 - `/` landing, `/health` metrics
 - `/auth/eudi` start verification, `/auth/callback` return
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
+- `/profile` (provider-local profile attributes editor)
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
 - `/admin` settings, policy toggles, rate‑limit overrides, and audit summaries; `/extensions` extension toggles
@@ -157,10 +159,11 @@ sequenceDiagram
 **Always-on value (messaging kernel)**
 - **Discussion + forum**: threaded posts/comments with SSR UI.
 - **Notifications**: internal read/unread registry and preferences.
+- **Profile attributes**: schema-driven provider-local fields with self-service editing under `/profile`.
 - **Social feed**: micro‑post lane with typed follows (circle/interest/info/alerts) kept separate from petitions/votes.
 
 **Optional governance tools**
-- **Petitions**: draft proposals, collaborative revisions with history, signatures/quorum, stage transitions, discussion feed.
+- **Petitions**: draft proposals, collaborative revisions with history + diffs, signatures/quorum, stage transitions, pre-vote freeze, discussion feed.
 - **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
 - **Delegation**: topic‑scoped delegation with conflict resolution UI.
 - **Groups/elections**: group‑level delegate preferences and elections (advisory by design, with optional conflict prompts); in `electionMode=vote`, recommendations prefer the latest closed election winner.
@@ -261,7 +264,7 @@ If you want to contribute, start by reading `AGENTS.md` and keep changes aligned
 - One person = one voice via blinded PID hashes and policy gates.
 - Soft-power accountability: auditable policy decisions and signed vote envelopes instead of imperative mandates.
 - Liquid representation: topic-scoped delegation with revocable overrides.
-- Personalizable structure manager: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded identity) are fixed across a party ring; provider-local optional fields (contact email, personal details, notification preferences) live in a schema/data-table editor and never gossip.
+- Personalizable structure manager: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded identity) are fixed across a party ring; provider-local optional fields (contact email, personal details, notification preferences) live in a versioned schema/data-table editor with a per-session profile page and never gossip.
 - Messaging-first adoption: discussion and notifications work alone; petitions/votes/delegation/federation are opt-in.
 - Federation resilience: peers gossip ledger/vote hashes, reject policy id/version mismatches, and can quarantine toxic providers (peer health visible in `/admin`); ActivityPub actors expose public presence.
 - Human-ready maintenance: small modules, plain SSR templates, env-driven knobs, documented flows.
