@@ -58,6 +58,21 @@ async function getAdminForm(page, intent) {
   return intentField.evaluateHandle((node) => node.closest('form'));
 }
 
+async function getAdminFormByAction(page, { intent, action }) {
+  const forms = await page.$$('form[action="/admin"]');
+  for (const form of forms) {
+    const matches = await form.evaluate((node, intentValue, actionValue) => {
+      const intentField = node.querySelector('input[name="intent"]');
+      if (!intentField || intentField.value !== intentValue) return false;
+      if (!actionValue) return true;
+      const actionField = node.querySelector('input[name="action"]');
+      return actionField && actionField.value === actionValue;
+    }, intent, action);
+    if (matches) return form;
+  }
+  return null;
+}
+
 test('UI respects roles, privileges, module toggles, and background styling', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
@@ -699,4 +714,126 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
 
   await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
   assert.ok(await page.$('[data-module-disabled="petitions"]'));
+});
+
+test('UI admin reviews topic anchor suggestions and logs history', { timeout: 60000 }, async (t) => {
+  const tempDir = await mkdtemp(path.join(os.tmpdir(), 'rpw-ui-anchors-'));
+  const kvFile = path.join(tempDir, 'state.json');
+  t.after(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  const now = new Date().toISOString();
+  const seed = {
+    topics: [
+      {
+        id: 'topic-climate',
+        key: 'climate',
+        label: 'Climate',
+        slug: 'climate',
+        pathKey: 'climate',
+        depth: 0,
+        aliases: [],
+        history: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'topic-economy',
+        key: 'economy',
+        label: 'Economy',
+        slug: 'economy',
+        pathKey: 'economy',
+        depth: 0,
+        aliases: [],
+        history: [],
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
+    settings: {
+      initialized: true,
+      topicGardener: {
+        anchors: ['general', 'economy', 'society'],
+        pinned: [],
+        pendingAnchors: [
+          {
+            key: 'climate',
+            label: 'Climate',
+            action: 'promote',
+            at: now,
+            reason: 'count 14',
+            source: 'gardener',
+          },
+          {
+            key: 'economy',
+            label: 'Economy',
+            action: 'archive',
+            at: now,
+            reason: 'stale anchor',
+            source: 'gardener',
+          },
+        ],
+      },
+    },
+    meta: { schemaVersion: LATEST_SCHEMA_VERSION, migrations: [] },
+  };
+  await writeFile(kvFile, JSON.stringify(seed, null, 2));
+
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'kv', kvFile });
+  t.after(async () => server.stop());
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await page.goto(`${server.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => document.body.textContent.includes('Anchor suggestions'));
+  await page.waitForFunction(() => document.body.textContent.includes('Promote to anchor'));
+  await page.waitForFunction(() => document.body.textContent.includes('Archive anchor'));
+
+  const promoteForm = await getAdminFormByAction(page, { intent: 'topic-anchor-accept', action: 'promote' });
+  assert.ok(promoteForm);
+  const anchorLabel = await promoteForm.$('input[name="anchorLabel"]');
+  assert.ok(anchorLabel);
+  await anchorLabel.click({ clickCount: 3 });
+  await anchorLabel.type('Climate');
+  const promoteResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const promoteButton = await promoteForm.$('button[type="submit"]');
+  await promoteButton.click();
+  await promoteResponse;
+  await page.waitForFunction(() => document.body.textContent.includes('Anchor "Climate" promoted'));
+
+  const anchorsAfterPromote = await page.$eval('input[name="topicAnchors"]', (el) =>
+    el.value.split(',').map((entry) => entry.trim().toLowerCase()),
+  );
+  assert.ok(anchorsAfterPromote.includes('climate'));
+  await page.waitForFunction(() => document.body.textContent.includes('anchor_promote_accept'));
+
+  const archiveForm = await getAdminFormByAction(page, { intent: 'topic-anchor-accept', action: 'archive' });
+  assert.ok(archiveForm);
+  const confirmArchive = await archiveForm.$('input[name="confirm"]');
+  assert.ok(confirmArchive);
+  await confirmArchive.click();
+  const archiveResponse = page.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const archiveButton = await archiveForm.$('button[type="submit"]');
+  await archiveButton.click();
+  await archiveResponse;
+  await page.waitForFunction(() => document.body.textContent.includes('Anchor "Economy" archived'));
+
+  const anchorsAfterArchive = await page.$eval('input[name="topicAnchors"]', (el) =>
+    el.value.split(',').map((entry) => entry.trim().toLowerCase()),
+  );
+  assert.ok(!anchorsAfterArchive.includes('economy'));
+  await page.waitForFunction(() => document.body.textContent.includes('anchor_archive_accept'));
+  await page.waitForFunction(() => document.body.textContent.includes('No anchor suggestions'));
 });
