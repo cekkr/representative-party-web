@@ -80,8 +80,15 @@ export function buildInboundSocialPost({ state, payload, baseUrl, policy } = {})
   const authorHash = hashActorId(actorId || normalized.objectId || content);
   const issuer = deriveIssuer(actorId);
   const visibility = normalized.isPublic ? 'public' : 'direct';
-  const { targetHash, targetHandle } = resolveLocalTarget(normalized.recipients, baseUrl);
+  const { targetHash, targetHandle } = resolveLocalTarget(normalized.recipients, baseUrl, state);
   const replyTo = resolveReplyTo(normalized.inReplyTo, baseUrl);
+  if (visibility === 'direct' && !targetHash) {
+    return {
+      error: 'direct_not_local',
+      statusCode: 202,
+      detail: 'Direct ActivityPub note not addressed to a local actor.',
+    };
+  }
 
   const entry = stampLocalEntry(state, {
     id: buildInboundId(normalized.objectId || normalized.activityId || content),
@@ -234,13 +241,14 @@ function toArray(value) {
   return Array.isArray(value) ? value : [value];
 }
 
-function resolveLocalTarget(recipients, baseUrl) {
+function resolveLocalTarget(recipients, baseUrl, state) {
   if (!recipients || !baseUrl) return { targetHash: '', targetHandle: '' };
   const prefix = `${baseUrl.replace(/\/+$/, '')}/ap/actors/`;
   const match = recipients.all.find((entry) => typeof entry === 'string' && entry.startsWith(prefix));
   if (!match) return { targetHash: '', targetHandle: '' };
   const targetHash = match.slice(prefix.length);
-  return { targetHash, targetHandle: targetHash };
+  const targetHandle = resolveSessionHandle(state, targetHash);
+  return { targetHash, targetHandle: targetHandle || targetHash };
 }
 
 function resolveReplyTo(inReplyTo, baseUrl) {
@@ -285,6 +293,14 @@ function deriveIssuer(actorId) {
   } catch (_error) {
     return sanitizeText(actorId, 120);
   }
+}
+
+function resolveSessionHandle(state, pidHash) {
+  if (!pidHash || !state?.sessions) return '';
+  for (const session of state.sessions.values()) {
+    if (session.pidHash === pidHash) return session.handle || '';
+  }
+  return '';
 }
 
 function extractMentions(content = '') {

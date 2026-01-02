@@ -1,7 +1,7 @@
 import { URL } from 'node:url';
 
 import { renderAdmin, updateAdmin, exportAuditLog } from '../interfaces/http/controllers/admin.js';
-import { serveActor, serveOutbox, serveOutboxCollection, inbox } from '../interfaces/http/controllers/activitypub.js';
+import { serveActor, serveOutbox, serveOutboxCollection, serveObject, inbox } from '../interfaces/http/controllers/activitypub.js';
 import { completeAuth, startAuth } from '../interfaces/http/controllers/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../interfaces/http/controllers/circle.js';
 import { renderDiscussion, postDiscussion } from '../interfaces/http/controllers/discussion.js';
@@ -116,6 +116,15 @@ const routes = [
     },
   },
   { method: 'GET', path: '/ap/outbox', action: serveOutboxCollection },
+  {
+    method: 'GET',
+    prefix: '/ap/objects/',
+    buildParams: (pathname) => {
+      const segments = pathname.split('/').filter(Boolean);
+      return { id: segments[segments.length - 1] || '' };
+    },
+    action: ({ req, res, state, params }) => serveObject({ req, res, state, id: params.id }),
+  },
   { method: 'POST', path: '/ap/inbox', action: inbox },
   {
     method: 'GET',

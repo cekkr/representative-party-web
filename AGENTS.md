@@ -55,7 +55,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Delegation UI: group recommendations show election-winner metadata so users can see why a suggestion was picked.
 
 ## Endpoints
-- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/inbox` (ingests preview social notes), `/public/*`.
+- `/` landing, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` (ingests preview social notes), `/public/*`.
 - `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle; `/social/media/{id}` serves provider-gated media and `/social/media/report` records reports.
 - `/petitions` (GET/POST) drafts proposals with summary + optional full text; `/petitions/update` records collaborative revisions; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.

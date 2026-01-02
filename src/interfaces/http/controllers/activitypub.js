@@ -6,6 +6,7 @@ import { persistSocialPosts } from '../../../infra/persistence/storage.js';
 import { createSocialNote, wrapCreateActivity, buildInboundSocialPost } from '../../../modules/federation/activitypub.js';
 import { filterVisibleEntries } from '../../../modules/federation/replication.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
+import { notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function serveActor({ res, state, hash }) {
@@ -54,6 +55,16 @@ export async function inbox({ req, res, state }) {
     },
     validationStatus: entry.validationStatus,
   });
+  const targetSession = entry.targetHash ? findSessionByHash(state, entry.targetHash) : null;
+  try {
+    await notifySocialParticipants(state, {
+      post: entry,
+      author: { handle: entry.authorHandle, pidHash: entry.authorHash },
+      targetSession,
+    });
+  } catch (error) {
+    console.warn('[activitypub] notification dispatch failed', error);
+  }
 
   return sendJson(res, 202, {
     status: 'accepted',
@@ -101,6 +112,21 @@ export function serveOutbox({ req, res, state, hash }) {
   });
 }
 
+export function serveObject({ req, res, state, id }) {
+  if (!isModuleEnabled(state, 'federation')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+  }
+  if (!id) return sendNotFound(res);
+  const post = filterVisibleEntries(state.socialPosts || [], state).find((entry) => entry.id === id);
+  if (!post || post.visibility === 'direct' || post.activityPub?.inbound) {
+    return sendNotFound(res);
+  }
+  const baseUrl = deriveBaseUrl(req);
+  const note = post.activityPub?.note || createSocialNote({ post, baseUrl });
+  if (!note) return sendNotFound(res);
+  return sendJson(res, 200, note);
+}
+
 function buildOutboxItems(posts, baseUrl) {
   return posts
     .map((post) => {
@@ -135,4 +161,12 @@ function isDuplicateInbound(state, activityPub = {}) {
     if (activityId && meta.activityId === activityId) return true;
     return false;
   });
+}
+
+function findSessionByHash(state, pidHash) {
+  if (!pidHash || !state?.sessions) return null;
+  for (const session of state.sessions.values()) {
+    if (session.pidHash === pidHash) return session;
+  }
+  return null;
 }
