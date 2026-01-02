@@ -121,6 +121,14 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const result = await dismissTopicSplit(state, body);
     return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
+  if (intent === 'topic-anchor-accept') {
+    const result = await acceptTopicAnchorSuggestion(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
+  if (intent === 'topic-anchor-dismiss') {
+    const result = await dismissTopicAnchorSuggestion(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
     return renderAdminPage({
@@ -500,12 +508,15 @@ function buildAdminViewModel(
   const topicRenames = listPendingTopicRenames(state);
   const topicMerges = listPendingTopicMerges(state);
   const topicSplits = listPendingTopicSplits(state);
+  const topicAnchorSuggestions = listPendingAnchorSuggestions(state);
   const topicRenameList = renderTopicRenameList(topicRenames);
   const topicMergeList = renderTopicMergeList(topicMerges, state);
   const topicSplitList = renderTopicSplitList(topicSplits, state);
+  const topicAnchorList = renderTopicAnchorSuggestionList(topicAnchorSuggestions);
   const topicRenameCount = topicRenames.length;
   const topicMergeCount = topicMerges.length;
   const topicSplitCount = topicSplits.length;
+  const topicAnchorCount = topicAnchorSuggestions.length;
   const topicHistoryList = renderTopicHistoryList(listTopicHistory(state), state);
   const topicGardenerSyncAt = topicConfig.lastSyncAt ? formatTimestamp(topicConfig.lastSyncAt) : 'Not yet';
   const topicGardenerLastOperationAt = topicConfig.lastOperationAt
@@ -597,6 +608,8 @@ function buildAdminViewModel(
     topicMergeCount,
     topicSplitList,
     topicSplitCount,
+    topicAnchorList,
+    topicAnchorCount,
     topicHistoryList,
     topicGardenerSyncAt,
     topicGardenerLastOperationAt,
@@ -682,6 +695,11 @@ function listPendingTopicMerges(state) {
 
 function listPendingTopicSplits(state) {
   return (state?.topics || []).filter((topic) => topic?.pendingSplit);
+}
+
+function listPendingAnchorSuggestions(state) {
+  const pending = state?.settings?.topicGardener?.pendingAnchors;
+  return Array.isArray(pending) ? pending : [];
 }
 
 function listTopicHistory(state, { limit = 24 } = {}) {
@@ -862,6 +880,84 @@ function renderTopicSplitList(topics = [], state) {
     .join('\n');
 }
 
+function renderTopicAnchorSuggestionList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No anchor suggestions.</p>';
+  }
+  return entries
+    .map((entry) => {
+      const action = entry.action === 'archive' ? 'archive' : 'promote';
+      const title = action === 'archive' ? 'Archive anchor' : 'Promote to anchor';
+      const confirmLabel = action === 'archive' ? 'Confirm archive' : '';
+      const reason = entry.reason ? `<span class="muted small">${escapeHtml(String(entry.reason))}</span>` : '';
+      const requestedAt = entry.at ? `<span class="muted small">${escapeHtml(formatTimestamp(entry.at))}</span>` : '';
+      const labelValue = escapeHtml(String(entry.label || entry.key || 'topic'));
+      const keyValue = escapeHtml(String(entry.key || ''));
+      const promoteLabelField =
+        action === 'promote'
+          ? `
+            <label class="field">
+              <span>Anchor label</span>
+              <input name="anchorLabel" value="${labelValue}" />
+            </label>
+          `
+          : '';
+      const confirmField =
+        action === 'archive'
+          ? `
+            <label class="field checkbox">
+              <input type="checkbox" name="confirm" value="yes" />
+              <span>${confirmLabel}</span>
+            </label>
+          `
+          : '';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">${escapeHtml(title)}</span>
+            <span class="pill ghost">${labelValue}</span>
+            ${reason}
+            ${requestedAt}
+          </div>
+          <form class="stack" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-anchor-accept" />
+            <input type="hidden" name="topicKey" value="${keyValue}" />
+            <input type="hidden" name="action" value="${escapeHtml(action)}" />
+            ${promoteLabelField}
+            ${confirmField}
+            <div class="cta-row">
+              <button class="ghost" type="submit">Accept</button>
+            </div>
+          </form>
+          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+            <input type="hidden" name="intent" value="topic-anchor-dismiss" />
+            <input type="hidden" name="topicKey" value="${keyValue}" />
+            <input type="hidden" name="action" value="${escapeHtml(action)}" />
+            <button class="ghost" type="submit">Dismiss</button>
+          </form>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function upsertAnchorLabel(list = [], label) {
+  if (!label) return { list, updated: false };
+  const normalizedKey = normalizeTopicKey(label);
+  const existingKeys = new Set((list || []).map((entry) => normalizeTopicKey(entry)));
+  if (existingKeys.has(normalizedKey)) {
+    return { list, updated: false };
+  }
+  return { list: [...list, label], updated: true };
+}
+
+function removeAnchorByKey(list = [], key) {
+  if (!key) return { list, updated: false };
+  const normalizedKey = normalizeTopicKey(key);
+  const filtered = (list || []).filter((entry) => normalizeTopicKey(entry) !== normalizedKey);
+  return { list: filtered, updated: filtered.length !== (list || []).length };
+}
+
 function renderTopicHistoryList(entries = [], state) {
   if (!entries.length) {
     return '<p class="muted small">No topic history recorded yet.</p>';
@@ -904,7 +1000,11 @@ function renderTopicHistoryDiff(entry = {}, state) {
     lines.push(`* suggested: ${suggested.join(', ')}`);
   }
   if (entry.label) {
-    lines.push(`+ alias: ${entry.label}`);
+    if (String(entry.action || '').startsWith('anchor_')) {
+      lines.push(`anchor: ${entry.label}`);
+    } else {
+      lines.push(`+ alias: ${entry.label}`);
+    }
   }
   if (topic) {
     const breadcrumb = formatTopicBreadcrumb(state, topic.id);
@@ -1151,6 +1251,118 @@ async function dismissTopicSplit(state, body) {
   topic.updatedAt = now;
   await persistTopics(state);
   return { flash: 'Topic split dismissed.' };
+}
+
+async function acceptTopicAnchorSuggestion(state, body) {
+  const action = sanitizeText(body.action || '', 24).toLowerCase();
+  const topicKey = sanitizeText(body.topicKey || '', 120);
+  const anchorLabel = sanitizeText(body.anchorLabel || '', 64);
+  const confirmed = parseBoolean(body.confirm, false);
+  if (!topicKey || !action) {
+    return { flash: 'Anchor suggestion missing key or action.' };
+  }
+  if (action !== 'promote' && action !== 'archive') {
+    return { flash: 'Unknown anchor action.' };
+  }
+  if (action === 'archive' && !confirmed) {
+    return { flash: 'Confirm the anchor archive before applying.' };
+  }
+
+  const pending = listPendingAnchorSuggestions(state);
+  const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
+  if (index < 0) {
+    return { flash: 'Anchor suggestion not found.' };
+  }
+  const entry = pending[index];
+  const topicGardener = state.settings?.topicGardener || {};
+  let anchors = Array.isArray(topicGardener.anchors) ? [...topicGardener.anchors] : [];
+
+  let updated = false;
+  let labelUsed = '';
+  if (action === 'promote') {
+    labelUsed = normalizeTopicLabel(anchorLabel || entry.label || entry.key);
+    const result = upsertAnchorLabel(anchors, labelUsed);
+    anchors = result.list;
+    updated = result.updated;
+  } else {
+    labelUsed = entry.label || entry.key;
+    const result = removeAnchorByKey(anchors, entry.key);
+    anchors = result.list;
+    updated = result.updated;
+  }
+
+  const nextPending = pending.filter((_, idx) => idx !== index);
+  state.settings = {
+    ...(state.settings || {}),
+    topicGardener: {
+      ...topicGardener,
+      anchors,
+      pendingAnchors: nextPending,
+    },
+  };
+  await persistSettings(state);
+
+  const topic = findTopicByPathKey(state, topicKey);
+  if (topic) {
+    const now = new Date().toISOString();
+    appendTopicHistory(topic, {
+      at: now,
+      action: `anchor_${action}_accept`,
+      source: 'admin',
+      reason: entry.reason || 'admin_accept',
+      from: topicKey,
+      label: labelUsed,
+    });
+    topic.updatedAt = now;
+    await persistTopics(state);
+  }
+
+  if (!updated) {
+    return { flash: `Anchor suggestion applied (no anchor list changes).` };
+  }
+  return {
+    flash: action === 'archive' ? `Anchor "${labelUsed}" archived.` : `Anchor "${labelUsed}" promoted.`,
+  };
+}
+
+async function dismissTopicAnchorSuggestion(state, body) {
+  const action = sanitizeText(body.action || '', 24).toLowerCase();
+  const topicKey = sanitizeText(body.topicKey || '', 120);
+  if (!topicKey || !action) {
+    return { flash: 'Anchor suggestion missing key or action.' };
+  }
+  const pending = listPendingAnchorSuggestions(state);
+  const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
+  if (index < 0) {
+    return { flash: 'Anchor suggestion not found.' };
+  }
+  const entry = pending[index];
+  const topicGardener = state.settings?.topicGardener || {};
+  const nextPending = pending.filter((_, idx) => idx !== index);
+  state.settings = {
+    ...(state.settings || {}),
+    topicGardener: {
+      ...topicGardener,
+      pendingAnchors: nextPending,
+    },
+  };
+  await persistSettings(state);
+
+  const topic = findTopicByPathKey(state, topicKey);
+  if (topic) {
+    const now = new Date().toISOString();
+    appendTopicHistory(topic, {
+      at: now,
+      action: `anchor_${action}_dismiss`,
+      source: 'admin',
+      reason: entry.reason || 'dismissed',
+      from: topicKey,
+      label: entry.label || topic.label,
+    });
+    topic.updatedAt = now;
+    await persistTopics(state);
+  }
+  return { flash: 'Anchor suggestion dismissed.' };
 }
 
 function recordAdminAudit(state, { action, summary }) {
@@ -1580,8 +1792,9 @@ function formatTopicGardenerFlash(summary = {}) {
   const renames = Number(summary.pendingRenames || 0);
   const merges = Number(summary.pendingMerges || 0);
   const splits = Number(summary.pendingSplits || 0);
+  const anchors = Number(summary.pendingAnchors || 0);
   const processed = Number(summary.processed || 0);
-  return `Topic gardener synced ${processed} ops (${updated} topic updates, ${renames} rename, ${merges} merge, ${splits} split suggestions).`;
+  return `Topic gardener synced ${processed} ops (${updated} topic updates, ${renames} rename, ${merges} merge, ${splits} split, ${anchors} anchor suggestions).`;
 }
 
 function roleSelectFlags(role) {

@@ -12,6 +12,7 @@ import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './
 
 const DEFAULT_TIMEOUT_MS = 8000;
 const SKIPPABLE_ERRORS = new Set(['module_disabled', 'gossip_disabled']);
+const SKIPPABLE_STATUS = new Set([404, 405, 410, 501]);
 
 export { collectGossipPeers, normalizePeerUrl } from './peers.js';
 
@@ -588,7 +589,7 @@ function describeFailure(scope, status) {
 }
 
 function shouldSkipResponse(status, error, { skipNotFound = false } = {}) {
-  if (skipNotFound && status === 404) return true;
+  if (skipNotFound && SKIPPABLE_STATUS.has(status)) return true;
   if (status !== 403) return false;
   const normalized = String(error || '').trim().toLowerCase();
   if (!normalized) return false;

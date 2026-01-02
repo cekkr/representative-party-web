@@ -49,6 +49,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals, collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed, vote envelopes (signable).
+- **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
@@ -158,6 +159,7 @@ npm run db:check
 - **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
 - **Delegation**: topic‑scoped delegation with conflict resolution UI.
 - **Groups/elections**: group‑level delegate preferences and elections (advisory by design, with optional conflict prompts); in `electionMode=vote`, recommendations prefer the latest closed election winner.
+- **Topics & gardener**: dynamic topic labeling with admin review (rename/merge/split + anchor promotion/archival suggestions).
 
 ### Circle & federation scaffolding
 - **Uniqueness ledger + gossip**: exchange ledger hashes and peer hints.

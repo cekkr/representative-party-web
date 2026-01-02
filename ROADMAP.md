@@ -47,10 +47,10 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Persistence adapters (json/memory/sql/kv), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
-- Structure manager UI for provider-local fields and attributes is available; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin rename/merge/split review are wired.
+- Structure manager UI for provider-local fields and attributes is available; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 
 ## Near-term next steps (Phase 2 focus)
-- Extend topic gardener review to cover suggested anchor promotion/archival and deeper diff visualization for topic history.
+- Extend topic gardener review with deeper diff visualization for topic history.
 - Add petition revision diffs, review prompts, and pre-vote freeze UX so contributors can validate the final text before voting opens.
 - Expand the structure manager: schema versioning, inline validation errors, and a per-session attributes editor that respects provider-only storage and consent.
 - Wire outbound transports (email/SMS) with delivery logs and opt-in enforcement using provider-local preferences.

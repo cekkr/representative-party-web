@@ -15,7 +15,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
 - Topic stewardship & gardening: users (people in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
 - Topic registry: persist topic ids/path metadata for discussions, forum threads, and petitions so SSR views can render breadcrumbs and future renames can be tracked.
-- Topic gardener review: sync gardener operations into topic history and surface pending rename/merge/split suggestions in `/admin` with previews, confirmations, and a lightweight history diff view.
+- Topic gardener review: sync gardener operations into topic history and surface pending rename/merge/split plus anchor promotion/archival suggestions in `/admin` with previews, confirmations, and a lightweight history diff view.
 - Collaborative petitions: drafts support revision history, revision diffs, stage-aware editing (draft/discussion only), and pre-vote freeze/review cues.
 - Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts; outbound delivery attempts are logged to the transactions registry.
 - Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.

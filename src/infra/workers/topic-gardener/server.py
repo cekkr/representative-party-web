@@ -23,6 +23,8 @@ DEFAULT_SIMILARITY_THRESHOLD = 0.35
 DEFAULT_MERGE_THRESHOLD = 0.85
 DEFAULT_MIN_RENAME_COUNT = 6
 DEFAULT_MIN_SPLIT_COUNT = 14
+DEFAULT_MIN_ANCHOR_PROMOTE_COUNT = 12
+DEFAULT_MIN_ANCHOR_ARCHIVE_COUNT = 2
 DEFAULT_STALE_SECONDS = 7 * 24 * 60 * 60
 MAX_OPERATIONS = 200
 
@@ -81,12 +83,16 @@ class TopicGardener:
     min_rename_count: int,
     min_split_count: int,
     stale_seconds: int,
+    min_anchor_promote_count: int,
+    min_anchor_archive_count: int,
   ):
     self.similarity_threshold = similarity_threshold
     self.merge_threshold = merge_threshold
     self.min_rename_count = min_rename_count
     self.min_split_count = min_split_count
     self.stale_seconds = stale_seconds
+    self.min_anchor_promote_count = min_anchor_promote_count
+    self.min_anchor_archive_count = min_anchor_archive_count
     self.topics: Dict[str, TopicStats] = {}
     self.operations: List[dict] = []
     self.last_refactor_at: Optional[float] = None
@@ -99,6 +105,11 @@ class TopicGardener:
     now = time.time()
 
     with self.lock:
+      anchor_keys = {slugify(label) for label in anchors}
+      pinned_keys = {slugify(label) for label in pinned}
+      for topic in self.topics.values():
+        topic.anchor = topic.key in anchor_keys
+        topic.pinned = topic.key in pinned_keys
       for label in anchors:
         self._ensure_topic(label, anchor=True)
       for label in pinned:
@@ -119,6 +130,8 @@ class TopicGardener:
       ops.extend(self._merge_similar(now))
       ops.extend(self._rename_topics(now))
       ops.extend(self._split_topics(now))
+      ops.extend(self._suggest_anchor_promotions(now))
+      ops.extend(self._suggest_anchor_archives(now))
       ops.extend(self._prune_stale(now))
       if ops:
         self.operations.extend(ops)
@@ -289,6 +302,55 @@ class TopicGardener:
       })
     return ops
 
+  def _suggest_anchor_promotions(self, now: float) -> List[dict]:
+    ops = []
+    for topic in self.topics.values():
+      if topic.anchor or topic.pinned:
+        continue
+      if topic.count < self.min_anchor_promote_count:
+        continue
+      if not topic.last_seen or (now - topic.last_seen) > self.stale_seconds:
+        continue
+      if self._has_recent_anchor_op("promote", topic.key):
+        continue
+      ops.append({
+        "type": "anchor",
+        "action": "promote",
+        "from": topic.key,
+        "label": topic.label,
+        "count": topic.count,
+        "at": now,
+        "reason": f"count {topic.count}",
+      })
+    return ops
+
+  def _suggest_anchor_archives(self, now: float) -> List[dict]:
+    ops = []
+    for topic in self.topics.values():
+      if not topic.anchor:
+        continue
+      if topic.pinned:
+        continue
+      if topic.key == "general":
+        continue
+      if topic.count > self.min_anchor_archive_count:
+        continue
+      if not topic.last_seen or (now - topic.last_seen) < self.stale_seconds:
+        continue
+      if self._has_recent_anchor_op("archive", topic.key):
+        continue
+      ops.append({
+        "type": "anchor",
+        "action": "archive",
+        "from": topic.key,
+        "label": topic.label,
+        "count": topic.count,
+        "lastSeen": topic.last_seen,
+        "at": now,
+        "reason": "stale anchor",
+      })
+    return ops
+
   def _prune_stale(self, now: float) -> List[dict]:
     ops = []
     for topic in list(self.topics.values()):
@@ -303,6 +365,17 @@ class TopicGardener:
           "reason": "stale topic",
         })
     return ops
+
+  def _has_recent_anchor_op(self, action: str, key: str) -> bool:
+    for op in reversed(self.operations):
+      if op.get("type") != "anchor":
+        continue
+      if op.get("action") != action:
+        continue
+      if op.get("from") != key:
+        continue
+      return True
+    return False
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -384,6 +457,8 @@ def main():
   parser.add_argument("--merge-threshold", type=float, default=DEFAULT_MERGE_THRESHOLD)
   parser.add_argument("--min-rename-count", type=int, default=DEFAULT_MIN_RENAME_COUNT)
   parser.add_argument("--min-split-count", type=int, default=DEFAULT_MIN_SPLIT_COUNT)
+  parser.add_argument("--min-anchor-promote-count", type=int, default=DEFAULT_MIN_ANCHOR_PROMOTE_COUNT)
+  parser.add_argument("--min-anchor-archive-count", type=int, default=DEFAULT_MIN_ANCHOR_ARCHIVE_COUNT)
   args = parser.parse_args()
 
   gardener = TopicGardener(
@@ -392,6 +467,8 @@ def main():
     min_rename_count=args.min_rename_count,
     min_split_count=args.min_split_count,
     stale_seconds=DEFAULT_STALE_SECONDS,
+    min_anchor_promote_count=args.min_anchor_promote_count,
+    min_anchor_archive_count=args.min_anchor_archive_count,
   )
   Handler.gardener = gardener
   start_refactor_loop(gardener, args.refactor_seconds)

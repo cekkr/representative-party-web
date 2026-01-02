@@ -191,13 +191,25 @@ export async function ingestVoteGossip({ state, envelopes = [], statusHint, peer
       continue;
     }
     const voteKey = `${envelope.petitionId}:${envelope.authorHash}`;
+    const issuer = envelope.issuer || peerHint || null;
+    const now = new Date().toISOString();
     const existingIndex = state.votes.findIndex((vote) => `${vote.petitionId}:${vote.authorHash}` === voteKey);
     const nextEntry = {
       petitionId: envelope.petitionId,
       authorHash: envelope.authorHash,
       choice: envelope.choice,
-      createdAt: envelope.createdAt || new Date().toISOString(),
+      createdAt: envelope.createdAt || now,
       validationStatus: replicationStatus.status,
+      issuer,
+      mode: profile.mode,
+      adapter: profile.adapter,
+      provenance: {
+        issuer,
+        mode: profile.mode,
+        adapter: profile.adapter,
+      },
+      validatedAt: replicationStatus.status === 'validated' ? now : null,
+      validatedBy: replicationStatus.status === 'validated' ? issuer : null,
       envelope: { ...envelope, status: replicationStatus.status },
     };
     if (existingIndex >= 0) {

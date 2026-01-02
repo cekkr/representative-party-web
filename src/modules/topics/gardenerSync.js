@@ -1,7 +1,13 @@
 import { TOPIC_GARDENER_SYNC_SECONDS } from '../../config.js';
 import { persistSettings, persistTopics } from '../../infra/persistence/storage.js';
 import { isModuleEnabled } from '../circle/modules.js';
-import { appendTopicHistory, findTopicByPathKey, labelFromKey } from './registry.js';
+import {
+  appendTopicHistory,
+  findTopicByPathKey,
+  labelFromKey,
+  normalizeTopicKey,
+  normalizeTopicLabel,
+} from './registry.js';
 import { fetchGardenerOperations, getTopicConfig } from './topicGardenerClient.js';
 
 const DEFAULT_SYNC_SECONDS = 120;
@@ -68,6 +74,7 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
   let pendingRenames = 0;
   let pendingMerges = 0;
   let pendingSplits = 0;
+  let pendingAnchors = 0;
 
   for (const operation of operations) {
     const type = String(operation?.type || '').toLowerCase();
@@ -75,6 +82,7 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
     const toKey = String(operation?.to || '').trim();
     const suggested = Array.isArray(operation?.suggested) ? operation.suggested : [];
     const reason = operation?.reason || '';
+    const action = String(operation?.action || '').toLowerCase();
     const atSeconds = Number(operation?.at || 0);
     const timestamp = Number.isFinite(atSeconds) && atSeconds > 0 ? new Date(atSeconds * 1000).toISOString() : new Date().toISOString();
 
@@ -142,9 +150,82 @@ function applyGardenerOperations(state, operations = [], { source } = {}) {
       pendingSplits += 1;
     }
 
+    if (type === 'anchor' || type === 'anchor_promote' || type === 'anchor_archive') {
+      const resolvedAction = resolveAnchorAction(type, action);
+      if (resolvedAction) {
+        const rawAnchorKey = fromKey || operation?.label || '';
+        const rawAnchorLabel = operation?.label || (fromKey ? labelFromKey(fromKey) : '');
+        const anchorEntry = upsertPendingAnchorSuggestion(state, {
+          action: resolvedAction,
+          key: rawAnchorKey ? normalizeTopicKey(rawAnchorKey) : '',
+          label: rawAnchorLabel ? normalizeTopicLabel(rawAnchorLabel) : '',
+          at: timestamp,
+          reason,
+          source,
+        });
+        if (anchorEntry.added) {
+          pendingAnchors += 1;
+        }
+        if (fromTopic) {
+          appendTopicHistory(fromTopic, {
+            at: timestamp,
+            action: `anchor_${resolvedAction}`,
+            source,
+            reason,
+            from: fromKey,
+            label: anchorEntry.entry?.label || labelFromKey(fromKey),
+          });
+          fromTopic.updatedAt = timestamp;
+          updatedTopics += 1;
+        }
+      }
+    }
+
     fromTopic.updatedAt = timestamp;
     updatedTopics += 1;
   }
 
-  return { updatedTopics, pendingRenames, pendingMerges, pendingSplits, processed: operations.length };
+  return { updatedTopics, pendingRenames, pendingMerges, pendingSplits, pendingAnchors, processed: operations.length };
+}
+
+function resolveAnchorAction(type, action) {
+  if (type === 'anchor_promote') return 'promote';
+  if (type === 'anchor_archive') return 'archive';
+  if (type === 'anchor') {
+    if (action === 'promote' || action === 'archive') return action;
+  }
+  return '';
+}
+
+function upsertPendingAnchorSuggestion(state, suggestion) {
+  const settings = state.settings || {};
+  const topicGardener = settings.topicGardener || {};
+  const pending = Array.isArray(topicGardener.pendingAnchors) ? topicGardener.pendingAnchors : [];
+  const rawLabel = suggestion.label && String(suggestion.label).trim() ? suggestion.label : '';
+  const key = suggestion.key || (rawLabel ? normalizeTopicKey(rawLabel) : '');
+  const label = rawLabel || (key ? labelFromKey(key) : '');
+  if (!key || !label) {
+    return { added: false, entry: null };
+  }
+  const exists = pending.some((entry) => entry.key === key && entry.action === suggestion.action);
+  if (exists) {
+    return { added: false, entry: pending.find((entry) => entry.key === key && entry.action === suggestion.action) };
+  }
+  const entry = {
+    key,
+    label,
+    action: suggestion.action,
+    at: suggestion.at,
+    reason: suggestion.reason || '',
+    source: suggestion.source || 'gardener',
+  };
+  const next = [...pending, entry].slice(-40);
+  state.settings = {
+    ...settings,
+    topicGardener: {
+      ...topicGardener,
+      pendingAnchors: next,
+    },
+  };
+  return { added: true, entry };
 }

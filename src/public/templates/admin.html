@@ -150,7 +150,7 @@
   <h2>Topic gardener review</h2>
   <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>
   <p class="muted small">Last operation: {{topicGardenerLastOperationAt}}</p>
-  <p class="muted small">Pending renames: {{topicRenameCount}} · merges: {{topicMergeCount}} · splits: {{topicSplitCount}}</p>
+  <p class="muted small">Pending renames: {{topicRenameCount}} · merges: {{topicMergeCount}} · splits: {{topicSplitCount}} · anchors: {{topicAnchorCount}}</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">
     <input type="hidden" name="intent" value="topic-gardener-sync" />
     <div class="cta-row">
@@ -169,6 +169,10 @@
     <div class="stack">
       <p class="muted small">Split suggestions</p>
       {{topicSplitList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Anchor suggestions</p>
+      {{topicAnchorList}}
     </div>
   </div>
   <div class="stack">
