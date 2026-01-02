@@ -90,7 +90,12 @@ DATA_ADAPTER=memory DATA_MODE=centralized npm start
 
 # Persisted JSON (default)
 npm start
+
+# Standalone full-feature dev (admin/admin bootstrap)
+./run-standalone.sh
 ```
+
+The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`).
 
 ### Common recipes
 
