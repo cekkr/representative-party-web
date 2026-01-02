@@ -82,6 +82,8 @@ The code keeps this distinction explicit so deployments can start lightweight an
 
 **Prereqs:** Node.js 20+ (ESM) and npm. `sqlite3` is bundled for the optional SQL adapter.
 
+Copy `.env.example` to `.env` for the full list of available configuration variables. The server loads `.env` automatically at startup.
+
 ```bash
 npm install
 

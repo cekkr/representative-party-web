@@ -25,6 +25,7 @@
     "db:check": "node scripts/db-check.js"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
     "sqlite3": "^5.1.7"
   },
   "devDependencies": {
