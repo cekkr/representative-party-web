@@ -66,6 +66,16 @@ test('p2p ring gossips ledger and votes without conflicts', { timeout: 90000 }, 
   const { payload: healthC } = await fetchJson(`${nodeC.baseUrl}/health`);
   assert.equal(healthB.ledger, 1);
   assert.equal(healthC.ledger, 1);
+  const peerHealthB = healthB?.gossip?.peerHealth?.entries || [];
+  const peerHealthC = healthC?.gossip?.peerHealth?.entries || [];
+  const peerEntryB = peerHealthB.find((entry) => entry.peer === 'node-a');
+  const peerEntryC = peerHealthC.find((entry) => entry.peer === 'node-a');
+  assert.ok(peerEntryB, 'expected peer health entry on node B');
+  assert.ok(peerEntryC, 'expected peer health entry on node C');
+  assert.ok(peerEntryB.lastLedgerHash, 'expected ledger hash snapshot on node B');
+  assert.ok(peerEntryC.lastLedgerHash, 'expected ledger hash snapshot on node C');
+  assert.equal(peerEntryB.lastLedgerMatch, true);
+  assert.equal(peerEntryC.lastLedgerMatch, true);
 
   const repeatGossip = await postJson(`${nodeB.baseUrl}/circle/gossip`, { envelope: ledgerExport.envelope });
   const repeatPayload = await repeatGossip.json();

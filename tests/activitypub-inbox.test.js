@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fetchText, postJson } from './helpers/http.js';
+import { fetchText, postForm, postJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { buildActivityPubCreateNote } from './helpers/activitypub.js';
 
@@ -66,4 +66,27 @@ test('ActivityPub inbox rejects policy mismatches', { timeout: 60000 }, async (t
   const body = await response.json();
   assert.equal(response.status, 409);
   assert.equal(body.error, 'policy_mismatch');
+});
+
+test('ActivityPub inbox respects social module toggles', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory', allowPreviews: true });
+  t.after(async () => server.stop());
+
+  await postForm(
+    `${server.baseUrl}/admin`,
+    { intent: 'modules', module_federation: 'on' },
+    { partial: true },
+  );
+
+  const payload = buildActivityPubCreateNote({
+    content: 'Social module disabled note',
+    activityId: 'https://remote.example/ap/activities/inbox-4',
+    objectId: 'https://remote.example/ap/objects/inbox-4',
+  });
+  const response = await postJson(`${server.baseUrl}/ap/inbox`, payload);
+  const body = await response.json();
+  assert.equal(response.status, 403);
+  assert.equal(body.error, 'module_disabled');
+  assert.equal(body.module, 'social');
 });

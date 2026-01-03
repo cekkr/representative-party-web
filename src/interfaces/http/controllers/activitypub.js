@@ -10,18 +10,14 @@ import { notifySocialParticipants } from '../../../modules/social/notifications.
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function serveActor({ res, state, hash }) {
-  if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
-  }
+  if (!ensureActivityPubModules(state, res)) return;
   const actor = state.actors.get(hash);
   if (!actor) return sendNotFound(res);
   return sendJson(res, 200, actor);
 }
 
 export async function inbox({ req, res, state }) {
-  if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
-  }
+  if (!ensureActivityPubModules(state, res)) return;
   const rawBody = await readRequestBody(req);
   const body = normalizeBody(rawBody);
   const baseUrl = deriveBaseUrl(req);
@@ -76,9 +72,7 @@ export async function inbox({ req, res, state }) {
 }
 
 export function serveOutboxCollection({ req, res, state }) {
-  if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
-  }
+  if (!ensureActivityPubModules(state, res)) return;
   const baseUrl = deriveBaseUrl(req);
   const posts = filterVisibleEntries(state.socialPosts || [], state).filter((post) => post.visibility !== 'direct');
   const orderedItems = buildOutboxItems(posts, baseUrl);
@@ -92,9 +86,7 @@ export function serveOutboxCollection({ req, res, state }) {
 }
 
 export function serveOutbox({ req, res, state, hash }) {
-  if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
-  }
+  if (!ensureActivityPubModules(state, res)) return;
   const actor = state.actors.get(hash);
   if (!actor) return sendNotFound(res);
   const baseUrl = deriveBaseUrl(req);
@@ -113,9 +105,7 @@ export function serveOutbox({ req, res, state, hash }) {
 }
 
 export function serveObject({ req, res, state, id }) {
-  if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
-  }
+  if (!ensureActivityPubModules(state, res)) return;
   if (!id) return sendNotFound(res);
   const post = filterVisibleEntries(state.socialPosts || [], state).find((entry) => entry.id === id);
   if (!post || post.visibility === 'direct' || post.activityPub?.inbound) {
@@ -169,4 +159,16 @@ function findSessionByHash(state, pidHash) {
     if (session.pidHash === pidHash) return session;
   }
   return null;
+}
+
+function ensureActivityPubModules(state, res) {
+  if (!isModuleEnabled(state, 'federation')) {
+    sendModuleDisabledJson({ res, moduleKey: 'federation' });
+    return false;
+  }
+  if (!isModuleEnabled(state, 'social')) {
+    sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return false;
+  }
+  return true;
 }

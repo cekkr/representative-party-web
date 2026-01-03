@@ -4,7 +4,7 @@ import { persistLedger, persistPeers, persistSettings, persistVotes } from '../.
 import { verifyVoteEnvelope } from '../votes/voteEnvelope.js';
 import { decideStatus, getReplicationProfile } from './replication.js';
 import { normalizePeerUrl } from './peers.js';
-import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess, resolvePeerKey } from './quarantine.js';
+import { isPeerQuarantined, recordPeerFailure, recordPeerLedger, recordPeerSuccess, resolvePeerKey } from './quarantine.js';
 
 const MAX_PEER_HINTS = 25;
 
@@ -24,6 +24,14 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
   const preLedgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const policy = getEffectivePolicy(state);
   const policyCheck = envelope ? validatePolicy(policy, envelope.policy) : { ok: true };
+  const entries = envelope
+    ? Array.isArray(envelope.entries)
+      ? envelope.entries
+      : []
+    : Array.isArray(hashes)
+      ? hashes
+      : [];
+  const digestHint = envelope?.ledgerHash || ledgerHash;
 
   if (verification && !verification.valid && !verification.skipped) {
     const updated = recordPeerFailure(state, peerKey, { reason: 'invalid_signature', penalty: 2 }).updated;
@@ -49,6 +57,11 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
   }
 
   if (replicationStatus.status === 'rejected') {
+    if (peerKey && digestHint) {
+      const ledgerMatch = preLedgerHash === digestHint;
+      const ledgerUpdate = recordPeerLedger(state, peerKey, { ledgerHash: digestHint, match: ledgerMatch });
+      if (ledgerUpdate.updated) await persistSettings(state);
+    }
     return {
       statusCode: 202,
       payload: {
@@ -63,19 +76,16 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
     };
   }
 
-  const entries = envelope
-    ? Array.isArray(envelope.entries)
-      ? envelope.entries
-      : []
-    : Array.isArray(hashes)
-      ? hashes
-      : [];
-  const digestHint = envelope?.ledgerHash || ledgerHash;
   if (digestHint) {
     const expected = computeLedgerHash(entries);
     if (expected !== digestHint) {
-      const updated = recordPeerFailure(state, peerKey, { reason: 'ledger_hash_mismatch', penalty: 2 }).updated;
-      if (updated) await persistSettings(state);
+      const failureUpdated = recordPeerFailure(state, peerKey, { reason: 'ledger_hash_mismatch', penalty: 2 }).updated;
+      const ledgerUpdated = peerKey
+        ? recordPeerLedger(state, peerKey, { ledgerHash: digestHint, match: false }).updated
+        : false;
+      if (failureUpdated || ledgerUpdated) {
+        await persistSettings(state);
+      }
       return {
         statusCode: 400,
         payload: {
@@ -124,12 +134,17 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
     await persistLedger(state);
   }
 
-  if (peerKey) {
-    const updated = recordPeerSuccess(state, peerKey).updated;
-    if (updated) await persistSettings(state);
-  }
-
   const localLedgerHash = computeLedgerHash([...state.uniquenessLedger]);
+  let peerHealthUpdated = false;
+  if (peerKey) {
+    peerHealthUpdated = recordPeerSuccess(state, peerKey).updated || peerHealthUpdated;
+    if (digestHint) {
+      peerHealthUpdated =
+        recordPeerLedger(state, peerKey, { ledgerHash: digestHint, match: digestHint === localLedgerHash }).updated ||
+        peerHealthUpdated;
+    }
+    if (peerHealthUpdated) await persistSettings(state);
+  }
   return {
     statusCode: 200,
     payload: {
