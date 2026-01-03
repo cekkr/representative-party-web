@@ -1,4 +1,4 @@
-# Representative Party Framework
+# Representative Party Web Framework
 
 A **messaging‑first “Party Circle” kernel** for civic and political organizations that want deliberation and representation *without* turning identity into a surveillance problem.
 
