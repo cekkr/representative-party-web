@@ -87,6 +87,15 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
   const profileEntry = entry || (person ? findProfileAttributes(state, person.sessionId) : null);
   const defaultValues = values || buildProfileValues(providerFields, profileEntry);
   const updatedAt = profileEntry?.updatedAt ? new Date(profileEntry.updatedAt).toLocaleString() : '';
+  const profileSchema = state.settings?.profileSchema || {};
+  const schemaParts = [`Schema v${Number(profileSchema.version || 0)}`];
+  if (profileSchema.updatedAt) {
+    schemaParts.push(`updated ${new Date(profileSchema.updatedAt).toLocaleString()}`);
+  }
+  if (profileSchema.updatedBy) {
+    schemaParts.push(`by ${profileSchema.updatedBy}`);
+  }
+  const profileSchemaNote = schemaParts.join(' · ');
   const profileForm = renderProfileForm({
     person,
     actorLabels,
@@ -107,6 +116,7 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
       profileForm,
       profileSummary,
       profileFlash,
+      profileSchemaNote,
     },
     { wantsPartial, title: 'Profile', state },
   );

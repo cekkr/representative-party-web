@@ -106,12 +106,15 @@ export function upsertProviderAttributes(state, { sessionId, handle, attributes 
   const now = new Date().toISOString();
   const existingIndex = state.profileAttributes.findIndex((entry) => entry.sessionId === sessionId);
   const existing = existingIndex >= 0 ? state.profileAttributes[existingIndex] : null;
+  const schemaVersion = Number(state?.settings?.profileSchema?.version);
+  const resolvedSchemaVersion = Number.isFinite(schemaVersion) ? schemaVersion : existing?.schemaVersion || 0;
   const providerPayload = replace ? { ...attributes } : { ...(existing?.provider || {}), ...attributes };
   const next = {
     sessionId,
     handle: handle || existing?.handle || '',
     provider: providerPayload,
     updatedAt: now,
+    schemaVersion: resolvedSchemaVersion,
   };
   if (existingIndex >= 0) {
     state.profileAttributes[existingIndex] = next;

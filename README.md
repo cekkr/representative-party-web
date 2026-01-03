@@ -49,13 +49,13 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals, collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed, vote envelopes (signable).
-- **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions.
+- **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions with history diff previews.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
-- **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor; never gossiped.
+- **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, and inline validation; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
 
 ---
@@ -158,7 +158,7 @@ npm run db:check
 ### Always‑on value (messaging kernel)
 - **Discussion + forum**: threaded posts/comments with SSR UI.
 - **Notifications**: internal read/unread registry and preferences.
-- **Profile attributes**: schema‑driven provider‑local fields with self‑service editing under `/profile`.
+- **Profile attributes**: schema‑driven provider‑local fields with self‑service editing under `/profile`, schema versioning, and inline validation.
 - **Social feed**: micro‑post lane with typed follows (circle/interest/info/alerts) kept separate from petitions/votes.
 
 ### Optional governance tools

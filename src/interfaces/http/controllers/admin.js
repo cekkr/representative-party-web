@@ -10,6 +10,7 @@ import {
   formatTopicBreadcrumb,
   findTopicById,
   findTopicByPathKey,
+  labelFromKey,
   normalizeTopicKey,
   normalizeTopicLabel,
 } from '../../../modules/topics/registry.js';
@@ -1024,12 +1025,64 @@ function renderTopicHistoryDiff(entry = {}, state) {
   }
 
   if (!lines.length) return '';
+  const previews = buildTopicHistoryPreviews(entry, state, { topic, fromKey, toKey });
+  const previewBlock = previews.length ? `<div class="stack">${previews.join('')}</div>` : '';
   return `
     <details class="note">
       <summary>Diff</summary>
       <pre>${escapeHtml(lines.join('\n'))}</pre>
+      ${previewBlock}
     </details>
   `;
+}
+
+function buildTopicHistoryPreviews(entry, state, { topic, fromKey, toKey } = {}) {
+  const previews = [];
+  const sourceTopic = topic || (fromKey ? findTopicByPathKey(state, fromKey) : null);
+  if (sourceTopic) {
+    previews.push(renderTopicPreview(state, sourceTopic, { title: 'Topic snapshot' }));
+  }
+  const action = String(entry?.action || '').toLowerCase();
+  const toKeyValue = String(toKey || '').trim();
+  const hasMultipleTargets = toKeyValue.includes(',');
+  if (toKeyValue && !action.startsWith('split') && !hasMultipleTargets) {
+    const targetTopic = findTopicByPathKey(state, toKeyValue);
+    if (!sourceTopic || targetTopic?.id !== sourceTopic.id) {
+      const warning = targetTopic ? '' : `Missing topic for ${toKeyValue}`;
+      previews.push(renderTopicPreview(state, targetTopic, { title: 'Target topic', warning }));
+    }
+  }
+  const splitSuggestions = resolveSplitSuggestions(entry, toKey);
+  if (splitSuggestions.length && sourceTopic) {
+    previews.push(renderTopicSplitPreview(state, sourceTopic, splitSuggestions));
+  }
+  return previews;
+}
+
+function resolveSplitSuggestions(entry = {}, toKey) {
+  const action = String(entry.action || '').toLowerCase();
+  if (!action.startsWith('split')) return [];
+  const rawSuggested = Array.isArray(entry.suggested) ? entry.suggested : [];
+  const labels = rawSuggested
+    .map((value) => extractSplitLeaf(value))
+    .filter(Boolean)
+    .map((value) => labelFromKey(value))
+    .filter(Boolean);
+  if (labels.length) return labels;
+  if (!toKey) return [];
+  return String(toKey)
+    .split(',')
+    .map((value) => extractSplitLeaf(value))
+    .filter(Boolean)
+    .map((value) => labelFromKey(value))
+    .filter(Boolean);
+}
+
+function extractSplitLeaf(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  const parts = text.split('/');
+  return parts[parts.length - 1] || '';
 }
 
 function renderTopicPreview(state, topic, { title = 'Topic preview', warning = '' } = {}) {
@@ -1643,6 +1696,9 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
     const ledger = gossipState.lastSummary.ledger || {};
     const votes = gossipState.lastSummary.votes || {};
     const transactions = gossipState.lastSummary.transactions || {};
+    const ledgerCounts = [];
+    if (Number.isFinite(ledger.added) && ledger.added > 0) ledgerCounts.push(`+${ledger.added}`);
+    const ledgerTail = ledgerCounts.length ? ` (${ledgerCounts.join(', ')})` : '';
     const voteCounts = [];
     if (Number.isFinite(votes.added) && votes.added > 0) voteCounts.push(`+${votes.added}`);
     if (Number.isFinite(votes.updated) && votes.updated > 0) voteCounts.push(`~${votes.updated}`);
@@ -1655,7 +1711,7 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
     const transactionLine = transactions.skipped
       ? 'transactions skipped'
       : `transactions ${transactions.ok || 0}/${transactions.sent || 0} ok${transactionTail}`;
-    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok · ${voteLine} · ${transactionLine}`);
+    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok${ledgerTail} · ${voteLine} · ${transactionLine}`);
   }
   if (gossipState.lastError) {
     lines.push(`Last error: ${gossipState.lastError}`);
