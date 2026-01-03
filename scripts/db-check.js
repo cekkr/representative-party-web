@@ -23,12 +23,19 @@ async function main() {
         discussions: state.discussions?.length || 0,
         petitions: state.petitions?.length || 0,
         votes: state.votes?.length || 0,
-        signatures: state.signatures?.length || 0,
-        groups: state.groups?.length || 0,
-        notifications: state.notifications?.length || 0,
-        topics: state.topics?.length || 0,
-      },
-    };
+      signatures: state.signatures?.length || 0,
+      groups: state.groups?.length || 0,
+      notifications: state.notifications?.length || 0,
+      topics: state.topics?.length || 0,
+      socialPosts: state.socialPosts?.length || 0,
+      socialFollows: state.socialFollows?.length || 0,
+      socialMedia: state.socialMedia?.length || 0,
+      transactions: state.transactions?.length || 0,
+      transactionSummaries: state.transactionSummaries?.length || 0,
+      profileStructures: state.profileStructures?.length || 0,
+      profileAttributes: state.profileAttributes?.length || 0,
+    },
+  };
     console.log(JSON.stringify(summary, null, 2));
     process.exit(0);
   } catch (error) {

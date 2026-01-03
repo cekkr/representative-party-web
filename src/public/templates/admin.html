@@ -5,8 +5,9 @@
   <div class="callout">
     <p class="muted small">Circle name: {{circleName}}</p>
     <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
+    <p class="muted small">Issuer: {{issuer}}</p>
     <p class="muted small">Posting gate: {{postingGate}}</p>
-    <p class="muted small">Ledger entries: {{ledgerEntries}} · Peers: {{peersKnown}}</p>
+    <p class="muted small">Ledger entries: {{ledgerEntries}} - Peers: {{peersKnown}}</p>
     <p class="muted small">Ledger hash: {{ledgerHash}}</p>
     <p class="muted small">Data: {{dataProfile}}</p>
     <p class="muted small">Gossip ingest: {{gossipIngest}}</p>
@@ -75,6 +76,10 @@
       <label class="field">
         <span>Admin contact</span>
         <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
+      </label>
+      <label class="field">
+        <span>Circle issuer (public URL)</span>
+        <input name="issuer" value="{{issuer}}" placeholder="https://provider.party" />
       </label>
       <label class="field">
         <span>Preferred peer (Circle anchor)</span>

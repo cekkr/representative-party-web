@@ -14,9 +14,9 @@ export function deriveStatusMeta(state) {
   const discussionCount = filterVisibleEntries(state?.discussions || [], state).length;
   const policyStatus =
     policy.enforcement === 'strict'
-      ? `Circle enforcement: strict · Verification ${policy.requireVerification ? 'required' : 'optional'}`
-      : `Circle enforcement: observing · Verification ${policy.requireVerification ? 'recommended' : 'optional'}`;
-  const accountabilityStatus = `Ledger ${ledgerCount} · Actors ${actorCount} · Discussions ${discussionCount}`;
+      ? `Circle enforcement: strict - Verification ${policy.requireVerification ? 'required' : 'optional'}`
+      : `Circle enforcement: observing - Verification ${policy.requireVerification ? 'recommended' : 'optional'}`;
+  const accountabilityStatus = `Ledger ${ledgerCount} - Actors ${actorCount} - Discussions ${discussionCount}`;
   const gossipStatus = `Gossip ingest: ${isGossipEnabled(profile) ? 'on' : 'off'}`;
   const validationStatus = `Validation: ${profile.validationLevel} (${profile.allowPreviews ? 'previews allowed' : 'previews hidden'})`;
   const previewStatus = `Data mode: ${describeProfile(profile)}`;

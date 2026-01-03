@@ -165,6 +165,8 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const prev = state.settings || {};
   const enforceCircle = parseBoolean(body.enforceCircle, false);
   const requireVerification = parseBoolean(body.requireVerification, false);
+  const issuerInput = sanitizeText(body.issuer || prev.issuer || state.issuer || '', 200);
+  const issuerNormalized = normalizePeerUrl(issuerInput) || issuerInput || state.issuer || 'local-circle';
   const newPeerRaw = sanitizeText(body.peerJoin || '', 200);
   const preferredPeerRaw = sanitizeText(body.preferredPeer || prev.preferredPeer || '', 200);
   const newPeer = normalizePeerUrl(newPeerRaw);
@@ -197,6 +199,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     enforceCircle,
     requireVerification,
     adminContact: sanitizeText(body.adminContact || prev.adminContact || '', 120),
+    issuer: issuerNormalized,
     preferredPeer,
     notes: sanitizeText(body.notes || prev.notes || '', 400),
     petitionQuorumAdvance,
@@ -214,6 +217,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     },
   };
   state.dataConfig = state.settings.data;
+  state.issuer = issuerNormalized;
 
   let peersAdded = 0;
   const peersToAdd = Array.from(new Set([newPeer, preferredPeerNormalized].filter(Boolean)));
@@ -248,7 +252,7 @@ async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const html = await renderPage(
     'admin',
     buildAdminViewModel(state, { ...viewModel, availableExtensions }),
-    { wantsPartial, title: 'Admin · Circle Settings', state },
+    { wantsPartial, title: 'Admin - Circle Settings', state },
   );
   return sendHtml(res, html);
 }
@@ -492,6 +496,7 @@ function buildAdminViewModel(
 ) {
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
+  const issuer = state.issuer || 'local-circle';
   const defaultRole = resolveDefaultActorRole(state);
   const postingGate = evaluateAction(state, null, 'post');
   const extensions = state.extensions?.active || [];
@@ -581,6 +586,7 @@ function buildAdminViewModel(
     enforceCircleChecked: effective.enforceCircle ? 'checked' : '',
     requireVerificationChecked: effective.requireVerification ? 'checked' : '',
     adminContact: effective.adminContact,
+    issuer,
     preferredPeer: effective.preferredPeer,
     policyVersion: effective.version || POLICIES.version,
     initialized: effective.initialized,

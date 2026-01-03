@@ -20,7 +20,7 @@ export async function initState() {
   state.store = store;
   state.dataConfig = deriveDataConfig(state.settings);
   state.settings = { ...(state.settings || {}), data: state.dataConfig };
-  state.issuer = state.issuer || process.env.CIRCLE_ISSUER || 'local-circle';
+  state.issuer = state.settings?.issuer || process.env.CIRCLE_ISSUER || state.issuer || 'local-circle';
   return state;
 }
 

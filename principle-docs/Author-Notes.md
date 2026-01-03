@@ -5,7 +5,7 @@
 
 Go-ahead pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
-Continue with other roadmap implementations (and improvements/fixes where needed) in source code in various contexts (UX, features, data management and P2P protocol...). Remember to update README.md
+Continue with other roadmap implementations (and improvements/fixes where needed) in source code in various contexts (UX, features, data management and P2P protocol etc...). Remember to update README.md
 
 Check-back pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 

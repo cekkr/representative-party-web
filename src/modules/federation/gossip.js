@@ -45,9 +45,12 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
     return summary;
   }
 
-  const ledgerPayload = { envelope: buildLedgerEnvelope(state) };
+  const sender = state.issuer || state.settings?.issuer || 'local-circle';
+  const ledgerPayload = { envelope: buildLedgerEnvelope(state), peer: sender };
   const votesPayload = buildVotesPayload(state);
+  if (votesPayload) votesPayload.peer = sender;
   const transactionsPayload = buildTransactionsPayload(state);
+  if (transactionsPayload) transactionsPayload.peer = sender;
   state.gossipState = { ...initial, running: true };
 
   let peerResults = [];

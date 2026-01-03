@@ -14,6 +14,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded hash) stay fixed across a party ring; provider-local optional fields (contact email, personal info, notification preferences) are modeled via a schema/data-table editor and stored locally to power provider-owned notifications/consent.
 - **Persistence**: JSON store (ledger, sessions, peers, discussions, actors) under `src/data/` with pluggable upgrade path.
 - **Federation seeds**: ActivityPub actor emitter, outbox plus inbox ingestion (preview-gated), gossip endpoints for peer/ledger sync.
+- **Gossip identity**: set a stable issuer URL/identifier (`CIRCLE_ISSUER` or `/admin`) so peers can track envelope provenance.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
