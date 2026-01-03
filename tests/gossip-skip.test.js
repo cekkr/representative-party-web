@@ -75,4 +75,6 @@ test('gossip skips peers that disable votes without penalizing health', { timeou
   const peerEntry = health?.gossip?.peerHealth?.entries?.find((entry) => entry.peer === nodeB.baseUrl);
   assert.ok(peerEntry, 'expected peer health entry');
   assert.ok(peerEntry.score > 0);
+  assert.ok(peerEntry.lastLedgerHash, 'expected peer ledger hash snapshot');
+  assert.equal(peerEntry.lastLedgerMatch, true);
 });
