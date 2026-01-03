@@ -5,21 +5,22 @@ import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 export function renderForum(entries, person, state) {
   const threads = entries.filter((e) => !e.parentId);
   const comments = entries.filter((e) => e.parentId);
+  const commentsByThread = groupCommentsByParent(comments);
   return {
-    threads: renderThreads(threads, comments, person, state),
+    threads: renderThreads(threads, commentsByThread, state),
     personHandle: resolvePersonHandle(person),
     roleLabel: person?.role || 'guest',
   };
 }
 
-function renderThreads(threads, comments, person, state) {
+function renderThreads(threads, commentsByThread, state) {
   if (!threads.length) {
     return '<p class="muted">No threads yet. Start a discussion.</p>';
   }
   return threads
     .map((thread) => {
       const topicLabel = resolveTopicBreadcrumb(thread, state);
-      const threadComments = comments.filter((c) => c.parentId === thread.id);
+      const threadComments = commentsByThread.get(thread.id) || [];
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -47,6 +48,17 @@ function renderThreads(threads, comments, person, state) {
       `;
     })
     .join('\n');
+}
+
+function groupCommentsByParent(comments = []) {
+  const map = new Map();
+  for (const comment of comments) {
+    if (!comment?.parentId) continue;
+    const list = map.get(comment.parentId) || [];
+    list.push(comment);
+    map.set(comment.parentId, list);
+  }
+  return map;
 }
 
 function renderComments(comments) {

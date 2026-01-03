@@ -49,6 +49,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const followTypeByHash = new Map(follows.map((edge) => [edge.targetHash, edge.type]));
   const mediaById = new Map((state.socialMedia || []).map((media) => [media.id, media]));
   const permission = evaluateAction(state, person, 'post');
+  const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
   const statusMeta = deriveStatusMeta(state);
 
   const html = await renderPage(
@@ -57,7 +58,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
-      postingReason: permission.message || permission.reason || '',
+      postingReason,
       followCount: follows.length,
       followerCount: followers.length,
       followList: renderFollowList(follows),

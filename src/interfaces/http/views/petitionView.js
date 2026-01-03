@@ -22,6 +22,7 @@ export function renderPetitionList(
   }
 
   const voteBuckets = buildVoteBuckets(votes);
+  const signatureBuckets = buildSignatureBuckets(signatures || [], person);
 
   return petitions
     .map((petition) => {
@@ -35,8 +36,9 @@ export function renderPetitionList(
       const voteDisabledLabel = allowVoting
         ? 'Voting disabled while proposal is not in the vote stage.'
         : 'Voting module disabled.';
-      const signatureCount = (signatures || []).filter((s) => s.petitionId === petition.id).length;
-      const hasSigned = person?.pidHash ? (signatures || []).some((s) => s.petitionId === petition.id && s.authorHash === person.pidHash) : false;
+      const signatureSummary = signatureBuckets.get(petition.id) || { count: 0, signed: false };
+      const signatureCount = signatureSummary.count;
+      const hasSigned = signatureSummary.signed;
       const comments = commentsByPetition.get(petition.id) || [];
       const lastCommentAt = getLastCommentAt(comments);
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
@@ -113,7 +115,7 @@ export function renderPetitionList(
 
 function buildVoteBuckets(votes) {
   const buckets = new Map();
-  for (const vote of votes) {
+  for (const vote of votes || []) {
     const key = vote.petitionId;
     if (!buckets.has(key)) {
       buckets.set(key, { yes: 0, no: 0, abstain: 0 });
@@ -123,6 +125,24 @@ function buildVoteBuckets(votes) {
     if (choice === 'yes') tally.yes += 1;
     else if (choice === 'no') tally.no += 1;
     else tally.abstain += 1;
+  }
+  return buckets;
+}
+
+function buildSignatureBuckets(signatures = [], person) {
+  const buckets = new Map();
+  const signerHash = person?.pidHash || '';
+  for (const signature of signatures) {
+    if (!signature?.petitionId) continue;
+    let summary = buckets.get(signature.petitionId);
+    if (!summary) {
+      summary = { count: 0, signed: false };
+      buckets.set(signature.petitionId, summary);
+    }
+    summary.count += 1;
+    if (signerHash && signature.authorHash === signerHash) {
+      summary.signed = true;
+    }
   }
   return buckets;
 }
