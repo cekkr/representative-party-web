@@ -3,6 +3,10 @@
 
 - Remember to maintain the protocol concept: not only "shared data across providers", but also "possible shared client across providers" (especially in the same social-party circle-ring)
 
-Go ahead pre-cooked prompt:
+Go-ahead pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
 Continue with other roadmap implementations (and improvements/fixes where needed) in source code in various contexts (UX, features, data management and P2P protocol...). Remember to update README.md
+
+Check-back pre-cooked prompt:
+[AGENTS.md](AGENTS.md) 
+Check current project and source code status and apply performances and redundancies optimizations on code and UX consistency
