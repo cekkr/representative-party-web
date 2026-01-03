@@ -1,13 +1,13 @@
 import { POLICIES } from '../../config.js';
 import { persistSettings } from '../../infra/persistence/storage.js';
-import { buildLedgerEnvelope } from '../circle/federation.js';
+import { buildLedgerEnvelope, computeLedgerHash } from '../circle/federation.js';
 import { getEffectivePolicy } from '../circle/policy.js';
 import { isModuleEnabled } from '../circle/modules.js';
 import { buildVoteEnvelope } from '../votes/voteEnvelope.js';
 import { buildTransactionsPayload, ingestTransactionsSummary } from '../transactions/gossip.js';
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
 import { collectGossipPeers } from './peers.js';
-import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess } from './quarantine.js';
+import { isPeerQuarantined, recordPeerFailure, recordPeerLedger, recordPeerSuccess } from './quarantine.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './replication.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -567,6 +567,7 @@ function updateGossipState(current, { summary, peerResults, startedAt, finishedA
 
 async function updatePeerHealthFromResults(state, peerResults = []) {
   let updated = false;
+  const localLedgerHash = computeLedgerHash([...state.uniquenessLedger]);
   for (const result of peerResults) {
     if (!result?.peer) continue;
     const outcome = classifyPeerOutcome(result);
@@ -575,6 +576,12 @@ async function updatePeerHealthFromResults(state, peerResults = []) {
       updated = recordPeerSuccess(state, result.peer).updated || updated;
     } else {
       updated = recordPeerFailure(state, result.peer, { reason: outcome.reason, penalty: 1 }).updated || updated;
+    }
+    const ledgerHash = result.ledger?.ledgerHash;
+    const ledgerOk = result.ledger?.ok;
+    if (ledgerHash && ledgerOk) {
+      const ledgerUpdate = recordPeerLedger(state, result.peer, { ledgerHash, match: ledgerHash === localLedgerHash });
+      updated = ledgerUpdate.updated || updated;
     }
   }
   if (updated) {

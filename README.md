@@ -54,8 +54,9 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
+- **Peer ledger audits**: peer health tracks last ledger hash snapshots (match/mismatch) in `/admin` and `/health`.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
-- **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, and inline validation; never gossiped.
+- **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
 
 ---
@@ -422,7 +423,7 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 
 - **No raw PID/PII**: persist only blinded hashes. Treat any provider‑local optional fields (email, personal details) as *local only* and never gossip them.
 - **Peers are hints, not trust anchors**: federation tooling should assume peers can be wrong or malicious; strict validation and quarantine are part of the intended hardening path.
-- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts for ops dashboards. Gossip sync skips peers that disable modules or gossip, so peer health reflects real failures.
+- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, and recent transactions; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts for ops dashboards, including last peer ledger hash snapshots (match/mismatch). Gossip sync skips peers that disable modules or gossip, so peer health reflects real failures.
 - **Gossip resilience**: optional endpoints (votes/transactions) that are missing or disabled are treated as skipped for peer health scoring, so messaging-only peers do not get penalized.
 - **Backups**: if you run with JSON/KV storage, schedule backups of `src/data/` (or your DB/KV file), especially before migrations.
 

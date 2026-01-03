@@ -530,6 +530,14 @@ function buildAdminViewModel(
   const profileSchemaVersion = Number(profileSchema.version || 0);
   const profileSchemaUpdatedAt = profileSchema.updatedAt ? formatTimestamp(profileSchema.updatedAt) : 'Not yet';
   const profileSchemaUpdatedBy = profileSchema.updatedBy || '';
+  const staleProfileCount = profileSchemaVersion
+    ? (state.profileAttributes || []).filter((entry) => Number(entry?.schemaVersion || 0) < profileSchemaVersion).length
+    : 0;
+  const profileSchemaStaleNote = profileSchemaVersion
+    ? staleProfileCount
+      ? `${staleProfileCount} profile${staleProfileCount === 1 ? '' : 's'} saved on older schema.`
+      : 'All profiles match the latest schema.'
+    : '';
   const providerFieldsValueRendered = providerFieldsValue ?? formatProviderFieldsForTextarea(providerFields);
   const providerFieldErrorsRendered = providerFieldErrors || '';
   const attributesSessionIdValue = attributesSessionId || '';
@@ -639,6 +647,7 @@ function buildAdminViewModel(
     profileSchemaVersion,
     profileSchemaUpdatedAt,
     profileSchemaUpdatedBy,
+    profileSchemaStaleNote,
     attributesSessionId: attributesSessionIdValue,
     attributesPayloadValue: attributesPayloadValueRendered,
     profileAttributeErrors: profileAttributeErrorsRendered,
@@ -1750,9 +1759,15 @@ function renderPeerHealthList(peerHealth = {}) {
       const quarantined = entry.quarantineUntil && Date.parse(entry.quarantineUntil) > Date.now();
       const status = quarantined ? `quarantined until ${formatTimestamp(entry.quarantineUntil)}` : 'active';
       const lastFailure = entry.lastFailureReason ? `last failure: ${entry.lastFailureReason}` : 'no failures';
+      const ledgerShort = entry.lastLedgerHash ? String(entry.lastLedgerHash).slice(0, 10) : '';
+      const ledgerMatch =
+        entry.lastLedgerMatch === true ? 'match' : entry.lastLedgerMatch === false ? 'mismatch' : 'unverified';
+      const ledgerNote = ledgerShort
+        ? `ledger ${ledgerShort} (${ledgerMatch})`
+        : 'ledger unknown';
       return `<li><strong>${escapeHtml(peer)}</strong> · score ${score} · ${escapeHtml(status)} · ${escapeHtml(
         lastFailure,
-      )}</li>`;
+      )} · ${escapeHtml(ledgerNote)}</li>`;
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;

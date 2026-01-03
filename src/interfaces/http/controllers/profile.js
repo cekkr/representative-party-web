@@ -96,6 +96,12 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
     schemaParts.push(`by ${profileSchema.updatedBy}`);
   }
   const profileSchemaNote = schemaParts.join(' · ');
+  const currentSchemaVersion = Number(profileSchema.version || 0);
+  const entrySchemaVersion = Number(profileEntry?.schemaVersion || 0);
+  const profileSchemaWarning =
+    profileEntry && currentSchemaVersion && entrySchemaVersion < currentSchemaVersion
+      ? `<div class="callout"><p class="muted small">Profile schema updated since your last save (v${entrySchemaVersion} → v${currentSchemaVersion}). Review and resave to keep provider-local fields consistent.</p></div>`
+      : '';
   const profileForm = renderProfileForm({
     person,
     actorLabels,
@@ -117,6 +123,7 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
       profileSummary,
       profileFlash,
       profileSchemaNote,
+      profileSchemaWarning,
     },
     { wantsPartial, title: 'Profile', state },
   );

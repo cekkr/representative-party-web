@@ -69,6 +69,21 @@ export function recordPeerSuccess(state, peerKey, { now = Date.now() } = {}) {
   return { updated, entry: next };
 }
 
+export function recordPeerLedger(state, peerKey, { ledgerHash, match, now = Date.now() } = {}) {
+  const key = resolvePeerKey(peerKey);
+  if (!key || !ledgerHash) return { updated: false };
+  const entry = normalizePeerEntry(readPeerEntry(state, key));
+  const next = {
+    ...entry,
+    lastLedgerHash: ledgerHash,
+    lastLedgerAt: new Date(now).toISOString(),
+    lastLedgerMatch: typeof match === 'boolean' ? match : null,
+    lastLedgerMismatchAt: match === false ? new Date(now).toISOString() : entry.lastLedgerMismatchAt || null,
+  };
+  const updated = writePeerEntry(state, key, next);
+  return { updated, entry: next };
+}
+
 export function listPeerHealth(state) {
   return state?.settings?.peerHealth || {};
 }
@@ -109,6 +124,10 @@ export function summarizePeerHealth(peerHealth = {}, { limit = 20, now = Date.no
       lastFailureAt: entry.lastFailureAt || null,
       lastFailureReason: entry.lastFailureReason || null,
       lastSuccessAt: entry.lastSuccessAt || null,
+      lastLedgerHash: entry.lastLedgerHash || null,
+      lastLedgerAt: entry.lastLedgerAt || null,
+      lastLedgerMatch: typeof entry.lastLedgerMatch === 'boolean' ? entry.lastLedgerMatch : null,
+      lastLedgerMismatchAt: entry.lastLedgerMismatchAt || null,
     };
   });
   const quarantinedCount = entries.filter((entry) => entry.quarantined).length;
@@ -134,6 +153,10 @@ function normalizePeerEntry(entry) {
       lastSeenAt: null,
       quarantinedAt: null,
       quarantineUntil: null,
+      lastLedgerHash: null,
+      lastLedgerAt: null,
+      lastLedgerMatch: null,
+      lastLedgerMismatchAt: null,
     };
   }
   return {
@@ -146,6 +169,10 @@ function normalizePeerEntry(entry) {
     lastSeenAt: entry.lastSeenAt || null,
     quarantinedAt: entry.quarantinedAt || null,
     quarantineUntil: entry.quarantineUntil || null,
+    lastLedgerHash: entry.lastLedgerHash || null,
+    lastLedgerAt: entry.lastLedgerAt || null,
+    lastLedgerMatch: typeof entry.lastLedgerMatch === 'boolean' ? entry.lastLedgerMatch : null,
+    lastLedgerMismatchAt: entry.lastLedgerMismatchAt || null,
   };
 }
 
