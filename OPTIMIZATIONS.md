@@ -3,8 +3,6 @@
 This file tracks follow-up ideas that are out of scope for the current patch but would further improve performance, reduce redundancy, or tighten UX consistency.
 
 ## Performance
-- Add per-request session indexes (handle -> session, pidHash -> session) to avoid repeated linear scans in `findSessionByHandle` and `findSessionByHash`.
-- Introduce `countVisibleEntries()` in `src/modules/federation/replication.js` for fast counts without allocating filtered arrays (use in status strip + home counts).
 - Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
 - Cache normalized topic keys in entries to avoid repeated normalization and filtering in topic views.
@@ -21,3 +19,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## Observability
 - Add structured counters for rate-limit hits and module-disabled requests to surface in `/admin` and `/health`.
+
+## Completed
+- Added session index helpers for handle/pidHash lookup and invalidation on session updates.
+- Added `countVisibleEntries()` and switched status/home counts to use it.

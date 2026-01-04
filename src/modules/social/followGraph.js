@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { sanitizeText } from '../../shared/utils/text.js';
+import { findSessionByHandle as lookupSessionByHandle } from '../identity/sessions.js';
 
 export const DEFAULT_FOLLOW_TYPES = ['circle', 'interest', 'info', 'alerts'];
 
@@ -59,11 +60,5 @@ export function listFollowersOf(state, targetHash) {
 }
 
 export function findSessionByHandle(state, handle) {
-  if (!handle) return null;
-  const normalized = handle.trim().replace(/^@+/, '').toLowerCase();
-  for (const session of state.sessions.values()) {
-    const sessionHandle = (session.handle || '').toLowerCase();
-    if (sessionHandle === normalized) return session;
-  }
-  return null;
+  return lookupSessionByHandle(state, handle);
 }

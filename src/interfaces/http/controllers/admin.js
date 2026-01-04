@@ -41,6 +41,7 @@ import {
   isGossipEnabled,
 } from '../../../modules/federation/replication.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
+import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
 import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
 import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
 import {
@@ -299,6 +300,7 @@ async function updateSession(state, body) {
     next.handle = handle;
   }
   state.sessions.set(sessionId, next);
+  invalidateSessionIndex(state);
   await persistSessions(state);
   return {
     flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { createActor } from '../../../modules/federation/activitypub.js';
 import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../../modules/identity/auth.js';
 import { getPerson } from '../../../modules/identity/person.js';
+import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
 import { getCirclePolicyState, resolveDefaultActorRole } from '../../../modules/circle/policy.js';
 import { deriveBaseUrl } from '../../../shared/utils/request.js';
 import { sendHtml } from '../../../shared/utils/http.js';
@@ -48,6 +49,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
     role: existing?.role || defaultRole,
     banned: existing?.banned || false,
   });
+  invalidateSessionIndex(state);
   await persistSessions(state);
 
   const html = await renderPage(
@@ -124,6 +126,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
     role,
     banned,
   });
+  invalidateSessionIndex(state);
   await persistSessions(state);
 
   const ledgerNote = alreadyKnown ? 'Ledger entry already present (peer sync).' : 'New entry added to the Uniqueness Ledger.';

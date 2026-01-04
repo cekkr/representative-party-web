@@ -1,6 +1,6 @@
 import { getPerson } from '../../../modules/identity/person.js';
 import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { filterVisibleEntries } from '../../../modules/federation/replication.js';
+import { countVisibleEntries } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
@@ -13,9 +13,9 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const actorLabels = getActorLabels(state);
   const gateSummary = summarizeGateSnapshot(buildPolicyGates(state), actorLabels);
   const extensionsSummary = summarizeExtensions(state);
-  const visibleDiscussions = filterVisibleEntries(state.discussions, state);
-  const visiblePetitions = filterVisibleEntries(state.petitions, state);
-  const visibleGroups = filterVisibleEntries(state.groups, state);
+  const discussionCount = countVisibleEntries(state.discussions, state);
+  const petitionCount = countVisibleEntries(state.petitions, state);
+  const groupCount = countVisibleEntries(state.groups, state);
   const federationEnabled = isModuleEnabled(state, 'federation');
   const ledgerLink = federationEnabled
     ? '<a class="ghost" href="/circle/ledger" target="_blank" rel="noreferrer">Ledger feed</a>'
@@ -25,9 +25,9 @@ export async function renderHome({ req, res, state, wantsPartial }) {
     {
       ledgerSize: state.uniquenessLedger.size,
       actorCount: state.actors.size,
-      discussionCount: visibleDiscussions.length,
-      petitionCount: visiblePetitions.length,
-      groupCount: visibleGroups.length,
+      discussionCount,
+      petitionCount,
+      groupCount,
       personHandle: person?.handle,
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',
       policyDetail: `Policy ${effective.id} v${effective.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,

@@ -69,3 +69,16 @@ export function filterVisibleEntries(list, state) {
   if (profile.allowPreviews) return list || [];
   return (list || []).filter((item) => (item?.validationStatus || 'validated') !== 'preview');
 }
+
+export function countVisibleEntries(list, state) {
+  const profile = getReplicationProfile(state);
+  const entries = list || [];
+  if (profile.allowPreviews) return entries.length || 0;
+  let count = 0;
+  for (const item of entries) {
+    if ((item?.validationStatus || 'validated') !== 'preview') {
+      count += 1;
+    }
+  }
+  return count;
+}

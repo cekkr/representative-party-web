@@ -1,6 +1,6 @@
 import {
+  countVisibleEntries,
   describeProfile,
-  filterVisibleEntries,
   getReplicationProfile,
   isGossipEnabled,
 } from '../../../modules/federation/replication.js';
@@ -11,7 +11,7 @@ export function deriveStatusMeta(state) {
   const profile = getReplicationProfile(state);
   const ledgerCount = state?.uniquenessLedger?.size || 0;
   const actorCount = state?.actors?.size || 0;
-  const discussionCount = filterVisibleEntries(state?.discussions || [], state).length;
+  const discussionCount = countVisibleEntries(state?.discussions || [], state);
   const policyStatus =
     policy.enforcement === 'strict'
       ? `Circle enforcement: strict - Verification ${policy.requireVerification ? 'required' : 'optional'}`

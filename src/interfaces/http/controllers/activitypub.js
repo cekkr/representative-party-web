@@ -5,6 +5,7 @@ import { getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { persistSocialPosts } from '../../../infra/persistence/storage.js';
 import { createSocialNote, wrapCreateActivity, buildInboundSocialPost } from '../../../modules/federation/activitypub.js';
 import { filterVisibleEntries } from '../../../modules/federation/replication.js';
+import { findSessionByHash } from '../../../modules/identity/sessions.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
@@ -151,14 +152,6 @@ function isDuplicateInbound(state, activityPub = {}) {
     if (activityId && meta.activityId === activityId) return true;
     return false;
   });
-}
-
-function findSessionByHash(state, pidHash) {
-  if (!pidHash || !state?.sessions) return null;
-  for (const session of state.sessions.values()) {
-    if (session.pidHash === pidHash) return session;
-  }
-  return null;
 }
 
 function ensureActivityPubModules(state, res) {

@@ -1,6 +1,6 @@
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
 import { extractMentions } from './posts.js';
-import { findSessionByHandle } from './followGraph.js';
+import { findSessionByHandle, findSessionByHash } from '../identity/sessions.js';
 
 const SNIPPET_LENGTH = 120;
 
@@ -50,12 +50,4 @@ export async function notifySocialParticipants(state, { post, author, targetSess
       message: payload.message,
     }, { sessionId: payload.sessionId, handle: payload.handle });
   }
-}
-
-function findSessionByHash(state, pidHash) {
-  if (!pidHash || !state?.sessions) return null;
-  for (const session of state.sessions.values()) {
-    if (session.pidHash === pidHash) return session;
-  }
-  return null;
 }

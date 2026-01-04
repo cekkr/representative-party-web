@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 
 import { sanitizeText } from '../../shared/utils/text.js';
+import { findSessionByHash } from '../identity/sessions.js';
 import { decideStatus, getReplicationProfile, stampLocalEntry } from './replication.js';
 
 const PUBLIC_AUDIENCE = 'https://www.w3.org/ns/activitystreams#Public';
@@ -296,11 +297,9 @@ function deriveIssuer(actorId) {
 }
 
 function resolveSessionHandle(state, pidHash) {
-  if (!pidHash || !state?.sessions) return '';
-  for (const session of state.sessions.values()) {
-    if (session.pidHash === pidHash) return session.handle || '';
-  }
-  return '';
+  if (!pidHash) return '';
+  const session = findSessionByHash(state, pidHash);
+  return session?.handle || '';
 }
 
 function extractMentions(content = '') {

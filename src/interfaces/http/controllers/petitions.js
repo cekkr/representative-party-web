@@ -12,7 +12,7 @@ import { persistDiscussions, persistPetitions, persistVotes } from '../../../inf
 import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../../modules/petitions/signatures.js';
 import { resolveNotificationPreferences } from '../../../modules/messaging/outbound.js';
 import { extractMentions } from '../../../modules/social/posts.js';
-import { findSessionByHandle } from '../../../modules/social/followGraph.js';
+import { findSessionByHandle, findSessionByHash } from '../../../modules/identity/sessions.js';
 import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
@@ -574,14 +574,6 @@ async function notifyPetitionAuthor(state, { petition, commenter, petitionId, co
     },
     { sessionId: authorSession?.id, handle: authorSession?.handle },
   );
-}
-
-function findSessionByHash(state, pidHash) {
-  if (!pidHash || !state?.sessions) return null;
-  for (const session of state.sessions.values()) {
-    if (session.pidHash === pidHash) return session;
-  }
-  return null;
 }
 
 async function notifyPetitionMentions(state, { petition, commenter, petitionId, content }) {
