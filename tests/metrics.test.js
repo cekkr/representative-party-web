@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { getMetricsSnapshot, recordModuleDisabled, recordRateLimit } from '../src/modules/ops/metrics.js';
+import { getMetricsSnapshot, getOpsMetricsConfig, recordModuleDisabled, recordRateLimit } from '../src/modules/ops/metrics.js';
 
 test('metrics snapshot defaults to empty buckets', () => {
   const snapshot = getMetricsSnapshot({});
@@ -73,4 +73,11 @@ test('metrics snapshots prune entries beyond retention window', () => {
   assert.equal(snapshot.moduleDisabled.total, 0);
   assert.equal(snapshot.rateLimit.total, 0);
   assert.equal(state.settings.opsMetrics.snapshots.length, 0);
+});
+
+test('ops metrics config prefers settings when provided', () => {
+  const state = { settings: { opsMetrics: { retentionHours: 12, intervalSeconds: 600 } } };
+  const config = getOpsMetricsConfig(state);
+  assert.equal(config.retentionHours, 12);
+  assert.equal(config.intervalSeconds, 600);
 });

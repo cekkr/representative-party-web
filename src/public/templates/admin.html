@@ -353,6 +353,29 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Ops</p>
+  <h2>Metrics retention</h2>
+  <p class="muted small">Snapshots persist to <code>settings.json</code>. Interval min 60s; retention min 1h.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="ops-metrics" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Snapshot interval (seconds)</span>
+        <input name="opsMetricsIntervalSeconds" value="{{opsMetricsIntervalValue}}" placeholder="300" />
+      </label>
+      <label class="field">
+        <span>Retention window (hours)</span>
+        <input name="opsMetricsRetentionHours" value="{{opsMetricsRetentionValue}}" placeholder="24" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save ops settings</button>
+    </div>
+  </form>
+  {{opsMetricsErrors}}
+</section>
+
+<section class="panel">
   <p class="eyebrow">Transactions</p>
   <h2>Recent ledgered actions</h2>
   <p class="muted small">Append-only log for sensitive actions (petitions, votes, delegations, social, groups). Export JSON for audits.</p>

@@ -43,7 +43,7 @@ import {
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
 import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
-import { getMetricsSnapshot } from '../../../modules/ops/metrics.js';
+import { getMetricsSnapshot, getOpsMetricsConfig } from '../../../modules/ops/metrics.js';
 import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
 import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
 import {
@@ -92,6 +92,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'rate-limits') {
     const result = await updateRateLimits(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
+  if (intent === 'ops-metrics') {
+    const result = await updateOpsMetrics(state, body);
     return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'media-moderate') {
@@ -279,6 +283,75 @@ function parseList(value, fallback = []) {
 
 function dedupe(list) {
   return [...new Set(list || [])];
+}
+
+function normalizeNumericInput(raw, { fallback, min, max, label } = {}) {
+  const errors = [];
+  if (raw === undefined || raw === null || raw === '') {
+    const fallbackNumber = Number(fallback);
+    return { value: Number.isFinite(fallbackNumber) ? fallbackNumber : null, errors };
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) {
+    errors.push(`${label || 'Value'} must be a number.`);
+    return { value: null, errors };
+  }
+  if (Number.isFinite(min) && parsed < min) {
+    errors.push(`${label || 'Value'} must be at least ${min}.`);
+  }
+  if (Number.isFinite(max) && parsed > max) {
+    errors.push(`${label || 'Value'} must be at most ${max}.`);
+  }
+  return { value: parsed, errors };
+}
+
+async function updateOpsMetrics(state, body) {
+  const prev = state.settings?.opsMetrics || {};
+  const retentionInput = sanitizeText(body.opsMetricsRetentionHours || '', 12);
+  const intervalInput = sanitizeText(body.opsMetricsIntervalSeconds || '', 12);
+  const retentionResult = normalizeNumericInput(retentionInput, {
+    fallback: prev.retentionHours,
+    min: 1,
+    max: 720,
+    label: 'Retention hours',
+  });
+  const intervalResult = normalizeNumericInput(intervalInput, {
+    fallback: prev.intervalSeconds,
+    min: 60,
+    max: 86_400,
+    label: 'Interval seconds',
+  });
+
+  const errors = [...retentionResult.errors, ...intervalResult.errors];
+  if (errors.length) {
+    return {
+      flash: 'Ops metrics settings not updated.',
+      opsMetricsErrors: renderValidationErrors(errors, { title: 'Ops metrics' }),
+      opsMetricsRetentionValue: retentionInput || String(prev.retentionHours || ''),
+      opsMetricsIntervalValue: intervalInput || String(prev.intervalSeconds || ''),
+    };
+  }
+
+  const next = {
+    retentionHours: retentionResult.value ?? prev.retentionHours ?? 24,
+    intervalSeconds: intervalResult.value ?? prev.intervalSeconds ?? 300,
+    snapshots: Array.isArray(prev.snapshots) ? prev.snapshots : [],
+    lastSnapshotAt: prev.lastSnapshotAt || null,
+  };
+  state.settings = {
+    ...(state.settings || {}),
+    opsMetrics: next,
+  };
+  recordAdminAudit(state, {
+    action: 'ops.metrics.update',
+    summary: `retention=${next.retentionHours}h interval=${next.intervalSeconds}s`,
+  });
+  await persistSettings(state);
+  return {
+    flash: 'Ops metrics settings updated.',
+    opsMetricsRetentionValue: String(next.retentionHours),
+    opsMetricsIntervalValue: String(next.intervalSeconds),
+  };
 }
 
 async function updateSession(state, body) {
@@ -498,6 +571,9 @@ function buildAdminViewModel(
     profileAttributeErrors,
     rateLimitOverridesValue,
     rateLimitErrors,
+    opsMetricsErrors,
+    opsMetricsIntervalValue,
+    opsMetricsRetentionValue,
   } = {},
 ) {
   const policy = getCirclePolicyState(state);
@@ -589,6 +665,13 @@ function buildAdminViewModel(
   const rateLimitOverrides = rateLimitOverridesValue ?? formatRateLimitOverrides(state.settings?.rateLimits || {});
   const rateLimitDefaults = renderRateLimitDefaults(DEFAULT_RATE_LIMITS);
   const rateLimitErrorsRendered = rateLimitErrors || '';
+  const opsMetricsConfig = getOpsMetricsConfig(state);
+  const opsIntervalValue =
+    opsMetricsIntervalValue ??
+    String(opsMetricsConfig.intervalSeconds || state.settings?.opsMetrics?.intervalSeconds || '');
+  const opsRetentionValue =
+    opsMetricsRetentionValue ??
+    String(opsMetricsConfig.retentionHours || state.settings?.opsMetrics?.retentionHours || '');
 
   return {
     circleName: effective.circleName,
@@ -690,6 +773,9 @@ function buildAdminViewModel(
     rateLimitOverridesValue: rateLimitOverrides,
     rateLimitDefaults,
     rateLimitErrors: rateLimitErrorsRendered,
+    opsMetricsIntervalValue: opsIntervalValue,
+    opsMetricsRetentionValue: opsRetentionValue,
+    opsMetricsErrors: opsMetricsErrors || '',
   };
 }
 

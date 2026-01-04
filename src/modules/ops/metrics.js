@@ -29,6 +29,10 @@ export function getMetricsSnapshot(state) {
   return snapshotFromLive(state);
 }
 
+export function getOpsMetricsConfig(state) {
+  return resolveConfig(state);
+}
+
 function ensureMetrics(state) {
   if (!state.metrics) {
     state.metrics = {
