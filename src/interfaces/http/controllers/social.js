@@ -32,7 +32,6 @@ import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shar
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
-import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
@@ -43,14 +42,13 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const feed = buildFeed(state, person, { followType: followTypeFilter || undefined });
   const follows = person ? listFollowsFor(state, person.pidHash, followTypeFilter || undefined) : [];
+  const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows });
   const followers = person ? listFollowersOf(state, person.pidHash) : [];
   const followTypeByHash = new Map(follows.map((edge) => [edge.targetHash, edge.type]));
-  const mediaById = new Map((state.socialMedia || []).map((media) => [media.id, media]));
+  const mediaById = buildMediaLookup(feed, state.socialMedia);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
-  const statusMeta = deriveStatusMeta(state);
 
   const html = await renderPage(
     'social',
@@ -66,7 +64,6 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followTypeOptions: renderFollowTypeOptions(followTypeFilter),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
-      statusStrip: renderStatusStrip(statusMeta),
     },
     { wantsPartial, title: 'Social feed', state },
   );
@@ -519,4 +516,30 @@ function renderFollowTypeOptions(selectedType = '') {
     const selected = normalized === type ? ' selected' : '';
     return `<option value="${type}"${selected}>${type}</option>`;
   }).join('\n');
+}
+
+function buildMediaLookup(posts = [], mediaEntries = []) {
+  if (!posts.length || !mediaEntries?.length) return new Map();
+  const needed = new Set();
+  for (const post of posts) {
+    if (Array.isArray(post.mediaIds)) {
+      for (const mediaId of post.mediaIds) {
+        if (mediaId) needed.add(mediaId);
+      }
+    }
+    if (post.reshare && Array.isArray(post.reshare.mediaIds)) {
+      for (const mediaId of post.reshare.mediaIds) {
+        if (mediaId) needed.add(mediaId);
+      }
+    }
+  }
+  if (!needed.size) return new Map();
+  const lookup = new Map();
+  for (const media of mediaEntries) {
+    if (!media?.id) continue;
+    if (!needed.has(media.id)) continue;
+    lookup.set(media.id, media);
+    if (lookup.size >= needed.size) break;
+  }
+  return lookup;
 }

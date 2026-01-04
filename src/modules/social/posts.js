@@ -103,7 +103,7 @@ export function createPost(
   return entry;
 }
 
-export function buildFeed(state, person, { followType } = {}) {
+export function buildFeed(state, person, { followType, follows } = {}) {
   const allPosts = filterVisibleEntries(state.socialPosts || [], state);
   if (!person) {
     return allPosts.filter((post) => post.visibility !== 'direct').slice(0, 80);
@@ -111,11 +111,10 @@ export function buildFeed(state, person, { followType } = {}) {
 
   const ownHash = person.pidHash;
   const normalizedType = followType ? normalizeFollowType(followType) : null;
-  const follows = listFollowsFor(state, ownHash, normalizedType || undefined);
-  const followedHashes = new Set(follows.map((edge) => edge.targetHash));
+  const followList = Array.isArray(follows) ? follows : listFollowsFor(state, ownHash, normalizedType || undefined);
+  const filteredFollows = normalizedType ? followList.filter((edge) => edge.type === normalizedType) : followList;
+  const followedHashes = new Set(filteredFollows.map((edge) => edge.targetHash));
   followedHashes.add(ownHash);
-
-  const allowedTypes = normalizedType ? new Set([normalizedType]) : null;
 
   const feed = [];
   for (const post of allPosts) {
@@ -124,10 +123,6 @@ export function buildFeed(state, person, { followType } = {}) {
     const isRecipient = post.targetHash && post.targetHash === ownHash;
     if (isDirect && !(post.authorHash === ownHash || isRecipient)) continue;
     if (!isDirect && !isAuthorFollowed) continue;
-    if (allowedTypes) {
-      const edge = follows.find((f) => f.targetHash === post.authorHash);
-      if (edge && !allowedTypes.has(edge.type)) continue;
-    }
     feed.push(post);
     if (feed.length >= 120) break;
   }

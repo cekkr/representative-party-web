@@ -5,7 +5,6 @@ import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { renderPage } from '../views/templates.js';
 import { getActorLabels } from '../views/actorLabel.js';
-import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -37,7 +36,6 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       gateSummary,
       extensionsSummary,
       ledgerLink,
-      statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
     { wantsPartial, title: 'Representative Party', state },
   );

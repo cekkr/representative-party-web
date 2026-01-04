@@ -15,7 +15,6 @@ import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identi
 import { renderDiscussionList } from '../views/discussionView.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
-import { deriveStatusMeta, renderStatusStrip } from '../views/status.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../views/topicHelpers.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
@@ -154,7 +153,6 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       topicPreferencesValue: formatTopicList(topicPreferences),
       topicAnchors: formatTopicList(topicConfig.anchors || []),
       topicPinned: formatTopicList(topicConfig.pinned || []) || 'none',
-      statusStrip: renderStatusStrip(deriveStatusMeta(state)),
     },
     { wantsPartial, title: 'Deliberation Sandbox', state },
   );
