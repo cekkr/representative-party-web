@@ -673,7 +673,7 @@ function buildAdminViewModel(
     outboundSummaryList,
     outboundSummaryNote: `Summary of the most recent ${OUTBOUND_SUMMARY_LIMIT} outbound delivery attempts.`,
     metricsList,
-    metricsNote: 'Counts reset on server restart.',
+    metricsNote: buildMetricsNote(metricsSnapshot),
     socialMediaList,
     socialMediaCount,
     gossipPushSummary,
@@ -1543,6 +1543,20 @@ function formatMetricBreakdown(map = {}, label) {
     .slice(0, 6);
   if (!items.length) return [];
   return items.map((entry) => `${label} ${entry.key}: ${entry.value}`);
+}
+
+function buildMetricsNote(metrics = {}) {
+  const window = metrics.window;
+  if (!window) return 'Counts reset on server restart.';
+  const parts = [
+    `Rolling window: last ${window.retentionHours}h`,
+    `interval ${window.intervalSeconds}s`,
+    `${window.snapshots} snapshot${window.snapshots === 1 ? '' : 's'}`,
+  ];
+  if (window.from && window.to) {
+    parts.push(`from ${window.from} to ${window.to}`);
+  }
+  return parts.join(' · ');
 }
 
 function renderSocialMediaList(entries = []) {

@@ -36,3 +36,41 @@ test('recordRateLimit increments totals and per-action counts', () => {
   assert.equal(snapshot.rateLimit.byAction.petition_comment, 1);
   assert.ok(snapshot.rateLimit.lastAt);
 });
+
+test('metrics snapshots persist into settings with retention window', () => {
+  const state = { settings: {} };
+  recordModuleDisabled(state, 'social');
+  recordRateLimit(state, 'discussion_post');
+
+  const snapshot = getMetricsSnapshot(state);
+  assert.equal(snapshot.moduleDisabled.total, 1);
+  assert.equal(snapshot.rateLimit.total, 1);
+  assert.ok(snapshot.window);
+  assert.equal(Array.isArray(state.settings.opsMetrics.snapshots), true);
+  assert.equal(state.settings.opsMetrics.snapshots.length, 1);
+});
+
+test('metrics snapshots prune entries beyond retention window', () => {
+  const staleDate = new Date(Date.now() - 36 * 60 * 60 * 1000).toISOString();
+  const state = {
+    settings: {
+      opsMetrics: {
+        retentionHours: 12,
+        intervalSeconds: 300,
+        snapshots: [
+          {
+            at: staleDate,
+            lastAt: staleDate,
+            moduleDisabled: { total: 4, byModule: { social: 4 } },
+            rateLimit: { total: 2, byAction: { forum_thread: 2 } },
+          },
+        ],
+      },
+    },
+  };
+
+  const snapshot = getMetricsSnapshot(state);
+  assert.equal(snapshot.moduleDisabled.total, 0);
+  assert.equal(snapshot.rateLimit.total, 0);
+  assert.equal(state.settings.opsMetrics.snapshots.length, 0);
+});

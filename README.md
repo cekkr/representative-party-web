@@ -257,6 +257,7 @@ Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same previe
 - Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`)
 - Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM)
 - Outbound delivery: `OUTBOUND_EMAIL_WEBHOOK`, `OUTBOUND_SMS_WEBHOOK`, `OUTBOUND_WEBHOOK_HEADERS`, `OUTBOUND_TRANSPORT_MODULE`
+- Ops metrics: `METRICS_SNAPSHOT_INTERVAL_SECONDS` (rolling bucket size), `METRICS_SNAPSHOT_RETENTION_HOURS` (retention window)
 - Persistence:
   - `DATA_MODE` (`centralized|hybrid|p2p`)
   - `DATA_ADAPTER` (`json|memory|sql|kv`)
@@ -426,6 +427,7 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 - **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, recent transactions, outbound delivery summaries, and runtime ops counters; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts, outbound delivery stats, and ops metrics for dashboards, including last peer ledger hash snapshots (match/mismatch). Gossip sync skips peers that disable modules or gossip, so peer health reflects real failures.
 - **Gossip resilience**: optional endpoints (votes/transactions) that are missing or disabled are treated as skipped for peer health scoring, so messaging-only peers do not get penalized.
 - **Backups**: if you run with JSON/KV storage, schedule backups of `src/data/` (or your DB/KV file), especially before migrations.
+- **Ops metrics persistence**: module-disabled + rate-limit counters are snapshotted into `settings.json` on a rolling window (`METRICS_SNAPSHOT_INTERVAL_SECONDS`, `METRICS_SNAPSHOT_RETENTION_HOURS`) so restarts keep recent trends.
 
 ---
 - Identity safety: only store blinded PID hashes; never persist wallet-provided PII. Keys used for envelope signing must be rotated carefully; publish `CIRCLE_PUBLIC_KEY` to peers before enabling signatures.
