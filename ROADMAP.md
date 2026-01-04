@@ -25,7 +25,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Modes: `DATA_MODE=centralized` (single adapter, no gossip writes/ingest), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
 - Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQLite-backed SQL and file-based KV adapters exist (SQL requires optional `sqlite3`); JSON/memory remain defaults. MySQL and MongoDB adapters are available as optional advanced drivers.
 - Future schema optimization: define table/collection schemas once and share them across adapters; some tables/collections are defined directly inside modules and should be created lazily so disabled modules do not create storage artifacts.
-- Phase alignment: Phase 1 ships the adapterized interface + JSON driver + replication profile stub; Phase 2 adds SQL/kv drivers and hybrid-mode wiring; MySQL/MongoDB adapters are available as optional advanced drivers; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
+- Phase alignment: Phase 1-2 deliver the adapterized interface plus JSON/memory/sql/kv drivers and hybrid-mode wiring; MySQL/MongoDB adapters remain optional advanced drivers; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
 
 ## UX Baseline (to harden during Phase 1)
 - Clear entry points: CTA for “Verify with EU Wallet” and “Start debating” with copy that explains privacy (hash-only, no PII stored) and the natural-person exclusion principle when civic mode is on.
@@ -53,10 +53,10 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
 
 ## Near-term next steps (Phase 2 focus)
-- Extend topic gardener review with deeper diff visualization for topic history.
-- Add petition revision diffs, review prompts, and pre-vote freeze UX so contributors can validate the final text before voting opens.
-- Expand the structure manager: schema versioning, inline validation errors, and a per-session attributes editor that respects provider-only storage and consent.
-- Wire outbound transports (email/SMS) with delivery logs and opt-in enforcement using provider-local preferences.
+- Deliberative workbench upgrades: structured proposal templates (evidence fields), argument mapping UI (pro/con trees), evidence/citation prompts, and community fact-check flags.
+- Governance module: digital constitution for quorum/debate/voting-method parameters with a community proposal/change workflow and audit trail.
+- Delegation trust UX: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
+- Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 
@@ -87,22 +87,32 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection, and vote-mode recommendations should prefer the latest closed election winner.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
+- **Deliberative workbench**: structured proposal templates with evidence fields, collaborative drafting upgrades, argument mapping UI, and evidence/citation prompts with community fact-check flags.
+- **Governance module**: digital constitution for quorum/debate windows/voting-method defaults, with community proposals, audits, and admin emergency overrides.
+- **Delegation trust UX**: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
+- **Topics/Taxonomy**: reinforce dynamic topics + anchors with clearer stewardship cues and topic history context across deliberation surfaces.
+- UX: guided flows for “draft → discuss → freeze”, argument-map entry points, evidence badges, and topic breadcrumbs.
 
 ### Phase 3 — Decision Engine (Months 8-11)
-- **Voting module**: implement Schulze/Condorcet; split authentication (hash) from anonymized ballot storage.
+- **Voting module**: multi-method ballots (Condorcet/STAR/approval), anonymized ballot storage, and E2E-verifiable receipts + bulletin board.
 - **Ranked-choice ballots (person elections)**: group delegate elections already capture up to three preferences with multi-round transfers (Alaska-style); extend the same ranked-choice capture to the core voting module when it lands.
-- **Delegation graph**: revocable, topic-scoped delegation with decay/visibility rules; worker to compute power weights.
-- UX: ballot clarity (options, ranking helper), delegation previews, and “explain my influence” summaries.
+- **Delegation graph**: transitive delegation, decay/renewal rules, and a worker to compute power weights with “explain my influence” summaries.
+- **Reputation system**: multi-dimensional trust metrics (deliberation score, vote history, topic expertise) to feed delegate discovery and anti-super-delegate safeguards.
+- UX: ballot clarity (options, ranking helper), delegation previews, and trust cues.
 
 ### Phase 4 — Federation Hardening & Migration (Months 12-14)
 - **Claim & Seize** protocol: signed migration requests to move history across providers when the same wallet re-verifies.
 - **Circle health**: scheduled peer audits for policy compliance; automatic quarantine of toxic peers.
+- **Cross-provider access**: view/vote on petitions across providers with signed envelopes and policy gating.
 - UX: migration status banners and audit transparency dashboard.
 
-### Phase 5 — Launch Polish (Months 15+)
-- SEO metadata for petitions/proposals; schema.org generation server-side.
-- EUDI compliance audit against eIDAS 2.0/ARF.
-- Mobile-first refinements for app-switch flows and QR fallback, plus public trust dashboards for accountability.
+### Phase 5 — Accountability & Launch (Months 15+)
+- **Accountability dashboard**: ingest legislative vote data, compare with platform decisions, compute fidelity scores, and provide representative justification space with a public audit trail.
+- **Ethical pact + representative role**: candidate pledge capture, divergence explanations, and reputation linkages for re-selection flows.
+- **Phygital inclusion + digital literacy**: offline agenda exports, kiosk/QR check-ins, SMS/print briefs, and training content hooks.
+- **Information integrity**: disinformation reporting workflows, evidence citation requirements, and optional third-party fact-check integrations.
+- **Cross-language access**: integrated machine translation for deliberation surfaces in multi-lingual Circles.
+- **Launch polish**: SEO metadata for petitions/proposals (schema.org), eIDAS 2.0/ARF compliance audit, and mobile-first verification refinements.
 
 # General roadmap
 
@@ -155,11 +165,15 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 | :--- | :--- |
 | **1. Party Circle (Civic kernel, optional)** | **Governance:** Manages OIDC4VP strategy, the "Uniqueness Ledger," and the list of federated peers when Circle mode is enabled. <br> **Policy:** Enforces the "One person/person, One Voice" rule, applies the natural-person exclusion principle, and handles "Toxic Provider" exclusion lists. |
 | **2. Discussion (Agorà)** | **Debate:** Standard threads with "Pro/Con" structure. <br> **Policy:** linked to the verified handle (user-by-default, person badge when civic proof is on) so participants are accountable to their unique hash. |
+| **2. Deliberative Workbench (Agorà)** | **Debate:** Structured deliberation with argument mapping, evidence prompts, and collaborative drafting. <br> **Policy:** linked to the verified handle (user-by-default, person badge when civic proof is on) so participants are accountable to their unique hash. |
 | **3. Dynamic Topics (Ext.)** | **Organization:** Users create nested category trees (tags). <br> **Policy:** Topics evolve organically based on usage metrics. |
 | **4. Petitions (Ext.)** | **Initiative:** Collaborative drafting of laws/proposals. <br> **Policy:** Git-like version control for text. Requires a signature threshold (Quorum) to move to Discussion. |
 | **5. The Connector** | **Workflow:** Logic engine (Petition $\rightarrow$ Discussion $\rightarrow$ Vote). |
-| **6. Voting** | **Decision:** Secure ballot box. <br> **Policy:** Vote masking. The database stores the vote linked to a temporary session ID, not the permanent User ID, ensuring secrecy. |
-| **7. Delegates (Liquid Ext.)** | **Representation:** Extension for Voting. <br> **Policy:** Manages the graph of trust. Allows delegating votes to others, with transitive calculations (A $\to$ B $\to$ C). |
+| **5. Governance (Digital Constitution)** | **Rules:** Community-managed parameters (quorum, debate windows, default voting methods) with an auditable change history. |
+| **6. Voting** | **Decision:** Secure ballot box with multi-method tallies and E2E verifiability. <br> **Policy:** Ballots are anonymized from the voter identity. |
+| **7. Delegation & Trust (Liquid Ext.)** | **Representation:** Extension for Voting. <br> **Policy:** Manages the graph of trust with transitive delegation, decay/renewal, and reputation signals. |
+| **8. Accountability Dashboard** | **Accountability:** Compares platform decisions with representative votes, exposes fidelity scores, and hosts public justifications. |
+| **9. The Connector** | **Workflow:** Logic engine (Petition $\rightarrow$ Discussion $\rightarrow$ Freeze $\rightarrow$ Vote). |
 
 -----
 
@@ -173,6 +187,8 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * Initialize the server (Fastify/Express).
       * Implement the **OIDC4VP Verifier**: Use libraries like `@sphereon/oid4vc-common` or `@credo-ts/openid4vc` to handle the handshake with EUDI Wallets.
       * **The "Blind" Token:** Create the logic to receive the Verifiable Presentation, validate the government signature, and hash the Subject ID for storage.
+1.  **OIDC4VP & Session Scaffolds:**
+      * **Complete:** OIDC4VP verifier scaffold with blinded PID hashing, session roles, and policy toggles for person enforcement.
       * Keep verifier enforcement behind a policy toggle so messaging-only deployments can run without civic proof while still supporting the exclusion principle when enabled.
 2.  **Federated Identity Registry:**
       * Build the `UserHash` table.
@@ -181,9 +197,16 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Frontend Framework (SSR + Vanilla):**
       * Set up the template engine (EJS/Pug).
       * Build the "Deep Link" handler: A generic JS module that detects `openid-credential-offer://` links and triggers the user's installed EUDI Wallet app (or displays a QR code on desktop).
+      * **Complete:** ActivityPub actor/outbox plus preview-gated inbox ingestion.
+      * **Complete:** Uniqueness sync gossip with ledger digests to enforce cross-provider uniqueness when Circle mode is enabled.
+3.  **SSR Shell + Wallet Handoff:**
+      * **Complete:** SSR templates with partial HTML navigation.
+      * **Complete:** Deep-link + QR wallet handoff handling.
 4.  **Messaging baseline:**
       * Ship SSR discussion/forum surfaces and the notification registry as the default value even without petitions/votes enabled.
       * Keep handles/roles visible so policy can later enforce the person-only exclusion principle without reworking the UX.
+      * **Complete:** discussion/forum/notifications + social feed as the default value even without petitions/votes enabled.
+      * **Complete:** handles/roles visible so policy can enforce the person-only exclusion principle without reworking the UX.
 
 #### **Phase 2: Deliberation & Structure (Months 5-7)**
 
@@ -198,6 +221,16 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Discussion Module:**
       * Link threads to Petitions.
       * Implement **Accountability**: Since users are unique, implement "Rate Limiting by Identity" (not IP) to effectively stop spam without captchas.
+1.  **Deliberative Workbench:**
+      * Structured proposal templates with evidence fields.
+      * Collaborative drafting with revision history plus argument mapping (pro/con) UI.
+      * Evidence/citation prompts with community fact-check flags.
+2.  **Governance Module:**
+      * Digital constitution for quorum, debate windows, and voting-method defaults.
+      * Community proposal/change workflow with auditable history.
+3.  **Delegation & Trust UX:**
+      * Delegate profiles (bio, vote history, delegation counts) and delegation chain visualization.
+      * Delegation decay/renewal controls and reputation scaffolds (deliberation score, topic expertise).
 
 #### **Phase 3: The Decision Engine (Months 8-11)**
 
@@ -206,11 +239,13 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 1.  **Voting Module:**
       * Implement the **Schulze Method** for ranking options.
       * **Anonymity Layer:** Ensure that while *access* to the ballot box requires the OIDC4VP token, the *ballot itself* is stored in a separate table with no link back to the user hash.
+      * Multi-method ballots (Condorcet/STAR/approval) with anonymized ballot storage.
+      * E2E-verifiable receipts and a public bulletin board for tally verification.
 2.  **Delegates Manager:**
-      * Build the "Delegation Dashboard."
-      * **Transitivity Engine:** A NodeJS worker that traverses the delegation graph (A delegates to B, B to C) to calculate the "Power Weight" of every user before a vote opens.
+      * Transitive delegation engine with decay/renewal and power-weight computation.
+      * Reputation signals feed delegate discovery and “explain my influence” views.
 3.  **The Connector:**
-      * Automate the pipeline: *Quorum Reached $\rightarrow$ Open Discussion $\rightarrow$ Freeze Text $\rightarrow$ Vote*.
+      * Automate the pipeline: *Quorum Reached $\rightarrow$ Open Discussion $\rightarrow$ Freeze Text $\rightarrow$ Vote* with review prompts.
 
 #### **Phase 4: Federation Hardening & Migration (Months 12-14)**
 
@@ -223,8 +258,12 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Cross-Provider Access:**
       * Allow a user on *Server A* to view and vote on a Petition hosted on *Server B* seamlessly, using the ActivityPub federation to transport the vote authentication.
 
-#### **Phase 5: Polish & Launch (Months 15+)**
+#### **Phase 5: Accountability & Launch (Months 15+)**
 
 1.  **SEO & Indexing:** Ensure every Petition and Proposal has valid Schema.org metadata generated server-side.
 2.  **EUDI Compliance Audit:** Verify the implementation against the final **eIDAS 2.0 / ARF** technical specifications to ensure the wallet integration is legally compliant for EU regions.
 3.  **Mobile Optimization:** Refine the Vanilla JS interactions to ensure the OIDC4VP app-switching flow works smoothly on iOS and Android devices.
+1.  **Accountability Dashboard + Ethical Pact:** ingest legislative votes, compare with platform decisions, compute fidelity scores, and capture representative justifications.
+2.  **Phygital Inclusion + Digital Literacy:** offline agenda exports, kiosk/QR check-ins, SMS/print briefs, and training content hooks.
+3.  **Information Integrity + Security:** disinformation reporting workflows, optional fact-check integrations, and third-party security audits/bug bounty posture.
+4.  **Internationalization + Launch Polish:** integrated machine translation for deliberation, SEO/schema.org, eIDAS 2.0/ARF compliance audit, and mobile verification refinements.
