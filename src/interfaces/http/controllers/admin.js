@@ -1493,6 +1493,10 @@ function renderSocialMediaList(entries = []) {
       const kind = escapeHtml(String(entry.kind || 'media'));
       const created = formatTimestamp(entry.createdAt);
       const reportCount = Number(entry.reportCount || 0);
+      const viewRequests = Number(entry.viewRequests || 0);
+      const viewerCount = Array.isArray(entry.viewers) ? entry.viewers.length : 0;
+      const viewCountLabel = `View requests: ${viewRequests}${viewerCount ? ` (${viewerCount} unique)` : ''}`;
+      const lastViewRequest = entry.lastViewRequestAt ? formatTimestamp(entry.lastViewRequestAt) : '';
       const name = entry.originalName ? ` · ${escapeHtml(entry.originalName)}` : '';
       return `
         <article class="discussion">
@@ -1501,10 +1505,12 @@ function renderSocialMediaList(entries = []) {
             <span class="pill ghost">${status}</span>
             <span class="muted small">${created}</span>
             <span class="muted small">Reports: ${reportCount}</span>
+            <span class="muted small">${escapeHtml(viewCountLabel)}</span>
           </div>
           <p class="muted small">Media ID: ${escapeHtml(entry.id)}</p>
           <p class="muted small">Post ID: ${escapeHtml(entry.postId || 'n/a')}</p>
           <p class="muted small">Type: ${escapeHtml(entry.contentType || 'unknown')} · ${formatBytes(entry.size || 0)}${name}</p>
+          ${lastViewRequest ? `<p class="muted small">Last view request: ${escapeHtml(lastViewRequest)}</p>` : ''}
           <form class="stack" method="post" action="/admin" data-enhance="admin">
             <input type="hidden" name="intent" value="media-moderate" />
             <input type="hidden" name="mediaId" value="${escapeHtml(entry.id)}" />

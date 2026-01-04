@@ -48,18 +48,19 @@ export function isGossipEnabled(profile) {
 export function stampLocalEntry(state, entry = {}) {
   const profile = getReplicationProfile(state);
   const now = new Date().toISOString();
+  const issuer = state?.issuer || state?.settings?.issuer || ISSUER;
   return {
     validationStatus: 'validated',
     mode: profile.mode,
     adapter: profile.adapter,
-    issuer: ISSUER,
+    issuer,
     provenance: {
-      issuer: ISSUER,
+      issuer,
       mode: profile.mode,
       adapter: profile.adapter,
     },
     validatedAt: entry.validationStatus === 'preview' ? null : now,
-    validatedBy: entry.validationStatus === 'preview' ? null : ISSUER,
+    validatedBy: entry.validationStatus === 'preview' ? null : issuer,
     ...entry,
   };
 }

@@ -42,10 +42,11 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const follows = person ? listFollowsFor(state, person.pidHash, followTypeFilter || undefined) : [];
-  const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows });
+  const allFollows = person ? listFollowsFor(state, person.pidHash) : [];
+  const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows: allFollows });
   const followers = person ? listFollowersOf(state, person.pidHash) : [];
-  const followTypeByHash = new Map(follows.map((edge) => [edge.targetHash, edge.type]));
+  const followTypeByHash = new Map(allFollows.map((edge) => [edge.targetHash, edge.type]));
+  const followTypeCounts = countFollowTypes(allFollows);
   const mediaById = buildMediaLookup(feed, state.socialMedia);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
@@ -57,13 +58,14 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
       postingReason,
-      followCount: follows.length,
+      followCount: allFollows.length,
       followerCount: followers.length,
-      followList: renderFollowList(follows),
+      followList: renderFollowList(allFollows),
       feedList: renderSocialPosts(feed, { enableReplies: Boolean(person), followTypeByHash, mediaById }),
-      followTypeOptions: renderFollowTypeOptions(followTypeFilter),
+      followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
+      followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
     },
     { wantsPartial, title: 'Social feed', state },
   );
@@ -510,11 +512,15 @@ export async function listRelationships({ req, res, state }) {
   });
 }
 
-function renderFollowTypeOptions(selectedType = '') {
+function renderFollowTypeOptions(selectedType = '', counts = new Map()) {
   const normalized = selectedType ? normalizeFollowType(selectedType) : '';
-  return DEFAULT_FOLLOW_TYPES.map((type) => {
+  const extraTypes = [...counts.keys()].filter((type) => !DEFAULT_FOLLOW_TYPES.includes(type)).sort();
+  const types = [...DEFAULT_FOLLOW_TYPES, ...extraTypes];
+  return types.map((type) => {
     const selected = normalized === type ? ' selected' : '';
-    return `<option value="${type}"${selected}>${type}</option>`;
+    const count = counts.get(type);
+    const label = Number.isFinite(count) && count > 0 ? `${type} (${count})` : type;
+    return `<option value="${type}"${selected}>${label}</option>`;
   }).join('\n');
 }
 
@@ -542,4 +548,18 @@ function buildMediaLookup(posts = [], mediaEntries = []) {
     if (lookup.size >= needed.size) break;
   }
   return lookup;
+}
+
+function countFollowTypes(follows = []) {
+  const counts = new Map();
+  for (const edge of follows || []) {
+    const type = normalizeFollowType(edge.type || 'circle');
+    counts.set(type, (counts.get(type) || 0) + 1);
+  }
+  return counts;
+}
+
+function buildFollowTypeAllLabel(count) {
+  const total = Number.isFinite(count) ? count : 0;
+  return total > 0 ? `All (${total})` : 'All';
 }
