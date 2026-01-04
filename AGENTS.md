@@ -1,5 +1,8 @@
 This file captures the essential implementation directives. Keep it in sync with README.md and ROADMAP.md. The core philosophy lives in principle-docs/RepresentativeParties.md (One Person = One Voice, soft-power accountability, liquid delegation, phygital inclusion). Use **user** as the default actor for general-purpose deployments; **person** is a contextual label for civic/party Circles and implies a verified natural person (the exclusion principle: no org/bot/service accounts can hold handles or act in flows).
 
+## High priority directives
+- Always update `OPTIMIZATIONS.md` whenever a new possible optimization (performance, redundancy, UX consistency, observability, storage/IO) is identified during any development task, even if not implemented yet.
+
 ## Concept anchors
 - User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “person” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
 - Messaging-first kernel: start as a simple threaded messaging surface (discussion/forum + notifications). Law proposals (petitions), votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
