@@ -14,7 +14,8 @@ export function exportVotes({ res, state }) {
   const policy = getEffectivePolicy(state);
   const visibleVotes = filterVisibleEntries(state.votes, state);
   const envelopes = visibleVotes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
-  return sendJson(res, 200, { entries: envelopes, replication: getReplicationProfile(state) });
+  const hasPreview = envelopes.some((entry) => entry?.status === 'preview');
+  return sendJson(res, 200, { entries: envelopes, status: hasPreview ? 'preview' : 'validated', replication: getReplicationProfile(state) });
 }
 
 export async function gossipVotes({ req, res, state }) {

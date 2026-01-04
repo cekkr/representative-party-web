@@ -140,6 +140,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const title = sanitizeText(body.title || '', 120);
   const summary = sanitizeText(body.summary || '', 800);
   const proposalText = sanitizeText(body.body || '', 4000);
+  const evidenceSummary = sanitizeText(body.evidenceSummary || '', 800);
+  const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   const classifiedTopic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
   const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
   const topic = topicResult.topic?.label || classifiedTopic || 'general';
@@ -156,6 +158,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     title,
     summary,
     body: proposalText,
+    evidenceSummary,
+    evidenceLinks,
     authorHash: person?.pidHash || 'anonymous',
     createdAt,
     updatedAt: createdAt,
@@ -176,6 +180,8 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
         topic,
         topicId: topicResult.topic?.id || null,
         topicPath,
+        evidenceSummary,
+        evidenceLinks,
         createdAt,
       }),
     ],
@@ -243,6 +249,14 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
   const title = sanitizeText(body.title || petition.title || '', 120);
   const summary = sanitizeText(body.summary || petition.summary || '', 800);
   const proposalText = sanitizeText(body.body || petition.body || '', 4000);
+  const evidenceSummaryInput = Object.prototype.hasOwnProperty.call(body, 'evidenceSummary')
+    ? body.evidenceSummary
+    : petition.evidenceSummary || '';
+  const evidenceLinksInput = Object.prototype.hasOwnProperty.call(body, 'evidenceLinks')
+    ? body.evidenceLinks
+    : petition.evidenceLinks || '';
+  const evidenceSummary = sanitizeText(evidenceSummaryInput || '', 800);
+  const evidenceLinks = parseEvidenceLinks(evidenceLinksInput || '');
   const note = sanitizeText(body.note || '', 240);
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
@@ -263,11 +277,15 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     topic,
     topicId: topicResult.topic?.id || petition.topicId || null,
     topicPath,
+    evidenceSummary,
+    evidenceLinks,
   });
 
   petition.title = title;
   petition.summary = summary;
   petition.body = proposalText;
+  petition.evidenceSummary = evidenceSummary;
+  petition.evidenceLinks = evidenceLinks;
   petition.topic = topic;
   petition.topicId = topicResult.topic?.id || petition.topicId || null;
   petition.topicPath = topicPath.length ? topicPath : petition.topicPath || [];
@@ -486,6 +504,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);
   const content = sanitizeText(body.content || '', 800);
+  const factCheck = parseBoolean(body.factCheck, false);
   if (!petitionId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
@@ -511,6 +530,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     topicPath,
     stance: 'comment',
     content,
+    factCheck: Boolean(factCheck),
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
   };
@@ -521,7 +541,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     type: 'petition_comment',
     actorHash: person?.pidHash || 'anonymous',
     petitionId,
-    payload: { petitionId },
+    payload: { petitionId, factCheck: Boolean(factCheck) },
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
@@ -652,6 +672,8 @@ function buildPetitionRevision({
   title,
   summary,
   body,
+  evidenceSummary,
+  evidenceLinks,
   person,
   note,
   topic,
@@ -665,6 +687,8 @@ function buildPetitionRevision({
     title,
     summary,
     body,
+    evidenceSummary: evidenceSummary || '',
+    evidenceLinks: Array.isArray(evidenceLinks) ? evidenceLinks : [],
     note: note || '',
     authorHash: person?.pidHash || 'anonymous',
     authorHandle: person?.handle || null,
@@ -690,6 +714,8 @@ function buildFreezeSnapshot(petition, person) {
     title: source.title || petition.title || '',
     summary: source.summary || petition.summary || '',
     body: source.body || petition.body || '',
+    evidenceSummary: source.evidenceSummary || petition.evidenceSummary || '',
+    evidenceLinks: Array.isArray(source.evidenceLinks) ? source.evidenceLinks : petition.evidenceLinks || [],
     topic: source.topic || petition.topic || 'general',
     topicId: source.topicId || petition.topicId || null,
     topicPath: Array.isArray(source.topicPath)
@@ -698,4 +724,27 @@ function buildFreezeSnapshot(petition, person) {
         ? petition.topicPath
         : [],
   };
+}
+
+function parseEvidenceLinks(rawInput) {
+  if (!rawInput) return [];
+  const rawLines = Array.isArray(rawInput) ? rawInput : String(rawInput).split(/[\n,]/);
+  const links = [];
+  const seen = new Set();
+  for (const raw of rawLines) {
+    const trimmed = sanitizeText(String(raw || '').trim(), 320);
+    if (!trimmed) continue;
+    if (!/^https?:\/\//i.test(trimmed)) continue;
+    let normalized = trimmed;
+    try {
+      normalized = new URL(trimmed).toString();
+    } catch (_error) {
+      continue;
+    }
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    links.push(normalized);
+    if (links.length >= 8) break;
+  }
+  return links;
 }

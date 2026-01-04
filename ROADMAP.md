@@ -46,7 +46,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default, blockable after reports), gated by the same role/ban checks.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
-- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, transactions log + gossip summaries, and admin controls.
+- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, evidence summaries + sources, comment fact-check flags, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.

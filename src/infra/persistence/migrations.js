@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 
-export const LATEST_SCHEMA_VERSION = 18;
+export const LATEST_SCHEMA_VERSION = 19;
 
 const MIGRATIONS = [
   {
@@ -419,6 +419,50 @@ const MIGRATIONS = [
       };
     },
   },
+  {
+    version: 19,
+    description: 'Add petition evidence fields and fact-check flags.',
+    up: (data) => {
+      const petitions = (data.petitions || []).map((petition) => {
+        const evidenceSummary = stringOrEmpty(petition.evidenceSummary);
+        const evidenceLinks = normalizeEvidenceLinks(petition.evidenceLinks);
+        const versions = (Array.isArray(petition.versions) ? petition.versions : []).map((revision) => {
+          const revSummary = stringOrEmpty(revision.evidenceSummary) || evidenceSummary;
+          const revLinks = normalizeEvidenceLinks(revision.evidenceLinks);
+          return {
+            ...revision,
+            evidenceSummary: revSummary,
+            evidenceLinks: revLinks.length ? revLinks : evidenceLinks,
+          };
+        });
+        const freeze = petition.freeze
+          ? {
+              ...petition.freeze,
+              evidenceSummary: stringOrEmpty(petition.freeze.evidenceSummary) || evidenceSummary,
+              evidenceLinks: normalizeEvidenceLinks(petition.freeze.evidenceLinks).length
+                ? normalizeEvidenceLinks(petition.freeze.evidenceLinks)
+                : evidenceLinks,
+            }
+          : petition.freeze;
+        return {
+          ...petition,
+          evidenceSummary,
+          evidenceLinks,
+          versions,
+          freeze,
+        };
+      });
+      const discussions = (data.discussions || []).map((entry) => ({
+        ...entry,
+        factCheck: Boolean(entry.factCheck),
+      }));
+      return {
+        ...data,
+        petitions,
+        discussions,
+      };
+    },
+  },
 ];
 
 export function runMigrations({ data, meta }) {
@@ -550,6 +594,8 @@ function normalizeRevision(revision, petition, index, fallbackTime) {
     title: revision?.title || petition.title || 'Untitled petition',
     summary: revision?.summary || petition.summary || '',
     body: revision?.body || petition.body || petition.text || '',
+    evidenceSummary: revision?.evidenceSummary || petition.evidenceSummary || '',
+    evidenceLinks: normalizeEvidenceLinks(revision?.evidenceLinks || petition.evidenceLinks || []),
     note: revision?.note || '',
     authorHash,
     authorHandle: revision?.authorHandle || null,
@@ -568,6 +614,23 @@ function parseTopicPath(rawTopic) {
     .map((entry) => stringOrEmpty(entry))
     .filter(Boolean);
   return parts.length ? parts : ['general'];
+}
+
+function normalizeEvidenceLinks(value) {
+  if (!value) return [];
+  const rawList = Array.isArray(value) ? value : String(value).split(/[\n,]/);
+  const links = [];
+  const seen = new Set();
+  for (const entry of rawList) {
+    const trimmed = stringOrEmpty(entry);
+    if (!trimmed) continue;
+    if (!/^https?:\/\//i.test(trimmed)) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    links.push(trimmed);
+    if (links.length >= 8) break;
+  }
+  return links;
 }
 
 function uniqueStrings(values) {

@@ -44,8 +44,16 @@ export function renderPetitionList(
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
       const anchorId = `petition-${petition.id}`;
       const proposalText = petition.freeze?.body ?? petition.body;
+      const evidenceSummary = petition.freeze?.evidenceSummary ?? petition.evidenceSummary;
+      const evidenceLinks = Array.isArray(petition.freeze?.evidenceLinks)
+        ? petition.freeze.evidenceLinks
+        : Array.isArray(petition.evidenceLinks)
+          ? petition.evidenceLinks
+          : [];
       const freezeNotice = renderFreezeNotice(petition);
       const reviewPrompt = renderReviewPrompt(petition, revisions);
+      const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
+      const evidencePill = evidenceBlock ? '<span class="pill ghost">Evidence</span>' : '';
       return `
         <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
@@ -60,6 +68,7 @@ export function renderPetitionList(
             <span class="pill ghost">Discussion: ${comments.length}</span>
             <span class="pill ghost">Revisions: ${revisions.length}</span>
             ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
+            ${evidencePill}
             ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
             <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
           </div>
@@ -68,6 +77,7 @@ export function renderPetitionList(
           ${freezeNotice}
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
+          ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
           <p class="muted small">Author hash: ${escapeHtml(petition.authorHash || 'anonymous')}</p>
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
@@ -231,6 +241,14 @@ function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, acto
           <textarea name="body" rows="6">${escapeHtml(petition.body || '')}</textarea>
         </label>
         <label class="field">
+          <span>Evidence summary (optional)</span>
+          <textarea name="evidenceSummary" rows="3">${escapeHtml(petition.evidenceSummary || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Evidence links (optional, one per line)</span>
+          <textarea name="evidenceLinks" rows="3">${escapeHtml(formatEvidenceLinks(petition.evidenceLinks || []))}</textarea>
+        </label>
+        <label class="field">
           <span>Revision note (optional)</span>
           <input name="note" placeholder="What changed?" />
         </label>
@@ -288,6 +306,10 @@ function renderDiscussionBlock(petition, comments) {
           <span>Comment</span>
           <textarea name="content" rows="2" placeholder="Add a discussion note" required></textarea>
         </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="factCheck" value="yes" />
+          <span>Request fact check for this comment</span>
+        </label>
         <button class="ghost" type="submit">Post comment</button>
       </form>
       `
@@ -305,10 +327,12 @@ function renderPetitionComments(comments) {
   }
   return comments
     .map((comment) => {
+      const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
+            ${factCheckPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
@@ -331,11 +355,13 @@ export function renderProposalDiscussionFeed(items) {
       const snippet = (comment.content || '').slice(0, 180);
       const anchorId = petition?.id ? `petition-${petition.id}` : null;
       const permalink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
+      const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
             <span class="pill ghost">Proposal</span>
+            ${factCheckPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
@@ -440,6 +466,16 @@ function renderRevisionDiff(revision, previous, state) {
   if ((revision.body || '') !== (previous.body || '')) {
     changes.push({ label: 'Body', before: previous.body, after: revision.body });
   }
+  if ((revision.evidenceSummary || '') !== (previous.evidenceSummary || '')) {
+    changes.push({ label: 'Evidence summary', before: previous.evidenceSummary, after: revision.evidenceSummary });
+  }
+  if (formatEvidenceLinks(revision.evidenceLinks) !== formatEvidenceLinks(previous.evidenceLinks)) {
+    changes.push({
+      label: 'Evidence links',
+      before: formatEvidenceLinks(previous.evidenceLinks),
+      after: formatEvidenceLinks(revision.evidenceLinks),
+    });
+  }
   const topicBefore = resolveTopicBreadcrumb(previous, state);
   const topicAfter = resolveTopicBreadcrumb(revision, state);
   if (topicBefore !== topicAfter) {
@@ -472,4 +508,34 @@ function truncateText(text, limit = 240) {
   if (!text) return '';
   if (text.length <= limit) return text;
   return `${text.slice(0, limit)}...`;
+}
+
+function renderEvidenceBlock(summary, links = []) {
+  const trimmed = (summary || '').trim();
+  const normalizedLinks = normalizeEvidenceLinks(links);
+  if (!trimmed && !normalizedLinks.length) return '';
+  const summaryBlock = trimmed ? `<p class="muted small">${escapeHtml(trimmed)}</p>` : '';
+  const linkItems = normalizedLinks
+    .map((link) => `<li><a href="${escapeHtml(link)}" target="_blank" rel="noreferrer">${escapeHtml(link)}</a></li>`)
+    .join('');
+  const linkBlock = normalizedLinks.length ? `<ul class="plain">${linkItems}</ul>` : '';
+  return `
+    <details class="note">
+      <summary>Evidence and sources</summary>
+      ${summaryBlock}
+      ${linkBlock}
+    </details>
+  `;
+}
+
+function normalizeEvidenceLinks(links = []) {
+  if (!Array.isArray(links)) return [];
+  return links
+    .map((link) => String(link || '').trim())
+    .filter((link) => link && /^https?:\/\//i.test(link))
+    .slice(0, 8);
+}
+
+function formatEvidenceLinks(links = []) {
+  return normalizeEvidenceLinks(links).join('\n');
 }
