@@ -13,6 +13,5 @@ Check current project and source code status and apply performances and redundan
 
 
 REMEMBER TODOs:
-- Add data adapters also for MySQL and MongoDB
 - Add to the roadmap the optional "invisible user provider" option: seen that user ID are unique for an entire circle indipendently by their provider, can be possible allowing to hide the user's provider even for the provider through certain P2P protocols.
 - Is important, at least conceptually, the possibility that a circle borns without people with particular privileges (excluded providers' admins), they would be able to create a complex organic structure through evolution of think groups, member votings and voted contextual (and dynamic) organic structures.

@@ -83,6 +83,16 @@ export const DATA = {
   allowPreviews: parseBooleanEnv(process.env.DATA_PREVIEW, DATA_DEFAULTS.allowPreviews),
   sqliteFile: resolveSqliteFilename(),
   kvFile: process.env.DATA_KV_FILE || PATHS.DATA_KV,
+  mysqlUrl: process.env.DATA_MYSQL_URL || '',
+  mysqlHost: process.env.DATA_MYSQL_HOST || '',
+  mysqlPort: parseNumberEnv(process.env.DATA_MYSQL_PORT, undefined),
+  mysqlUser: process.env.DATA_MYSQL_USER || '',
+  mysqlPassword: process.env.DATA_MYSQL_PASSWORD || '',
+  mysqlDatabase: process.env.DATA_MYSQL_DATABASE || '',
+  mysqlTable: process.env.DATA_MYSQL_TABLE || 'state_entries',
+  mongoUrl: process.env.DATA_MONGO_URL || process.env.DATA_MONGODB_URL || '',
+  mongoDb: process.env.DATA_MONGO_DB || process.env.DATA_MONGODB_DB || '',
+  mongoCollection: process.env.DATA_MONGO_COLLECTION || 'state_entries',
 };
 
 export const MEDIA = {
@@ -109,7 +119,17 @@ export function normalizeValidationLevel(value) {
 
 export function normalizeDataAdapter(value) {
   if (!value) return DATA_DEFAULTS.adapter;
-  return String(value).trim().toLowerCase();
+  const normalized = String(value).trim().toLowerCase();
+  const aliases = {
+    sqlite: 'sql',
+    postgres: 'sql',
+    postgresql: 'sql',
+    mariadb: 'mysql',
+    mongo: 'mongodb',
+    keyvalue: 'kv',
+    key_value: 'kv',
+  };
+  return aliases[normalized] || normalized;
 }
 
 function parseBooleanEnv(value, fallback = false) {

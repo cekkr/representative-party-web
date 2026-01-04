@@ -7,14 +7,14 @@ async function main() {
     const state = await initState();
     const profile = state.dataConfig || state.settings?.data || {};
     const adapterId = state.store?.adapterId || 'unknown';
-    const filename = state.store?.filename || state.store?.kvFile || 'n/a';
+    const connectionLabel = state.store?.connectionLabel || state.store?.filename || state.store?.kvFile || 'n/a';
     const summary = {
       adapter: adapterId,
       dataProfile: describeProfile(profile),
       mode: profile.mode,
       validation: profile.validationLevel,
       allowPreviews: Boolean(profile.allowPreviews),
-      file: filename,
+      file: connectionLabel,
       schemaVersion: state.meta?.schemaVersion,
       counts: {
         ledger: state.uniquenessLedger?.size || 0,
@@ -23,19 +23,19 @@ async function main() {
         discussions: state.discussions?.length || 0,
         petitions: state.petitions?.length || 0,
         votes: state.votes?.length || 0,
-      signatures: state.signatures?.length || 0,
-      groups: state.groups?.length || 0,
-      notifications: state.notifications?.length || 0,
-      topics: state.topics?.length || 0,
-      socialPosts: state.socialPosts?.length || 0,
-      socialFollows: state.socialFollows?.length || 0,
-      socialMedia: state.socialMedia?.length || 0,
-      transactions: state.transactions?.length || 0,
-      transactionSummaries: state.transactionSummaries?.length || 0,
-      profileStructures: state.profileStructures?.length || 0,
-      profileAttributes: state.profileAttributes?.length || 0,
-    },
-  };
+        signatures: state.signatures?.length || 0,
+        groups: state.groups?.length || 0,
+        notifications: state.notifications?.length || 0,
+        topics: state.topics?.length || 0,
+        socialPosts: state.socialPosts?.length || 0,
+        socialFollows: state.socialFollows?.length || 0,
+        socialMedia: state.socialMedia?.length || 0,
+        transactions: state.transactions?.length || 0,
+        transactionSummaries: state.transactionSummaries?.length || 0,
+        profileStructures: state.profileStructures?.length || 0,
+        profileAttributes: state.profileAttributes?.length || 0,
+      },
+    };
     console.log(JSON.stringify(summary, null, 2));
     process.exit(0);
   } catch (error) {

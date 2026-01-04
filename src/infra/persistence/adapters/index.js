@@ -2,12 +2,16 @@ import { createJsonAdapter } from './json.js';
 import { createMemoryAdapter } from './memory.js';
 import { createSqlAdapter } from './sql.js';
 import { createKeyValueAdapter } from './kv.js';
+import { createMysqlAdapter } from './mysql.js';
+import { createMongoAdapter } from './mongodb.js';
 
 const REGISTRY = {
   json: createJsonAdapter,
   memory: createMemoryAdapter,
   sql: createSqlAdapter,
   kv: createKeyValueAdapter,
+  mysql: createMysqlAdapter,
+  mongodb: createMongoAdapter,
 };
 
 export function resolveAdapter(name = 'json') {
@@ -26,7 +30,8 @@ export function normalizeAdapter(name) {
     sqlite: 'sql',
     postgres: 'sql',
     postgresql: 'sql',
-    mysql: 'sql',
+    mariadb: 'mysql',
+    mongo: 'mongodb',
     keyvalue: 'kv',
     key_value: 'kv',
   };

@@ -23,8 +23,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Data topology & adapters
 - Modes: `DATA_MODE=centralized` (single adapter, no gossip writes/ingest), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache). `DATA_VALIDATION_LEVEL` (`strict` | `observe` | `off`) and `DATA_PREVIEW` (allow/prevent preview storage) gate when uncertified data is stored or surfaced; `DATA_ADAPTER` selects the driver (`json` default, `memory` for ephemeral/local).
-- Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQLite-backed SQL and file-based KV adapters exist (SQL requires optional `sqlite3`); JSON/memory remain defaults. MySQL and MongoDB adapters are planned.
-- Phase alignment: Phase 1 ships the adapterized interface + JSON driver + replication profile stub; Phase 2 adds SQL/kv drivers, hybrid-mode wiring, and MySQL/MongoDB adapters; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
+- Adapter map: drivers live under `src/infra/persistence/adapters/` with the selector in `src/infra/persistence/store.js`; replication/validation helpers live in `src/modules/federation/replication.js`. Domain modules call the interface, not the concrete adapter. SQLite-backed SQL and file-based KV adapters exist (SQL requires optional `sqlite3`); JSON/memory remain defaults. MySQL and MongoDB adapters are available as optional advanced drivers.
+- Phase alignment: Phase 1 ships the adapterized interface + JSON driver + replication profile stub; Phase 2 adds SQL/kv drivers and hybrid-mode wiring; MySQL/MongoDB adapters are available as optional advanced drivers; Phase 4 tightens redundancy targets, quarantine, and cross-ring audits.
 
 ## UX Baseline (to harden during Phase 1)
 - Clear entry points: CTA for “Verify with EU Wallet” and “Start debating” with copy that explains privacy (hash-only, no PII stored) and the natural-person exclusion principle when civic mode is on.
@@ -47,7 +47,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
 - Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
-- Persistence adapters (json/memory/sql/kv), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place; MySQL/MongoDB adapters are next on deck.
+- Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
 
@@ -58,7 +58,6 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Wire outbound transports (email/SMS) with delivery logs and opt-in enforcement using provider-local preferences.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
-- Add MySQL and MongoDB persistence adapters (drivers + config wiring).
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.

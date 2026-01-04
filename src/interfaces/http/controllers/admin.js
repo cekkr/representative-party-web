@@ -738,6 +738,8 @@ function buildAdminViewModel(
     dataAdapterMemory: dataConfig.adapter === 'memory' ? 'selected' : '',
     dataAdapterSql: dataConfig.adapter === 'sql' ? 'selected' : '',
     dataAdapterKv: dataConfig.adapter === 'kv' ? 'selected' : '',
+    dataAdapterMysql: dataConfig.adapter === 'mysql' ? 'selected' : '',
+    dataAdapterMongodb: dataConfig.adapter === 'mongodb' ? 'selected' : '',
     dataPreviewChecked: dataConfig.allowPreviews ? 'checked' : '',
     canonicalProfileSummary: describeCanonicalProfile(),
     providerFieldsValue: providerFieldsValueRendered,
