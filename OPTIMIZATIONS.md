@@ -35,6 +35,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
+- Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.

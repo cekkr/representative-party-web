@@ -122,6 +122,7 @@ npm run db:check
 - `npm test` runs the full `node:test` suite (including Puppeteer UI flows and P2P ring smoke tests) and spins up local servers on ad hoc ports with temp data files.
 - `npm run test:ui` runs the UI‑only Puppeteer flow for a stable CI entry point.
 - If headless Chrome fails in CI, set up the system dependencies or skip the UI suite.
+- External adapter tests are opt-in: set `TEST_MYSQL_URL` or `TEST_MONGO_URL` (plus optional `TEST_MYSQL_TABLE` / `TEST_MONGO_COLLECTION`) to exercise MySQL/MongoDB adapters.
 
 ### Defaults
 
