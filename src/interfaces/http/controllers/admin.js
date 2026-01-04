@@ -42,6 +42,7 @@ import {
 } from '../../../modules/federation/replication.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
 import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
+import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
 import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
 import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
 import {
@@ -57,6 +58,8 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
+
+const OUTBOUND_SUMMARY_LIMIT = 200;
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
   return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null } });
@@ -557,6 +560,8 @@ function buildAdminViewModel(
   const transactionSummariesList = renderTransactionSummariesList(
     filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),
   );
+  const outboundSummary = summarizeOutboundDeliveries(state, { limit: OUTBOUND_SUMMARY_LIMIT });
+  const outboundSummaryList = renderOutboundSummary(outboundSummary);
   const socialMediaList = renderSocialMediaList(state.socialMedia || []);
   const socialMediaCount = (state.socialMedia || []).length;
   const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
@@ -662,6 +667,8 @@ function buildAdminViewModel(
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
     transactionSummariesList,
+    outboundSummaryList,
+    outboundSummaryNote: `Summary of the most recent ${OUTBOUND_SUMMARY_LIMIT} outbound delivery attempts.`,
     socialMediaList,
     socialMediaCount,
     gossipPushSummary,
@@ -1479,6 +1486,29 @@ function renderTransactionsList(entries = []) {
       } <span class="muted">${time}</span></li>`;
     })
     .join('');
+  return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderOutboundSummary(summary = {}) {
+  const sampleSize = Number(summary.sampleSize || 0);
+  if (!sampleSize) {
+    return '<p class="muted small">No outbound delivery entries logged yet.</p>';
+  }
+  const delivered = Number(summary.delivered || 0);
+  const suppressed = Number(summary.suppressed || 0);
+  const email = summary.email || {};
+  const sms = summary.sms || {};
+  const lines = [
+    `Sample size: ${sampleSize}`,
+    `Delivered: ${delivered} · Suppressed: ${suppressed}`,
+    `Email attempts: ${Number(email.attempted || 0)} · delivered ${Number(email.delivered || 0)} · failed ${Number(
+      email.failed || 0,
+    )}`,
+    `SMS attempts: ${Number(sms.attempted || 0)} · delivered ${Number(sms.delivered || 0)} · failed ${Number(
+      sms.failed || 0,
+    )}`,
+  ];
+  const items = lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
   return `<ul class="stack small">${items}</ul>`;
 }
 

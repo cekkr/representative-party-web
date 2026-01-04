@@ -63,6 +63,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followList: renderFollowList(allFollows),
       feedList: renderSocialPosts(feed, { enableReplies: Boolean(person), followTypeByHash, mediaById }),
       followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts),
+      followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false }),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
@@ -512,14 +513,14 @@ export async function listRelationships({ req, res, state }) {
   });
 }
 
-function renderFollowTypeOptions(selectedType = '', counts = new Map()) {
+function renderFollowTypeOptions(selectedType = '', counts = new Map(), { includeCounts = true } = {}) {
   const normalized = selectedType ? normalizeFollowType(selectedType) : '';
   const extraTypes = [...counts.keys()].filter((type) => !DEFAULT_FOLLOW_TYPES.includes(type)).sort();
   const types = [...DEFAULT_FOLLOW_TYPES, ...extraTypes];
   return types.map((type) => {
     const selected = normalized === type ? ' selected' : '';
     const count = counts.get(type);
-    const label = Number.isFinite(count) && count > 0 ? `${type} (${count})` : type;
+    const label = includeCounts && Number.isFinite(count) && count > 0 ? `${type} (${count})` : type;
     return `<option value="${type}"${selected}>${label}</option>`;
   }).join('\n');
 }

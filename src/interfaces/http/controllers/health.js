@@ -3,6 +3,7 @@ import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
+import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
 import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
@@ -59,6 +60,9 @@ export function renderHealth({ res, state }) {
       count: state.transactions?.length || 0,
       summaries: filterVisibleEntries(state.transactionSummaries || [], state).length,
       recent: (state.transactions || []).slice(0, 5).map((t) => ({ id: t.id, type: t.type, digest: t.digest, at: t.createdAt })),
+    },
+    outbound: {
+      deliveries: summarizeOutboundDeliveries(state),
     },
   });
 }

@@ -1,6 +1,7 @@
 import { normalizeProviderFields } from '../structure/structureManager.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 import { logTransaction } from '../transactions/registry.js';
+import { filterVisibleEntries } from '../federation/replication.js';
 
 const defaultTransport = {
   async sendEmail({ to, subject, body }) {
@@ -81,6 +82,27 @@ export function resolveNotificationPreferences(state, { sessionId, handle } = {}
   };
 }
 
+export function summarizeOutboundDeliveries(state, { limit = 200 } = {}) {
+  const entries = filterVisibleEntries(state?.transactions || [], state)
+    .filter((entry) => entry?.type === 'outbound_delivery')
+    .slice(0, limit);
+  const summary = {
+    sampleSize: entries.length,
+    delivered: 0,
+    suppressed: 0,
+    email: { attempted: 0, delivered: 0, failed: 0 },
+    sms: { attempted: 0, delivered: 0, failed: 0 },
+  };
+  for (const entry of entries) {
+    const payload = entry?.payload || {};
+    if (payload.suppressed) summary.suppressed += 1;
+    if (payload.delivered) summary.delivered += 1;
+    tallyChannel(summary.email, payload.results || {}, 'email');
+    tallyChannel(summary.sms, payload.results || {}, 'sms');
+  }
+  return summary;
+}
+
 function findProviderAttributes(state, sessionId, handle) {
   const list = state.profileAttributes || [];
   if (sessionId) {
@@ -92,6 +114,16 @@ function findProviderAttributes(state, sessionId, handle) {
     if (match) return match;
   }
   return null;
+}
+
+function tallyChannel(target, results, key) {
+  if (!Object.prototype.hasOwnProperty.call(results, key)) return;
+  target.attempted += 1;
+  if (results[key]) {
+    target.delivered += 1;
+  } else {
+    target.failed += 1;
+  }
 }
 
 function readBooleanPreference(value, fallback) {

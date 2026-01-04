@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deliverOutbound } from '../src/modules/messaging/outbound.js';
+import { deliverOutbound, summarizeOutboundDeliveries } from '../src/modules/messaging/outbound.js';
 
 function buildState() {
   return {
@@ -56,4 +56,32 @@ test('outbound deliveries log channel results', async () => {
   assert.equal(entry.payload.delivered, true);
   assert.equal(entry.payload.channels.email, true);
   assert.equal(entry.payload.channels.sms, true);
+});
+
+test('outbound summary counts delivery outcomes by channel', async () => {
+  const state = buildState();
+  await deliverOutbound(state, {
+    contact: { email: 'test@example.com', sessionId: 's3', handle: 'h3' },
+    notification: { type: 'petition_comment', recipientHash: 'hash-3', message: 'Hello' },
+    transport: {
+      sendEmail: async () => false,
+    },
+  });
+  await deliverOutbound(state, {
+    contact: { notify: false, sessionId: 's4', handle: 'h4' },
+    notification: { type: 'petition_comment', recipientHash: 'hash-4', message: 'Hello' },
+    transport: {
+      sendEmail: async () => true,
+      sendSms: async () => true,
+    },
+  });
+
+  const summary = summarizeOutboundDeliveries(state);
+  assert.equal(summary.sampleSize, 2);
+  assert.equal(summary.delivered, 0);
+  assert.equal(summary.suppressed, 1);
+  assert.equal(summary.email.attempted, 1);
+  assert.equal(summary.email.delivered, 0);
+  assert.equal(summary.email.failed, 1);
+  assert.equal(summary.sms.attempted, 0);
 });

@@ -11,6 +11,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Add request-scoped memoization for common lookups (policy, actor labels, person/session) inside controllers.
 - Track incremental counts in state (discussions/petitions/groups) to avoid full scans when only counts are needed.
 - Add bounded list windows (e.g., keep latest N for discussions/social) with optional archive paging to limit memory growth.
+- Cache outbound delivery summaries instead of scanning the full transactions list on every `/admin` or `/health` render.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
