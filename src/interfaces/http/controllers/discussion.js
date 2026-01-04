@@ -12,6 +12,7 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
+import { recordRateLimit } from '../../../modules/ops/metrics.js';
 import { renderDiscussionList } from '../views/discussionView.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
@@ -51,6 +52,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'discussion_post', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'discussion_post');
     return sendRateLimit(res, {
       action: 'discussion_post',
       message: rateLimit.message,

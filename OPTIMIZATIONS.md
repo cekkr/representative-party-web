@@ -28,7 +28,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
 
 ## Observability
-- Add structured counters for rate-limit hits and module-disabled requests to surface in `/admin` and `/health`.
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
 
@@ -40,3 +39,4 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
 - Added `countVisibleEntries()` and switched status/home counts to use it.
+- Added in-memory counters for module-disabled requests and rate-limit hits, surfaced in `/admin` and `/health`.

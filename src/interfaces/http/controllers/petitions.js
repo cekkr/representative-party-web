@@ -25,6 +25,7 @@ import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
+import { recordRateLimit } from '../../../modules/ops/metrics.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -114,7 +115,7 @@ function renderSuggestions(person, state) {
 
 export async function submitPetition({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'petition');
@@ -124,6 +125,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'petition_draft', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'petition_draft');
     return sendRateLimit(res, {
       action: 'petition_draft',
       message: rateLimit.message,
@@ -207,7 +209,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
 
 export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'petition');
@@ -217,6 +219,7 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'petition_update', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'petition_update');
     return sendRateLimit(res, {
       action: 'petition_update',
       message: rateLimit.message,
@@ -289,10 +292,10 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
 
 export async function castVote({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   if (!isModuleEnabled(state, 'votes')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'votes' });
+    return sendModuleDisabledJson({ res, moduleKey: 'votes', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'vote');
@@ -375,7 +378,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'moderate');
@@ -435,7 +438,7 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
 
 export async function signPetitionRoute({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'vote');
@@ -460,7 +463,7 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
 
 export async function postPetitionComment({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'petitions' });
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
@@ -470,6 +473,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'petition_comment', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'petition_comment');
     return sendRateLimit(res, {
       action: 'petition_comment',
       message: rateLimit.message,

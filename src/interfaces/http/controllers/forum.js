@@ -13,6 +13,7 @@ import { sanitizeText } from '../../../shared/utils/text.js';
 import { renderForum } from '../views/forumView.js';
 import { renderPage } from '../views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
+import { recordRateLimit } from '../../../modules/ops/metrics.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial }) {
   return renderForumPage({ req, res, state, wantsPartial });
@@ -27,6 +28,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'forum_thread', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'forum_thread');
     return sendRateLimit(res, {
       action: 'forum_thread',
       message: rateLimit.message,
@@ -84,6 +86,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'forum_comment', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'forum_comment');
     return sendRateLimit(res, {
       action: 'forum_comment',
       message: rateLimit.message,

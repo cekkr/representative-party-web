@@ -1,0 +1,38 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { getMetricsSnapshot, recordModuleDisabled, recordRateLimit } from '../src/modules/ops/metrics.js';
+
+test('metrics snapshot defaults to empty buckets', () => {
+  const snapshot = getMetricsSnapshot({});
+  assert.equal(snapshot.moduleDisabled.total, 0);
+  assert.equal(snapshot.rateLimit.total, 0);
+  assert.deepEqual(snapshot.moduleDisabled.byModule, {});
+  assert.deepEqual(snapshot.rateLimit.byAction, {});
+});
+
+test('recordModuleDisabled increments totals and per-module counts', () => {
+  const state = {};
+  recordModuleDisabled(state, 'social');
+  recordModuleDisabled(state, 'social');
+  recordModuleDisabled(state, 'votes');
+
+  const snapshot = getMetricsSnapshot(state);
+  assert.equal(snapshot.moduleDisabled.total, 3);
+  assert.equal(snapshot.moduleDisabled.byModule.social, 2);
+  assert.equal(snapshot.moduleDisabled.byModule.votes, 1);
+  assert.ok(snapshot.moduleDisabled.lastAt);
+});
+
+test('recordRateLimit increments totals and per-action counts', () => {
+  const state = {};
+  recordRateLimit(state, 'discussion_post');
+  recordRateLimit(state, 'discussion_post');
+  recordRateLimit(state, 'petition_comment');
+
+  const snapshot = getMetricsSnapshot(state);
+  assert.equal(snapshot.rateLimit.total, 3);
+  assert.equal(snapshot.rateLimit.byAction.discussion_post, 2);
+  assert.equal(snapshot.rateLimit.byAction.petition_comment, 1);
+  assert.ok(snapshot.rateLimit.lastAt);
+});

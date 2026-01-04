@@ -4,6 +4,7 @@ import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '..
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
+import { getMetricsSnapshot } from '../../../modules/ops/metrics.js';
 import { sendJson } from '../../../shared/utils/http.js';
 
 export function renderHealth({ res, state }) {
@@ -64,6 +65,7 @@ export function renderHealth({ res, state }) {
     outbound: {
       deliveries: summarizeOutboundDeliveries(state),
     },
+    metrics: getMetricsSnapshot(state),
   });
 }
 

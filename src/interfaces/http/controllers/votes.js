@@ -9,7 +9,7 @@ import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function exportVotes({ res, state }) {
   if (!isModuleEnabled(state, 'votes')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'votes' });
+    return sendModuleDisabledJson({ res, moduleKey: 'votes', state });
   }
   const policy = getEffectivePolicy(state);
   const visibleVotes = filterVisibleEntries(state.votes, state);
@@ -19,10 +19,10 @@ export function exportVotes({ res, state }) {
 
 export async function gossipVotes({ req, res, state }) {
   if (!isModuleEnabled(state, 'votes')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'votes' });
+    return sendModuleDisabledJson({ res, moduleKey: 'votes', state });
   }
   if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+    return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
   const profile = getReplicationProfile(state);
   if (!isGossipEnabled(profile)) {

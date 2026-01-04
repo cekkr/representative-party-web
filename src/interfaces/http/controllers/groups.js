@@ -48,7 +48,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
 
 export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+    return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
   }
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
@@ -228,7 +228,7 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
 
 export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+    return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
   }
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
@@ -263,7 +263,7 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
 
 export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'groups' });
+    return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
   }
   const person = getPerson(req, state);
   const body = await readRequestBody(req);

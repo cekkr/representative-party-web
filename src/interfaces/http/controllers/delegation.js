@@ -16,7 +16,7 @@ import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function resolveConflict({ req, res, state }) {
   if (!isModuleEnabled(state, 'delegation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'delegation' });
+    return sendModuleDisabledJson({ res, moduleKey: 'delegation', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'delegate');
@@ -77,7 +77,7 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
 
 export async function updateDelegation({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'delegation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'delegation' });
+    return sendModuleDisabledJson({ res, moduleKey: 'delegation', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'delegate');

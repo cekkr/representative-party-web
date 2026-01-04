@@ -35,6 +35,7 @@ import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
+import { recordRateLimit } from '../../../modules/ops/metrics.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
@@ -76,7 +77,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
 
 export async function postSocialMessage({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
@@ -86,6 +87,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'social_post', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'social_post');
     return sendRateLimit(res, {
       action: 'social_post',
       message: rateLimit.message,
@@ -260,7 +262,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 
 export async function serveSocialMedia({ req, res, state, params }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const mediaId = params?.mediaId || '';
   const media = findMedia(state, mediaId);
@@ -346,7 +348,7 @@ export async function serveSocialMedia({ req, res, state, params }) {
 
 export async function reportSocialMedia({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const person = getPerson(req, state);
   if (!person) {
@@ -360,6 +362,7 @@ export async function reportSocialMedia({ req, res, state, wantsPartial, url }) 
   const actorKey = resolveRateLimitActor({ person, req });
   const rateLimit = consumeRateLimit(state, { key: 'social_media_report', actorKey });
   if (!rateLimit.allowed) {
+    recordRateLimit(state, 'social_media_report');
     return sendRateLimit(res, {
       action: 'social_media_report',
       message: rateLimit.message,
@@ -411,7 +414,7 @@ export async function reportSocialMedia({ req, res, state, wantsPartial, url }) 
 
 export async function followHandle({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const person = getPerson(req, state);
   if (!person) {
@@ -455,7 +458,7 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
 
 export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const person = getPerson(req, state);
   if (!person) {
@@ -493,7 +496,7 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
 
 export async function listRelationships({ req, res, state }) {
   if (!isModuleEnabled(state, 'social')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'social' });
+    return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
   const person = getPerson(req, state);
   const query = req.url ? new URL(req.url, `http://${req.headers.host}`) : null;

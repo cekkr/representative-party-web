@@ -156,11 +156,11 @@ function isDuplicateInbound(state, activityPub = {}) {
 
 function ensureActivityPubModules(state, res) {
   if (!isModuleEnabled(state, 'federation')) {
-    sendModuleDisabledJson({ res, moduleKey: 'federation' });
+    sendModuleDisabledJson({ res, moduleKey: 'federation', state });
     return false;
   }
   if (!isModuleEnabled(state, 'social')) {
-    sendModuleDisabledJson({ res, moduleKey: 'social' });
+    sendModuleDisabledJson({ res, moduleKey: 'social', state });
     return false;
   }
   return true;

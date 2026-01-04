@@ -21,7 +21,7 @@ export function exportTransactions({ res, state, url }) {
 
 export function exportTransactionsLedger({ res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+    return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
   const envelope = exportTransactionsEnvelope(state, { limit: 100 });
   return sendJson(res, 200, { envelope, replication: getReplicationProfile(state) });
@@ -29,7 +29,7 @@ export function exportTransactionsLedger({ res, state }) {
 
 export async function gossipTransactions({ req, res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
-    return sendModuleDisabledJson({ res, moduleKey: 'federation' });
+    return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
   const profile = getReplicationProfile(state);
   if (!isGossipEnabled(profile)) {

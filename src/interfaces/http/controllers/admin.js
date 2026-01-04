@@ -43,6 +43,7 @@ import {
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
 import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
+import { getMetricsSnapshot } from '../../../modules/ops/metrics.js';
 import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
 import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
 import {
@@ -562,6 +563,8 @@ function buildAdminViewModel(
   );
   const outboundSummary = summarizeOutboundDeliveries(state, { limit: OUTBOUND_SUMMARY_LIMIT });
   const outboundSummaryList = renderOutboundSummary(outboundSummary);
+  const metricsSnapshot = getMetricsSnapshot(state);
+  const metricsList = renderOpsMetrics(metricsSnapshot);
   const socialMediaList = renderSocialMediaList(state.socialMedia || []);
   const socialMediaCount = (state.socialMedia || []).length;
   const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
@@ -669,6 +672,8 @@ function buildAdminViewModel(
     transactionSummariesList,
     outboundSummaryList,
     outboundSummaryNote: `Summary of the most recent ${OUTBOUND_SUMMARY_LIMIT} outbound delivery attempts.`,
+    metricsList,
+    metricsNote: 'Counts reset on server restart.',
     socialMediaList,
     socialMediaCount,
     gossipPushSummary,
@@ -1510,6 +1515,34 @@ function renderOutboundSummary(summary = {}) {
   ];
   const items = lines.map((line) => `<li>${escapeHtml(line)}</li>`).join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function renderOpsMetrics(metrics = {}) {
+  const moduleDisabled = metrics.moduleDisabled || {};
+  const rateLimit = metrics.rateLimit || {};
+  const moduleTotal = Number(moduleDisabled.total || 0);
+  const rateTotal = Number(rateLimit.total || 0);
+  if (!moduleTotal && !rateTotal) {
+    return '<p class="muted small">No module-disabled or rate-limit events logged yet.</p>';
+  }
+  const lines = [
+    `Module-disabled total: ${moduleTotal}`,
+    `Rate-limit total: ${rateTotal}`,
+  ];
+  const moduleLines = formatMetricBreakdown(moduleDisabled.byModule || {}, 'module');
+  const rateLines = formatMetricBreakdown(rateLimit.byAction || {}, 'action');
+  const entries = [...lines, ...moduleLines, ...rateLines].map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+  return `<ul class="stack small">${entries}</ul>`;
+}
+
+function formatMetricBreakdown(map = {}, label) {
+  const items = Object.entries(map)
+    .map(([key, value]) => ({ key, value: Number(value || 0) }))
+    .filter((entry) => entry.value > 0)
+    .sort((a, b) => b.value - a.value || a.key.localeCompare(b.key))
+    .slice(0, 6);
+  if (!items.length) return [];
+  return items.map((entry) => `${label} ${entry.key}: ${entry.value}`);
 }
 
 function renderSocialMediaList(entries = []) {
