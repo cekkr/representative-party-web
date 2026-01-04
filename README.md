@@ -228,6 +228,7 @@ The persistence layer is intentionally storage‑agnostic.
 - `memory` (ephemeral)
 - `sql` (SQLite)
 - `kv` (single‑file KV JSON)
+- Planned: `mysql`, `mongodb`
 
 ### Modes
 - `DATA_MODE=centralized`: single provider store, no gossip writes/ingest
@@ -265,6 +266,7 @@ Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same previe
   - `DATA_PREVIEW` (`true|false`)
   - SQL: `DATA_SQLITE_URL` / `DATA_SQLITE_FILE`
   - KV: `DATA_KV_FILE`
+  - Planned adapters: `mysql`, `mongodb` (not wired yet)
 - Rate limits: per‑action overrides via `/admin` (stored in `settings.rateLimits`)
 - Social/media: `SOCIAL_MEDIA_MAX_BYTES` (default 10MB), `SOCIAL_MEDIA_REPORT_THRESHOLD` (default 3)
 
@@ -366,6 +368,7 @@ Adapter notes:
 - `adapters/sql.js` uses SQLite (`DATA_SQLITE_URL|FILE`, needs `sqlite3`).
 - `adapters/kv.js` stores everything in a single KV JSON file.
 - `src/infra/persistence/storage.js` routes through `src/infra/persistence/store.js` to pick the adapter.
+- MySQL and MongoDB adapters are planned (connection settings to be defined).
 
 ### Data management priorities
 
@@ -382,7 +385,7 @@ Adapter notes:
 ### Profiles
 
 - **Centralized profile**: `DATA_MODE=centralized` with any adapter; gossip is off (no ingest), all writes go to the chosen store. Best for single‑provider deployments and local dev. Back up `src/data/` (or the DB/KV file) regularly.
-- **Hybrid profile**: `DATA_MODE=hybrid` keeps a canonical adapter (JSON/SQL/KV) while accepting gossip for redundancy/audit. Pair with `DATA_VALIDATION_LEVEL=observe|strict` to decide if gossip is stored as preview or rejected; `DATA_PREVIEW=true` allows staging until validated. Control push/pull frequency with `GOSSIP_INTERVAL_SECONDS`.
+- **Hybrid profile**: `DATA_MODE=hybrid` keeps a canonical adapter (JSON/SQL/KV today; MySQL/MongoDB planned) while accepting gossip for redundancy/audit. Pair with `DATA_VALIDATION_LEVEL=observe|strict` to decide if gossip is stored as preview or rejected; `DATA_PREVIEW=true` allows staging until validated. Control push/pull frequency with `GOSSIP_INTERVAL_SECONDS`.
 - **P2P profile**: `DATA_MODE=p2p` treats gossip as primary, with an optional local cache. Combine with `DATA_PREVIEW=false` and `DATA_VALIDATION_LEVEL=strict` to only accept signed, validated envelopes. Peers listed in `/circle/peers` seed synchronization; replication logic lives in `src/modules/federation/replication.js`.
 
 ### Signing & provenance
