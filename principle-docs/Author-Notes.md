@@ -14,3 +14,4 @@ Check current project and source code status and apply performances and redundan
 
 REMEMBER TODOs:
 - Add data adapters for MySQL and MongoDB
+- Add to the roadmap the optional "invisible user provider" option: seen that user ID are unique for an entire circle indipendently by their provider, can be possible allowing to hide the user's provider even for the provider through certain P2P protocols.
