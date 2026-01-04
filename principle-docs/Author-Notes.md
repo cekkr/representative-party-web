@@ -9,4 +9,4 @@ Continue with other roadmap implementations (and improvements/fixes where needed
 
 Check-back pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
-Check current project and source code status and apply performances and redundancies optimizations on code and UX consistency. Then execute unit tests.
+Check current project and source code status and apply performances and redundancies optimizations on code and UX consistency. Then execute unit tests. Collect all possible future optimizations in file OPTIMIZATIONS.md
