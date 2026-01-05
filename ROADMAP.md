@@ -46,14 +46,14 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default, blockable after reports), gated by the same role/ban checks.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
-- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, evidence summaries + sources, comment fact-check flags, transactions log + gossip summaries, and admin controls.
+- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
 
 ## Near-term next steps (Phase 2 focus)
-- Deliberative workbench upgrades: structured proposal templates (evidence fields), argument mapping UI (pro/con trees), evidence/citation prompts, and community fact-check flags.
+- Deliberative workbench upgrades: structured proposal templates (evidence fields), argument mapping UI (pro/con trees, building on stance tags), evidence/citation prompts, and community fact-check flags.
 - Governance module: digital constitution for quorum/debate/voting-method parameters with a community proposal/change workflow and audit trail.
 - Delegation trust UX: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
@@ -87,7 +87,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection, and vote-mode recommendations should prefer the latest closed election winner.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
-- **Deliberative workbench**: structured proposal templates with evidence fields, collaborative drafting upgrades, argument mapping UI, and evidence/citation prompts with community fact-check flags.
+- **Deliberative workbench**: structured proposal templates with evidence fields, collaborative drafting upgrades, argument mapping UI (building on stance tags), and evidence/citation prompts with community fact-check flags.
 - **Governance module**: digital constitution for quorum/debate windows/voting-method defaults, with community proposals, audits, and admin emergency overrides.
 - **Delegation trust UX**: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
 - **Topics/Taxonomy**: reinforce dynamic topics + anchors with clearer stewardship cues and topic history context across deliberation surfaces.

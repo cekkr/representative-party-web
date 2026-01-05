@@ -26,6 +26,7 @@ import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
+import { normalizeCommentStance } from '../../../modules/petitions/commentStance.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -504,6 +505,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);
   const content = sanitizeText(body.content || '', 800);
+  const stance = normalizeCommentStance(body.stance || '');
   const factCheck = parseBoolean(body.factCheck, false);
   if (!petitionId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
@@ -528,7 +530,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     topic: petition.topic || 'general',
     topicId,
     topicPath,
-    stance: 'comment',
+    stance,
     content,
     factCheck: Boolean(factCheck),
     authorHash: person?.pidHash || 'anonymous',
@@ -541,7 +543,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     type: 'petition_comment',
     actorHash: person?.pidHash || 'anonymous',
     petitionId,
-    payload: { petitionId, factCheck: Boolean(factCheck) },
+    payload: { petitionId, stance, factCheck: Boolean(factCheck) },
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });

@@ -1,4 +1,9 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import {
+  getCommentStanceLabel,
+  listCommentStances,
+  normalizeCommentStance,
+} from '../../../modules/petitions/commentStance.js';
 import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderPetitionList(
@@ -293,15 +298,23 @@ function renderDiscussionBlock(petition, comments) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
   const discussionList = renderPetitionComments(comments);
+  const stanceSummary = renderCommentStanceSummary(comments);
   return `
     <details class="note">
       <summary>Discussion (${count})</summary>
+      ${stanceSummary ? `<p class="muted small">${escapeHtml(stanceSummary)}</p>` : ''}
       ${
         disabled
           ? '<p class="muted small">Discussion closed.</p>'
           : `
       <form class="stack" method="post" action="/petitions/comment" data-enhance="petitions">
         <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+        <label class="field">
+          <span>Comment type</span>
+          <select name="stance">
+            ${renderCommentStanceOptions('comment')}
+          </select>
+        </label>
         <label class="field">
           <span>Comment</span>
           <textarea name="content" rows="2" placeholder="Add a discussion note" required></textarea>
@@ -327,11 +340,13 @@ function renderPetitionComments(comments) {
   }
   return comments
     .map((comment) => {
+      const stanceLabel = getCommentStanceLabel(comment.stance);
+      const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill ghost">Comment</span>
+            ${stancePill}
             ${factCheckPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
@@ -355,12 +370,15 @@ export function renderProposalDiscussionFeed(items) {
       const snippet = (comment.content || '').slice(0, 180);
       const anchorId = petition?.id ? `petition-${petition.id}` : null;
       const permalink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
+      const stanceLabel = getCommentStanceLabel(comment.stance);
+      const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
             <span class="pill ghost">Proposal</span>
+            ${stancePill}
             ${factCheckPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
@@ -416,6 +434,33 @@ function getLastCommentAt(comments) {
     }
   }
   return latest ? new Date(latest).toLocaleString() : '';
+}
+
+function renderCommentStanceOptions(selected = 'comment') {
+  const normalized = normalizeCommentStance(selected);
+  return listCommentStances()
+    .map((entry) => {
+      const isSelected = entry.value === normalized ? 'selected' : '';
+      return `<option value="${escapeHtml(entry.value)}" ${isSelected}>${escapeHtml(entry.label)}</option>`;
+    })
+    .join('');
+}
+
+function renderCommentStanceSummary(comments) {
+  if (!comments.length) return '';
+  const counts = { support: 0, concern: 0, question: 0, comment: 0 };
+  for (const comment of comments) {
+    const key = normalizeCommentStance(comment?.stance);
+    if (counts[key] !== undefined) {
+      counts[key] += 1;
+    }
+  }
+  const parts = [];
+  if (counts.support) parts.push(`Support ${counts.support}`);
+  if (counts.concern) parts.push(`Concern ${counts.concern}`);
+  if (counts.question) parts.push(`Question ${counts.question}`);
+  if (counts.comment) parts.push(`Notes ${counts.comment}`);
+  return parts.join(' · ');
 }
 
 function renderUpdatedMeta(petition) {
