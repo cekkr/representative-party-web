@@ -1,5 +1,7 @@
 # Representative Party Web Framework
 
+**Repo moved: [https://codeberg.org/eparty/party-web](https://codeberg.org/eparty/party-web)**
+
 A **messaging‑first “Party Circle” kernel** for civic and political organizations that want deliberation and representation *without* turning identity into a surveillance problem.
 
 This repository is a Node.js SSR application that starts as a usable discussion + notification network, then lets you progressively enable higher‑stakes modules (petitions, votes, delegation, federation) as your policy and governance mature. The identity layer is designed around **blinded uniqueness**: the server can enforce **one natural person = one voice** **without storing raw PII**.
