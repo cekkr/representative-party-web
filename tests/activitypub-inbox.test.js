@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fetchText, postForm, postJson } from './helpers/http.js';
+import { fetchJson, fetchText, postForm, postJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { buildActivityPubCreateNote } from './helpers/activitypub.js';
 
@@ -29,6 +29,11 @@ test('ActivityPub inbox stores preview notes when previews allowed', { timeout: 
 
   const { text } = await fetchText(`${server.baseUrl}/social/feed`);
   assert.ok(text.includes(content));
+
+  const { payload: health } = await fetchJson(`${server.baseUrl}/health`);
+  const peerEntry = findPeerEntry(health, 'remote.example');
+  assert.ok(peerEntry);
+  assert.ok(peerEntry.successes >= 1);
 });
 
 test('ActivityPub inbox blocks previews when preview storage is disabled', { timeout: 60000 }, async (t) => {
@@ -66,6 +71,11 @@ test('ActivityPub inbox rejects policy mismatches', { timeout: 60000 }, async (t
   const body = await response.json();
   assert.equal(response.status, 409);
   assert.equal(body.error, 'policy_mismatch');
+
+  const { payload: health } = await fetchJson(`${server.baseUrl}/health`);
+  const peerEntry = findPeerEntry(health, 'remote.example');
+  assert.ok(peerEntry);
+  assert.equal(peerEntry.lastFailureReason, 'activitypub_policy_mismatch');
 });
 
 test('ActivityPub inbox respects social module toggles', { timeout: 60000 }, async (t) => {
@@ -90,3 +100,12 @@ test('ActivityPub inbox respects social module toggles', { timeout: 60000 }, asy
   assert.equal(body.error, 'module_disabled');
   assert.equal(body.module, 'social');
 });
+
+function findPeerEntry(healthPayload, peerKey) {
+  const entries = healthPayload?.gossip?.peerHealth?.entries || [];
+  return (
+    entries.find((entry) => entry.peer === peerKey) ||
+    entries.find((entry) => entry.peer && entry.peer.includes(peerKey)) ||
+    null
+  );
+}
