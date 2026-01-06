@@ -2,6 +2,7 @@ import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, norma
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
+import { getGovernanceSettings, normalizeGovernanceSettings } from '../../../modules/governance/constitution.js';
 import {
   appendTopicHistory,
   applyTopicMerge,
@@ -96,6 +97,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'ops-metrics') {
     const result = await updateOpsMetrics(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
+  if (intent === 'governance') {
+    const result = await updateGovernance(state, body);
     return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'media-moderate') {
@@ -354,6 +359,101 @@ async function updateOpsMetrics(state, body) {
   };
 }
 
+async function updateGovernance(state, body) {
+  const prev = getGovernanceSettings(state);
+  const quorumInput = sanitizeText(body.governanceQuorumDefault || '', 12);
+  const discussionInput = sanitizeText(body.governanceDiscussionWindowDays || '', 12);
+  const voteInput = sanitizeText(body.governanceVoteWindowDays || '', 12);
+  const reviewInput = sanitizeText(body.governanceReviewWindowHours || '', 12);
+  const methodInput = sanitizeText(body.governanceVoteMethod || prev.defaultVoteMethod || '', 32).toLowerCase();
+  const notesInput = sanitizeText(body.governanceNotes || '', 400);
+
+  const quorumResult = normalizeNumericInput(quorumInput, {
+    fallback: prev.quorumDefault,
+    min: 0,
+    max: 100000,
+    label: 'Default quorum',
+  });
+  const discussionResult = normalizeNumericInput(discussionInput, {
+    fallback: prev.discussionWindowDays,
+    min: 0,
+    max: 365,
+    label: 'Discussion window days',
+  });
+  const voteResult = normalizeNumericInput(voteInput, {
+    fallback: prev.voteWindowDays,
+    min: 0,
+    max: 365,
+    label: 'Vote window days',
+  });
+  const reviewResult = normalizeNumericInput(reviewInput, {
+    fallback: prev.reviewWindowHours,
+    min: 0,
+    max: 168,
+    label: 'Review window hours',
+  });
+
+  const draft = normalizeGovernanceSettings({
+    ...prev,
+    quorumDefault: quorumResult.value ?? prev.quorumDefault,
+    discussionWindowDays: discussionResult.value ?? prev.discussionWindowDays,
+    voteWindowDays: voteResult.value ?? prev.voteWindowDays,
+    reviewWindowHours: reviewResult.value ?? prev.reviewWindowHours,
+    defaultVoteMethod: methodInput || prev.defaultVoteMethod,
+    notes: notesInput,
+  });
+
+  const errors = [
+    ...quorumResult.errors,
+    ...discussionResult.errors,
+    ...voteResult.errors,
+    ...reviewResult.errors,
+  ];
+  if (methodInput && methodInput !== draft.defaultVoteMethod) {
+    errors.push('Default vote method must be one of: majority, approval, ranked, condorcet, star.');
+  }
+
+  if (errors.length) {
+    return {
+      flash: 'Governance settings not updated.',
+      governanceErrors: renderValidationErrors(errors, { title: 'Governance settings' }),
+      governanceQuorumDefaultValue: quorumInput || String(prev.quorumDefault),
+      governanceDiscussionWindowDaysValue: discussionInput || String(prev.discussionWindowDays),
+      governanceVoteWindowDaysValue: voteInput || String(prev.voteWindowDays),
+      governanceReviewWindowHoursValue: reviewInput || String(prev.reviewWindowHours),
+      governanceVoteMethodValue: methodInput || prev.defaultVoteMethod,
+      governanceNotesValue: notesInput || prev.notes,
+    };
+  }
+
+  const now = new Date().toISOString();
+  const next = {
+    ...draft,
+    updatedAt: now,
+    updatedBy: 'admin',
+  };
+
+  state.settings = {
+    ...(state.settings || {}),
+    governance: next,
+  };
+  recordAdminAudit(state, {
+    action: 'governance.update',
+    summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod}`,
+  });
+  await persistSettings(state);
+
+  return {
+    flash: 'Governance settings updated.',
+    governanceQuorumDefaultValue: String(next.quorumDefault),
+    governanceDiscussionWindowDaysValue: String(next.discussionWindowDays),
+    governanceVoteWindowDaysValue: String(next.voteWindowDays),
+    governanceReviewWindowHoursValue: String(next.reviewWindowHours),
+    governanceVoteMethodValue: next.defaultVoteMethod,
+    governanceNotesValue: next.notes,
+  };
+}
+
 async function updateSession(state, body) {
   const sessionId = sanitizeText(body.sessionId || '', 72);
   const defaultRole = resolveDefaultActorRole(state);
@@ -574,6 +674,13 @@ function buildAdminViewModel(
     opsMetricsErrors,
     opsMetricsIntervalValue,
     opsMetricsRetentionValue,
+    governanceErrors,
+    governanceQuorumDefaultValue,
+    governanceDiscussionWindowDaysValue,
+    governanceVoteWindowDaysValue,
+    governanceReviewWindowHoursValue,
+    governanceVoteMethodValue,
+    governanceNotesValue,
   } = {},
 ) {
   const policy = getCirclePolicyState(state);
@@ -659,9 +766,9 @@ function buildAdminViewModel(
   const gossipPullDisabledAttr = gossipAllowed ? '' : 'disabled';
   const peerHealth = listPeerHealth(state);
   const peerHealthList = renderPeerHealthList(peerHealth);
-    const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);
-    const peerHealthCount = Object.keys(peerHealth || {}).length;
-    const peerHealthResetDisabledAttr = peerHealthCount ? '' : 'disabled';
+  const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);
+  const peerHealthCount = Object.keys(peerHealth || {}).length;
+  const peerHealthResetDisabledAttr = peerHealthCount ? '' : 'disabled';
   const rateLimitOverrides = rateLimitOverridesValue ?? formatRateLimitOverrides(state.settings?.rateLimits || {});
   const rateLimitDefaults = renderRateLimitDefaults(DEFAULT_RATE_LIMITS);
   const rateLimitErrorsRendered = rateLimitErrors || '';
@@ -672,6 +779,15 @@ function buildAdminViewModel(
   const opsRetentionValue =
     opsMetricsRetentionValue ??
     String(opsMetricsConfig.retentionHours || state.settings?.opsMetrics?.retentionHours || '');
+  const governance = getGovernanceSettings(state);
+  const governanceErrorsRendered = governanceErrors || '';
+  const governanceQuorumDefault = governanceQuorumDefaultValue ?? String(governance.quorumDefault);
+  const governanceDiscussionWindowDays = governanceDiscussionWindowDaysValue ?? String(governance.discussionWindowDays);
+  const governanceVoteWindowDays = governanceVoteWindowDaysValue ?? String(governance.voteWindowDays);
+  const governanceReviewWindowHours = governanceReviewWindowHoursValue ?? String(governance.reviewWindowHours);
+  const governanceVoteMethod = governanceVoteMethodValue ?? governance.defaultVoteMethod;
+  const governanceNotes = governanceNotesValue ?? governance.notes;
+  const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
 
   return {
     circleName: effective.circleName,
@@ -778,6 +894,18 @@ function buildAdminViewModel(
     opsMetricsIntervalValue: opsIntervalValue,
     opsMetricsRetentionValue: opsRetentionValue,
     opsMetricsErrors: opsMetricsErrors || '',
+    governanceErrors: governanceErrorsRendered,
+    governanceQuorumDefault,
+    governanceDiscussionWindowDays,
+    governanceVoteWindowDays,
+    governanceReviewWindowHours,
+    governanceVoteMethodMajority: governanceVoteMethod === 'majority' ? 'selected' : '',
+    governanceVoteMethodApproval: governanceVoteMethod === 'approval' ? 'selected' : '',
+    governanceVoteMethodRanked: governanceVoteMethod === 'ranked' ? 'selected' : '',
+    governanceVoteMethodCondorcet: governanceVoteMethod === 'condorcet' ? 'selected' : '',
+    governanceVoteMethodStar: governanceVoteMethod === 'star' ? 'selected' : '',
+    governanceNotes,
+    governanceUpdatedAt,
   };
 }
 

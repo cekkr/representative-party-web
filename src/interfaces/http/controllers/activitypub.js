@@ -2,9 +2,10 @@ import { sendJson, sendNotFound } from '../../../shared/utils/http.js';
 import { deriveBaseUrl, readRequestBody } from '../../../shared/utils/request.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { persistSocialPosts } from '../../../infra/persistence/storage.js';
+import { persistSettings, persistSocialPosts } from '../../../infra/persistence/storage.js';
 import { createSocialNote, wrapCreateActivity, buildInboundSocialPost } from '../../../modules/federation/activitypub.js';
 import { filterVisibleEntries } from '../../../modules/federation/replication.js';
+import { recordPeerFailure, recordPeerSuccess } from '../../../modules/federation/quarantine.js';
 import { findSessionByHash } from '../../../modules/identity/sessions.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
@@ -25,6 +26,11 @@ export async function inbox({ req, res, state }) {
   const policy = getEffectivePolicy(state);
   const result = buildInboundSocialPost({ state, payload: body, baseUrl, policy });
   if (result.error) {
+    const peerKey = result.peerHint && result.peerHint !== 'remote' ? result.peerHint : null;
+    if (peerKey && (result.error === 'policy_mismatch' || result.error === 'policy_version_mismatch')) {
+      const updated = recordPeerFailure(state, peerKey, { reason: `activitypub_${result.error}` }).updated;
+      if (updated) await persistSettings(state);
+    }
     return sendJson(res, result.statusCode || 400, {
       error: result.error,
       message: result.detail || 'Inbound ActivityPub payload rejected.',
@@ -34,6 +40,11 @@ export async function inbox({ req, res, state }) {
   const { entry } = result;
   if (!entry) {
     return sendJson(res, 400, { error: 'invalid_payload', message: 'Inbound ActivityPub payload missing content.' });
+  }
+  const peerKey = result.peerHint && result.peerHint !== 'remote' ? result.peerHint : null;
+  if (peerKey) {
+    const updated = recordPeerSuccess(state, peerKey).updated;
+    if (updated) await persistSettings(state);
   }
   if (isDuplicateInbound(state, entry.activityPub)) {
     return sendJson(res, 202, { status: 'duplicate', objectId: entry.activityPub?.objectId || null });

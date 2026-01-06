@@ -113,13 +113,17 @@ function renderDelegationList(delegations = []) {
   const items = delegations
     .map((entry) => {
       const createdAt = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+      const delegateHash = escapeHtml(entry.delegateHash || 'unknown');
+      const profileLink = entry.delegateHash
+        ? `<a class="muted tiny" href="/delegates/${delegateHash}" data-partial>Profile</a>`
+        : '';
       const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
       const issuerPill = renderIssuerPill(entry);
       return `
         <div class="list-row">
           <div>
             <p class="small">${escapeHtml(entry.topic || 'general')}</p>
-            <p class="muted tiny">delegate ${escapeHtml(entry.delegateHash)}</p>
+            <p class="muted tiny">delegate ${delegateHash}${profileLink ? ` · ${profileLink}` : ''}</p>
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(entry.provider || 'manual')}</span>
@@ -189,6 +193,9 @@ function renderSuggestionRow({ suggestion, topicKey, chosen }) {
   const isChosen = chosen && chosen.delegateHash === suggestion.delegateHash;
   const meta = formatSuggestionMeta(suggestion);
   const chosenPill = isChosen ? '<span class="pill">Chosen</span>' : '';
+  const profileLink = suggestion.delegateHash
+    ? `<a class="ghost" href="/delegates/${escapeHtml(suggestion.delegateHash)}" data-partial>Profile</a>`
+    : '';
   return `
     <div class="list-row">
       <div>
@@ -197,6 +204,7 @@ function renderSuggestionRow({ suggestion, topicKey, chosen }) {
       </div>
       <div>
         ${chosenPill}
+        ${profileLink}
         <form class="form-inline" method="post" action="/delegation/conflict" data-enhance="delegation-conflict">
           <input type="hidden" name="topic" value="${escapeHtml(topicKey)}" />
           <input type="hidden" name="delegateHash" value="${escapeHtml(suggestion.delegateHash)}" />

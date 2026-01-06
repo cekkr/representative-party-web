@@ -27,6 +27,7 @@ import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGat
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
 import { normalizeCommentStance } from '../../../modules/petitions/commentStance.js';
+import { getGovernanceSettings } from '../../../modules/governance/constitution.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -57,6 +58,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const petitions = filterVisibleEntries(state.petitions, state);
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
+  const governance = getGovernanceSettings(state);
   const query = url || new URL(req.url, `http://${req.headers.host}`);
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
   const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
@@ -84,6 +86,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       conflictList: delegationEnabled ? conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected' : 'Delegation disabled.',
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
+      quorumDefault: governance.quorumDefault,
       discussionFeed: renderProposalDiscussionFeed(discussionFeedItems),
       stageFilterOptions,
     },
@@ -158,6 +161,9 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
 
   const createdAt = new Date().toISOString();
   const petitionId = randomUUID();
+  const governance = getGovernanceSettings(state);
+  const quorumInput = body.quorum === undefined || body.quorum === '' ? Number.NaN : Number(body.quorum);
+  const quorum = Number.isFinite(quorumInput) ? quorumInput : governance.quorumDefault;
   const petition = {
     id: petitionId,
     title,
@@ -175,7 +181,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     updatedAt: createdAt,
     updatedBy: person?.pidHash || 'anonymous',
     status: 'draft',
-    quorum: Number(body.quorum || 0),
+    quorum,
     topic,
     topicId: topicResult.topic?.id || null,
     topicPath,

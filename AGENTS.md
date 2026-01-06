@@ -66,6 +66,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - `/extensions` (GET/POST) to list and toggle extension modules without env changes.
 - `/notifications` (GET) list internal notifications; `/notifications/read` marks all read; `/notifications/preferences` stores per-user alert toggles (proposal comments).
 - `/forum` (GET/POST) publish articles; `/forum/comment` post comments.
+- `/governance` (GET) shows constitution defaults; `/delegates/{hash}` (GET) shows delegate profiles.
 - `/groups` (GET/POST) list/create/join groups; `/groups/delegate` set group-level preferred delegates.
 - `/delegation` (GET/POST) manage manual delegation preferences; `/delegation/conflict` resolve delegation conflicts by user choice.
 - `/groups` actions also start/close/vote delegate elections per topic.
@@ -85,6 +86,8 @@ This file captures the essential implementation directives. Keep it in sync with
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
 - Ops cues: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status, peer health reset actions, recent transactions, and inbound transaction summaries for audit snapshots; `/health` includes peer health summaries plus vote/transactions gossip added/updated counts for ops dashboards.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, structured outline fields, collaborative revisions + version history, revision diffs, evidence summaries + sources, stance-tagged discussion notes + fact-check flags, argument-map linking, quorum → discussion (or admin-configured vote), pre-vote freeze, and vote tallies; UI surfaces gate errors per role and stage cues.
+- Governance defaults: admin-managed constitution baseline (quorum, discussion/vote windows, vote method) surfaced at `/governance`; community proposal workflow remains pending.
+- Delegation trust UX: delegate profile views show delegation counts, vote history, and group endorsements; optional public bios live in provider-local `publicBio` profile fields.
 - Extension manifest: `/extensions` surfaces available modules + metadata; toggles persist to settings, reloading extensions at runtime.
 - Module toggles: `/admin` lets operators disable optional modules (petitions/votes/delegation/groups/federation/topic gardener/social) for messaging-only deployments; navigation and endpoints honor the settings to avoid dead ends.
 - Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.

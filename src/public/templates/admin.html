@@ -153,6 +153,59 @@
 </section>
 
 <section class="panel">
+  <p class="eyebrow">Governance</p>
+  <h2>Digital constitution defaults</h2>
+  <p class="muted small">These defaults inform proposal quorum and stage timing. Community proposal workflows are forthcoming.</p>
+  <p class="muted small">Last updated: {{governanceUpdatedAt}}</p>
+  {{governanceErrors}}
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="governance" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Default quorum</span>
+        <input name="governanceQuorumDefault" type="number" min="0" value="{{governanceQuorumDefault}}" />
+      </label>
+      <label class="field">
+        <span>Default vote method</span>
+        <select name="governanceVoteMethod">
+          <option value="majority" {{governanceVoteMethodMajority}}>majority</option>
+          <option value="approval" {{governanceVoteMethodApproval}}>approval</option>
+          <option value="ranked" {{governanceVoteMethodRanked}}>ranked</option>
+          <option value="condorcet" {{governanceVoteMethodCondorcet}}>condorcet</option>
+          <option value="star" {{governanceVoteMethodStar}}>star</option>
+        </select>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Discussion window (days)</span>
+        <input name="governanceDiscussionWindowDays" type="number" min="0" value="{{governanceDiscussionWindowDays}}" />
+      </label>
+      <label class="field">
+        <span>Vote window (days)</span>
+        <input name="governanceVoteWindowDays" type="number" min="0" value="{{governanceVoteWindowDays}}" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Review window (hours)</span>
+        <input name="governanceReviewWindowHours" type="number" min="0" value="{{governanceReviewWindowHours}}" />
+      </label>
+      <div class="stack">
+        <p class="muted small">Review window notes inform the pre-vote freeze check.</p>
+      </div>
+    </div>
+    <label class="field">
+      <span>Governance notes</span>
+      <textarea name="governanceNotes" rows="3" placeholder="Document constitution intent">{{governanceNotes}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Save governance defaults</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel">
   <p class="eyebrow">Topics</p>
   <h2>Topic gardener review</h2>
   <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>

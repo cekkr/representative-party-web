@@ -48,14 +48,16 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
 - Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags, argument-map linking, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
+- Governance defaults (quorum, timing windows, vote method) are editable in `/admin` and published at `/governance`.
+- Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
 
 ## Near-term next steps (Phase 2 focus)
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; remaining work includes richer pro/con trees, evidence/citation prompts, and community fact-check workflows.
-- Governance module: digital constitution for quorum/debate/voting-method parameters with a community proposal/change workflow and audit trail.
-- Delegation trust UX: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
+- Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
+- Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).

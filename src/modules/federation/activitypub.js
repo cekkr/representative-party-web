@@ -61,22 +61,23 @@ export function buildInboundSocialPost({ state, payload, baseUrl, policy } = {})
   if (!normalized) {
     return { error: 'unsupported_activity', statusCode: 400 };
   }
+  const actorId = normalized.actorId || '';
+  const peerHint = actorId ? deriveIssuer(actorId) : '';
   const policyCheck = validatePolicy(policy, normalized.policy);
   if (!policyCheck.ok) {
-    return { error: policyCheck.error, statusCode: 409, detail: policyCheck.detail };
+    return { error: policyCheck.error, statusCode: 409, detail: policyCheck.detail, peerHint };
   }
   const profile = getReplicationProfile(state);
   const decision = decideStatus(profile, 'preview');
   if (decision.status === 'rejected') {
-    return { error: 'preview_blocked', statusCode: 202 };
+    return { error: 'preview_blocked', statusCode: 202, peerHint };
   }
 
   const content = sanitizeText(normalized.content || '', MAX_NOTE_LENGTH);
   if (!content) {
-    return { error: 'missing_content', statusCode: 400 };
+    return { error: 'missing_content', statusCode: 400, peerHint };
   }
 
-  const actorId = normalized.actorId || '';
   const authorHandle = deriveActorHandle(actorId) || 'remote';
   const authorHash = hashActorId(actorId || normalized.objectId || content);
   const issuer = deriveIssuer(actorId);
@@ -88,6 +89,7 @@ export function buildInboundSocialPost({ state, payload, baseUrl, policy } = {})
       error: 'direct_not_local',
       statusCode: 202,
       detail: 'Direct ActivityPub note not addressed to a local actor.',
+      peerHint,
     };
   }
 
@@ -121,7 +123,7 @@ export function buildInboundSocialPost({ state, payload, baseUrl, policy } = {})
     },
   });
 
-  return { entry, normalized };
+  return { entry, normalized, peerHint };
 }
 
 function normalizeInboundPayload(payload) {

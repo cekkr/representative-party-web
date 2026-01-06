@@ -300,9 +300,12 @@ function renderGroupList(groups, person, state) {
       const delegates = (group.delegates || [])
         .map((d) => {
           const topic = escapeHtml(String(d.topic || 'general'));
-          const delegate = escapeHtml(String(d.delegateHash || 'unknown'));
+          const delegateHash = escapeHtml(String(d.delegateHash || 'unknown'));
+          const delegateLink = d.delegateHash
+            ? `<a href="/delegates/${delegateHash}" data-partial>${delegateHash}</a>`
+            : delegateHash;
           const priority = Number(d.priority) || 0;
-          return `<li>${topic} → ${delegate} (prio ${priority})</li>`;
+          return `<li>${topic} → ${delegateLink} (prio ${priority})</li>`;
         })
         .join('');
       const elections = renderElections(group.elections || [], person, state);

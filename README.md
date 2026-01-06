@@ -49,10 +49,12 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Petitions → votes pipeline**: proposals with evidence summaries + source links, structured outline fields (problem/action/impact/risks/plan), collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed with stance tags (support/concern/question) + fact‑check flags, and argument‑map linking for pro/con trees.
+- **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with a public read-only view.
 - **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions with history diff previews.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
+- **Delegate profiles**: view delegation counts, vote history, and group endorsements (optional `publicBio` profile field).
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
 - **Peer ledger audits**: peer health tracks last ledger hash snapshots (match/mismatch) in `/admin` and `/health`.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
@@ -135,6 +137,8 @@ npm run db:check
 - `/auth/eudi` start verification, `/auth/callback` return
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
 - `/profile` (provider‑local profile attributes editor)
+- `/governance` (public constitution defaults)
+- `/delegates/{hash}` (delegate profile summary)
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
 - `/admin` settings, policy toggles, rate‑limit overrides, and audit summaries; `/extensions` extension toggles
@@ -168,6 +172,7 @@ npm run db:check
 - **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
 - **Delegation**: topic‑scoped delegation with conflict resolution UI.
 - **Groups/elections**: group‑level delegate preferences and elections (advisory by design, with optional conflict prompts); in `electionMode=vote`, recommendations prefer the latest closed election winner.
+- **Governance defaults**: admin-set constitution settings surfaced under `/governance` (community proposal workflow pending).
 - **Topics & gardener**: dynamic topic labeling with admin review (rename/merge/split + anchor promotion/archival suggestions).
 
 ### Circle & federation scaffolding

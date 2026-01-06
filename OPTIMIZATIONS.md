@@ -16,6 +16,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache petition discussion stance counts (support/concern/question/note) to avoid recomputing summaries on every render.
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
+- Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.

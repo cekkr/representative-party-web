@@ -16,6 +16,7 @@ import {
 } from '../interfaces/http/controllers/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../interfaces/http/controllers/forum.js';
 import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../interfaces/http/controllers/groups.js';
+import { renderGovernance } from '../interfaces/http/controllers/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
 import { renderHome } from '../interfaces/http/controllers/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
@@ -23,6 +24,7 @@ import { getExtensions, toggleExtension } from '../interfaces/http/controllers/e
 import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../interfaces/http/controllers/notifications.js';
 import { renderProfile, updateProfileAttributes } from '../interfaces/http/controllers/profile.js';
 import { renderDelegation, resolveConflict, updateDelegation } from '../interfaces/http/controllers/delegation.js';
+import { renderDelegateProfile } from '../interfaces/http/controllers/delegates.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
   renderSocialFeed,
@@ -46,6 +48,7 @@ const routes = [
   { method: 'GET', path: '/forum', action: renderForumRoute },
   { method: 'POST', path: '/forum', action: postThread },
   { method: 'POST', path: '/forum/comment', action: postComment },
+  { method: 'GET', path: '/governance', action: renderGovernance },
   { method: 'GET', path: '/petitions', action: renderPetitions },
   { method: 'POST', path: '/petitions', action: submitPetition },
   { method: 'POST', path: '/petitions/update', action: updatePetitionDraft },
@@ -87,6 +90,16 @@ const routes = [
   { method: 'GET', path: '/delegation', action: renderDelegation },
   { method: 'POST', path: '/delegation', action: updateDelegation },
   { method: 'POST', path: '/delegation/conflict', action: resolveConflict },
+  {
+    method: 'GET',
+    prefix: '/delegates/',
+    buildParams: (pathname) => {
+      const segments = pathname.split('/').filter(Boolean);
+      return { hash: segments[segments.length - 1] || '' };
+    },
+    action: ({ req, res, state, wantsPartial, params }) =>
+      renderDelegateProfile({ req, res, state, wantsPartial, params }),
+  },
   { method: 'GET', path: '/votes/ledger', action: exportVotes },
   { method: 'POST', path: '/votes/gossip', action: gossipVotes },
   { method: 'GET', path: '/extensions', action: getExtensions },
