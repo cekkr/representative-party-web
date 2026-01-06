@@ -20,11 +20,9 @@ npm i puppeteer
 ## Example usage: `examples/run.js`
 
 ```js
-'use strict';
-
-const fs = require('fs');
-const puppeteer = require('puppeteer');
-const { captureViewport, renderAsText, renderAsHtml, act } = require('../index');
+import fs from 'node:fs';
+import puppeteer from 'puppeteer';
+import { captureViewport, renderAsText, renderAsHtml, act } from '../index.js';
 
 /**
  * This example demonstrates the intended agent loop:
@@ -144,7 +142,7 @@ Example command schema:
 Use locator objects to find elements without hard-coding ids, then assert against the snapshot.
 
 ```js
-const { captureViewport, act, assertSnapshot } = require('./agent-viewport');
+import { captureViewport, act, assertSnapshot } from './agent-viewport.js';
 
 const snap = await captureViewport(page);
 

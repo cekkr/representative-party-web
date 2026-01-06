@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * agent-viewport
  * -------------
@@ -19,7 +17,7 @@
  *   await act(page, snap, { type: 'click', target: 'e12' })
  */
 
-const crypto = require('crypto');
+import crypto from 'node:crypto';
 
 function sha1(s) {
   return crypto.createHash('sha1').update(String(s)).digest('hex');
@@ -1007,7 +1005,7 @@ function rectContains(a, b) {
   return b.left >= a.left && b.right <= a.right && b.top >= a.top && b.bottom <= a.bottom;
 }
 
-module.exports = {
+export {
   captureViewport,
   renderAsText,
   renderAsHtml,
