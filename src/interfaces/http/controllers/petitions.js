@@ -143,7 +143,11 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const proposalText = sanitizeText(body.body || '', 4000);
   const evidenceSummary = sanitizeText(body.evidenceSummary || '', 800);
   const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
-  const classifiedTopic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
+  const structuredFields = parseStructuredFields(body);
+  const classifiedTopic = await classifyTopic(
+    `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
+    state,
+  );
   const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
   const topic = topicResult.topic?.label || classifiedTopic || 'general';
   const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
@@ -161,6 +165,11 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     body: proposalText,
     evidenceSummary,
     evidenceLinks,
+    problem: structuredFields.problem,
+    proposedAction: structuredFields.proposedAction,
+    impact: structuredFields.impact,
+    risks: structuredFields.risks,
+    implementationPlan: structuredFields.implementationPlan,
     authorHash: person?.pidHash || 'anonymous',
     createdAt,
     updatedAt: createdAt,
@@ -183,6 +192,11 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
         topicPath,
         evidenceSummary,
         evidenceLinks,
+        problem: structuredFields.problem,
+        proposedAction: structuredFields.proposedAction,
+        impact: structuredFields.impact,
+        risks: structuredFields.risks,
+        implementationPlan: structuredFields.implementationPlan,
         createdAt,
       }),
     ],
@@ -258,12 +272,16 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     : petition.evidenceLinks || '';
   const evidenceSummary = sanitizeText(evidenceSummaryInput || '', 800);
   const evidenceLinks = parseEvidenceLinks(evidenceLinksInput || '');
+  const structuredFields = parseStructuredFields(body, petition);
   const note = sanitizeText(body.note || '', 240);
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
   }
 
-  const classifiedTopic = await classifyTopic(`${title} ${summary} ${proposalText}`, state);
+  const classifiedTopic = await classifyTopic(
+    `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
+    state,
+  );
   const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
   const topic = topicResult.topic?.label || classifiedTopic || petition.topic || 'general';
   const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
@@ -280,6 +298,11 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     topicPath,
     evidenceSummary,
     evidenceLinks,
+    problem: structuredFields.problem,
+    proposedAction: structuredFields.proposedAction,
+    impact: structuredFields.impact,
+    risks: structuredFields.risks,
+    implementationPlan: structuredFields.implementationPlan,
   });
 
   petition.title = title;
@@ -287,6 +310,11 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
   petition.body = proposalText;
   petition.evidenceSummary = evidenceSummary;
   petition.evidenceLinks = evidenceLinks;
+  petition.problem = structuredFields.problem;
+  petition.proposedAction = structuredFields.proposedAction;
+  petition.impact = structuredFields.impact;
+  petition.risks = structuredFields.risks;
+  petition.implementationPlan = structuredFields.implementationPlan;
   petition.topic = topic;
   petition.topicId = topicResult.topic?.id || petition.topicId || null;
   petition.topicPath = topicPath.length ? topicPath : petition.topicPath || [];
@@ -507,6 +535,8 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const content = sanitizeText(body.content || '', 800);
   const stance = normalizeCommentStance(body.stance || '');
   const factCheck = parseBoolean(body.factCheck, false);
+  const argumentTitle = sanitizeText(body.argumentTitle || '', 120);
+  const argumentParentId = sanitizeText(body.argumentParentId || '', 120);
   if (!petitionId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
@@ -517,6 +547,10 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   if (petition.status === 'closed') {
     return sendJson(res, 400, { error: 'petition_closed', message: 'Discussion closed for this proposal.' });
   }
+  const resolvedArgumentParent = argumentParentId
+    ? state.discussions.find((entry) => entry.id === argumentParentId && entry.petitionId === petitionId)
+    : null;
+  const argumentTitleFinal = argumentTitle || (resolvedArgumentParent ? 'Argument note' : '');
   let topicId = petition.topicId || null;
   let topicPath = Array.isArray(petition.topicPath) ? petition.topicPath : [];
   if (!topicId) {
@@ -533,6 +567,8 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     stance,
     content,
     factCheck: Boolean(factCheck),
+    argumentTitle: argumentTitleFinal,
+    argumentParentId: resolvedArgumentParent ? argumentParentId : '',
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
   };
@@ -543,7 +579,13 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     type: 'petition_comment',
     actorHash: person?.pidHash || 'anonymous',
     petitionId,
-    payload: { petitionId, stance, factCheck: Boolean(factCheck) },
+    payload: {
+      petitionId,
+      stance,
+      factCheck: Boolean(factCheck),
+      argumentTitle: argumentTitleFinal || null,
+      argumentParentId: resolvedArgumentParent ? argumentParentId : null,
+    },
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
@@ -676,6 +718,11 @@ function buildPetitionRevision({
   body,
   evidenceSummary,
   evidenceLinks,
+  problem,
+  proposedAction,
+  impact,
+  risks,
+  implementationPlan,
   person,
   note,
   topic,
@@ -691,6 +738,11 @@ function buildPetitionRevision({
     body,
     evidenceSummary: evidenceSummary || '',
     evidenceLinks: Array.isArray(evidenceLinks) ? evidenceLinks : [],
+    problem: problem || '',
+    proposedAction: proposedAction || '',
+    impact: impact || '',
+    risks: risks || '',
+    implementationPlan: implementationPlan || '',
     note: note || '',
     authorHash: person?.pidHash || 'anonymous',
     authorHandle: person?.handle || null,
@@ -718,6 +770,11 @@ function buildFreezeSnapshot(petition, person) {
     body: source.body || petition.body || '',
     evidenceSummary: source.evidenceSummary || petition.evidenceSummary || '',
     evidenceLinks: Array.isArray(source.evidenceLinks) ? source.evidenceLinks : petition.evidenceLinks || [],
+    problem: source.problem || petition.problem || '',
+    proposedAction: source.proposedAction || petition.proposedAction || '',
+    impact: source.impact || petition.impact || '',
+    risks: source.risks || petition.risks || '',
+    implementationPlan: source.implementationPlan || petition.implementationPlan || '',
     topic: source.topic || petition.topic || 'general',
     topicId: source.topicId || petition.topicId || null,
     topicPath: Array.isArray(source.topicPath)
@@ -749,4 +806,20 @@ function parseEvidenceLinks(rawInput) {
     if (links.length >= 8) break;
   }
   return links;
+}
+
+function parseStructuredFields(body = {}, fallback = {}) {
+  return {
+    problem: readOptionalField(body, 'problem', fallback.problem, 800),
+    proposedAction: readOptionalField(body, 'proposedAction', fallback.proposedAction, 800),
+    impact: readOptionalField(body, 'impact', fallback.impact, 800),
+    risks: readOptionalField(body, 'risks', fallback.risks, 800),
+    implementationPlan: readOptionalField(body, 'implementationPlan', fallback.implementationPlan, 800),
+  };
+}
+
+function readOptionalField(body, key, fallback, limit) {
+  const hasValue = Object.prototype.hasOwnProperty.call(body, key);
+  const source = hasValue ? body[key] : fallback || '';
+  return sanitizeText(source || '', limit);
 }

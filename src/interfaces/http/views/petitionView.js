@@ -6,6 +6,9 @@ import {
 } from '../../../modules/petitions/commentStance.js';
 import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
+const MAX_ARGUMENT_NODES = 60;
+const MAX_ARGUMENT_DEPTH = 4;
+
 export function renderPetitionList(
   petitions,
   votes,
@@ -45,10 +48,13 @@ export function renderPetitionList(
       const signatureCount = signatureSummary.count;
       const hasSigned = signatureSummary.signed;
       const comments = commentsByPetition.get(petition.id) || [];
+      const argumentCount = countArgumentNodes(comments);
       const lastCommentAt = getLastCommentAt(comments);
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
       const anchorId = `petition-${petition.id}`;
       const proposalText = petition.freeze?.body ?? petition.body;
+      const structuredFields = resolveStructuredFields(petition);
+      const structuredOutline = renderStructuredOutline(structuredFields);
       const evidenceSummary = petition.freeze?.evidenceSummary ?? petition.evidenceSummary;
       const evidenceLinks = Array.isArray(petition.freeze?.evidenceLinks)
         ? petition.freeze.evidenceLinks
@@ -59,6 +65,8 @@ export function renderPetitionList(
       const reviewPrompt = renderReviewPrompt(petition, revisions);
       const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
       const evidencePill = evidenceBlock ? '<span class="pill ghost">Evidence</span>' : '';
+      const structuredPill = structuredOutline ? '<span class="pill ghost">Structured</span>' : '';
+      const argumentPill = argumentCount ? `<span class="pill ghost">Arguments: ${argumentCount}</span>` : '';
       return `
         <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
@@ -72,8 +80,10 @@ export function renderPetitionList(
             <span class="pill ghost">Signatures: ${signatureCount}</span>
             <span class="pill ghost">Discussion: ${comments.length}</span>
             <span class="pill ghost">Revisions: ${revisions.length}</span>
+            ${argumentPill}
             ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
             ${evidencePill}
+            ${structuredPill}
             ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
             <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
           </div>
@@ -82,6 +92,7 @@ export function renderPetitionList(
           ${freezeNotice}
           <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
+          ${structuredOutline}
           ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
           <p class="muted small">Author hash: ${escapeHtml(petition.authorHash || 'anonymous')}</p>
@@ -242,6 +253,26 @@ function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, acto
           <textarea name="summary" rows="3" required>${escapeHtml(petition.summary || '')}</textarea>
         </label>
         <label class="field">
+          <span>Problem statement (optional)</span>
+          <textarea name="problem" rows="3">${escapeHtml(petition.problem || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Proposed action (optional)</span>
+          <textarea name="proposedAction" rows="3">${escapeHtml(petition.proposedAction || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Impact (optional)</span>
+          <textarea name="impact" rows="3">${escapeHtml(petition.impact || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Risks and trade-offs (optional)</span>
+          <textarea name="risks" rows="3">${escapeHtml(petition.risks || '')}</textarea>
+        </label>
+        <label class="field">
+          <span>Implementation plan (optional)</span>
+          <textarea name="implementationPlan" rows="3">${escapeHtml(petition.implementationPlan || '')}</textarea>
+        </label>
+        <label class="field">
           <span>Proposal text (optional)</span>
           <textarea name="body" rows="6">${escapeHtml(petition.body || '')}</textarea>
         </label>
@@ -299,10 +330,15 @@ function renderDiscussionBlock(petition, comments) {
   const disabled = petition.status === 'closed';
   const discussionList = renderPetitionComments(comments);
   const stanceSummary = renderCommentStanceSummary(comments);
+  const argumentData = collectArgumentNodes(comments);
+  const argumentMap = renderArgumentMap(argumentData);
+  const argumentDatalistId = `argument-map-${petition.id}`;
+  const argumentDatalist = renderArgumentDatalist(argumentData.nodes, argumentDatalistId);
   return `
     <details class="note">
       <summary>Discussion (${count})</summary>
       ${stanceSummary ? `<p class="muted small">${escapeHtml(stanceSummary)}</p>` : ''}
+      ${argumentMap}
       ${
         disabled
           ? '<p class="muted small">Discussion closed.</p>'
@@ -319,6 +355,19 @@ function renderDiscussionBlock(petition, comments) {
           <span>Comment</span>
           <textarea name="content" rows="2" placeholder="Add a discussion note" required></textarea>
         </label>
+        <details class="note">
+          <summary>Argument map (optional)</summary>
+          <label class="field">
+            <span>Argument title</span>
+            <input name="argumentTitle" placeholder="Claim or evidence headline" />
+          </label>
+          <label class="field">
+            <span>Builds on argument id</span>
+            <input name="argumentParentId" list="${escapeHtml(argumentDatalistId)}" placeholder="Paste an argument id" />
+          </label>
+          ${argumentDatalist}
+          <p class="muted small">Use short titles to map pro/con threads and link related notes.</p>
+        </details>
         <label class="field checkbox">
           <input type="checkbox" name="factCheck" value="yes" />
           <span>Request fact check for this comment</span>
@@ -343,16 +392,32 @@ function renderPetitionComments(comments) {
       const stanceLabel = getCommentStanceLabel(comment.stance);
       const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
+      const argumentPill =
+        comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
+      const argumentTitle = comment.argumentTitle
+        ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
+        : '';
+      const argumentParent = comment.argumentParentId
+        ? `<p class="muted small">Builds on ${escapeHtml(String(comment.argumentParentId).slice(0, 8))}</p>`
+        : '';
+      const argumentId =
+        comment.argumentTitle || comment.argumentParentId
+          ? `<p class="muted tiny">Argument id: ${escapeHtml(comment.id)}</p>`
+          : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
             ${stancePill}
             ${factCheckPill}
+            ${argumentPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
           </div>
+          ${argumentTitle}
+          ${argumentParent}
           <p>${escapeHtml(comment.content)}</p>
+          ${argumentId}
           <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
         </article>
       `;
@@ -373,6 +438,11 @@ export function renderProposalDiscussionFeed(items) {
       const stanceLabel = getCommentStanceLabel(comment.stance);
       const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
+      const argumentPill =
+        comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
+      const argumentLine = comment.argumentTitle
+        ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
+        : '';
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -380,12 +450,14 @@ export function renderProposalDiscussionFeed(items) {
             <span class="pill ghost">Proposal</span>
             ${stancePill}
             ${factCheckPill}
+            ${argumentPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
             ${permalink}
           </div>
           <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
+          ${argumentLine}
           <p>${escapeHtml(snippet)}</p>
           <p class="muted small">Comment by ${escapeHtml(comment.authorHash || 'anonymous')}</p>
         </article>
@@ -463,6 +535,165 @@ function renderCommentStanceSummary(comments) {
   return parts.join(' · ');
 }
 
+function countArgumentNodes(comments = []) {
+  let count = 0;
+  for (const comment of comments) {
+    if (comment?.argumentTitle || comment?.argumentParentId) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function collectArgumentNodes(comments = []) {
+  const nodes = comments.filter((comment) => comment?.argumentTitle || comment?.argumentParentId);
+  const sorted = nodes.slice().sort(sortByCreatedAt);
+  const truncated = sorted.length > MAX_ARGUMENT_NODES;
+  const limited = truncated ? sorted.slice(sorted.length - MAX_ARGUMENT_NODES) : sorted;
+  return { nodes: limited, total: sorted.length, truncated };
+}
+
+function renderArgumentMap(argumentData) {
+  if (!argumentData || !argumentData.nodes.length) return '';
+  const { nodes, total, truncated } = argumentData;
+  const nodeMap = new Map(nodes.map((node) => [node.id, node]));
+  const childMap = new Map();
+  const roots = [];
+
+  for (const node of nodes) {
+    const parentId = node.argumentParentId;
+    if (parentId && parentId !== node.id && nodeMap.has(parentId)) {
+      const list = childMap.get(parentId) || [];
+      list.push(node);
+      childMap.set(parentId, list);
+    } else {
+      roots.push(node);
+    }
+  }
+
+  roots.sort(sortByCreatedAt);
+  for (const list of childMap.values()) {
+    list.sort(sortByCreatedAt);
+  }
+
+  const visited = new Set();
+  const items = roots.map((node) => renderArgumentNode(node, childMap, visited, 0)).join('');
+  const truncatedNote = truncated
+    ? `<p class="muted small">Showing latest ${nodes.length} of ${total} argument nodes.</p>`
+    : '';
+  return `
+    <details class="note argument-map">
+      <summary>Argument map (${total})</summary>
+      ${truncatedNote}
+      <ul class="argument-list">
+        ${items}
+      </ul>
+    </details>
+  `;
+}
+
+function renderArgumentNode(node, childMap, visited, depth) {
+  if (!node || visited.has(node.id) || depth > MAX_ARGUMENT_DEPTH) return '';
+  visited.add(node.id);
+  const stanceLabel = getCommentStanceLabel(node.stance);
+  const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
+  const factCheckPill = node.factCheck ? '<span class="pill warning">Fact check</span>' : '';
+  const previewPill = node.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+  const createdAt = node.createdAt ? new Date(node.createdAt).toLocaleString() : '';
+  const title = node.argumentTitle || 'Argument note';
+  const shortId = String(node.id || '').slice(0, 8);
+  const parentHint = node.argumentParentId
+    ? `Builds on ${escapeHtml(String(node.argumentParentId).slice(0, 8))}`
+    : '';
+  const content = node.content ? `<p>${escapeHtml(node.content)}</p>` : '';
+  const author = node.authorHash ? `<p class="muted tiny">Author hash: ${escapeHtml(node.authorHash)}</p>` : '';
+  const children = childMap.get(node.id) || [];
+  const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1)).join('');
+  const childBlock = childItems ? `<ul class="argument-children">${childItems}</ul>` : '';
+  return `
+    <li>
+      <div class="argument-node">
+        <div class="discussion__meta">
+          ${stancePill}
+          ${factCheckPill}
+          ${previewPill}
+          ${renderIssuerPill(node)}
+          ${createdAt ? `<span class="muted small">${escapeHtml(createdAt)}</span>` : ''}
+        </div>
+        <p class="small"><strong>${escapeHtml(title)}</strong> <span class="muted tiny">#${escapeHtml(shortId)}</span></p>
+        ${parentHint ? `<p class="muted tiny">${parentHint}</p>` : ''}
+        ${content}
+        ${author}
+      </div>
+      ${childBlock}
+    </li>
+  `;
+}
+
+function renderArgumentDatalist(nodes = [], datalistId = 'argument-map-options') {
+  if (!nodes.length) return '';
+  const options = nodes
+    .map((node) => {
+      const label = node.argumentTitle || truncateText(node.content || 'Argument note', 80);
+      const stanceLabel = getCommentStanceLabel(node.stance);
+      return `<option value="${escapeHtml(node.id)}">${escapeHtml(label)} · ${escapeHtml(stanceLabel)}</option>`;
+    })
+    .join('');
+  return `<datalist id="${escapeHtml(datalistId)}">${options}</datalist>`;
+}
+
+function resolveStructuredFields(petition) {
+  const frozen = petition?.freeze || {};
+  return {
+    problem: frozen.problem || petition?.problem || '',
+    proposedAction: frozen.proposedAction || petition?.proposedAction || '',
+    impact: frozen.impact || petition?.impact || '',
+    risks: frozen.risks || petition?.risks || '',
+    implementationPlan: frozen.implementationPlan || petition?.implementationPlan || '',
+  };
+}
+
+function renderStructuredOutline(fields = {}) {
+  const entries = [
+    { label: 'Problem statement', value: fields.problem },
+    { label: 'Proposed action', value: fields.proposedAction },
+    { label: 'Impact', value: fields.impact },
+    { label: 'Risks and trade-offs', value: fields.risks },
+    { label: 'Implementation plan', value: fields.implementationPlan },
+  ];
+  const filled = entries.filter((entry) => (entry.value || '').trim());
+  if (!filled.length) return '';
+  const items = filled
+    .map((entry) => {
+      return `
+        <li>
+          <p class="structured-label">${escapeHtml(entry.label)}</p>
+          <p>${escapeHtml(entry.value)}</p>
+        </li>
+      `;
+    })
+    .join('');
+  return `
+    <details class="note structured-outline">
+      <summary>Structured outline</summary>
+      <ul class="plain structured-outline__list">
+        ${items}
+      </ul>
+    </details>
+  `;
+}
+
+function sortByCreatedAt(a, b) {
+  const aTime = Date.parse(a?.createdAt || '');
+  const bTime = Date.parse(b?.createdAt || '');
+  const aValid = Number.isFinite(aTime);
+  const bValid = Number.isFinite(bTime);
+  if (!aValid && !bValid) return 0;
+  if (!aValid) return -1;
+  if (!bValid) return 1;
+  return aTime - bTime;
+}
+
 function renderUpdatedMeta(petition) {
   const updatedAt = petition.updatedAt || '';
   if (!updatedAt) return '';
@@ -510,6 +741,25 @@ function renderRevisionDiff(revision, previous, state) {
   }
   if ((revision.body || '') !== (previous.body || '')) {
     changes.push({ label: 'Body', before: previous.body, after: revision.body });
+  }
+  if ((revision.problem || '') !== (previous.problem || '')) {
+    changes.push({ label: 'Problem', before: previous.problem, after: revision.problem });
+  }
+  if ((revision.proposedAction || '') !== (previous.proposedAction || '')) {
+    changes.push({ label: 'Proposed action', before: previous.proposedAction, after: revision.proposedAction });
+  }
+  if ((revision.impact || '') !== (previous.impact || '')) {
+    changes.push({ label: 'Impact', before: previous.impact, after: revision.impact });
+  }
+  if ((revision.risks || '') !== (previous.risks || '')) {
+    changes.push({ label: 'Risks', before: previous.risks, after: revision.risks });
+  }
+  if ((revision.implementationPlan || '') !== (previous.implementationPlan || '')) {
+    changes.push({
+      label: 'Implementation plan',
+      before: previous.implementationPlan,
+      after: revision.implementationPlan,
+    });
   }
   if ((revision.evidenceSummary || '') !== (previous.evidenceSummary || '')) {
     changes.push({ label: 'Evidence summary', before: previous.evidenceSummary, after: revision.evidenceSummary });
