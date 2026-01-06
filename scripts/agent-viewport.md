@@ -4,7 +4,7 @@ This is a small **Node.js library design + full implementation** you can drop in
 2. **Plain text**: a deterministic “screen reader / wireframe” for LLMs
 3. **Simplified HTML**: an “absolute-positioned overlay DOM” that contains only what’s visible (great for agent reasoning + debugging)
 
-It also provides helpers to **click/type/select** by element id.
+It also provides helpers to **click/type/select** by element id, plus locator-based helpers for unit tests and AI-assisted workflows.
 
 ---
 
@@ -138,6 +138,51 @@ Example command schema:
 ```
 
 ---
+
+## Unit-test helpers (AI-friendly)
+
+Use locator objects to find elements without hard-coding ids, then assert against the snapshot.
+
+```js
+const { captureViewport, act, assertSnapshot } = require('./agent-viewport');
+
+const snap = await captureViewport(page);
+
+assertSnapshot(snap, [
+  { id: 'title', target: { text: 'Example Domain', kind: 'text' }, count: 1 },
+  { id: 'cta', target: { role: 'link', label: 'More information' }, min: 1 },
+]);
+
+await act(page, snap, {
+  type: 'click',
+  target: { role: 'link', label: 'More information', nth: 1 },
+});
+```
+
+You can also call `findElements(snapshot, locator)` to inspect all matches before asserting.
+
+Locator fields (combine to narrow matches):
+
+* `id`, `text`, `name`, `label` (text or name), `value`
+* `role`, `kind`, `tag`
+* `action` (single), `actions` (array)
+* `selector`, `disabled`
+* `within`: `{ x, y, width, height, mode: 'intersects' | 'contains' }`
+* `index` (0-based), `nth` (1-based), `pick` ('first'|'last')
+* `match`: `'contains' | 'exact' | 'prefix' | 'suffix' | 'regex'`
+* `caseSensitive`: `true` or `false`
+
+String matches also accept objects:
+
+```json
+{ "text": { "value": "Save", "match": "exact" } }
+```
+
+```json
+{ "text": { "regex": "^Save", "flags": "i" } }
+```
+
+Assertions use `target` with the locator fields above and accept `count`, `min`, `max`, or `exists`. If none are set, the default expectation is "at least one match". `assertSnapshot` throws on failure by default; pass `{ throwOnFailure: false }` to get a report instead.
 
 ## Quick improvement knobs (if you extend it)
 

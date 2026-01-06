@@ -25,6 +25,11 @@ function sha1(s) {
   return crypto.createHash('sha1').update(String(s)).digest('hex');
 }
 
+function sortByReadingOrder(a, b) {
+  if (a.rect.y !== b.rect.y) return a.rect.y - b.rect.y;
+  return a.rect.x - b.rect.x;
+}
+
 /**
  * Renders a simplified "absolute-position overlay HTML".
  * This is useful both for debugging and for giving the agent a clean DOM
@@ -159,10 +164,7 @@ function renderAsText(snapshot, opts = {}) {
   }
 
   // already sorted by the capture step, but re-sort to be safe
-  const els = [...snapshot.elements].sort((a, b) => {
-    if (a.rect.y !== b.rect.y) return a.rect.y - b.rect.y;
-    return a.rect.x - b.rect.x;
-  });
+  const els = [...snapshot.elements].sort(sortByReadingOrder);
 
   for (const el of els) {
     const r = el.rect;
@@ -187,6 +189,137 @@ function renderAsText(snapshot, opts = {}) {
   }
 
   return lines.join('\n');
+}
+
+/**
+ * findElements(snapshot, locator)
+ *
+ * A small locator engine for unit tests and AI-assisted scripts.
+ * You can match by text/name/role/kind/actions and return 0..N elements.
+ */
+function findElements(snapshot, locator = {}, opts = {}) {
+  if (!snapshot || !Array.isArray(snapshot.elements)) return [];
+
+  const query = typeof locator === 'string' ? { id: locator } : (locator || {});
+  const matchDefaults = {
+    match: query.match || opts.match || 'contains',
+    caseSensitive: query.caseSensitive ?? opts.caseSensitive ?? false,
+  };
+
+  const idList = query.id || query.ids;
+  const ids = idList ? (Array.isArray(idList) ? idList : [idList]) : null;
+
+  const tag = typeof query.tag === 'string' ? query.tag.toLowerCase() : query.tag;
+  const role = typeof query.role === 'string' ? query.role.toLowerCase() : query.role;
+  const kind = typeof query.kind === 'string' ? query.kind.toLowerCase() : query.kind;
+
+  const matches = snapshot.elements.filter(el => {
+    if (ids && !ids.includes(el.id)) return false;
+    if (tag && el.tag !== tag) return false;
+    if (role && el.role !== role) return false;
+    if (kind && el.kind !== kind) return false;
+
+    if (query.disabled != null && Boolean(el.disabled) !== Boolean(query.disabled)) return false;
+
+    if (query.action) {
+      if (!el.actions || !el.actions.includes(query.action)) return false;
+    }
+    if (query.actions) {
+      const required = Array.isArray(query.actions) ? query.actions : [query.actions];
+      if (!required.every(action => el.actions?.includes(action))) return false;
+    }
+
+    if (query.text != null && !matchString(el.text, query.text, matchDefaults)) return false;
+    if (query.name != null && !matchString(el.name, query.name, matchDefaults)) return false;
+    if (query.label != null) {
+      const labelMatch =
+        matchString(el.text, query.label, matchDefaults) ||
+        matchString(el.name, query.label, matchDefaults);
+      if (!labelMatch) return false;
+    }
+    if (query.value != null && !matchString(el.value, query.value, matchDefaults)) return false;
+    if (query.selector != null && !matchString(el.selector, query.selector, matchDefaults)) return false;
+
+    if (query.within) {
+      const area = normalizeRect(query.within);
+      const rect = normalizeRect(el.rect);
+      const mode = query.within.mode || 'intersects';
+      const ok = mode === 'contains'
+        ? rectContains(area, rect)
+        : rectIntersects(area, rect);
+      if (!ok) return false;
+    }
+
+    return true;
+  });
+
+  matches.sort(sortByReadingOrder);
+
+  if (Number.isInteger(query.index)) {
+    return matches[query.index] ? [matches[query.index]] : [];
+  }
+  if (Number.isInteger(query.nth)) {
+    const idx = query.nth - 1;
+    return idx >= 0 && matches[idx] ? [matches[idx]] : [];
+  }
+  if (query.pick === 'first') return matches.slice(0, 1);
+  if (query.pick === 'last') return matches.slice(-1);
+
+  return matches;
+}
+
+/**
+ * assertSnapshot(snapshot, assertions)
+ *
+ * Asserts the viewport snapshot against locator-based expectations.
+ * Returns a report and throws by default when assertions fail.
+ */
+function assertSnapshot(snapshot, assertions = [], opts = {}) {
+  const items = Array.isArray(assertions) ? assertions : [assertions];
+  const checks = [];
+  const failures = [];
+
+  const defaultMatch = opts.match || 'contains';
+  const defaultCaseSensitive = opts.caseSensitive ?? false;
+
+  for (let i = 0; i < items.length; i++) {
+    const assertion = items[i] || {};
+    const id = assertion.id || assertion.label || `assert-${i + 1}`;
+    const target = assertion.target || assertion.query || assertion.locator;
+
+    if (!target) {
+      throw new Error(`assertSnapshot(): assertion missing target at index ${i}`);
+    }
+
+    const matchOpts = {
+      match: assertion.match ?? defaultMatch,
+      caseSensitive: assertion.caseSensitive ?? defaultCaseSensitive,
+    };
+
+    const matches = findElements(snapshot, target, matchOpts);
+    const count = matches.length;
+
+    const expected = resolveExpectedRange(assertion);
+    const pass = count >= expected.min && count <= expected.max;
+
+    const check = {
+      id,
+      target,
+      expected,
+      count,
+      matchIds: matches.slice(0, 5).map(el => el.id),
+      pass,
+    };
+
+    checks.push(check);
+    if (!pass) failures.push(check);
+  }
+
+  const report = { ok: failures.length === 0, failures, checks };
+  if (!report.ok && opts.throwOnFailure !== false) {
+    throw new Error(formatAssertionReport(report));
+  }
+  return report;
 }
 
 /**
@@ -586,8 +719,10 @@ async function act(page, snapshot, command) {
   const { type, target, text, value } = command || {};
   if (!type) throw new Error('act(): command.type is required');
 
-  const el = snapshot.elements.find(e => e.id === target);
-  if (!el) throw new Error(`act(): target not found in snapshot: ${target}`);
+  const el = resolveTarget(snapshot, target, {
+    match: command?.match,
+    caseSensitive: command?.caseSensitive,
+  });
 
   const cx = Math.round(el.rect.x + el.rect.width / 2);
   const cy = Math.round(el.rect.y + el.rect.height / 2);
@@ -679,11 +814,204 @@ function safeInline(s, maxLen = 200) {
   return t.slice(0, maxLen - 1) + '…';
 }
 
+function resolveTarget(snapshot, target, opts = {}) {
+  if (typeof target === 'string') {
+    const direct = snapshot.elements.find(e => e.id === target);
+    if (!direct) throw new Error(`act(): target not found in snapshot: ${target}`);
+    return direct;
+  }
+
+  if (!target || typeof target !== 'object') {
+    throw new Error('act(): command.target must be a string or locator object');
+  }
+
+  const matches = findElements(snapshot, target, opts);
+  if (matches.length === 0) {
+    throw new Error(`act(): target locator not found: ${formatLocator(target)}`);
+  }
+
+  if (matches.length > 1 && !Number.isInteger(target.index) && !Number.isInteger(target.nth) && !target.pick) {
+    throw new Error(`act(): target locator matched multiple elements (${matches.length}). Add index/nth/pick or refine: ${formatLocator(target)}`);
+  }
+
+  if (target.pick === 'last') return matches[matches.length - 1];
+  return matches[0];
+}
+
+function resolveExpectedRange(assertion) {
+  if (assertion && Object.prototype.hasOwnProperty.call(assertion, 'count')) {
+    return { min: assertion.count, max: assertion.count };
+  }
+
+  let min = assertion?.min;
+  let max = assertion?.max;
+
+  if (Object.prototype.hasOwnProperty.call(assertion || {}, 'exists')) {
+    if (assertion.exists) {
+      if (min == null) min = 1;
+      if (max == null) max = Infinity;
+    } else {
+      min = 0;
+      max = 0;
+    }
+  }
+
+  if (min == null && max == null) {
+    min = 1;
+    max = Infinity;
+  } else {
+    if (min == null) min = 0;
+    if (max == null) max = Infinity;
+  }
+
+  return { min, max };
+}
+
+function formatAssertionReport(report) {
+  const lines = ['assertSnapshot failed:'];
+  for (const failure of report.failures || []) {
+    const expectedLabel = formatExpectedRange(failure.expected);
+    const sample = failure.matchIds?.length
+      ? ` matches=[${failure.matchIds.join(', ')}]`
+      : '';
+    lines.push(
+      `- ${failure.id}: expected ${expectedLabel} match(es), got ${failure.count} for ${formatLocator(failure.target)}${sample}`
+    );
+  }
+  return lines.join('\n');
+}
+
+function formatExpectedRange(expected) {
+  if (!expected) return 'unknown';
+  if (expected.min === expected.max) return String(expected.min);
+  if (expected.max === Infinity) return `>= ${expected.min}`;
+  return `${expected.min}..${expected.max}`;
+}
+
+function formatLocator(locator) {
+  if (typeof locator === 'string') return locator;
+  if (!locator || typeof locator !== 'object') return String(locator);
+
+  const summary = {};
+  const keys = [
+    'id',
+    'label',
+    'text',
+    'name',
+    'value',
+    'role',
+    'kind',
+    'tag',
+    'selector',
+    'action',
+    'actions',
+    'disabled',
+    'within',
+    'index',
+    'nth',
+    'pick',
+    'match',
+    'caseSensitive',
+  ];
+
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(locator, key)) continue;
+    const value = locator[key];
+    if (typeof value === 'string') {
+      summary[key] = value.length > 120 ? `${value.slice(0, 117)}...` : value;
+    } else {
+      summary[key] = value;
+    }
+  }
+
+  return JSON.stringify(summary);
+}
+
+function matchString(actual, expected, defaults = {}) {
+  if (expected == null) return true;
+
+  if (expected instanceof RegExp) {
+    return expected.test(String(actual || ''));
+  }
+
+  let match = defaults.match || 'contains';
+  let caseSensitive = defaults.caseSensitive ?? false;
+  let flags = '';
+  let value = expected;
+
+  if (expected && typeof expected === 'object') {
+    if (expected.regex instanceof RegExp) {
+      return expected.regex.test(String(actual || ''));
+    }
+    if (expected.regex != null) {
+      match = 'regex';
+      value = expected.regex;
+      flags = expected.flags || '';
+      if (expected.caseSensitive != null) caseSensitive = expected.caseSensitive;
+    } else if (Object.prototype.hasOwnProperty.call(expected, 'value')) {
+      value = expected.value;
+      if (expected.match) match = expected.match;
+      if (expected.caseSensitive != null) caseSensitive = expected.caseSensitive;
+      if (expected.flags) flags = expected.flags;
+    }
+  }
+
+  const actualStr = String(actual || '');
+  const valueStr = String(value || '');
+
+  if (match === 'regex') {
+    let reFlags = flags;
+    if (!caseSensitive && !reFlags.includes('i')) reFlags += 'i';
+    const re = new RegExp(valueStr, reFlags);
+    return re.test(actualStr);
+  }
+
+  if (valueStr === '') return actualStr === '';
+
+  const a = caseSensitive ? actualStr : actualStr.toLowerCase();
+  const b = caseSensitive ? valueStr : valueStr.toLowerCase();
+
+  if (match === 'exact') return a === b;
+  if (match === 'prefix') return a.startsWith(b);
+  if (match === 'suffix') return a.endsWith(b);
+  return a.includes(b);
+}
+
+function normalizeRect(rect) {
+  const x = Number.isFinite(rect?.x) ? rect.x : (Number.isFinite(rect?.left) ? rect.left : 0);
+  const y = Number.isFinite(rect?.y) ? rect.y : (Number.isFinite(rect?.top) ? rect.top : 0);
+  const width = Number.isFinite(rect?.width)
+    ? rect.width
+    : (Number.isFinite(rect?.right) ? rect.right - x : 0);
+  const height = Number.isFinite(rect?.height)
+    ? rect.height
+    : (Number.isFinite(rect?.bottom) ? rect.bottom - y : 0);
+
+  return {
+    x,
+    y,
+    width,
+    height,
+    left: x,
+    top: y,
+    right: x + width,
+    bottom: y + height,
+  };
+}
+
+function rectIntersects(a, b) {
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+
+function rectContains(a, b) {
+  return b.left >= a.left && b.right <= a.right && b.top >= a.top && b.bottom <= a.bottom;
+}
+
 module.exports = {
   captureViewport,
   renderAsText,
   renderAsHtml,
   act,
+  findElements,
+  assertSnapshot,
 };
-
-
