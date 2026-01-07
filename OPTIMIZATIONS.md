@@ -19,6 +19,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
+- Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -44,6 +45,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
+- Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
