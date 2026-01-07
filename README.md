@@ -2,7 +2,7 @@
 
 A **messaging‑first “Party Circle” kernel** for civic and political organizations that want deliberation and representation *without* turning identity into a surveillance problem.
 
-![Party Web logo](https://codeberg.org/eparty/party-web/raw/branch/main/md-assets/partyweb-logo.png)
+<img src="https://codeberg.org/eparty/party-web/raw/branch/main/md-assets/partyweb-logo.png" style="max-height: 300px;">
 
 This repository is a Node.js SSR application that starts as a usable discussion + notification network, then lets you progressively enable higher‑stakes modules (petitions, votes, delegation, federation) as your policy and governance mature. The identity layer is designed around **blinded uniqueness**: the server can enforce **one natural person = one voice** **without storing raw PII**.
 
