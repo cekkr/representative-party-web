@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import {
   getCommentStanceLabel,
   listCommentStances,
@@ -32,9 +33,10 @@ export function renderPetitionList(
   const voteBuckets = buildVoteBuckets(votes);
   const signatureBuckets = buildSignatureBuckets(signatures || [], person);
 
+  const topicCache = new Map();
   return petitions
     .map((petition) => {
-      const topicLabel = resolveTopicBreadcrumb(petition, state);
+      const topicLabel = resolveTopicBreadcrumb(petition, state, topicCache);
       const statusLabel = displayStatus(petition.status);
       const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
       const stageAllowsVoting = isVotingStage(petition.status);
@@ -67,13 +69,14 @@ export function renderPetitionList(
       const evidencePill = evidenceBlock ? '<span class="pill ghost">Evidence</span>' : '';
       const structuredPill = structuredOutline ? '<span class="pill ghost">Structured</span>' : '';
       const argumentPill = argumentCount ? `<span class="pill ghost">Arguments: ${argumentCount}</span>` : '';
+      const createdAt = formatTimestamp(petition.createdAt);
       return `
         <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
             ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(petition)}
-            <span class="muted small">${new Date(petition.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             ${renderUpdatedMeta(petition)}
             <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
@@ -175,7 +178,7 @@ function buildSignatureBuckets(signatures = [], person) {
 
 function renderModerationForm(petition) {
   const status = petition.status === 'open' ? 'vote' : petition.status;
-  const frozenAt = petition.freeze?.frozenAt ? new Date(petition.freeze.frozenAt).toLocaleString() : '';
+  const frozenAt = formatTimestamp(petition.freeze?.frozenAt);
   const frozenBy = petition.freeze?.frozenBy || '';
   const freezeNote = frozenAt ? `<p class="muted small">Frozen at ${escapeHtml(frozenAt)} ${frozenBy ? `by ${escapeHtml(frozenBy)}` : ''}.</p>` : '';
   return `
@@ -300,7 +303,7 @@ function renderRevisionHistory(petition, state) {
   const items = versions
     .map((revision, index) => {
       const previous = versions[index + 1];
-      const when = revision.createdAt ? new Date(revision.createdAt).toLocaleString() : '';
+      const when = formatTimestamp(revision.createdAt);
       const author = String(revision.authorHandle || revision.authorHash || 'anonymous');
       const note = revision.note ? `<div class="muted small">${escapeHtml(String(revision.note))}</div>` : '';
       const topicLabel = resolveTopicBreadcrumb(revision, state);
@@ -394,6 +397,7 @@ function renderPetitionComments(comments) {
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       const argumentPill =
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
+      const createdAt = formatTimestamp(comment.createdAt);
       const argumentTitle = comment.argumentTitle
         ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
         : '';
@@ -412,7 +416,7 @@ function renderPetitionComments(comments) {
             ${argumentPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
-            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           ${argumentTitle}
           ${argumentParent}
@@ -443,6 +447,7 @@ export function renderProposalDiscussionFeed(items) {
       const argumentLine = comment.argumentTitle
         ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
         : '';
+      const createdAt = formatTimestamp(comment.createdAt);
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -453,7 +458,7 @@ export function renderProposalDiscussionFeed(items) {
             ${argumentPill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
-            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             ${permalink}
           </div>
           <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
@@ -505,7 +510,7 @@ function getLastCommentAt(comments) {
       latest = time;
     }
   }
-  return latest ? new Date(latest).toLocaleString() : '';
+  return latest ? formatTimestamp(latest) : '';
 }
 
 function renderCommentStanceOptions(selected = 'comment') {
@@ -599,7 +604,7 @@ function renderArgumentNode(node, childMap, visited, depth) {
   const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
   const factCheckPill = node.factCheck ? '<span class="pill warning">Fact check</span>' : '';
   const previewPill = node.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
-  const createdAt = node.createdAt ? new Date(node.createdAt).toLocaleString() : '';
+  const createdAt = formatTimestamp(node.createdAt);
   const title = node.argumentTitle || 'Argument note';
   const shortId = String(node.id || '').slice(0, 8);
   const parentHint = node.argumentParentId
@@ -698,7 +703,7 @@ function renderUpdatedMeta(petition) {
   const updatedAt = petition.updatedAt || '';
   if (!updatedAt) return '';
   if (petition.createdAt && petition.createdAt === updatedAt && !petition.updatedBy) return '';
-  const label = new Date(updatedAt).toLocaleString();
+  const label = formatTimestamp(updatedAt);
   const author = petition.updatedBy ? ` by ${petition.updatedBy}` : '';
   return `<span class="muted small">Updated ${escapeHtml(label)}${escapeHtml(author)}</span>`;
 }
@@ -706,7 +711,7 @@ function renderUpdatedMeta(petition) {
 
 function renderFreezeNotice(petition) {
   if (!petition?.freeze) return '';
-  const frozenAt = petition.freeze.frozenAt ? new Date(petition.freeze.frozenAt).toLocaleString() : '';
+  const frozenAt = formatTimestamp(petition.freeze.frozenAt);
   const frozenBy = petition.freeze.frozenBy ? `by ${petition.freeze.frozenBy}` : '';
   const revisionId = petition.freeze.revisionId ? petition.freeze.revisionId.slice(0, 8) : '';
   const revisionLine = revisionId ? `<p class="muted small">Revision: ${escapeHtml(revisionId)}</p>` : '';

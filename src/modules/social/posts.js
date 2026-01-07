@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { sanitizeText } from '../../shared/utils/text.js';
-import { stampLocalEntry, filterVisibleEntries } from '../federation/replication.js';
+import { getReplicationProfile, stampLocalEntry } from '../federation/replication.js';
 import { createSocialNote, wrapCreateActivity } from '../federation/activitypub.js';
 import { listFollowsFor, normalizeFollowType } from './followGraph.js';
 import { getEffectivePolicy } from '../circle/policy.js';
@@ -104,20 +104,33 @@ export function createPost(
 }
 
 export function buildFeed(state, person, { followType, follows } = {}) {
-  const allPosts = filterVisibleEntries(state.socialPosts || [], state);
+  const posts = state.socialPosts || [];
+  const { allowPreviews } = getReplicationProfile(state);
   if (!person) {
-    return allPosts.filter((post) => post.visibility !== 'direct').slice(0, 80);
+    const feed = [];
+    for (const post of posts) {
+      if (!post) continue;
+      if (!allowPreviews && post?.validationStatus === 'preview') continue;
+      if (post.visibility === 'direct') continue;
+      feed.push(post);
+      if (feed.length >= 80) break;
+    }
+    return feed;
   }
 
   const ownHash = person.pidHash;
   const normalizedType = followType ? normalizeFollowType(followType) : null;
   const followList = Array.isArray(follows) ? follows : listFollowsFor(state, ownHash, normalizedType || undefined);
   const filteredFollows = normalizedType ? followList.filter((edge) => edge.type === normalizedType) : followList;
-  const followedHashes = new Set(filteredFollows.map((edge) => edge.targetHash));
-  followedHashes.add(ownHash);
+  const followedHashes = new Set([ownHash]);
+  for (const edge of filteredFollows) {
+    followedHashes.add(edge.targetHash);
+  }
 
   const feed = [];
-  for (const post of allPosts) {
+  for (const post of posts) {
+    if (!post) continue;
+    if (!allowPreviews && post?.validationStatus === 'preview') continue;
     const isAuthorFollowed = followedHashes.has(post.authorHash);
     const isDirect = post.visibility === 'direct';
     const isRecipient = post.targetHash && post.targetHash === ownHash;

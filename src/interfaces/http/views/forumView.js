@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
 import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
@@ -17,9 +18,11 @@ function renderThreads(threads, commentsByThread, state) {
   if (!threads.length) {
     return '<p class="muted">No threads yet. Start a discussion.</p>';
   }
+  const topicCache = new Map();
   return threads
     .map((thread) => {
-      const topicLabel = resolveTopicBreadcrumb(thread, state);
+      const topicLabel = resolveTopicBreadcrumb(thread, state, topicCache);
+      const createdAt = formatTimestamp(thread.createdAt);
       const threadComments = commentsByThread.get(thread.id) || [];
       return `
         <article class="discussion">
@@ -28,7 +31,7 @@ function renderThreads(threads, commentsByThread, state) {
             <span class="pill ghost">Article</span>
             ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(thread)}
-            <span class="muted small">${new Date(thread.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
           <p>${escapeHtml(thread.content)}</p>
@@ -67,13 +70,14 @@ function renderComments(comments) {
   }
   return comments
     .map((comment) => {
+      const createdAt = formatTimestamp(comment.createdAt);
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
-            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <p>${escapeHtml(comment.content)}</p>
           <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>

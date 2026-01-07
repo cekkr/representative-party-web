@@ -8,6 +8,7 @@ import {
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
@@ -86,11 +87,11 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
   const providerFields = normalizeProviderFields(state.profileStructures || []);
   const profileEntry = entry || (person ? findProfileAttributes(state, person.sessionId) : null);
   const defaultValues = values || buildProfileValues(providerFields, profileEntry);
-  const updatedAt = profileEntry?.updatedAt ? new Date(profileEntry.updatedAt).toLocaleString() : '';
+  const updatedAt = formatTimestamp(profileEntry?.updatedAt);
   const profileSchema = state.settings?.profileSchema || {};
   const schemaParts = [`Schema v${Number(profileSchema.version || 0)}`];
   if (profileSchema.updatedAt) {
-    schemaParts.push(`updated ${new Date(profileSchema.updatedAt).toLocaleString()}`);
+    schemaParts.push(`updated ${formatTimestamp(profileSchema.updatedAt)}`);
   }
   if (profileSchema.updatedBy) {
     schemaParts.push(`by ${profileSchema.updatedBy}`);

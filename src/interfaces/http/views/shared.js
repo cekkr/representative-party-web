@@ -1,20 +1,39 @@
 import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 
-export function resolveTopicBreadcrumb(entry, state) {
+export function resolveTopicBreadcrumb(entry, state, cache) {
+  const cacheKey = buildTopicCacheKey(entry);
+  if (cache && cacheKey && cache.has(cacheKey)) {
+    return cache.get(cacheKey);
+  }
+  let resolved = '';
   if (entry?.topicId && state) {
     const live = formatTopicBreadcrumbFromRegistry(state, entry.topicId);
-    if (live) return live;
+    if (live) resolved = live;
   }
-  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
-    return entry.topicPath.join(' / ');
+  if (!resolved && Array.isArray(entry?.topicPath) && entry.topicPath.length) {
+    resolved = entry.topicPath.join(' / ');
   }
-  if (entry?.topicBreadcrumb) return entry.topicBreadcrumb;
-  return entry?.topic || 'general';
+  if (!resolved && entry?.topicBreadcrumb) resolved = entry.topicBreadcrumb;
+  if (!resolved) resolved = entry?.topic || 'general';
+  if (cache && cacheKey) {
+    cache.set(cacheKey, resolved);
+  }
+  return resolved;
 }
 
 export function renderIssuerPill(entry) {
   const issuer = entry?.issuer || entry?.provenance?.issuer;
   if (!issuer) return '';
   return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
+}
+
+function buildTopicCacheKey(entry) {
+  if (entry?.topicId) return `id:${entry.topicId}`;
+  if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
+    return `path:${JSON.stringify(entry.topicPath)}`;
+  }
+  if (entry?.topicBreadcrumb) return `crumb:${entry.topicBreadcrumb}`;
+  if (entry?.topic) return `topic:${entry.topic}`;
+  return null;
 }

@@ -8,6 +8,7 @@ import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { buildTopicOptions, renderTopicDatalist } from '../views/topicHelpers.js';
@@ -112,7 +113,7 @@ function renderDelegationList(delegations = []) {
   }
   const items = delegations
     .map((entry) => {
-      const createdAt = entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '';
+      const createdAt = formatTimestamp(entry.createdAt);
       const delegateHash = escapeHtml(entry.delegateHash || 'unknown');
       const profileLink = entry.delegateHash
         ? `<a class="muted tiny" href="/delegates/${delegateHash}" data-partial>Profile</a>`
@@ -241,13 +242,6 @@ function formatSuggestionMeta(suggestion = {}) {
     }
   }
   return parts.join(' · ');
-}
-
-function formatTimestamp(value) {
-  if (!value) return '';
-  const parsed = Date.parse(value);
-  if (Number.isNaN(parsed)) return '';
-  return new Date(parsed).toLocaleString();
 }
 
 function dedupeTopics(topics = []) {

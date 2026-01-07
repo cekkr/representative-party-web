@@ -18,6 +18,7 @@ import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { renderIssuerPill } from '../views/shared.js';
@@ -403,7 +404,7 @@ function renderElections(elections, person, state) {
       const winnerLabel = winnerHash
         ? `Winner: ${winnerHash}${winnerMethod ? ` (method ${winnerMethod}${winnerRounds ? `, rounds ${winnerRounds}` : ''})` : ''}`
         : '';
-      const closedAt = election.closedAt ? new Date(election.closedAt).toLocaleString() : '';
+      const closedAt = formatTimestamp(election.closedAt);
       return `
         <div class="muted small">
           <div class="discussion__meta">

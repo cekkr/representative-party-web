@@ -1,6 +1,7 @@
 import { getPerson } from '../../../modules/identity/person.js';
 import { getGovernanceSettings } from '../../../modules/governance/constitution.js';
 import { sendHtml } from '../../../shared/utils/http.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { renderPage } from '../views/templates.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
@@ -8,7 +9,7 @@ import { resolvePersonHandle } from '../views/actorLabel.js';
 export async function renderGovernance({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
   const governance = getGovernanceSettings(state);
-  const updatedAt = governance.updatedAt ? new Date(governance.updatedAt).toLocaleString() : 'Not yet updated';
+  const updatedAt = formatTimestamp(governance.updatedAt) || 'Not yet updated';
   const updatedBy = governance.updatedBy || 'admin';
 
   const html = await renderPage(

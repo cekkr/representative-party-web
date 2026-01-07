@@ -58,6 +58,7 @@ import {
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
 
@@ -1701,7 +1702,7 @@ function renderTransactionsList(entries = []) {
       const digest = escapeHtml(String(entry.digest || '').slice(0, 12));
       const actor = escapeHtml(String(entry.actorHash || 'anonymous').slice(0, 12));
       const petitionId = entry.petitionId ? escapeHtml(String(entry.petitionId).slice(0, 12)) : '';
-      const time = escapeHtml(new Date(entry.createdAt || Date.now()).toLocaleString());
+      const time = escapeHtml(formatTimestamp(entry.createdAt || Date.now()));
       return `<li><strong>${type}</strong> ${digest ? `· ${digest}` : ''} · actor ${actor}${
         petitionId ? ` · petition ${petitionId}` : ''
       } <span class="muted">${time}</span></li>`;
@@ -1852,7 +1853,7 @@ function renderTransactionSummariesList(entries = []) {
       const profileLabel = entry.profile?.mode ? `${entry.profile.mode}/${entry.profile.adapter || ''}` : 'profile unknown';
       const countLabel = Number.isFinite(entry.entryCount) ? `${entry.entryCount} digests` : 'digest count unknown';
       const receivedAt = escapeHtml(
-        new Date(entry.receivedAt || entry.issuedAt || Date.now()).toLocaleString(),
+        formatTimestamp(entry.receivedAt || entry.issuedAt || Date.now()),
       );
       const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
       const signaturePill = entry.verification?.skipped ? '<span class="pill ghost">unsigned</span>' : '';
@@ -2125,15 +2126,6 @@ function formatGossipStatus(status = {}) {
   if (status.error) return truncateText(status.error, 80);
   if (status.status) return `status ${status.status}`;
   return 'failed';
-}
-
-function formatTimestamp(value) {
-  if (!value) return '';
-  try {
-    return new Date(value).toLocaleString();
-  } catch (error) {
-    return String(value);
-  }
 }
 
 function truncateText(value, max) {

@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderIssuerPill } from './shared.js';
 
 export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
@@ -18,6 +19,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
       const previewPill = post.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
       const inboundPill = post.activityPub?.inbound ? '<span class="pill ghost">ActivityPub</span>' : '';
+      const createdAt = formatTimestamp(post.createdAt);
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
       const reshareBlock = renderReshare(post, mediaById);
       const mediaBlock = renderMediaAttachments(post.mediaIds || [], mediaById);
@@ -36,7 +38,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
             ${inboundPill}
             ${followTypePill}
             ${renderIssuerPill(post)}
-            <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           ${contentBlock}
           ${mediaBlock}
@@ -65,6 +67,7 @@ export function renderFollowList(follows) {
 
   return follows
     .map((edge) => {
+      const createdAt = formatTimestamp(edge.createdAt);
       return `
         <div class="list-row">
           <div>
@@ -73,7 +76,7 @@ export function renderFollowList(follows) {
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(edge.type)}</span>
-            <span class="muted tiny">${new Date(edge.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted tiny">${createdAt}</span>` : ''}
           </div>
         </div>
       `;
@@ -112,7 +115,7 @@ function renderReshare(post, mediaById) {
   if (!post.reshare) return '';
   const author = escapeHtml(post.reshare.authorHandle || post.reshare.authorHash || 'unknown');
   const content = escapeHtml(post.reshare.content || '');
-  const created = post.reshare.createdAt ? new Date(post.reshare.createdAt).toLocaleString() : '';
+  const created = formatTimestamp(post.reshare.createdAt);
   const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], mediaById);
   return `
     <div class="callout">

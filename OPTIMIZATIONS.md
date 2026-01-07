@@ -6,6 +6,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
 - Cache per-handle follow-type counts (or increment on follow/unfollow) to avoid recomputing tallies on every social feed render.
+- Combine follow-type map and count computations in a single pass when building social feed metadata.
 - Cache normalized topic keys in entries to avoid repeated normalization and filtering in topic views.
 - Add write-behind queues for persistence to batch JSON writes during bursty activity (discussion/posts/comments).
 - Add request-scoped memoization for common lookups (policy, actor labels, person/session) inside controllers.
@@ -14,6 +15,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache outbound delivery summaries instead of scanning the full transactions list on every `/admin` or `/health` render.
 - Pre-render or memoize petition evidence link lists (sanitized anchors) to avoid repeated normalization on each petitions render.
 - Cache petition discussion stance counts (support/concern/question/note) to avoid recomputing summaries on every render.
+- Cache vote and signature tallies per petition (or update incrementally on new votes/signatures) to avoid full scans on every proposal render.
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
@@ -47,3 +49,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added `countVisibleEntries()` and switched status/home counts to use it.
 - Added in-memory counters for module-disabled requests and rate-limit hits, surfaced in `/admin` and `/health`.
 - Added MySQL and MongoDB persistence adapters for larger datasets and provider-managed indexing/backups.
+- Added shared timestamp formatting to keep date rendering consistent across controllers and views.
+- Added topic breadcrumb caching in discussion/petition/forum lists and reduced social feed passes when filtering posts.

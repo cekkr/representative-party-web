@@ -2,6 +2,7 @@ import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { buildDelegateProfile } from '../../../modules/delegation/delegateProfiles.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled } from '../views/moduleGate.js';
 
@@ -46,7 +47,7 @@ function renderStats(profile) {
   const outgoing = profile.outgoing || { total: 0 };
   const votes = profile.votes || { total: 0 };
   const activity = profile.activity || { petitions: 0, discussions: 0, socialPosts: 0 };
-  const lastActive = activity.lastActiveAt ? new Date(activity.lastActiveAt).toLocaleString() : 'No activity yet';
+  const lastActive = formatTimestamp(activity.lastActiveAt) || 'No activity yet';
   const rows = [
     `Delegations received: ${incoming.total} from ${incoming.uniqueOwners} unique delegators`,
     `Delegations set: ${outgoing.total}`,
@@ -99,7 +100,7 @@ function renderActivitySummary(activity = {}) {
   }
   const items = recent
     .map((petition) => {
-      const updated = petition.updatedAt ? new Date(petition.updatedAt).toLocaleString() : '';
+      const updated = formatTimestamp(petition.updatedAt);
       return `<li>${escapeHtml(petition.title || 'Proposal')} - ${escapeHtml(petition.status)}${updated ? ` - ${escapeHtml(updated)}` : ''}</li>`;
     })
     .join('');
@@ -113,7 +114,7 @@ function renderGroupEndorsements(endorsements = []) {
   const items = endorsements
     .slice(0, 10)
     .map((entry) => {
-      const updated = entry.updatedAt ? new Date(entry.updatedAt).toLocaleString() : '';
+      const updated = formatTimestamp(entry.updatedAt);
       const label = `${entry.groupName} - ${entry.topic} - prio ${entry.priority}`;
       const detail = entry.provider ? ` - ${entry.provider}` : '';
       return `<li>${escapeHtml(label)}${detail ? escapeHtml(detail) : ''}${updated ? ` - ${escapeHtml(updated)}` : ''}</li>`;
@@ -129,7 +130,7 @@ function renderElectionWins(wins = []) {
   const items = wins
     .slice(0, 10)
     .map((entry) => {
-      const closedAt = entry.closedAt ? new Date(entry.closedAt).toLocaleString() : '';
+      const closedAt = formatTimestamp(entry.closedAt);
       const method = entry.method ? ` - method ${entry.method}` : '';
       const rounds = Number.isFinite(entry.rounds) ? ` - rounds ${entry.rounds}` : '';
       const base = `Group ${entry.groupId} - ${entry.topic}${method}${rounds}`;

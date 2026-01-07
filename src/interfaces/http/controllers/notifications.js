@@ -4,6 +4,7 @@ import { resolveNotificationPreferences } from '../../../modules/messaging/outbo
 import { persistProfileAttributes } from '../../../infra/persistence/storage.js';
 import { upsertProviderAttributes } from '../../../modules/structure/structureManager.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
@@ -56,16 +57,18 @@ function renderNotificationList(list) {
     .map((n) => {
       const anchorId = n.petitionId ? `petition-${n.petitionId}` : '';
       const proposalLink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
+      const createdAt = formatTimestamp(n.createdAt);
+      const expiresAt = formatTimestamp(n.expiresAt);
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(n.type)}</span>
-            <span class="muted small">${new Date(n.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             ${n.read ? '<span class="pill ghost">read</span>' : ''}
             ${proposalLink}
           </div>
           <p>${escapeHtml(n.message)}</p>
-          ${n.expiresAt ? `<p class="muted small">Expires: ${new Date(n.expiresAt).toLocaleString()}</p>` : ''}
+          ${expiresAt ? `<p class="muted small">Expires: ${expiresAt}</p>` : ''}
         </article>
       `;
     })

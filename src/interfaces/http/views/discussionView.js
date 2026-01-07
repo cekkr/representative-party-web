@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderDiscussionList(entries, state) {
@@ -6,9 +7,11 @@ export function renderDiscussionList(entries, state) {
     return '<p class="muted">No contributions yet. Be the first to start the debate.</p>';
   }
 
+  const topicCache = new Map();
   return entries
     .map((entry) => {
-      const topicLabel = resolveTopicBreadcrumb(entry, state);
+      const topicLabel = resolveTopicBreadcrumb(entry, state, topicCache);
+      const createdAt = formatTimestamp(entry.createdAt);
       return `
         <article class="discussion">
           <div class="discussion__meta">
@@ -16,7 +19,7 @@ export function renderDiscussionList(entries, state) {
             <span class="pill ghost">${escapeHtml(entry.stance)}</span>
             ${entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(entry)}
-            <span class="muted small">${new Date(entry.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <p>${escapeHtml(entry.content)}</p>
           <p class="muted small">Author hash: ${escapeHtml(entry.authorHash)}</p>
