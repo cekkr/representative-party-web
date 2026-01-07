@@ -789,6 +789,14 @@ function buildAdminViewModel(
   const governanceVoteMethod = governanceVoteMethodValue ?? governance.defaultVoteMethod;
   const governanceNotes = governanceNotesValue ?? governance.notes;
   const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
+  const installWizardActive = !effective.initialized;
+  const installWizardMode = installWizardActive ? 'wizard' : 'full';
+  const installWizardIntro = installWizardActive
+    ? '<p class="muted small">Installation wizard: follow the steps to set Circle identity, data mode, and peer alignment. Optional defaults come last.</p>'
+    : '';
+  const installWizardHint = installWizardActive
+    ? '<p class="muted small">Installation hint: toggle enforcement and add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>'
+    : '';
 
   return {
     circleName: effective.circleName,
@@ -803,7 +811,7 @@ function buildAdminViewModel(
     peersKnown: policy.peersKnown,
     ledgerEntries: policy.ledgerEntries,
     notes: effective.notes,
-    firstRunNote: effective.initialized ? '' : 'First installation mode: configure policy and save to persist.',
+    firstRunNote: effective.initialized ? '' : 'First installation mode: use the admin wizard to configure and persist Circle settings.',
     flash,
     postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
@@ -907,6 +915,9 @@ function buildAdminViewModel(
     governanceVoteMethodStar: governanceVoteMethod === 'star' ? 'selected' : '',
     governanceNotes,
     governanceUpdatedAt,
+    installWizardMode,
+    installWizardIntro,
+    installWizardHint,
   };
 }
 

@@ -1,6 +1,7 @@
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
+  initInstallWizard(root);
 
   document.addEventListener('click', async (event) => {
     const anchor = event.target.closest('a[data-partial]');
@@ -13,6 +14,7 @@
       if (!response.ok) throw new Error('Navigation failed');
       const html = await response.text();
       root.innerHTML = html;
+      initInstallWizard(root);
       window.history.pushState({}, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       triggerDeepLink();
@@ -75,6 +77,7 @@
       }
       const html = await response.text();
       root.innerHTML = html;
+      initInstallWizard(root);
       window.history.pushState({}, '', url);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       triggerDeepLink();
@@ -132,4 +135,68 @@ async function submitDelegationChoice(form) {
     console.error(error);
     alert('Failed to update delegation choice.');
   }
+}
+
+function initInstallWizard(root) {
+  const form = root.querySelector('form[data-install-wizard]');
+  if (!form) return;
+  if (form.dataset.installMode !== 'wizard') return;
+  const steps = Array.from(form.querySelectorAll('[data-wizard-step]'));
+  if (!steps.length) return;
+  const indicators = Array.from(form.querySelectorAll('[data-wizard-indicator]'));
+  const status = form.querySelector('[data-wizard-status]');
+  const bar = form.querySelector('[data-wizard-bar]');
+  const prevButton = form.querySelector('[data-wizard-prev]');
+  const nextButton = form.querySelector('[data-wizard-next]');
+  const submitButton = form.querySelector('[data-wizard-submit]');
+  let currentIndex = 0;
+
+  const update = (nextIndex) => {
+    const clamped = Math.min(Math.max(nextIndex, 0), steps.length - 1);
+    currentIndex = clamped;
+    steps.forEach((step, index) => {
+      step.hidden = index !== currentIndex;
+    });
+    indicators.forEach((indicator, index) => {
+      indicator.classList.toggle('is-active', index === currentIndex);
+      indicator.classList.toggle('is-complete', index < currentIndex);
+    });
+    if (status) {
+      status.textContent = `Step ${currentIndex + 1} of ${steps.length}`;
+    }
+    if (bar) {
+      bar.style.width = `${Math.round(((currentIndex + 1) / steps.length) * 100)}%`;
+    }
+    if (prevButton) {
+      prevButton.disabled = currentIndex === 0;
+    }
+    if (nextButton) {
+      nextButton.hidden = currentIndex >= steps.length - 1;
+    }
+    if (submitButton) {
+      submitButton.hidden = currentIndex < steps.length - 1;
+    }
+  };
+
+  form.addEventListener('click', (event) => {
+    const trigger = event.target.closest('[data-wizard-next], [data-wizard-prev], [data-wizard-jump]');
+    if (!trigger) return;
+    event.preventDefault();
+    if (trigger.dataset.wizardJump !== undefined) {
+      const jumpIndex = Number(trigger.dataset.wizardJump);
+      if (Number.isFinite(jumpIndex)) {
+        update(jumpIndex);
+      }
+      return;
+    }
+    if (trigger.hasAttribute('data-wizard-next')) {
+      update(currentIndex + 1);
+      return;
+    }
+    if (trigger.hasAttribute('data-wizard-prev')) {
+      update(currentIndex - 1);
+    }
+  });
+
+  update(0);
 }

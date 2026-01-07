@@ -331,6 +331,104 @@ ul.plain li:last-child {
   gap: 0.75rem;
 }
 
+.install-wizard {
+  gap: 1.1rem;
+}
+
+.wizard-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.wizard-progress__bar {
+  flex: 1;
+  min-width: 160px;
+  height: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.wizard-progress__fill {
+  display: block;
+  height: 100%;
+  width: 25%;
+  background: linear-gradient(90deg, var(--highlight), var(--accent));
+  transition: width 0.2s ease;
+}
+
+.wizard-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.5rem;
+}
+
+.wizard-step-indicator button {
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wizard-step-indicator.is-active button {
+  border-color: var(--accent);
+  background: rgba(126, 242, 208, 0.12);
+}
+
+.wizard-step-indicator.is-complete button {
+  border-color: var(--highlight);
+}
+
+.wizard-step {
+  border: 1px dashed var(--border);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(12, 19, 32, 0.6);
+}
+
+.wizard-step[hidden] {
+  display: none;
+}
+
+.wizard-actions {
+  margin-top: 0.5rem;
+}
+
+.wizard-actions button[hidden] {
+  display: none;
+}
+
+form[data-install-mode="full"] .wizard-progress,
+form[data-install-mode="full"] .wizard-steps {
+  display: none;
+}
+
+form[data-install-mode="full"] .wizard-step {
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+form[data-install-mode="full"] .wizard-step > .eyebrow {
+  display: none;
+}
+
+form[data-install-mode="full"] .wizard-actions button[data-wizard-prev],
+form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
+  display: none;
+}
+
 .field {
   display: flex;
   flex-direction: column;

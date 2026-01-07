@@ -104,6 +104,8 @@ npm start
 
 The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`).
 
+On first run, visit `/admin` to complete the installation wizard (Circle basics, data mode, peer alignment, optional defaults). Saving persists settings to the configured adapter (JSON/KV under `src/data/` by default).
+
 ### Common recipes
 
 ```bash
@@ -143,7 +145,7 @@ npm run db:check
 - `/delegates/{hash}` (delegate profile summary)
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
-- `/admin` settings, policy toggles, rate‑limit overrides, and audit summaries; `/extensions` extension toggles
+- `/admin` settings, first-run installation wizard, policy toggles, rate-limit overrides, and audit summaries; `/extensions` extension toggles
 - `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
 - `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub endpoints (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` ingesting preview social notes for local recipients)
 

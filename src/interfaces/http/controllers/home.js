@@ -32,7 +32,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',
       policyDetail: `Policy ${effective.id} v${effective.version} · Ledger entries ${policy.ledgerEntries} · Peers ${policy.peersKnown}`,
       circleName: effective.circleName,
-      firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to configure and persist Circle policies.',
+      firstRunNote: effective.initialized ? '' : 'First installation mode: visit Admin to run the installation wizard and persist Circle policies.',
       gateSummary,
       extensionsSummary,
       ledgerLink,

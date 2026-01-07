@@ -18,137 +18,184 @@
     <p class="muted small">{{firstRunNote}}</p>
   </div>
   <p class="muted small">{{flash}}</p>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
-    <div class="form-grid">
-      <label class="field">
-        <span>Circle name</span>
-        <input name="circleName" value="{{circleName}}" placeholder="Party Circle" />
-      </label>
-      <label class="field">
-        <span>Policy ID</span>
-        <input name="policyId" value="{{policyId}}" placeholder="party-circle-alpha" />
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field checkbox">
-        <input type="checkbox" name="enforceCircle" {{enforceCircleChecked}} />
-        <span>Enforce Circle (verification before posting/voting)</span>
-      </label>
-      <label class="field checkbox">
-        <input type="checkbox" name="requireVerification" {{requireVerificationChecked}} />
-        <span>Require wallet verification for posting</span>
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Data mode</span>
-        <select name="dataMode">
-          <option value="centralized" {{dataModeCentralized}}>centralized</option>
-          <option value="hybrid" {{dataModeHybrid}}>hybrid</option>
-          <option value="p2p" {{dataModeP2P}}>p2p</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Validation level</span>
-        <select name="dataValidation">
-          <option value="strict" {{dataValidationStrict}}>strict</option>
-          <option value="observe" {{dataValidationObserve}}>observe</option>
-          <option value="off" {{dataValidationOff}}>off</option>
-        </select>
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Data adapter</span>
-        <select name="dataAdapter">
-          <option value="json" {{dataAdapterJson}}>json (default)</option>
-          <option value="memory" {{dataAdapterMemory}}>memory (ephemeral)</option>
-          <option value="sql" {{dataAdapterSql}}>sql (sqlite3 optional dep)</option>
-          <option value="kv" {{dataAdapterKv}}>kv (file-based)</option>
-          <option value="mysql" {{dataAdapterMysql}}>mysql (mysql2 optional dep)</option>
-          <option value="mongodb" {{dataAdapterMongodb}}>mongodb (mongodb optional dep)</option>
-        </select>
-      </label>
-      <label class="field checkbox">
-        <input type="checkbox" name="dataPreview" {{dataPreviewChecked}} />
-        <span>Allow preview data (store uncertified entries)</span>
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Admin contact</span>
-        <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
-      </label>
-      <label class="field">
-        <span>Circle issuer (public URL)</span>
-        <input name="issuer" value="{{issuer}}" placeholder="https://provider.party" />
-      </label>
-      <label class="field">
-        <span>Preferred peer (Circle anchor)</span>
-        <input name="preferredPeer" value="{{preferredPeer}}" placeholder="https://peer.party" />
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Default group election mode</span>
-        <select name="defaultElectionMode">
-          <option value="priority" {{defaultElectionModePriority}}>Priority</option>
-          <option value="vote" {{defaultElectionModeVote}}>Vote</option>
-        </select>
-      </label>
-      <label class="field">
-        <span>Default group conflict rule</span>
-        <select name="defaultConflictRule">
-          <option value="highest_priority" {{defaultConflictHighest}}>Highest priority</option>
-          <option value="prompt_user" {{defaultConflictPrompt}}>Prompt user</option>
-        </select>
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Quorum advance stage (proposals)</span>
-        <select name="petitionQuorumAdvance">
-          <option value="discussion" {{petitionQuorumAdvanceDiscussion}}>discussion</option>
-          <option value="vote" {{petitionQuorumAdvanceVote}}>vote</option>
-        </select>
-      </label>
-      <div class="stack">
-        <p class="muted small">Choose whether quorum moves proposals into discussion or directly into the vote stage.</p>
+  <form class="stack install-wizard" method="post" action="/admin" data-enhance="admin" data-install-wizard data-install-mode="{{installWizardMode}}">
+    <input type="hidden" name="intent" value="settings" />
+    {{installWizardIntro}}
+    <div class="wizard-progress" data-wizard-progress>
+      <span class="muted small" data-wizard-status>Step 1 of 4</span>
+      <div class="wizard-progress__bar" aria-hidden="true">
+        <span class="wizard-progress__fill" data-wizard-bar></span>
       </div>
     </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Topic gardener URL (optional)</span>
-        <input name="topicGardenerUrl" value="{{topicGardenerUrl}}" placeholder="http://localhost:8070/classify" />
-      </label>
-      <label class="field">
-        <span>Topic anchors (comma separated)</span>
-        <input name="topicAnchors" value="{{topicAnchors}}" placeholder="general,governance,economy" />
-      </label>
-    </div>
-    <label class="field">
-      <span>Pinned topics (comma separated)</span>
-      <input name="topicPinned" value="{{topicPinned}}" placeholder="climate,health,education" />
-    </label>
-    <p class="muted small">Anchors and pins guide the topic gardener to reconcile provider labels.</p>
-    <label class="field">
-      <span>Notes</span>
-      <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>
-    </label>
-    <div class="form-grid">
-      <label class="field">
-        <span>Add peer and aggregate</span>
-        <input name="peerJoin" placeholder="https://peer.party" />
-      </label>
-      <div class="stack">
-        <p class="muted small">Add a trusted peer to sync ledger/policies. This will persist to the peer registry.</p>
+    <ol class="wizard-steps" data-wizard-steps>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="0">1. Circle basics</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="1">2. Data and validation</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="2">3. Identity and peers</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="3">4. Optional defaults</button>
+      </li>
+    </ol>
+    <section class="wizard-step stack" data-wizard-step="0">
+      <p class="eyebrow">Step 1</p>
+      <h3>Circle basics</h3>
+      <p class="muted small">Define the Circle identity and verification stance for users.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Circle name</span>
+          <input name="circleName" value="{{circleName}}" placeholder="Party Circle" />
+        </label>
+        <label class="field">
+          <span>Policy ID</span>
+          <input name="policyId" value="{{policyId}}" placeholder="party-circle-alpha" />
+        </label>
       </div>
-    </div>
-    <div class="cta-row">
-      <button class="cta" type="submit">Save settings</button>
+      <div class="form-grid">
+        <label class="field checkbox">
+          <input type="checkbox" name="enforceCircle" {{enforceCircleChecked}} />
+          <span>Enforce Circle (verification before posting/voting)</span>
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="requireVerification" {{requireVerificationChecked}} />
+          <span>Require wallet verification for posting</span>
+        </label>
+      </div>
+      <p class="muted small">Enforcement switches the UI label from user to person when verification is required.</p>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="1">
+      <p class="eyebrow">Step 2</p>
+      <h3>Data and validation</h3>
+      <p class="muted small">Choose how data is stored and whether preview entries can be kept.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Data mode</span>
+          <select name="dataMode">
+            <option value="centralized" {{dataModeCentralized}}>centralized</option>
+            <option value="hybrid" {{dataModeHybrid}}>hybrid</option>
+            <option value="p2p" {{dataModeP2P}}>p2p</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Validation level</span>
+          <select name="dataValidation">
+            <option value="strict" {{dataValidationStrict}}>strict</option>
+            <option value="observe" {{dataValidationObserve}}>observe</option>
+            <option value="off" {{dataValidationOff}}>off</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Data adapter</span>
+          <select name="dataAdapter">
+            <option value="json" {{dataAdapterJson}}>json (default)</option>
+            <option value="memory" {{dataAdapterMemory}}>memory (ephemeral)</option>
+            <option value="sql" {{dataAdapterSql}}>sql (sqlite3 optional dep)</option>
+            <option value="kv" {{dataAdapterKv}}>kv (file-based)</option>
+            <option value="mysql" {{dataAdapterMysql}}>mysql (mysql2 optional dep)</option>
+            <option value="mongodb" {{dataAdapterMongodb}}>mongodb (mongodb optional dep)</option>
+          </select>
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="dataPreview" {{dataPreviewChecked}} />
+          <span>Allow preview data (store uncertified entries)</span>
+        </label>
+      </div>
+      <p class="muted small">Centralized mode disables gossip ingest; hybrid and p2p keep it enabled.</p>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="2">
+      <p class="eyebrow">Step 3</p>
+      <h3>Circle identity and peers</h3>
+      <p class="muted small">Set an issuer URL and optional peer hints for audits and alignment.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Admin contact</span>
+          <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
+        </label>
+        <label class="field">
+          <span>Circle issuer (public URL)</span>
+          <input name="issuer" value="{{issuer}}" placeholder="https://provider.party" />
+        </label>
+        <label class="field">
+          <span>Preferred peer (Circle anchor)</span>
+          <input name="preferredPeer" value="{{preferredPeer}}" placeholder="https://peer.party" />
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Add peer and aggregate</span>
+          <input name="peerJoin" placeholder="https://peer.party" />
+        </label>
+        <div class="stack">
+          <p class="muted small">Add a trusted peer to sync ledger/policies. This will persist to the peer registry.</p>
+        </div>
+      </div>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="3">
+      <p class="eyebrow">Step 4</p>
+      <h3>Optional defaults</h3>
+      <p class="muted small">Optional settings you can revisit in Admin at any time.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Default group election mode</span>
+          <select name="defaultElectionMode">
+            <option value="priority" {{defaultElectionModePriority}}>Priority</option>
+            <option value="vote" {{defaultElectionModeVote}}>Vote</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Default group conflict rule</span>
+          <select name="defaultConflictRule">
+            <option value="highest_priority" {{defaultConflictHighest}}>Highest priority</option>
+            <option value="prompt_user" {{defaultConflictPrompt}}>Prompt user</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Quorum advance stage (proposals)</span>
+          <select name="petitionQuorumAdvance">
+            <option value="discussion" {{petitionQuorumAdvanceDiscussion}}>discussion</option>
+            <option value="vote" {{petitionQuorumAdvanceVote}}>vote</option>
+          </select>
+        </label>
+        <div class="stack">
+          <p class="muted small">Choose whether quorum moves proposals into discussion or directly into the vote stage.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Topic gardener URL (optional)</span>
+          <input name="topicGardenerUrl" value="{{topicGardenerUrl}}" placeholder="http://localhost:8070/classify" />
+        </label>
+        <label class="field">
+          <span>Topic anchors (comma separated)</span>
+          <input name="topicAnchors" value="{{topicAnchors}}" placeholder="general,governance,economy" />
+        </label>
+      </div>
+      <label class="field">
+        <span>Pinned topics (comma separated)</span>
+        <input name="topicPinned" value="{{topicPinned}}" placeholder="climate,health,education" />
+      </label>
+      <p class="muted small">Anchors and pins guide the topic gardener to reconcile provider labels.</p>
+      <label class="field">
+        <span>Notes</span>
+        <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>
+      </label>
+      <p class="muted small">Governance defaults can be tuned in the section below.</p>
+    </section>
+    <div class="cta-row wizard-actions">
+      <button class="ghost" type="button" data-wizard-prev>Back</button>
+      <button class="cta" type="button" data-wizard-next>Next</button>
+      <button class="cta" type="submit" data-wizard-submit>Save settings</button>
       <a class="ghost" href="/" data-partial>Back home</a>
     </div>
-    <p class="muted small">First installation hint: toggle enforcement + add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>
+    {{installWizardHint}}
   </form>
 </section>
 
