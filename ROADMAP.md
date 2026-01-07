@@ -50,7 +50,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Governance defaults (quorum, timing windows, vote method) are editable in `/admin` and published at `/governance`.
 - `/admin` now includes a first-run installation wizard for Circle basics, data mode, peer alignment, and optional defaults.
-- `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned.
+- `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned (links live with module metadata).
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.

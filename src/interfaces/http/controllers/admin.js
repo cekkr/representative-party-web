@@ -63,28 +63,6 @@ import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
-const MODULE_SETTINGS_LINKS = {
-  social: [{ label: 'Media moderation', href: '#social-media' }],
-  petitions: [
-    { label: 'Circle defaults', href: '#wizard-step-3' },
-    { label: 'Governance defaults', href: '#governance-settings' },
-  ],
-  votes: [
-    { label: 'Governance defaults', href: '#governance-settings' },
-    { label: 'Gossip sync', href: '#federation-gossip' },
-  ],
-  delegation: [{ label: 'Group defaults', href: '#wizard-step-3' }],
-  groups: [{ label: 'Group defaults', href: '#wizard-step-3' }],
-  federation: [
-    { label: 'Data and validation', href: '#wizard-step-1' },
-    { label: 'Issuer and peers', href: '#wizard-step-2' },
-    { label: 'Gossip sync', href: '#federation-gossip' },
-  ],
-  topicGardener: [
-    { label: 'Anchors and pins', href: '#wizard-step-3' },
-    { label: 'Review queue', href: '#topic-gardener-review' },
-  ],
-};
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
   return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null } });
@@ -2250,10 +2228,11 @@ function decorateModules(list = []) {
   const byKey = new Map((list || []).map((mod) => [mod.key, mod]));
   return (list || []).map((mod) => {
     const missingDependencies = (mod.requires || []).filter((dependency) => !byKey.get(dependency)?.enabled);
+    const settingsLinks = Array.isArray(mod.settingsLinks) ? mod.settingsLinks : [];
     return {
       ...mod,
       missingDependencies,
-      settingsLinks: MODULE_SETTINGS_LINKS[mod.key] || [],
+      settingsLinks,
     };
   });
 }

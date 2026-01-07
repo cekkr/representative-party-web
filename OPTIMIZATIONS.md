@@ -26,7 +26,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
 - Consolidate repeated "hash-only guarantee" and verification copy into shared view strings to keep copy consistent.
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
-- Centralize the module settings map (admin anchors + docs references) in shared config so toggles and documentation stay in sync.
 
 ## UX Consistency
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
@@ -52,3 +51,4 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added MySQL and MongoDB persistence adapters for larger datasets and provider-managed indexing/backups.
 - Added shared timestamp formatting to keep date rendering consistent across controllers and views.
 - Added topic breadcrumb caching in discussion/petition/forum lists and reduced social feed passes when filtering posts.
+- Centralized the module settings map in module metadata so admin toggles and settings links stay aligned.
