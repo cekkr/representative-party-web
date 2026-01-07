@@ -3,6 +3,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Anchoring Principles (from Representative Parties)
 - **One person/person, One Voice** backed by blinded identity; federation guards against double representation and toxic providers. “Person” is a Circle-specific label layered on top of the user role when civic proof is enabled.
 - **Exclusion principle**: only natural persons can hold handles or act; org/bot/service accounts are blocked via verification policy and banned flagging.
+- **Provider-blind option (optional)**: user ids are Circle-unique independent of provider; explore P2P protocols to obscure provider attribution in gossip/UX where feasible without breaking auditability.
+- **Privilege-free Circle genesis (optional)**: Circles can start with no special roles beyond provider admins; governance can emerge via groups, member votes, and contextual dynamic structures.
 - **Soft-power accountability**: transparency and auditable trails instead of hard imperative mandates.
 - **Liquid representation**: delegation is topic-scoped, revocable, and visible; users/people can migrate without losing history.
 - **Phygital inclusion**: the digital platform must remain accessible via desktop/mobile and be mirrored by physical “agorà” touchpoints.
@@ -90,6 +92,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection, and vote-mode recommendations should prefer the latest closed election winner.
+- **Privilege-free Circle bootstrap (optional)**: allow Circles to start without seeded roles beyond provider admins; group elections and member votes can grant roles and context-specific structures as they evolve.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
 - **Deliberative workbench**: structured proposal templates and argument-map linking are shipped in petitions; next steps include deeper pro/con trees, evidence/citation prompts, and community fact-check workflows.
 - **Governance module**: digital constitution for quorum/debate windows/voting-method defaults, with community proposals, audits, and admin emergency overrides.
@@ -108,6 +111,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Claim & Seize** protocol: signed migration requests to move history across providers when the same wallet re-verifies.
 - **Circle health**: scheduled peer audits for policy compliance; automatic quarantine of toxic peers.
 - **Cross-provider access**: view/vote on petitions across providers with signed envelopes and policy gating.
+- **Provider-blind mode (optional)**: explore P2P routing/mixnet approaches to hide provider attribution in gossip/envelopes while preserving auditability and abuse controls.
 - UX: migration status banners and audit transparency dashboard.
 
 ### Phase 5 — Accountability & Launch (Months 15+)
@@ -235,6 +239,9 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Delegation & Trust UX:**
       * Delegate profiles (bio, vote history, delegation counts) and delegation chain visualization.
       * Delegation decay/renewal controls and reputation scaffolds (deliberation score, topic expertise).
+4.  **Privilege-free Circle bootstrap (optional):**
+      * Allow Circles to start without seeded roles beyond provider admins.
+      * Enable groups + member votes to grant roles and evolve contextual structures over time.
 
 #### **Phase 3: The Decision Engine (Months 8-11)**
 
@@ -261,6 +268,8 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * **Policy Verification:** Servers periodically audit each other (e.g., checking if they are correctly enforcing OIDC4VP checks). If a server fails, it is automatically removed from the "Trusted Circle," isolating the toxic provider.
 3.  **Cross-Provider Access:**
       * Allow a user on *Server A* to view and vote on a Petition hosted on *Server B* seamlessly, using the ActivityPub federation to transport the vote authentication.
+4.  **Provider-blind mode (optional):**
+      * Explore P2P routing/mixnet approaches to hide provider attribution in gossip/envelopes while preserving auditability and abuse controls.
 
 #### **Phase 5: Accountability & Launch (Months 15+)**
 

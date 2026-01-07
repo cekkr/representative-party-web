@@ -50,6 +50,8 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Messaging‑first kernel**: discussion + forum + notifications work alone.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
+- **Provider-blind option (research)**: user ids are Circle-unique independent of provider; explore P2P protocols to hide provider attribution in envelopes/UX when feasible.
+- **Privilege-free genesis (optional)**: Circles can bootstrap without preassigned roles beyond provider admins; groups and member votes can evolve governance structures over time.
 - **Petitions → votes pipeline**: proposals with evidence summaries + source links, structured outline fields (problem/action/impact/risks/plan), collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed with stance tags (support/concern/question) + fact‑check flags + evidence/citation prompts, and argument‑map linking for pro/con trees.
 - **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with a public read-only view.
 - **Module control center**: admin toggles plus a settings map with jump links so module activation and configuration stay in one place (links are defined alongside module metadata).
