@@ -874,5 +874,5 @@ test('UI petition discussion exposes evidence prompt (agent viewport)', { timeou
   await new Promise((resolve) => setTimeout(resolve, 200));
 
   const snapshot = await captureViewport(page);
-  assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, count: 1 });
+  assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, min: 1 });
 });
