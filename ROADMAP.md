@@ -46,7 +46,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default, blockable after reports), gated by the same role/ban checks.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
-- Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags, argument-map linking, transactions log + gossip summaries, and admin controls.
+- Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags + evidence prompts, argument-map linking, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
 - Governance defaults (quorum, timing windows, vote method) are editable in `/admin` and published at `/governance`.
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
@@ -55,7 +55,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
 
 ## Near-term next steps (Phase 2 focus)
-- Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; remaining work includes richer pro/con trees, evidence/citation prompts, and community fact-check workflows.
+- Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.

@@ -11,6 +11,7 @@ import { fetchText, postForm, postJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { LATEST_SCHEMA_VERSION } from '../src/infra/persistence/migrations.js';
 import { buildActivityPubCreateNote } from './helpers/activitypub.js';
+import { captureViewport, assertSnapshot } from '../scripts/agent-viewport.js';
 
 async function configurePage(page, baseUrl) {
   await page.setRequestInterception(true);
@@ -836,4 +837,42 @@ test('UI admin reviews topic anchor suggestions and logs history', { timeout: 60
   assert.ok(!anchorsAfterArchive.includes('economy'));
   await page.waitForFunction(() => document.body.textContent.includes('anchor_archive_accept'));
   await page.waitForFunction(() => document.body.textContent.includes('No anchor suggestions'));
+});
+
+test('UI petition discussion exposes evidence prompt (agent viewport)', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'evidence-ui' });
+  await postForm(
+    `${server.baseUrl}/petitions`,
+    { title: 'Evidence UI', summary: 'Testing evidence prompt', body: '' },
+    { cookie: session.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+
+  await page.evaluate(() => {
+    const discussion = Array.from(document.querySelectorAll('details.note')).find((node) =>
+      node.querySelector('summary')?.textContent?.includes('Discussion'),
+    );
+    if (discussion) {
+      discussion.open = true;
+      discussion.scrollIntoView({ block: 'center' });
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const snapshot = await captureViewport(page);
+  assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, count: 1 });
 });

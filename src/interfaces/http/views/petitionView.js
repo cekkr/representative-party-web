@@ -371,6 +371,11 @@ function renderDiscussionBlock(petition, comments) {
           ${argumentDatalist}
           <p class="muted small">Use short titles to map pro/con threads and link related notes.</p>
         </details>
+        <label class="field">
+          <span>Evidence / citations (optional)</span>
+          <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
+        </label>
+        <p class="muted small">One URL per line.</p>
         <label class="field checkbox">
           <input type="checkbox" name="factCheck" value="yes" />
           <span>Request fact check for this comment</span>
@@ -392,11 +397,13 @@ function renderPetitionComments(comments) {
   }
   return comments
     .map((comment) => {
+      const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
       const stanceLabel = getCommentStanceLabel(comment.stance);
       const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       const argumentPill =
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
+      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
       const createdAt = formatTimestamp(comment.createdAt);
       const argumentTitle = comment.argumentTitle
         ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
@@ -414,6 +421,7 @@ function renderPetitionComments(comments) {
             ${stancePill}
             ${factCheckPill}
             ${argumentPill}
+            ${evidencePill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
@@ -421,6 +429,7 @@ function renderPetitionComments(comments) {
           ${argumentTitle}
           ${argumentParent}
           <p>${escapeHtml(comment.content)}</p>
+          ${renderEvidenceLinks(evidenceLinks)}
           ${argumentId}
           <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
         </article>
@@ -429,12 +438,32 @@ function renderPetitionComments(comments) {
     .join('\n');
 }
 
+function renderEvidenceLinks(links = [], { limit = 4 } = {}) {
+  const filtered = Array.isArray(links)
+    ? links.filter((link) => typeof link === 'string' && /^https?:\/\//i.test(link))
+    : [];
+  const items = filtered.slice(0, limit).map((link) => {
+    const safeLink = escapeHtml(link);
+    return `<li><a class="muted small" href="${safeLink}" target="_blank" rel="noreferrer">${safeLink}</a></li>`;
+  });
+  if (!items.length) return '';
+  return `
+    <div class="stack">
+      <p class="muted small">Evidence</p>
+      <ul class="plain small">
+        ${items.join('')}
+      </ul>
+    </div>
+  `;
+}
+
 export function renderProposalDiscussionFeed(items) {
   if (!items.length) {
     return '<p class="muted">No proposal discussions yet. Join a discussion to surface activity.</p>';
   }
   return items
     .map(({ comment, petition }) => {
+      const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
       const statusLabel = displayStatus(petition?.status || 'draft');
       const snippet = (comment.content || '').slice(0, 180);
       const anchorId = petition?.id ? `petition-${petition.id}` : null;
@@ -444,6 +473,7 @@ export function renderProposalDiscussionFeed(items) {
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       const argumentPill =
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
+      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
       const argumentLine = comment.argumentTitle
         ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
         : '';
@@ -456,6 +486,7 @@ export function renderProposalDiscussionFeed(items) {
             ${stancePill}
             ${factCheckPill}
             ${argumentPill}
+            ${evidencePill}
             ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}

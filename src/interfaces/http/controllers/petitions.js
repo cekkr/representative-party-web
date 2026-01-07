@@ -543,6 +543,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   const factCheck = parseBoolean(body.factCheck, false);
   const argumentTitle = sanitizeText(body.argumentTitle || '', 120);
   const argumentParentId = sanitizeText(body.argumentParentId || '', 120);
+  const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   if (!petitionId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
@@ -575,6 +576,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     factCheck: Boolean(factCheck),
     argumentTitle: argumentTitleFinal,
     argumentParentId: resolvedArgumentParent ? argumentParentId : '',
+    evidenceLinks,
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
   };
@@ -591,6 +593,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
       factCheck: Boolean(factCheck),
       argumentTitle: argumentTitleFinal || null,
       argumentParentId: resolvedArgumentParent ? argumentParentId : null,
+      evidenceLinks,
     },
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
