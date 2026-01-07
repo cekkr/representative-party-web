@@ -14,9 +14,9 @@
       if (!response.ok) throw new Error('Navigation failed');
       const html = await response.text();
       root.innerHTML = html;
-      initInstallWizard(root);
       window.history.pushState({}, '', url);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      initInstallWizard(root);
+      scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
@@ -77,9 +77,9 @@
       }
       const html = await response.text();
       root.innerHTML = html;
-      initInstallWizard(root);
       window.history.pushState({}, '', url);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      initInstallWizard(root);
+      scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
@@ -102,6 +102,19 @@ function triggerDeepLink() {
 }
 
 triggerDeepLink();
+
+function scrollToHash(url) {
+  const targetUrl = new URL(url, window.location.origin);
+  const hash = targetUrl.hash;
+  if (hash) {
+    const target = document.querySelector(hash);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 async function submitExtensionsForm(form) {
   const checkboxes = Array.from(form.querySelectorAll('input[name="extensions"]'));
@@ -198,5 +211,24 @@ function initInstallWizard(root) {
     }
   });
 
+  const syncFromHash = () => {
+    const match = window.location.hash.match(/wizard-step-(\d+)/);
+    if (!match) return;
+    const targetIndex = Number(match[1]);
+    if (!Number.isFinite(targetIndex)) return;
+    update(targetIndex);
+    const target = document.getElementById(`wizard-step-${targetIndex}`);
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  if (window.__wizardHashHandler) {
+    window.removeEventListener('hashchange', window.__wizardHashHandler);
+  }
+  window.__wizardHashHandler = syncFromHash;
+  window.addEventListener('hashchange', window.__wizardHashHandler);
+
   update(0);
+  syncFromHash();
 }

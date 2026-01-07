@@ -63,6 +63,28 @@ import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
+const MODULE_SETTINGS_LINKS = {
+  social: [{ label: 'Media moderation', href: '#social-media' }],
+  petitions: [
+    { label: 'Circle defaults', href: '#wizard-step-3' },
+    { label: 'Governance defaults', href: '#governance-settings' },
+  ],
+  votes: [
+    { label: 'Governance defaults', href: '#governance-settings' },
+    { label: 'Gossip sync', href: '#federation-gossip' },
+  ],
+  delegation: [{ label: 'Group defaults', href: '#wizard-step-3' }],
+  groups: [{ label: 'Group defaults', href: '#wizard-step-3' }],
+  federation: [
+    { label: 'Data and validation', href: '#wizard-step-1' },
+    { label: 'Issuer and peers', href: '#wizard-step-2' },
+    { label: 'Gossip sync', href: '#federation-gossip' },
+  ],
+  topicGardener: [
+    { label: 'Anchors and pins', href: '#wizard-step-3' },
+    { label: 'Review queue', href: '#topic-gardener-review' },
+  ],
+};
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
   return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null } });
@@ -580,20 +602,33 @@ async function updateProfileAttributes(state, body) {
 async function updateModules(state, body) {
   const definitions = listModuleDefinitions();
   const toggles = {};
+  const requested = {};
   for (const definition of definitions) {
-    toggles[definition.key] = Object.prototype.hasOwnProperty.call(body, `module_${definition.key}`);
+    const enabled = Object.prototype.hasOwnProperty.call(body, `module_${definition.key}`);
+    toggles[definition.key] = enabled;
+    requested[definition.key] = enabled;
   }
   const normalized = normalizeModuleSettings(toggles);
   state.settings = { ...(state.settings || {}), modules: normalized };
   const enabled = Object.entries(normalized)
     .filter(([, value]) => value)
     .map(([key]) => key);
+  const blocked = definitions
+    .filter((definition) => requested[definition.key] && !normalized[definition.key] && (definition.requires || []).length)
+    .map((definition) => {
+      const requirements = definition.requires.join(', ');
+      return `${definition.label || definition.key} (requires ${requirements})`;
+    });
   recordAdminAudit(state, {
     action: 'modules.update',
     summary: `enabled=${enabled.length ? enabled.join(',') : 'none'}`,
   });
   await persistSettings(state);
-  return { flash: 'Module toggles updated. Reload to refresh navigation.' };
+  let flash = 'Module toggles updated. Reload to refresh navigation.';
+  if (blocked.length) {
+    flash += ` Disabled by dependencies: ${blocked.join('; ')}.`;
+  }
+  return { flash };
 }
 
 async function updateRateLimits(state, body) {
@@ -692,8 +727,9 @@ function buildAdminViewModel(
   const extensions = state.extensions?.active || [];
   const roleFlags = roleSelectFlags(sessionForm.sessionRole || defaultRole);
   const extensionsList = renderExtensions(availableExtensions);
-  const moduleToggles = listModuleToggles(state);
+  const moduleToggles = decorateModules(listModuleToggles(state));
   const modulesList = renderModules(moduleToggles);
+  const moduleSettingsList = renderModuleSettingsList(moduleToggles);
   const modulesSummary = moduleToggles.filter((mod) => mod.enabled).map((mod) => mod.key).join(', ') || 'None';
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
@@ -817,6 +853,7 @@ function buildAdminViewModel(
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
     modulesSummary: `Modules: ${modulesSummary}`,
     modulesList,
+    moduleSettingsList,
     defaultElectionModePriority: defaultElectionMode === 'priority' ? 'selected' : '',
     defaultElectionModeVote: defaultElectionMode === 'vote' ? 'selected' : '',
     defaultConflictHighest: defaultConflictRule === 'highest_priority' ? 'selected' : '',
@@ -2209,12 +2246,67 @@ function renderExtensions(list) {
     .join('\n');
 }
 
+function decorateModules(list = []) {
+  const byKey = new Map((list || []).map((mod) => [mod.key, mod]));
+  return (list || []).map((mod) => {
+    const missingDependencies = (mod.requires || []).filter((dependency) => !byKey.get(dependency)?.enabled);
+    return {
+      ...mod,
+      missingDependencies,
+      settingsLinks: MODULE_SETTINGS_LINKS[mod.key] || [],
+    };
+  });
+}
+
+function renderModuleSettingsList(list) {
+  if (!list || !list.length) return '<p class="muted small">No module settings map available.</p>';
+  return list
+    .map((mod) => {
+      const statusPill = mod.enabled ? '<span class="pill">Enabled</span>' : '<span class="pill ghost">Disabled</span>';
+      const requiresNote = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
+      const blockedNote = mod.missingDependencies?.length
+        ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
+        : '';
+      const description = [mod.description, requiresNote, blockedNote].filter(Boolean).join(' ');
+      const links = renderModuleSettingsLinks(mod.settingsLinks || []);
+      return `
+        <article class="callout">
+          <div class="discussion__meta">
+            <span class="pill">${escapeHtml(mod.label || mod.key)}</span>
+            ${statusPill}
+          </div>
+          <p class="muted small">${escapeHtml(description || 'Optional module')}</p>
+          <div class="discussion__meta">
+            ${links}
+          </div>
+        </article>
+      `;
+    })
+    .join('\n');
+}
+
+function renderModuleSettingsLinks(list) {
+  if (!list.length) {
+    return '<span class="muted small">No admin settings yet.</span>';
+  }
+  return list
+    .map((entry) => {
+      const href = escapeHtml(String(entry.href || '#'));
+      const label = escapeHtml(String(entry.label || 'Settings'));
+      return `<a class="ghost pill" href="${href}">${label}</a>`;
+    })
+    .join('\n');
+}
+
 function renderModules(list) {
   if (!list || !list.length) return '<p class="muted small">No module toggles available.</p>';
   return list
     .map((mod) => {
-      const requires = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}` : '';
-      const description = [mod.description, requires].filter(Boolean).join(' ');
+      const requires = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
+      const blocked = mod.missingDependencies?.length
+        ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
+        : '';
+      const description = [mod.description, requires, blocked].filter(Boolean).join(' ');
       return `
         <label class="field checkbox">
           <input type="checkbox" name="module_${mod.key}" ${mod.enabled ? 'checked' : ''} data-module-toggle="${mod.key}" />

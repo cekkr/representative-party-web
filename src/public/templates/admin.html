@@ -1,4 +1,4 @@
-<section class="panel">
+<section class="panel" id="circle-settings">
   <p class="eyebrow">Admin</p>
   <h2>Circle settings and policy</h2>
   <p>Configure how this node enforces wallet verification, circle alignment, and peer aggregation.</p>
@@ -41,7 +41,7 @@
         <button type="button" data-wizard-jump="3">4. Optional defaults</button>
       </li>
     </ol>
-    <section class="wizard-step stack" data-wizard-step="0">
+    <section class="wizard-step stack" data-wizard-step="0" id="wizard-step-0">
       <p class="eyebrow">Step 1</p>
       <h3>Circle basics</h3>
       <p class="muted small">Define the Circle identity and verification stance for users.</p>
@@ -67,7 +67,7 @@
       </div>
       <p class="muted small">Enforcement switches the UI label from user to person when verification is required.</p>
     </section>
-    <section class="wizard-step stack" data-wizard-step="1">
+    <section class="wizard-step stack" data-wizard-step="1" id="wizard-step-1">
       <p class="eyebrow">Step 2</p>
       <h3>Data and validation</h3>
       <p class="muted small">Choose how data is stored and whether preview entries can be kept.</p>
@@ -108,7 +108,7 @@
       </div>
       <p class="muted small">Centralized mode disables gossip ingest; hybrid and p2p keep it enabled.</p>
     </section>
-    <section class="wizard-step stack" data-wizard-step="2">
+    <section class="wizard-step stack" data-wizard-step="2" id="wizard-step-2">
       <p class="eyebrow">Step 3</p>
       <h3>Circle identity and peers</h3>
       <p class="muted small">Set an issuer URL and optional peer hints for audits and alignment.</p>
@@ -136,7 +136,7 @@
         </div>
       </div>
     </section>
-    <section class="wizard-step stack" data-wizard-step="3">
+    <section class="wizard-step stack" data-wizard-step="3" id="wizard-step-3">
       <p class="eyebrow">Step 4</p>
       <h3>Optional defaults</h3>
       <p class="muted small">Optional settings you can revisit in Admin at any time.</p>
@@ -199,7 +199,7 @@
   </form>
 </section>
 
-<section class="panel">
+<section class="panel" id="governance-settings">
   <p class="eyebrow">Governance</p>
   <h2>Digital constitution defaults</h2>
   <p class="muted small">These defaults inform proposal quorum and stage timing. Community proposal workflows are forthcoming.</p>
@@ -252,7 +252,7 @@
   </form>
 </section>
 
-<section class="panel">
+<section class="panel" id="topic-gardener-review">
   <p class="eyebrow">Topics</p>
   <h2>Topic gardener review</h2>
   <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>
@@ -288,7 +288,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="federation-gossip">
   <p class="eyebrow">Federation</p>
   <h2>Gossip sync</h2>
   <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>
@@ -343,10 +343,10 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="modules">
   <p class="eyebrow">Modules</p>
-  <h2>Core feature toggles</h2>
-  <p class="muted small">Disable optional modules for messaging-only deployments.</p>
+  <h2>Module control center</h2>
+  <p class="muted small">Toggle modules and jump to their settings without hunting across panels.</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">
     <input type="hidden" name="intent" value="modules" />
     <div class="form-grid">{{modulesList}}</div>
@@ -355,9 +355,15 @@
     </div>
     <p class="muted small">Reload to refresh navigation after changing modules.</p>
   </form>
+  <div class="stack">
+    <p class="muted small">Module settings map</p>
+    <div class="grid two">
+      {{moduleSettingsList}}
+    </div>
+  </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="rate-limits">
   <p class="eyebrow">Rate limits</p>
   <h2>Identity throttles</h2>
   <p class="muted small">Throttle write-heavy actions per verified handle/session (IP fallback) to curb spam without CAPTCHA.</p>
@@ -381,7 +387,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="social-media">
   <p class="eyebrow">Social media</p>
   <h2>Media moderation</h2>
   <p class="muted small">Uploads stay with this provider, lock by default, and can be blocked after mass reports or manual review.</p>
