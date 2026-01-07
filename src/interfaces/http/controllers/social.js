@@ -25,7 +25,7 @@ import {
   recordMediaViewRequest,
   reportMedia,
 } from '../../../modules/social/media.js';
-import { notifySocialParticipants } from '../../../modules/social/notifications.js';
+import { notifyMediaViewRequest, notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
@@ -286,7 +286,9 @@ export async function serveSocialMedia({ req, res, state, params }) {
   }
 
   if (viewRequested) {
-    recordMediaViewRequest(state, media, { actorHash: person?.pidHash || '' });
+    const viewerHash = person?.pidHash || '';
+    const isNewViewer = viewerHash ? !((media.viewers || []).includes(viewerHash)) : false;
+    const updatedMedia = recordMediaViewRequest(state, media, { actorHash: viewerHash });
     await persistSocialMedia(state);
     await logTransaction(state, {
       type: 'social_media_view_request',
@@ -297,6 +299,9 @@ export async function serveSocialMedia({ req, res, state, params }) {
         status: media.status,
       },
     });
+    if (isNewViewer && media.status === 'locked') {
+      await notifyMediaViewRequest(state, { media: updatedMedia || media, viewer: person });
+    }
   }
 
   if (!media.storedName) {

@@ -33,6 +33,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
+- Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
 
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.

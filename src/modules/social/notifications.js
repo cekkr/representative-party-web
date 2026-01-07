@@ -1,4 +1,5 @@
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
+import { sanitizeText } from '../../shared/utils/text.js';
 import { extractMentions } from './posts.js';
 import { findSessionByHandle, findSessionByHash } from '../identity/sessions.js';
 
@@ -50,4 +51,22 @@ export async function notifySocialParticipants(state, { post, author, targetSess
       message: payload.message,
     }, { sessionId: payload.sessionId, handle: payload.handle });
   }
+}
+
+export async function notifyMediaViewRequest(state, { media, viewer } = {}) {
+  if (!media?.authorHash || !viewer?.pidHash) return;
+  if (media.authorHash === viewer.pidHash) return;
+  const authorSession = findSessionByHash(state, media.authorHash);
+  if (!authorSession) return;
+
+  const viewerLabel = sanitizeText(viewer.handle || viewer.pidHash || 'someone', 64) || 'someone';
+  const kindLabel = media.kind === 'video' ? 'video' : 'photo';
+  const nameSuffix = media.originalName ? ` (${sanitizeText(media.originalName, 80)})` : '';
+  const message = `View request from ${viewerLabel} for your ${kindLabel}${nameSuffix}.`;
+
+  await createNotificationWithOutbound(state, {
+    type: 'social_media_view',
+    recipientHash: authorSession.pidHash,
+    message,
+  }, { sessionId: authorSession.id, handle: authorSession.handle });
 }
