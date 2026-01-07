@@ -343,6 +343,93 @@
   </div>
 </section>
 
+<section class="panel" id="provider-blind">
+  <p class="eyebrow">Federation</p>
+  <h2>Provider-blind mode</h2>
+  <p class="muted small">Hide provider attribution in gossip envelopes while keeping auditability via a quorum reveal.</p>
+  {{providerBlindErrors}}
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="provider-blind" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Mode</span>
+        <select name="providerBlindMode">
+          <option value="off" {{providerBlindModeOff}}>off</option>
+          <option value="observe" {{providerBlindModeObserve}}>observe</option>
+          <option value="strict" {{providerBlindModeStrict}}>strict</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Ring ID</span>
+        <input name="providerBlindRingId" value="{{providerBlindRingId}}" placeholder="circle-2025-09" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Ring epoch (seconds)</span>
+        <input name="providerBlindRingEpoch" type="number" min="86400" value="{{providerBlindRingEpoch}}" />
+      </label>
+      <label class="field">
+        <span>Ring size cap</span>
+        <input name="providerBlindRingMaxSize" type="number" min="3" value="{{providerBlindRingMaxSize}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Ring provider key ids (one per line)</span>
+      <textarea name="providerBlindRingKeys" rows="4" placeholder="provider-key-a">{{providerBlindRingKeys}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Audit threshold (t)</span>
+        <input name="providerBlindAuditThreshold" type="number" min="2" value="{{providerBlindAuditThreshold}}" />
+      </label>
+      <label class="field">
+        <span>Max reveal scope (days)</span>
+        <input name="providerBlindAuditMaxScopeDays" type="number" min="1" value="{{providerBlindAuditMaxScopeDays}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Audit committee members (keyId:role:termStart:termEnd)</span>
+      <textarea name="providerBlindAuditMembers" rows="4" placeholder="key-a:member:2025-01-01:2026-01-01">{{providerBlindAuditMembers}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditRequireReason" {{providerBlindAuditRequireReasonChecked}} />
+        <span>Require reason for issuer reveal</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditEmergencyOverride" {{providerBlindAuditEmergencyOverrideChecked}} />
+        <span>Allow emergency override</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditOverride" {{providerBlindAuditOverrideChecked}} />
+        <span>Allow custom committee composition</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindTransportMixnet" {{providerBlindTransportMixnetChecked}} />
+        <span>Enable mixnet relays</span>
+      </label>
+      <label class="field">
+        <span>Mixnet max hops</span>
+        <input name="providerBlindTransportMaxHops" type="number" min="1" value="{{providerBlindTransportMaxHops}}" />
+      </label>
+      <label class="field">
+        <span>Mixnet timeout (ms)</span>
+        <input name="providerBlindTransportTimeoutMs" type="number" min="1000" value="{{providerBlindTransportTimeoutMs}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Mixnet relay URLs (one per line)</span>
+      <textarea name="providerBlindTransportRelays" rows="3" placeholder="https://relay.example">{{providerBlindTransportRelays}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider-blind settings</button>
+    </div>
+  </form>
+</section>
+
 <section class="panel" id="modules">
   <p class="eyebrow">Modules</p>
   <h2>Module control center</h2>

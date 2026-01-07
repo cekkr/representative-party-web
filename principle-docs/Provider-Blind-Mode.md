@@ -258,7 +258,7 @@ Fields:
 - providerBlind.ring.maxSize: integer (cap for ring size, min 3).
 - providerBlind.audit.threshold: integer t, 2 <= t <= n.
 - providerBlind.audit.members: list of { keyId, role, termStart, termEnd }.
-- providerBlind.audit.roles: member | provider | observer.
+- providerBlind.audit.overrideComposition: boolean (default false).
 - providerBlind.audit.requireReason: boolean (default true).
 - providerBlind.audit.maxScopeDays: integer (default 30).
 - providerBlind.audit.emergencyOverride: boolean (default false).

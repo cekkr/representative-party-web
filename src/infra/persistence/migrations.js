@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
+import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 
-export const LATEST_SCHEMA_VERSION = 20;
+export const LATEST_SCHEMA_VERSION = 21;
 
 const MIGRATIONS = [
   {
@@ -511,6 +512,21 @@ const MIGRATIONS = [
         ...data,
         petitions,
         discussions,
+      };
+    },
+  },
+  {
+    version: 21,
+    description: 'Add provider-blind settings scaffold.',
+    up: (data) => {
+      const settings = data.settings || {};
+      const providerBlind = normalizeProviderBlindSettings(settings.providerBlind || {});
+      return {
+        ...data,
+        settings: {
+          ...settings,
+          providerBlind,
+        },
       };
     },
   },

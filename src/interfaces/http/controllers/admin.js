@@ -30,6 +30,11 @@ import {
   getEffectivePolicy,
   resolveDefaultActorRole,
 } from '../../../modules/circle/policy.js';
+import {
+  getProviderBlindSettings,
+  normalizeProviderBlindSettings,
+  validateProviderBlindSettings,
+} from '../../../modules/circle/ringRegistry.js';
 import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
@@ -102,6 +107,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'governance') {
     const result = await updateGovernance(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
+  if (intent === 'provider-blind') {
+    const result = await updateProviderBlind(state, body);
     return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'media-moderate') {
@@ -291,6 +300,78 @@ function dedupe(list) {
   return [...new Set(list || [])];
 }
 
+function parseMultilineList(value, { maxLength = 120, fallback = [] } = {}) {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((entry) => sanitizeText(entry, maxLength)).filter(Boolean);
+    return cleaned.length ? dedupe(cleaned) : dedupe(fallback);
+  }
+  if (value === undefined || value === null) {
+    return dedupe(fallback);
+  }
+  const text = String(value || '');
+  if (!text.trim()) return [];
+  const parts = text
+    .split(/[\n,]/)
+    .map((entry) => sanitizeText(entry, maxLength))
+    .filter(Boolean);
+  return dedupe(parts);
+}
+
+function formatMultilineList(list = []) {
+  return (list || []).join('\n');
+}
+
+function parseAuditMembers(raw) {
+  const errors = [];
+  const members = [];
+  if (raw === undefined || raw === null) return { members, errors };
+  const lines = String(raw)
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  for (const line of lines) {
+    const [keyRaw, roleRaw, termStartRaw, termEndRaw] = line.split(':').map((part) => part.trim());
+    const keyId = sanitizeText(keyRaw || '', 120);
+    const role = sanitizeText(roleRaw || '', 24).toLowerCase();
+    if (!keyId || !role) {
+      errors.push(`Audit member entry "${line}" must include keyId and role.`);
+      continue;
+    }
+    if (!['member', 'provider', 'observer'].includes(role)) {
+      errors.push(`Audit member role "${role}" is invalid (member, provider, observer).`);
+      continue;
+    }
+    const termStart = sanitizeText(termStartRaw || '', 32);
+    const termEnd = sanitizeText(termEndRaw || '', 32);
+    if (termStart && Number.isNaN(Date.parse(termStart))) {
+      errors.push(`Audit member "${keyId}" has invalid termStart.`);
+    }
+    if (termEnd && Number.isNaN(Date.parse(termEnd))) {
+      errors.push(`Audit member "${keyId}" has invalid termEnd.`);
+    }
+    if (termStart && termEnd) {
+      const start = Date.parse(termStart);
+      const end = Date.parse(termEnd);
+      if (Number.isFinite(start) && Number.isFinite(end) && end < start) {
+        errors.push(`Audit member "${keyId}" termEnd must be after termStart.`);
+      }
+    }
+    members.push({ keyId, role, termStart: termStart || null, termEnd: termEnd || null });
+  }
+  return { members, errors };
+}
+
+function formatAuditMembers(list = []) {
+  return (list || [])
+    .map((entry) => {
+      const parts = [entry.keyId, entry.role];
+      if (entry.termStart) parts.push(entry.termStart);
+      if (entry.termEnd) parts.push(entry.termEnd);
+      return parts.join(':');
+    })
+    .join('\n');
+}
+
 function normalizeNumericInput(raw, { fallback, min, max, label } = {}) {
   const errors = [];
   if (raw === undefined || raw === null || raw === '') {
@@ -452,6 +533,169 @@ async function updateGovernance(state, body) {
     governanceReviewWindowHoursValue: String(next.reviewWindowHours),
     governanceVoteMethodValue: next.defaultVoteMethod,
     governanceNotesValue: next.notes,
+  };
+}
+
+async function updateProviderBlind(state, body) {
+  const prev = getProviderBlindSettings(state);
+  const modeInput = sanitizeText(body.providerBlindMode || prev.mode || 'off', 16).toLowerCase();
+  const ringIdInput = sanitizeText(body.providerBlindRingId || prev.ring.currentId || '', 64);
+  const ringEpochInput = sanitizeText(body.providerBlindRingEpoch || '', 12);
+  const ringMaxSizeInput = sanitizeText(body.providerBlindRingMaxSize || '', 12);
+  const ringEpochResult = normalizeNumericInput(ringEpochInput, {
+    fallback: prev.ring.epochSeconds,
+    min: 86_400,
+    max: 31_536_000,
+    label: 'Ring epoch (seconds)',
+  });
+  const ringMaxSizeResult = normalizeNumericInput(ringMaxSizeInput, {
+    fallback: prev.ring.maxSize,
+    min: 3,
+    max: 256,
+    label: 'Ring size cap',
+  });
+  const ringKeysInput = body.providerBlindRingKeys ?? formatMultilineList(prev.ring.keys);
+  const ringKeys = parseMultilineList(ringKeysInput, {
+    maxLength: 120,
+    fallback: prev.ring.keys,
+  }).slice(0, ringMaxSizeResult.value ?? prev.ring.maxSize);
+
+  const auditThresholdInput = sanitizeText(body.providerBlindAuditThreshold || '', 12);
+  const auditThresholdResult = normalizeNumericInput(auditThresholdInput, {
+    fallback: prev.audit.threshold,
+    min: 2,
+    max: 25,
+    label: 'Audit threshold',
+  });
+  const auditMembersInput = body.providerBlindAuditMembers ?? formatAuditMembers(prev.audit.members);
+  const auditMembersResult = parseAuditMembers(auditMembersInput);
+  const auditRequireReason = parseBoolean(body.providerBlindAuditRequireReason, prev.audit.requireReason);
+  const auditMaxScopeInput = sanitizeText(body.providerBlindAuditMaxScopeDays || '', 12);
+  const auditMaxScopeResult = normalizeNumericInput(auditMaxScopeInput, {
+    fallback: prev.audit.maxScopeDays,
+    min: 1,
+    max: 365,
+    label: 'Audit max scope days',
+  });
+  const auditEmergencyOverride = parseBoolean(body.providerBlindAuditEmergencyOverride, prev.audit.emergencyOverride);
+  const auditOverrideComposition = parseBoolean(body.providerBlindAuditOverride, prev.audit.overrideComposition);
+
+  const transportMixnet = parseBoolean(body.providerBlindTransportMixnet, prev.transport.mixnetEnabled);
+  const transportRelaysInput = body.providerBlindTransportRelays ?? formatMultilineList(prev.transport.relays);
+  const transportRelays = parseMultilineList(transportRelaysInput, {
+    maxLength: 200,
+    fallback: prev.transport.relays,
+  });
+  const transportMaxHopsInput = sanitizeText(body.providerBlindTransportMaxHops || '', 12);
+  const transportMaxHopsResult = normalizeNumericInput(transportMaxHopsInput, {
+    fallback: prev.transport.maxHops,
+    min: 1,
+    max: 5,
+    label: 'Mixnet max hops',
+  });
+  const transportTimeoutInput = sanitizeText(body.providerBlindTransportTimeoutMs || '', 12);
+  const transportTimeoutResult = normalizeNumericInput(transportTimeoutInput, {
+    fallback: prev.transport.timeoutMs,
+    min: 1000,
+    max: 30_000,
+    label: 'Mixnet timeout',
+  });
+
+  const draft = normalizeProviderBlindSettings({
+    ...prev,
+    mode: modeInput,
+    ring: {
+      currentId: ringIdInput,
+      epochSeconds: ringEpochResult.value ?? prev.ring.epochSeconds,
+      maxSize: ringMaxSizeResult.value ?? prev.ring.maxSize,
+      keys: ringKeys,
+    },
+    audit: {
+      threshold: auditThresholdResult.value ?? prev.audit.threshold,
+      members: auditMembersResult.members,
+      requireReason: auditRequireReason,
+      maxScopeDays: auditMaxScopeResult.value ?? prev.audit.maxScopeDays,
+      emergencyOverride: auditEmergencyOverride,
+      overrideComposition: auditOverrideComposition,
+    },
+    transport: {
+      mixnetEnabled: transportMixnet,
+      relays: transportRelays,
+      maxHops: transportMaxHopsResult.value ?? prev.transport.maxHops,
+      timeoutMs: transportTimeoutResult.value ?? prev.transport.timeoutMs,
+    },
+  });
+
+  const validation = validateProviderBlindSettings(draft);
+  const errors = [
+    ...ringEpochResult.errors,
+    ...ringMaxSizeResult.errors,
+    ...auditThresholdResult.errors,
+    ...auditMembersResult.errors,
+    ...auditMaxScopeResult.errors,
+    ...transportMaxHopsResult.errors,
+    ...transportTimeoutResult.errors,
+    ...validation.errors,
+  ];
+
+  if (errors.length) {
+    return {
+      flash: 'Provider-blind settings not updated.',
+      providerBlindErrors: renderValidationErrors(errors, { title: 'Provider-blind settings' }),
+      providerBlindModeValue: modeInput,
+      providerBlindRingIdValue: ringIdInput,
+      providerBlindRingEpochValue: ringEpochInput || String(prev.ring.epochSeconds || ''),
+      providerBlindRingMaxSizeValue: ringMaxSizeInput || String(prev.ring.maxSize || ''),
+      providerBlindRingKeysValue: ringKeysInput,
+      providerBlindAuditThresholdValue: auditThresholdInput || String(prev.audit.threshold || ''),
+      providerBlindAuditMembersValue: auditMembersInput,
+      providerBlindAuditRequireReasonValue: auditRequireReason,
+      providerBlindAuditMaxScopeDaysValue: auditMaxScopeInput || String(prev.audit.maxScopeDays || ''),
+      providerBlindAuditEmergencyOverrideValue: auditEmergencyOverride,
+      providerBlindAuditOverrideValue: auditOverrideComposition,
+      providerBlindTransportMixnetValue: transportMixnet,
+      providerBlindTransportRelaysValue: transportRelaysInput,
+      providerBlindTransportMaxHopsValue: transportMaxHopsInput || String(prev.transport.maxHops || ''),
+      providerBlindTransportTimeoutMsValue: transportTimeoutInput || String(prev.transport.timeoutMs || ''),
+    };
+  }
+
+  const next = validation.settings;
+  state.settings = {
+    ...(state.settings || {}),
+    providerBlind: next,
+  };
+
+  const modeSummary = `mode=${next.mode} ring=${next.ring.currentId || 'unset'} keys=${next.ring.keys.length}`;
+  recordAdminAudit(state, { action: 'provider_blind.update', summary: modeSummary });
+  await logTransaction(state, {
+    type: 'policy.provider_blind.update',
+    actorHash: 'admin',
+    payload: {
+      mode: next.mode,
+      ringId: next.ring.currentId || null,
+      ringKeys: next.ring.keys.length,
+    },
+  });
+  if (JSON.stringify(prev.audit) !== JSON.stringify(next.audit)) {
+    recordAdminAudit(state, {
+      action: 'audit_committee.update',
+      summary: `members=${next.audit.members.length} threshold=${next.audit.threshold}`,
+    });
+    await logTransaction(state, {
+      type: 'policy.audit_committee.update',
+      actorHash: 'admin',
+      payload: {
+        members: next.audit.members.length,
+        threshold: next.audit.threshold,
+      },
+    });
+  }
+
+  await persistSettings(state);
+
+  return {
+    flash: 'Provider-blind settings updated.',
   };
 }
 
@@ -695,6 +939,22 @@ function buildAdminViewModel(
     governanceReviewWindowHoursValue,
     governanceVoteMethodValue,
     governanceNotesValue,
+    providerBlindErrors,
+    providerBlindModeValue,
+    providerBlindRingIdValue,
+    providerBlindRingEpochValue,
+    providerBlindRingMaxSizeValue,
+    providerBlindRingKeysValue,
+    providerBlindAuditThresholdValue,
+    providerBlindAuditMembersValue,
+    providerBlindAuditRequireReasonValue,
+    providerBlindAuditMaxScopeDaysValue,
+    providerBlindAuditEmergencyOverrideValue,
+    providerBlindAuditOverrideValue,
+    providerBlindTransportMixnetValue,
+    providerBlindTransportRelaysValue,
+    providerBlindTransportMaxHopsValue,
+    providerBlindTransportTimeoutMsValue,
   } = {},
 ) {
   const policy = getCirclePolicyState(state);
@@ -803,6 +1063,31 @@ function buildAdminViewModel(
   const governanceVoteMethod = governanceVoteMethodValue ?? governance.defaultVoteMethod;
   const governanceNotes = governanceNotesValue ?? governance.notes;
   const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
+  const providerBlind = getProviderBlindSettings(state);
+  const providerBlindMode = providerBlindModeValue ?? providerBlind.mode;
+  const providerBlindRingId = providerBlindRingIdValue ?? providerBlind.ring.currentId;
+  const providerBlindRingEpoch = providerBlindRingEpochValue ?? String(providerBlind.ring.epochSeconds || '');
+  const providerBlindRingMaxSize = providerBlindRingMaxSizeValue ?? String(providerBlind.ring.maxSize || '');
+  const providerBlindRingKeys = providerBlindRingKeysValue ?? formatMultilineList(providerBlind.ring.keys || []);
+  const providerBlindAuditThreshold = providerBlindAuditThresholdValue ?? String(providerBlind.audit.threshold || '');
+  const providerBlindAuditMembers = providerBlindAuditMembersValue ?? formatAuditMembers(providerBlind.audit.members || []);
+  const providerBlindAuditRequireReason =
+    providerBlindAuditRequireReasonValue ?? Boolean(providerBlind.audit.requireReason);
+  const providerBlindAuditMaxScopeDays =
+    providerBlindAuditMaxScopeDaysValue ?? String(providerBlind.audit.maxScopeDays || '');
+  const providerBlindAuditEmergencyOverride =
+    providerBlindAuditEmergencyOverrideValue ?? Boolean(providerBlind.audit.emergencyOverride);
+  const providerBlindAuditOverride =
+    providerBlindAuditOverrideValue ?? Boolean(providerBlind.audit.overrideComposition);
+  const providerBlindTransportMixnet =
+    providerBlindTransportMixnetValue ?? Boolean(providerBlind.transport.mixnetEnabled);
+  const providerBlindTransportRelays =
+    providerBlindTransportRelaysValue ?? formatMultilineList(providerBlind.transport.relays || []);
+  const providerBlindTransportMaxHops =
+    providerBlindTransportMaxHopsValue ?? String(providerBlind.transport.maxHops || '');
+  const providerBlindTransportTimeoutMs =
+    providerBlindTransportTimeoutMsValue ?? String(providerBlind.transport.timeoutMs || '');
+  const providerBlindErrorsRendered = providerBlindErrors || '';
   const installWizardActive = !effective.initialized;
   const installWizardMode = installWizardActive ? 'wizard' : 'full';
   const installWizardIntro = installWizardActive
@@ -930,6 +1215,24 @@ function buildAdminViewModel(
     governanceVoteMethodStar: governanceVoteMethod === 'star' ? 'selected' : '',
     governanceNotes,
     governanceUpdatedAt,
+    providerBlindErrors: providerBlindErrorsRendered,
+    providerBlindModeOff: providerBlindMode === 'off' ? 'selected' : '',
+    providerBlindModeObserve: providerBlindMode === 'observe' ? 'selected' : '',
+    providerBlindModeStrict: providerBlindMode === 'strict' ? 'selected' : '',
+    providerBlindRingId,
+    providerBlindRingEpoch,
+    providerBlindRingMaxSize,
+    providerBlindRingKeys,
+    providerBlindAuditThreshold,
+    providerBlindAuditMembers,
+    providerBlindAuditRequireReasonChecked: providerBlindAuditRequireReason ? 'checked' : '',
+    providerBlindAuditMaxScopeDays,
+    providerBlindAuditEmergencyOverrideChecked: providerBlindAuditEmergencyOverride ? 'checked' : '',
+    providerBlindAuditOverrideChecked: providerBlindAuditOverride ? 'checked' : '',
+    providerBlindTransportMixnetChecked: providerBlindTransportMixnet ? 'checked' : '',
+    providerBlindTransportRelays,
+    providerBlindTransportMaxHops,
+    providerBlindTransportTimeoutMs,
     installWizardMode,
     installWizardIntro,
     installWizardHint,

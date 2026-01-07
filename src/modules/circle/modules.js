@@ -50,6 +50,7 @@ const MODULE_DEFINITIONS = [
       { label: 'Data and validation', href: '#wizard-step-1' },
       { label: 'Issuer and peers', href: '#wizard-step-2' },
       { label: 'Gossip sync', href: '#federation-gossip' },
+      { label: 'Provider-blind mode', href: '#provider-blind' },
     ],
     defaultEnabled: true,
   },
