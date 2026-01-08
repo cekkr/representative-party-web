@@ -57,6 +57,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
+- Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 
 ## Near-term next steps (Phase 2 focus)
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
@@ -65,6 +66,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
+- Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
@@ -111,7 +113,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Claim & Seize** protocol: signed migration requests to move history across providers when the same wallet re-verifies.
 - **Circle health**: scheduled peer audits for policy compliance; automatic quarantine of toxic peers.
 - **Cross-provider access**: view/vote on petitions across providers with signed envelopes and policy gating.
-- **Provider-blind mode (optional)**: explore P2P routing/mixnet approaches to hide provider attribution in gossip/envelopes while preserving auditability and abuse controls.
+- **Provider-blind mode (optional)**: complete ring signatures + issuer escrow, finalize audit-reveal governance, and add mixnet/onion transport so provider attribution is hidden without losing accountability.
 - UX: migration status banners and audit transparency dashboard.
 
 ### Phase 5 — Accountability & Launch (Months 15+)
@@ -269,7 +271,7 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Cross-Provider Access:**
       * Allow a user on *Server A* to view and vote on a Petition hosted on *Server B* seamlessly, using the ActivityPub federation to transport the vote authentication.
 4.  **Provider-blind mode (optional):**
-      * Explore P2P routing/mixnet approaches to hide provider attribution in gossip/envelopes while preserving auditability and abuse controls.
+      * Complete ring signatures + issuer escrow, finalize audit-reveal governance, and add mixnet/onion routing so provider attribution is hidden without losing accountability.
 
 #### **Phase 5: Accountability & Launch (Months 15+)**
 

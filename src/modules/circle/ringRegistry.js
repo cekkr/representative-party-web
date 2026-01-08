@@ -202,7 +202,7 @@ function normalizeRing(raw = {}, fallback) {
     max: 31_536_000,
   });
   const maxSize = clampNumber(raw.maxSize ?? fallback.maxSize, { fallback: fallback.maxSize, min: 3, max: 256 });
-  const keys = normalizeKeyList(raw.keys ?? fallback.keys, { maxLen: 120, maxItems: maxSize });
+  const keys = normalizeKeyList(raw.keys ?? fallback.keys, { maxLen: 4096, maxItems: maxSize });
   return {
     currentId,
     epochSeconds,
@@ -223,7 +223,7 @@ function normalizeRingEntry(entry, { maxSize }) {
   const id = sanitizeToken(entry?.id || entry?.ringId || '', 64);
   const createdAt = sanitizeToken(entry?.createdAt || '', 32);
   const expiresAt = sanitizeToken(entry?.expiresAt || '', 32);
-  const keys = normalizeKeyList(entry?.keys || [], { maxLen: 120, maxItems: maxSize });
+  const keys = normalizeKeyList(entry?.keys || [], { maxLen: 4096, maxItems: maxSize });
   return { id, keys, createdAt, expiresAt };
 }
 

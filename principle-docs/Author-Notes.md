@@ -13,5 +13,5 @@ Analyze current project and source code status and apply performances and redund
 
 
 REMEMBER TODOs:
-- Provider-blind mode spec drafted in principle-docs/Provider-Blind-Mode.md; keep roadmap aligned when a protocol choice is made.
+- Provider-blind scaffolding landed (admin policy + ring registry gossip + ringSignature placeholder); keep roadmap aligned for real ring signatures, issuer escrow, audit-reveal workflow, and mixnet transport.
 - Privilege-free Circle bootstrap: ensure governance bootstrapping details are documented and aligned with group elections and dynamic structures.

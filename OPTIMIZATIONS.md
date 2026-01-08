@@ -20,6 +20,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
+- Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.

@@ -61,6 +61,21 @@ Provider-blind mode reduces provider attribution for user identities and envelop
    - Complements ring signatures by hiding network-level origin metadata.
    - Can be introduced incrementally as a transport layer option.
 
+## Implementation status (scaffold)
+- `/admin` exposes providerBlind policy fields (mode off/observe/strict, ring
+  registry + audit committee metadata, transport hints) and logs updates to the
+  transactions registry.
+- `/circle/gossip` advertises providerBlind summaries (mode, ring registry
+  entries, audit committee key ids) and ingest merges them into local settings.
+- Vote and transaction envelopes accept providerBlind settings; observe mode
+  emits ringSignature alongside issuer+signature, strict mode omits issuer and
+  requires ringSignature.
+- ringSignature is currently a placeholder built with the provider signing key
+  and verified by trying each ring public key (not a true ring signature);
+  issuerEscrow is reserved but not emitted yet.
+- Canonicalization uses sorted-key JSON (see canonicalizeEnvelope) before
+  signing/verifying ringSignature.
+
 ## Envelope requirements (draft)
 - Remove or encrypt issuer fields by default in provider-blind mode.
 - Keep policy id/version and module fields (vote: petitionId/authorHash/choice,
@@ -188,7 +203,8 @@ Size expectations (rough):
   provider-blind transaction summaries with ringSignature and issuerEscrow.
 - GET /circle/ledger remains hash-only; issuer metadata stays sealed.
 - Backward compatibility: when provider-blind is off, accept issuer fields;
-  when on, reject or ignore issuer fields and require ringSignature.
+  when observe, accept issuer + ringSignature; when strict, ignore issuer
+  fields and require ringSignature.
 
 ## Endpoint JSON shapes (draft)
 ### GET /votes/ledger
