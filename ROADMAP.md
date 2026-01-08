@@ -65,6 +65,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
+- Add an optional libp2p-backed Circle key generator so P2P rings are not anchored to the first provider and can persist if a seed provider shuts down.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
 

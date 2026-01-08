@@ -61,6 +61,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Delegate profiles**: view delegation counts, vote history, and group endorsements (optional `publicBio` profile field).
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
+- **Libp2p readiness (optional)**: dependency included to evaluate P2P transport and future Circle key continuity not tied to the first provider.
 - **Peer ledger audits**: peer health tracks last ledger hash snapshots (match/mismatch) in `/admin` and `/health`.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.

@@ -2,6 +2,7 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## High priority directives
 - Always update `OPTIMIZATIONS.md` whenever a new possible optimization (performance, redundancy, UX consistency, observability, storage/IO) is identified during any development task, even if not implemented yet.
+- Evaluate libp2p usage where useful for P2P transport, ring identity, or resilience scaffolding.
 
 ## Concept anchors
 - User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “person” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
