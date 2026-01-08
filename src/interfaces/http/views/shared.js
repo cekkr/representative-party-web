@@ -34,6 +34,12 @@ export function renderEmptyState(message, { size = 'normal' } = {}) {
   return `<p class="${sizeClass}">${escapeHtml(String(message))}</p>`;
 }
 
+export function renderCalloutRow(message, { className = 'muted small' } = {}) {
+  const text = typeof message === 'string' ? message.trim() : message;
+  if (!text) return '';
+  return `<p class="${className}">${escapeHtml(String(text))}</p>`;
+}
+
 function buildTopicCacheKey(entry) {
   if (entry?.topicId) return `id:${entry.topicId}`;
   if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {

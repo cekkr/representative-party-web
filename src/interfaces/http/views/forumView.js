@@ -4,9 +4,7 @@ import { resolvePersonHandle } from './actorLabel.js';
 import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderForum(entries, person, state) {
-  const threads = entries.filter((e) => !e.parentId);
-  const comments = entries.filter((e) => e.parentId);
-  const commentsByThread = groupCommentsByParent(comments);
+  const { threads, commentsByThread } = splitForumEntries(entries);
   return {
     threads: renderThreads(threads, commentsByThread, state),
     personHandle: resolvePersonHandle(person),
@@ -53,15 +51,20 @@ function renderThreads(threads, commentsByThread, state) {
     .join('\n');
 }
 
-function groupCommentsByParent(comments = []) {
-  const map = new Map();
-  for (const comment of comments) {
-    if (!comment?.parentId) continue;
-    const list = map.get(comment.parentId) || [];
-    list.push(comment);
-    map.set(comment.parentId, list);
+function splitForumEntries(entries = []) {
+  const threads = [];
+  const commentsByThread = new Map();
+  for (const entry of entries || []) {
+    if (!entry) continue;
+    if (entry.parentId) {
+      const list = commentsByThread.get(entry.parentId) || [];
+      list.push(entry);
+      commentsByThread.set(entry.parentId, list);
+    } else {
+      threads.push(entry);
+    }
   }
-  return map;
+  return { threads, commentsByThread };
 }
 
 function renderComments(comments) {

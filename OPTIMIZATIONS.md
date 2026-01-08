@@ -21,7 +21,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Reuse a shared `Intl.DateTimeFormat` instance (or cache formatted timestamps) to reduce locale formatting overhead in list renders.
-- Group forum threads and comments in a single pass to avoid repeated filtering on large thread lists.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -29,11 +28,9 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
 - Consolidate repeated "hash-only guarantee" and verification copy into shared view strings to keep copy consistent.
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
-- Render optional gate reason rows only when present so callouts avoid blank lines across modules.
 
 ## UX Consistency
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
-- Align empty-state text tone and structure across discussion/social/forum/petitions.
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
@@ -63,3 +60,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Combined social follow stats (counts + map) in a single pass and reused follow-type lists for select/datalist rendering.
 - Added a shared empty-state renderer for list views to reduce duplicated markup and keep copy consistent.
 - Aligned forum header metadata with the callout styling used across other modules.
+- Grouped forum threads and comments in a single pass to avoid repeated filtering on large thread lists.
+- Rendered gate reason callout rows only when present to remove blank lines across modules.

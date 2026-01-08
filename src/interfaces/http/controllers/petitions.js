@@ -28,6 +28,7 @@ import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identi
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
 import { normalizeCommentStance } from '../../../modules/petitions/commentStance.js';
 import { getGovernanceSettings } from '../../../modules/governance/constitution.js';
+import { renderCalloutRow } from '../views/shared.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -59,6 +60,8 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
   const governance = getGovernanceSettings(state);
+  const petitionGateReasonLine = renderCalloutRow(petitionGate.message || '');
+  const voteGateReasonLine = renderCalloutRow(voteGate.message || '');
   const query = url || new URL(req.url, `http://${req.headers.host}`);
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
   const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
@@ -72,8 +75,8 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       personHandle: resolvePersonHandle(person),
       petitionStatus: petitionGate.allowed ? 'You can draft proposals.' : petitionGate.message || petitionGate.reason,
       voteStatus: voteGate.allowed ? 'You can vote on proposals.' : voteGate.message || voteGate.reason,
-      petitionGateReason: petitionGate.message || '',
-      voteGateReason: voteGate.message || '',
+      petitionGateReasonLine,
+      voteGateReasonLine,
       roleLabel: person?.role || 'guest',
       petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
         allowDelegation: delegationEnabled,

@@ -36,6 +36,7 @@ import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGat
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
+import { renderCalloutRow } from '../views/shared.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
@@ -52,6 +53,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const mediaById = buildMediaLookup(feed, state.socialMedia);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
+  const postingReasonLine = renderCalloutRow(postingReason);
 
   const html = await renderPage(
     'social',
@@ -59,7 +61,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
-      postingReason,
+      postingReasonLine,
       followCount: allFollows.length,
       followerCount: followStats.followerCount,
       followList: renderFollowList(allFollows),

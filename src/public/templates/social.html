@@ -6,7 +6,7 @@
     <p class="muted small">Handle: {{personHandle}}</p>
     <p class="muted small">Role: {{roleLabel}}</p>
     <p class="muted small">{{postingStatus}}</p>
-    <p class="muted small">{{postingReason}}</p>
+    {{postingReasonLine}}
     <p class="muted small">Following: {{followCount}} | Followers: {{followerCount}}</p>
   </div>
   <form class="stack" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">

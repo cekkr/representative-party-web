@@ -17,6 +17,7 @@ import { renderDiscussionList } from '../views/discussionView.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../views/topicHelpers.js';
+import { renderCalloutRow } from '../views/shared.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
@@ -110,6 +111,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const actorLabels = getActorLabels(state);
   const postingStatus = permission.allowed ? 'Posting allowed.' : 'Posting blocked.';
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
+  const postingReasonLine = renderCalloutRow(postingReason);
 
   const baseEntries = filterVisibleEntries(state.discussions, state).filter((entry) => {
     if (entry.petitionId) return false;
@@ -147,7 +149,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       circleName: policy.circleName,
       hashOnlyMessage: `Hash-only ledger: only salted PID hashes are stored to link posts to ${actorLabels.actorLabelPlural} for accountability.`,
       postingStatus,
-      postingReason,
+      postingReasonLine,
       roleLabel: person?.role || 'guest',
       topicFilterOptions: renderTopicFilterOptions(topicOptions, topicFilterKey),
       topicFilterSelectedAll: topicFilterKey === 'all' ? 'selected' : '',
