@@ -147,21 +147,46 @@ const routes = [
   },
 ];
 
+const routesByMethod = buildRouteIndex(routes);
+
 export async function routeRequest(req, res, state) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const wantsPartial = req.headers['x-requested-with'] === 'partial';
   const context = { req, res, url, state, wantsPartial };
+  const methodRoutes = routesByMethod.get(req.method);
+  if (!methodRoutes) {
+    return sendNotFound(res);
+  }
+  const pathname = url.pathname;
+  const exactRoute = methodRoutes.exact.get(pathname);
+  if (exactRoute) {
+    return exactRoute.action(context);
+  }
 
-  for (const route of routes) {
-    if (route.method !== req.method) continue;
-    if (route.path && url.pathname === route.path) {
-      return route.action(context);
-    }
-    if (route.prefix && url.pathname.startsWith(route.prefix)) {
-      const params = route.buildParams ? route.buildParams(url.pathname, url) : {};
+  for (const route of methodRoutes.prefixes) {
+    if (pathname.startsWith(route.prefix)) {
+      const params = route.buildParams ? route.buildParams(pathname, url) : {};
       return route.action({ ...context, params });
     }
   }
 
   return sendNotFound(res);
+}
+
+function buildRouteIndex(entries = []) {
+  const index = new Map();
+  for (const route of entries) {
+    if (!route?.method) continue;
+    let bucket = index.get(route.method);
+    if (!bucket) {
+      bucket = { exact: new Map(), prefixes: [] };
+      index.set(route.method, bucket);
+    }
+    if (route.path) {
+      bucket.exact.set(route.path, route);
+    } else if (route.prefix) {
+      bucket.prefixes.push(route);
+    }
+  }
+  return index;
 }

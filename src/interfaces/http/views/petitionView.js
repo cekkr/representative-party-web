@@ -5,7 +5,7 @@ import {
   listCommentStances,
   normalizeCommentStance,
 } from '../../../modules/petitions/commentStance.js';
-import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -27,7 +27,7 @@ export function renderPetitionList(
   const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
   const state = options.state;
   if (!petitions.length) {
-    return '<p class="muted">No proposals yet. Draft the first one.</p>';
+    return renderEmptyState('No proposals yet. Draft the first one.');
   }
 
   const voteBuckets = buildVoteBuckets(votes);
@@ -393,7 +393,7 @@ function renderDiscussionBlock(petition, comments) {
 
 function renderPetitionComments(comments) {
   if (!comments.length) {
-    return '<p class="muted small">No discussion notes yet.</p>';
+    return renderEmptyState('No discussion notes yet.', { size: 'small' });
   }
   return comments
     .map((comment) => {
@@ -459,7 +459,7 @@ function renderEvidenceLinks(links = [], { limit = 4 } = {}) {
 
 export function renderProposalDiscussionFeed(items) {
   if (!items.length) {
-    return '<p class="muted">No proposal discussions yet. Join a discussion to surface activity.</p>';
+    return renderEmptyState('No proposal discussions yet. Join a discussion to surface activity.');
   }
   return items
     .map(({ comment, petition }) => {

@@ -28,6 +28,12 @@ export function renderIssuerPill(entry) {
   return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
 
+export function renderEmptyState(message, { size = 'normal' } = {}) {
+  if (!message) return '';
+  const sizeClass = size === 'small' ? 'muted small' : size === 'tiny' ? 'muted tiny' : 'muted';
+  return `<p class="${sizeClass}">${escapeHtml(String(message))}</p>`;
+}
+
 function buildTopicCacheKey(entry) {
   if (entry?.topicId) return `id:${entry.topicId}`;
   if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {

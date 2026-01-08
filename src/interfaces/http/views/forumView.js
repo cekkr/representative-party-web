@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
-import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderForum(entries, person, state) {
   const threads = entries.filter((e) => !e.parentId);
@@ -16,7 +16,7 @@ export function renderForum(entries, person, state) {
 
 function renderThreads(threads, commentsByThread, state) {
   if (!threads.length) {
-    return '<p class="muted">No threads yet. Start a discussion.</p>';
+    return renderEmptyState('No threads yet. Start a discussion.');
   }
   const topicCache = new Map();
   return threads
@@ -66,7 +66,7 @@ function groupCommentsByParent(comments = []) {
 
 function renderComments(comments) {
   if (!comments.length) {
-    return '<p class="muted small">No comments yet.</p>';
+    return renderEmptyState('No comments yet.', { size: 'small' });
   }
   return comments
     .map((comment) => {

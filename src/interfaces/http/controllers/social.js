@@ -43,11 +43,12 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const allFollows = person ? listFollowsFor(state, person.pidHash) : [];
+  const followStats = person ? summarizeFollows(state, person.pidHash) : emptyFollowStats();
+  const allFollows = followStats.follows;
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows: allFollows });
-  const followers = person ? listFollowersOf(state, person.pidHash) : [];
-  const followTypeByHash = new Map(allFollows.map((edge) => [edge.targetHash, edge.type]));
-  const followTypeCounts = countFollowTypes(allFollows);
+  const followTypeByHash = followStats.followTypeByHash;
+  const followTypeCounts = followStats.followTypeCounts;
+  const followTypeList = buildFollowTypeList(followTypeCounts);
   const mediaById = buildMediaLookup(feed, state.socialMedia);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
@@ -60,11 +61,11 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
       postingReason,
       followCount: allFollows.length,
-      followerCount: followers.length,
+      followerCount: followStats.followerCount,
       followList: renderFollowList(allFollows),
       feedList: renderSocialPosts(feed, { enableReplies: Boolean(person), followTypeByHash, mediaById }),
-      followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts),
-      followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false }),
+      followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: followTypeList }),
+      followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false, types: followTypeList }),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
@@ -521,11 +522,10 @@ export async function listRelationships({ req, res, state }) {
   });
 }
 
-function renderFollowTypeOptions(selectedType = '', counts = new Map(), { includeCounts = true } = {}) {
+function renderFollowTypeOptions(selectedType = '', counts = new Map(), { includeCounts = true, types } = {}) {
   const normalized = selectedType ? normalizeFollowType(selectedType) : '';
-  const extraTypes = [...counts.keys()].filter((type) => !DEFAULT_FOLLOW_TYPES.includes(type)).sort();
-  const types = [...DEFAULT_FOLLOW_TYPES, ...extraTypes];
-  return types.map((type) => {
+  const resolvedTypes = types || buildFollowTypeList(counts);
+  return resolvedTypes.map((type) => {
     const selected = normalized === type ? ' selected' : '';
     const count = counts.get(type);
     const label = includeCounts && Number.isFinite(count) && count > 0 ? `${type} (${count})` : type;
@@ -559,13 +559,39 @@ function buildMediaLookup(posts = [], mediaEntries = []) {
   return lookup;
 }
 
-function countFollowTypes(follows = []) {
-  const counts = new Map();
-  for (const edge of follows || []) {
-    const type = normalizeFollowType(edge.type || 'circle');
-    counts.set(type, (counts.get(type) || 0) + 1);
+function buildFollowTypeList(counts = new Map()) {
+  const extraTypes = [...counts.keys()].filter((type) => !DEFAULT_FOLLOW_TYPES.includes(type)).sort();
+  return [...DEFAULT_FOLLOW_TYPES, ...extraTypes];
+}
+
+function summarizeFollows(state, personHash) {
+  const follows = [];
+  const followTypeCounts = new Map();
+  const followTypeByHash = new Map();
+  let followerCount = 0;
+  for (const edge of state.socialFollows || []) {
+    if (!edge) continue;
+    if (edge.followerHash === personHash) {
+      follows.push(edge);
+      const type = normalizeFollowType(edge.type || 'circle');
+      followTypeCounts.set(type, (followTypeCounts.get(type) || 0) + 1);
+      if (edge.targetHash) {
+        followTypeByHash.set(edge.targetHash, type);
+      }
+    } else if (edge.targetHash === personHash) {
+      followerCount += 1;
+    }
   }
-  return counts;
+  return { follows, followTypeCounts, followTypeByHash, followerCount };
+}
+
+function emptyFollowStats() {
+  return {
+    follows: [],
+    followTypeCounts: new Map(),
+    followTypeByHash: new Map(),
+    followerCount: 0,
+  };
 }
 
 function buildFollowTypeAllLabel(count) {

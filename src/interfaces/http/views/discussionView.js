@@ -1,10 +1,10 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderDiscussionList(entries, state) {
   if (!entries.length) {
-    return '<p class="muted">No contributions yet. Be the first to start the debate.</p>';
+    return renderEmptyState('No contributions yet. Be the first to start the debate.');
   }
 
   const topicCache = new Map();

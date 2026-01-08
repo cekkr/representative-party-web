@@ -6,7 +6,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
 - Cache per-handle follow-type counts (or increment on follow/unfollow) to avoid recomputing tallies on every social feed render.
-- Combine follow-type map and count computations in a single pass when building social feed metadata.
 - Cache normalized topic keys in entries to avoid repeated normalization and filtering in topic views.
 - Add write-behind queues for persistence to batch JSON writes during bursty activity (discussion/posts/comments).
 - Add request-scoped memoization for common lookups (policy, actor labels, person/session) inside controllers.
@@ -21,6 +20,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
+- Reuse a shared `Intl.DateTimeFormat` instance (or cache formatted timestamps) to reduce locale formatting overhead in list renders.
+- Group forum threads and comments in a single pass to avoid repeated filtering on large thread lists.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -28,6 +29,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
 - Consolidate repeated "hash-only guarantee" and verification copy into shared view strings to keep copy consistent.
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
+- Render optional gate reason rows only when present so callouts avoid blank lines across modules.
 
 ## UX Consistency
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
@@ -45,6 +47,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
+- Stream multipart uploads to disk (or temporary files) to avoid buffering large media uploads in memory.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
 
@@ -56,3 +59,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added shared timestamp formatting to keep date rendering consistent across controllers and views.
 - Added topic breadcrumb caching in discussion/petition/forum lists and reduced social feed passes when filtering posts.
 - Centralized the module settings map in module metadata so admin toggles and settings links stay aligned.
+- Indexed HTTP routes by method/path to avoid scanning the full route table on every request.
+- Combined social follow stats (counts + map) in a single pass and reused follow-type lists for select/datalist rendering.
+- Added a shared empty-state renderer for list views to reduce duplicated markup and keep copy consistent.
+- Aligned forum header metadata with the callout styling used across other modules.

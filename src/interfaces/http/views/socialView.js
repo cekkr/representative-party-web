@@ -1,10 +1,10 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderIssuerPill } from './shared.js';
+import { renderEmptyState, renderIssuerPill } from './shared.js';
 
 export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
   if (!posts || posts.length === 0) {
-    return '<p class="muted">No posts yet. Follow someone and start the conversation.</p>';
+    return renderEmptyState('No posts yet. Follow someone and start the conversation.');
   }
 
   return posts
@@ -62,7 +62,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
 
 export function renderFollowList(follows) {
   if (!follows || follows.length === 0) {
-    return '<p class="muted">You are not following anyone yet.</p>';
+    return renderEmptyState('You are not following anyone yet.');
   }
 
   return follows
