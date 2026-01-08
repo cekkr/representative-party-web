@@ -106,7 +106,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   let files = [];
   if (contentType.includes('multipart/form-data')) {
     try {
-      const parsed = await readMultipartForm(req, { maxBytes: MEDIA.maxBytes + 512 * 1024 });
+      const parsed = await readMultipartForm(req, { maxBytes: MEDIA.maxBytes + 512 * 1024, streamFiles: true });
       body = parsed.fields || {};
       files = parsed.files || [];
     } catch (error) {

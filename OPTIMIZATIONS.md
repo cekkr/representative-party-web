@@ -20,7 +20,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
-- Reuse a shared `Intl.DateTimeFormat` instance (or cache formatted timestamps) to reduce locale formatting overhead in list renders.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -44,9 +43,9 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
-- Stream multipart uploads to disk (or temporary files) to avoid buffering large media uploads in memory.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
+- Cap multipart field sizes or stream large text fields to disk to avoid memory spikes from oversized form inputs.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
@@ -62,3 +61,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Aligned forum header metadata with the callout styling used across other modules.
 - Grouped forum threads and comments in a single pass to avoid repeated filtering on large thread lists.
 - Rendered gate reason callout rows only when present to remove blank lines across modules.
+- Reused a shared `Intl.DateTimeFormat` instance to reduce locale formatting overhead in list renders.
+- Streamed multipart uploads to temporary files to avoid buffering large media uploads in memory.
