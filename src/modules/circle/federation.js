@@ -2,6 +2,7 @@ import { createHash, createSign, createVerify } from 'node:crypto';
 
 import { ISSUER, POLICIES } from '../../config.js';
 import { getEffectivePolicy } from './policy.js';
+import { buildProviderBlindAnnouncement } from './ringRegistry.js';
 
 export function computeLedgerHash(entries = []) {
   const normalized = [...(entries || [])].map((entry) => String(entry));
@@ -27,6 +28,10 @@ export function buildLedgerEnvelope(state) {
     ledgerHash: computeLedgerHash(entries),
     peers: [...state.peers],
   };
+  const providerBlind = buildProviderBlindAnnouncement(state?.settings?.providerBlind);
+  if (providerBlind) {
+    envelope.providerBlind = providerBlind;
+  }
 
   const signature = signEnvelope(envelope);
   if (signature) {

@@ -108,6 +108,87 @@ export function upsertRingRegistryEntry(providerBlind, entry) {
   return { ...normalized, rings: [ringEntry, ...filtered].slice(0, 24) };
 }
 
+export function buildProviderBlindAnnouncement(providerBlind) {
+  const normalized = normalizeProviderBlindSettings(providerBlind || {});
+  const ring = normalized.ring.currentId
+    ? {
+        id: normalized.ring.currentId,
+        epochSeconds: normalized.ring.epochSeconds,
+        maxSize: normalized.ring.maxSize,
+        keys: normalized.ring.keys,
+      }
+    : null;
+  const rings = (normalized.rings || []).map((entry) => ({
+    id: entry.id,
+    keys: entry.keys,
+    createdAt: entry.createdAt || null,
+    expiresAt: entry.expiresAt || null,
+  }));
+  const auditMembers = (normalized.audit.members || []).map((member) => ({
+    keyId: member.keyId,
+    role: member.role,
+    termStart: member.termStart || null,
+    termEnd: member.termEnd || null,
+  }));
+  const audit = auditMembers.length
+    ? {
+        threshold: normalized.audit.threshold,
+        members: auditMembers,
+      }
+    : null;
+  if (!ring && !rings.length && !audit) return null;
+  return {
+    mode: normalized.mode,
+    ring,
+    rings,
+    audit,
+  };
+}
+
+export function mergeProviderBlindAnnouncement(providerBlind, announcement) {
+  const normalized = normalizeProviderBlindSettings(providerBlind || {});
+  if (!announcement || typeof announcement !== 'object') {
+    return { updated: false, settings: normalized };
+  }
+
+  let updated = false;
+  let next = normalized;
+  const ringEntries = [];
+  if (announcement.ring && (announcement.ring.id || announcement.ring.currentId)) {
+    ringEntries.push(announcement.ring);
+  }
+  if (Array.isArray(announcement.rings)) {
+    ringEntries.push(...announcement.rings);
+  }
+
+  for (const entry of ringEntries) {
+    const normalizedEntry = normalizeRingEntry(entry, { maxSize: next.ring.maxSize });
+    if (!normalizedEntry.id || !normalizedEntry.keys.length) continue;
+    const merged = upsertRingRegistryEntry(next, normalizedEntry);
+    if (JSON.stringify(merged.rings) !== JSON.stringify(next.rings)) {
+      updated = true;
+      next = merged;
+    }
+    if (!next.ring.currentId) {
+      next = { ...next, ring: { ...next.ring, currentId: normalizedEntry.id, keys: normalizedEntry.keys } };
+      updated = true;
+    } else if (next.ring.currentId === normalizedEntry.id && !next.ring.keys.length) {
+      next = { ...next, ring: { ...next.ring, keys: normalizedEntry.keys } };
+      updated = true;
+    }
+  }
+
+  if (announcement.audit && Array.isArray(announcement.audit.members)) {
+    const candidate = normalizeAudit(announcement.audit, next.audit);
+    if (!next.audit.members.length && candidate.members.length) {
+      next = { ...next, audit: { ...next.audit, members: candidate.members, threshold: candidate.threshold } };
+      updated = true;
+    }
+  }
+
+  return { updated, settings: next };
+}
+
 function normalizeMode(value, fallback) {
   const text = String(value || '').trim().toLowerCase();
   return PROVIDER_BLIND_MODES.has(text) ? text : fallback;

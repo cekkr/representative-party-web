@@ -13,7 +13,17 @@ export function exportVotes({ res, state }) {
   }
   const policy = getEffectivePolicy(state);
   const visibleVotes = filterVisibleEntries(state.votes, state);
-  const envelopes = visibleVotes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
+  const providerBlind = state.settings?.providerBlind;
+  const providerBlindMode = providerBlind?.mode || 'off';
+  const useRing = providerBlindMode !== 'off';
+  const envelopes = visibleVotes.map((vote) => {
+    if (useRing && vote?.issuer === state.issuer) {
+      if (!vote.envelope || !vote.envelope.ringSignature || providerBlindMode === 'strict') {
+        return buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+      }
+    }
+    return vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+  });
   const hasPreview = envelopes.some((entry) => entry?.status === 'preview');
   return sendJson(res, 200, { entries: envelopes, status: hasPreview ? 'preview' : 'validated', replication: getReplicationProfile(state) });
 }

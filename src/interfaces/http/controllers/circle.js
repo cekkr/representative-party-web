@@ -26,6 +26,7 @@ export async function handleGossip({ req, res, state }) {
     ledgerHash: body.ledgerHash,
     peerHint: body.peer,
     statusHint: body.status,
+    providerBlind: body.providerBlind,
   });
   return sendJson(res, result.statusCode, result.payload);
 }

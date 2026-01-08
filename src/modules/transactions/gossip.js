@@ -3,6 +3,7 @@ import { decideStatus, getReplicationProfile } from '../federation/replication.j
 import { isPeerQuarantined, recordPeerFailure, recordPeerSuccess, resolvePeerKey } from '../federation/quarantine.js';
 import { persistSettings, persistTransactionSummaries } from '../../infra/persistence/storage.js';
 import { exportTransactionsEnvelope, verifyTransactionsEnvelope } from './registry.js';
+import { getProviderBlindSettings } from '../circle/ringRegistry.js';
 
 const MAX_SUMMARIES = 200;
 const MAX_ENTRY_DIGESTS = 120;
@@ -28,7 +29,7 @@ export async function ingestTransactionsSummary({ state, envelope, peerHint, sta
     return { statusCode: 400, payload: { error: 'missing_envelope', detail: 'Transactions envelope required.' } };
   }
 
-  const verification = verifyTransactionsEnvelope(envelope);
+  const verification = verifyTransactionsEnvelope(envelope, { providerBlind: getProviderBlindSettings(state) });
   if (verification && !verification.valid && !verification.skipped) {
     const updated = recordPeerFailure(state, peerKey, { reason: 'invalid_signature', penalty: 2 }).updated;
     if (updated) await persistSettings(state);
@@ -69,26 +70,34 @@ export async function ingestTransactionsSummary({ state, envelope, peerHint, sta
     };
   }
 
-  if (!envelope.summary || !envelope.issuer) {
+  const hasIssuer = Boolean(envelope.issuer);
+  const hasRingSignature = Boolean(envelope.ringSignature && envelope.ringId);
+  if (!envelope.summary || (!hasIssuer && !hasRingSignature)) {
     const updated = recordPeerFailure(state, peerKey, { reason: 'missing_fields' }).updated;
     if (updated) await persistSettings(state);
     return {
       statusCode: 400,
-      payload: { error: 'missing_fields', detail: 'Transactions summary or issuer missing.' },
+      payload: { error: 'missing_fields', detail: 'Transactions summary or issuer/ring signature missing.' },
     };
   }
 
   const entries = Array.isArray(envelope.entries)
     ? envelope.entries.slice(0, MAX_ENTRY_DIGESTS).map(normalizeEntry).filter(Boolean)
     : [];
-  const summaryKey = `${envelope.issuer}:${envelope.summary}`;
+  const summaryKey = hasIssuer
+    ? `${envelope.issuer}:${envelope.summary}`
+    : `${envelope.ringId || 'ring'}:${envelope.summary}`;
   const summaries = state.transactionSummaries || [];
-  const existingIndex = summaries.findIndex((entry) => `${entry.issuer}:${entry.summary}` === summaryKey);
+  const existingIndex = summaries.findIndex((entry) => {
+    const entryKey = entry.issuer ? `${entry.issuer}:${entry.summary}` : `${entry.ringId || 'ring'}:${entry.summary}`;
+    return entryKey === summaryKey;
+  });
 
   const now = new Date().toISOString();
   const nextEntry = {
     id: envelope.id || `transactions-${Date.now()}`,
-    issuer: envelope.issuer,
+    issuer: envelope.issuer || null,
+    ringId: envelope.ringId || null,
     issuedAt: envelope.issuedAt || now,
     summary: envelope.summary,
     entryCount: entries.length,
@@ -102,7 +111,7 @@ export async function ingestTransactionsSummary({ state, envelope, peerHint, sta
     peer: peerKey || null,
     receivedAt: now,
     provenance: {
-      issuer: envelope.issuer,
+      issuer: envelope.issuer || null,
       mode: envelope.profile?.mode || null,
       adapter: envelope.profile?.adapter || null,
     },
@@ -110,7 +119,10 @@ export async function ingestTransactionsSummary({ state, envelope, peerHint, sta
 
   let added = 0;
   let updated = 0;
-  const filtered = summaries.filter((entry) => `${entry.issuer}:${entry.summary}` !== summaryKey);
+  const filtered = summaries.filter((entry) => {
+    const entryKey = entry.issuer ? `${entry.issuer}:${entry.summary}` : `${entry.ringId || 'ring'}:${entry.summary}`;
+    return entryKey !== summaryKey;
+  });
   if (existingIndex >= 0) {
     updated = 1;
   } else {

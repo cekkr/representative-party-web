@@ -3,6 +3,7 @@ import { persistSettings } from '../../infra/persistence/storage.js';
 import { buildLedgerEnvelope, computeLedgerHash } from '../circle/federation.js';
 import { getEffectivePolicy } from '../circle/policy.js';
 import { isModuleEnabled } from '../circle/modules.js';
+import { buildProviderBlindAnnouncement } from '../circle/ringRegistry.js';
 import { buildVoteEnvelope } from '../votes/voteEnvelope.js';
 import { buildTransactionsPayload, ingestTransactionsSummary } from '../transactions/gossip.js';
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
@@ -47,6 +48,10 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
 
   const sender = state.issuer || state.settings?.issuer || 'local-circle';
   const ledgerPayload = { envelope: buildLedgerEnvelope(state), peer: sender };
+  const providerBlind = buildProviderBlindAnnouncement(state.settings?.providerBlind);
+  if (providerBlind) {
+    ledgerPayload.providerBlind = providerBlind;
+  }
   const votesPayload = buildVotesPayload(state);
   if (votesPayload) votesPayload.peer = sender;
   const transactionsPayload = buildTransactionsPayload(state);
@@ -179,9 +184,17 @@ export function startGossipScheduler(state) {
 function buildVotesPayload(state) {
   if (!isModuleEnabled(state, 'votes')) return null;
   const policy = getEffectivePolicy(state);
-  const entries = filterVisibleEntries(state.votes || [], state).map(
-    (vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }),
-  );
+  const providerBlind = state.settings?.providerBlind;
+  const providerBlindMode = providerBlind?.mode || 'off';
+  const useRing = providerBlindMode !== 'off';
+  const entries = filterVisibleEntries(state.votes || [], state).map((vote) => {
+    if (useRing && vote?.issuer === state.issuer) {
+      if (!vote.envelope || !vote.envelope.ringSignature || providerBlindMode === 'strict') {
+        return buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+      }
+    }
+    return vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+  });
   if (!entries.length) return null;
   return { entries };
 }
@@ -254,6 +267,7 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
         hashes: payload.entries,
         peerHint: peer,
         statusHint: payload.status,
+        providerBlind: payload.providerBlind || envelope?.providerBlind,
       });
       ledger = mapIngestResult(ledgerResponse, ingest, payload);
     } else {
@@ -319,6 +333,7 @@ function buildEnvelopeFromPayload(payload, peer) {
     policy: payload.policy || {},
     entries: payload.entries,
     ledgerHash: payload.ledgerHash,
+    providerBlind: payload.providerBlind || null,
   };
 }
 

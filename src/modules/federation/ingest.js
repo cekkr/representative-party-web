@@ -2,13 +2,14 @@ import { computeLedgerHash, verifyLedgerEnvelope } from '../circle/federation.js
 import { getEffectivePolicy } from '../circle/policy.js';
 import { persistLedger, persistPeers, persistSettings, persistVotes } from '../../infra/persistence/storage.js';
 import { verifyVoteEnvelope } from '../votes/voteEnvelope.js';
+import { mergeProviderBlindAnnouncement } from '../circle/ringRegistry.js';
 import { decideStatus, getReplicationProfile } from './replication.js';
 import { normalizePeerUrl } from './peers.js';
 import { isPeerQuarantined, recordPeerFailure, recordPeerLedger, recordPeerSuccess, resolvePeerKey } from './quarantine.js';
 
 const MAX_PEER_HINTS = 25;
 
-export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, peerHint, statusHint } = {}) {
+export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, peerHint, statusHint, providerBlind } = {}) {
   const peerKey = resolvePeerKey(peerHint, envelope?.issuer);
   const quarantine = isPeerQuarantined(state, peerKey);
   if (quarantine.quarantined) {
@@ -54,6 +55,15 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
         received: policyCheck.received,
       },
     };
+  }
+
+  const providerBlindHint = providerBlind || envelope?.providerBlind;
+  if (providerBlindHint) {
+    const merged = mergeProviderBlindAnnouncement(state.settings?.providerBlind || {}, providerBlindHint);
+    if (merged.updated) {
+      state.settings = { ...(state.settings || {}), providerBlind: merged.settings };
+      await persistSettings(state);
+    }
   }
 
   if (replicationStatus.status === 'rejected') {
@@ -180,7 +190,7 @@ export async function ingestVoteGossip({ state, envelopes = [], statusHint, peer
 
   for (const envelope of envelopes || []) {
     if (!envelope) continue;
-    const verification = verifyVoteEnvelope(envelope);
+    const verification = verifyVoteEnvelope(envelope, { providerBlind: state.settings?.providerBlind });
     if (verification && !verification.valid && !verification.skipped) {
       hardFailure = true;
       rejected += 1;
