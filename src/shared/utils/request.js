@@ -7,6 +7,8 @@ import { URLSearchParams } from 'node:url';
 import { PATHS, PORT } from '../../config.js';
 
 const DEFAULT_FIELD_MAX_BYTES = 64 * 1024;
+const DEFAULT_FIELD_TOTAL_MAX_BYTES = 128 * 1024;
+const DEFAULT_FIELD_MAX_COUNT = 40;
 
 export async function readRequestBody(req) {
   const chunks = [];
@@ -35,14 +37,27 @@ export async function readRequestBody(req) {
 
 export async function readMultipartForm(
   req,
-  { maxBytes = 10 * 1024 * 1024, maxFieldBytes = DEFAULT_FIELD_MAX_BYTES, streamFiles = false, tempDir } = {},
+  {
+    maxBytes = 10 * 1024 * 1024,
+    maxFieldBytes = DEFAULT_FIELD_MAX_BYTES,
+    maxFieldBytesTotal = DEFAULT_FIELD_TOTAL_MAX_BYTES,
+    maxFieldCount = DEFAULT_FIELD_MAX_COUNT,
+    streamFiles = false,
+    tempDir,
+  } = {},
 ) {
   const contentType = req.headers['content-type'] || '';
   const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
   if (!match) return { fields: {}, files: [] };
   const boundary = match[1] || match[2];
   if (streamFiles) {
-    return readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tempDir });
+    return readMultipartStream(req, boundary, {
+      maxBytes,
+      maxFieldBytes,
+      maxFieldBytesTotal,
+      maxFieldCount,
+      tempDir,
+    });
   }
 
   const chunks = [];
@@ -61,6 +76,8 @@ export async function readMultipartForm(
   const parts = splitMultipart(buffer, boundary);
   const fields = {};
   const files = [];
+  let fieldBytesTotal = 0;
+  let fieldCount = 0;
 
   for (const part of parts) {
     const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
@@ -83,8 +100,16 @@ export async function readMultipartForm(
         size: body.length,
       });
     } else {
+      fieldCount += 1;
+      if (isFieldCountExceeded(maxFieldCount, fieldCount)) {
+        throw createFieldCountTooLargeError(maxFieldCount);
+      }
       if (isFieldLimitExceeded(maxFieldBytes, body.length)) {
         throw createFieldTooLargeError(fieldName, maxFieldBytes);
+      }
+      fieldBytesTotal += body.length;
+      if (isFieldTotalLimitExceeded(maxFieldBytesTotal, fieldBytesTotal)) {
+        throw createFieldTotalTooLargeError(maxFieldBytesTotal);
       }
       fields[fieldName] = body.toString('utf-8');
     }
@@ -182,7 +207,11 @@ function parseHeaders(text) {
   return headers;
 }
 
-async function readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tempDir } = {}) {
+async function readMultipartStream(
+  req,
+  boundary,
+  { maxBytes, maxFieldBytes, maxFieldBytesTotal, maxFieldCount, tempDir } = {},
+) {
   const fields = {};
   const files = [];
   const tempFiles = new Set();
@@ -197,6 +226,8 @@ async function readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tem
   let total = 0;
   let state = 'preamble';
   let current = null;
+  let fieldBytesTotal = 0;
+  let fieldCount = 0;
 
   const writePartData = async (data) => {
     if (!data || data.length === 0 || !current) return;
@@ -210,7 +241,12 @@ async function readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tem
     if (isFieldLimitExceeded(maxFieldBytes, nextSize)) {
       throw createFieldTooLargeError(current.fieldName, maxFieldBytes);
     }
+    const nextTotal = fieldBytesTotal + data.length;
+    if (isFieldTotalLimitExceeded(maxFieldBytesTotal, nextTotal)) {
+      throw createFieldTotalTooLargeError(maxFieldBytesTotal);
+    }
     current.size = nextSize;
+    fieldBytesTotal = nextTotal;
     current.chunks.push(data);
   };
 
@@ -290,6 +326,10 @@ async function readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tem
             size: 0,
           };
         } else {
+          fieldCount += 1;
+          if (isFieldCountExceeded(maxFieldCount, fieldCount)) {
+            throw createFieldCountTooLargeError(maxFieldCount);
+          }
           current = { skip: false, isFile: false, fieldName, chunks: [], size: 0 };
         }
         state = 'body';
@@ -388,10 +428,34 @@ function isFieldLimitExceeded(maxFieldBytes, size) {
   return size > maxFieldBytes;
 }
 
+function isFieldTotalLimitExceeded(maxFieldBytesTotal, size) {
+  if (!Number.isFinite(maxFieldBytesTotal) || maxFieldBytesTotal <= 0) return false;
+  return size > maxFieldBytesTotal;
+}
+
+function isFieldCountExceeded(maxFieldCount, count) {
+  if (!Number.isFinite(maxFieldCount) || maxFieldCount <= 0) return false;
+  return count > maxFieldCount;
+}
+
 function createFieldTooLargeError(fieldName, maxFieldBytes) {
   const error = new Error('field_too_large');
   error.code = 'field_too_large';
   error.fieldName = fieldName;
   error.maxFieldBytes = maxFieldBytes;
+  return error;
+}
+
+function createFieldTotalTooLargeError(maxFieldBytesTotal) {
+  const error = new Error('fields_too_large');
+  error.code = 'fields_too_large';
+  error.maxFieldBytesTotal = maxFieldBytesTotal;
+  return error;
+}
+
+function createFieldCountTooLargeError(maxFieldCount) {
+  const error = new Error('too_many_fields');
+  error.code = 'too_many_fields';
+  error.maxFieldCount = maxFieldCount;
   return error;
 }

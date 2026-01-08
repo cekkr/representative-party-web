@@ -109,6 +109,8 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
       const parsed = await readMultipartForm(req, {
         maxBytes: MEDIA.maxBytes + 512 * 1024,
         maxFieldBytes: MEDIA.maxFieldBytes,
+        maxFieldBytesTotal: MEDIA.maxFieldBytesTotal,
+        maxFieldCount: MEDIA.maxFieldCount,
         streamFiles: true,
       });
       body = parsed.fields || {};
@@ -124,6 +126,18 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
         return sendJson(res, 413, {
           error: 'field_too_large',
           message: `Form field exceeds the ${Math.round(MEDIA.maxFieldBytes / 1024)}KB limit.`,
+        });
+      }
+      if (error.code === 'fields_too_large') {
+        return sendJson(res, 413, {
+          error: 'fields_too_large',
+          message: `Form fields exceed the ${Math.round(MEDIA.maxFieldBytesTotal / 1024)}KB total limit.`,
+        });
+      }
+      if (error.code === 'too_many_fields') {
+        return sendJson(res, 413, {
+          error: 'too_many_fields',
+          message: `Form exceeds the ${MEDIA.maxFieldCount} field limit.`,
         });
       }
       throw error;

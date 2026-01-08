@@ -69,6 +69,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Add an optional libp2p-backed Circle key generator so P2P rings are not anchored to the first provider and can persist if a seed provider shuts down.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
+- Next-next steps: expose upload cleanup stats in `/health` + `/admin`, add request-level multipart limits for non-media endpoints, and add integration tests for oversized multipart fields + cleanup scheduling.
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.

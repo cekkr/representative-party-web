@@ -16,11 +16,24 @@ export async function startServer() {
   state.extensions = await loadExtensions({ list: extensionList });
   // wire outbound transports (email/SMS/webhook); defaults log-only if not configured
   state.outbound = await loadOutboundTransports();
+  const uploadRetentionMs = MEDIA.uploadRetentionHours * 60 * 60 * 1000;
+  const cleanupUploads = async () => {
+    if (!Number.isFinite(uploadRetentionMs) || uploadRetentionMs <= 0) return;
+    await cleanupTempUploads({ maxAgeMs: uploadRetentionMs });
+  };
   try {
-    const maxAgeMs = MEDIA.uploadRetentionHours * 60 * 60 * 1000;
-    await cleanupTempUploads({ maxAgeMs });
+    await cleanupUploads();
   } catch (error) {
     console.warn('[uploads] temp cleanup failed', error);
+  }
+  const cleanupIntervalMs = MEDIA.uploadCleanupIntervalMinutes * 60 * 1000;
+  if (Number.isFinite(cleanupIntervalMs) && cleanupIntervalMs > 0) {
+    state.uploadCleanupInterval = setInterval(() => {
+      cleanupUploads().catch((error) => {
+        console.warn('[uploads] temp cleanup failed', error);
+      });
+    }, cleanupIntervalMs);
+    state.uploadCleanupInterval.unref();
   }
   state.gossipStop = startGossipScheduler(state);
   state.topicGardenerStop = startTopicGardenerScheduler(state);

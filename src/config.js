@@ -38,7 +38,10 @@ export const MEDIA_DEFAULTS = {
   maxBytes: 10 * 1024 * 1024,
   reportThreshold: 3,
   maxFieldBytes: 64 * 1024,
+  maxFieldBytesTotal: 128 * 1024,
+  maxFieldCount: 40,
   uploadRetentionHours: 24,
+  uploadCleanupIntervalMinutes: 30,
 };
 
 export const PATHS = {
@@ -102,9 +105,18 @@ export const MEDIA = {
   maxBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_MAX_BYTES, MEDIA_DEFAULTS.maxBytes),
   reportThreshold: parseNumberEnv(process.env.SOCIAL_MEDIA_REPORT_THRESHOLD, MEDIA_DEFAULTS.reportThreshold),
   maxFieldBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_BYTES, MEDIA_DEFAULTS.maxFieldBytes),
+  maxFieldBytesTotal: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES,
+    MEDIA_DEFAULTS.maxFieldBytesTotal,
+  ),
+  maxFieldCount: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_COUNT, MEDIA_DEFAULTS.maxFieldCount),
   uploadRetentionHours: parseNumberEnv(
     process.env.SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS,
     MEDIA_DEFAULTS.uploadRetentionHours,
+  ),
+  uploadCleanupIntervalMinutes: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES,
+    MEDIA_DEFAULTS.uploadCleanupIntervalMinutes,
   ),
 };
 
