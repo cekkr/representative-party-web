@@ -139,6 +139,11 @@ npm run db:check
 - Server: `http://0.0.0.0:3000`
 - JSON persistence (default): writes under `src/data/`
 
+### Media upload safety
+
+- Social media uploads stream to `src/data/uploads` before moving into `src/data/media`; stale temp files are pruned on startup.
+- Knobs: `SOCIAL_MEDIA_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_BYTES`, `SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS`.
+
 ### Useful endpoints
 
 - `/` landing, `/health` metrics

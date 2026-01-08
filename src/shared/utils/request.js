@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { createWriteStream } from 'node:fs';
-import { mkdir, unlink } from 'node:fs/promises';
+import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { URLSearchParams } from 'node:url';
 
 import { PATHS, PORT } from '../../config.js';
+
+const DEFAULT_FIELD_MAX_BYTES = 64 * 1024;
 
 export async function readRequestBody(req) {
   const chunks = [];
@@ -31,13 +33,16 @@ export async function readRequestBody(req) {
   return { raw };
 }
 
-export async function readMultipartForm(req, { maxBytes = 10 * 1024 * 1024, streamFiles = false, tempDir } = {}) {
+export async function readMultipartForm(
+  req,
+  { maxBytes = 10 * 1024 * 1024, maxFieldBytes = DEFAULT_FIELD_MAX_BYTES, streamFiles = false, tempDir } = {},
+) {
   const contentType = req.headers['content-type'] || '';
   const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
   if (!match) return { fields: {}, files: [] };
   const boundary = match[1] || match[2];
   if (streamFiles) {
-    return readMultipartStream(req, boundary, { maxBytes, tempDir });
+    return readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tempDir });
   }
 
   const chunks = [];
@@ -78,6 +83,9 @@ export async function readMultipartForm(req, { maxBytes = 10 * 1024 * 1024, stre
         size: body.length,
       });
     } else {
+      if (isFieldLimitExceeded(maxFieldBytes, body.length)) {
+        throw createFieldTooLargeError(fieldName, maxFieldBytes);
+      }
       fields[fieldName] = body.toString('utf-8');
     }
   }
@@ -101,6 +109,43 @@ export function deriveBaseUrl(req) {
   const proto = req.headers['x-forwarded-proto'] || 'http';
   const host = req.headers['x-forwarded-host'] || req.headers.host || `localhost:${PORT}`;
   return `${proto}://${host}`;
+}
+
+export async function cleanupTempUploads({ maxAgeMs = 24 * 60 * 60 * 1000, tempDir } = {}) {
+  const uploadRoot = tempDir || PATHS.UPLOADS_ROOT;
+  if (!Number.isFinite(maxAgeMs) || maxAgeMs <= 0) {
+    return { scanned: 0, cleaned: 0, skipped: 0 };
+  }
+  let entries;
+  try {
+    entries = await readdir(uploadRoot, { withFileTypes: true });
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { scanned: 0, cleaned: 0, skipped: 0 };
+    }
+    throw error;
+  }
+  const now = Date.now();
+  let cleaned = 0;
+  let skipped = 0;
+  for (const entry of entries) {
+    if (!entry.isFile() || !entry.name.endsWith('.upload')) continue;
+    const filePath = join(uploadRoot, entry.name);
+    let info;
+    try {
+      info = await stat(filePath);
+    } catch (error) {
+      if (error.code === 'ENOENT') continue;
+      throw error;
+    }
+    if (now - info.mtimeMs > maxAgeMs) {
+      await unlink(filePath).catch(() => null);
+      cleaned += 1;
+    } else {
+      skipped += 1;
+    }
+  }
+  return { scanned: entries.length, cleaned, skipped };
 }
 
 function splitMultipart(buffer, boundary) {
@@ -137,14 +182,14 @@ function parseHeaders(text) {
   return headers;
 }
 
-async function readMultipartStream(req, boundary, { maxBytes, tempDir } = {}) {
+async function readMultipartStream(req, boundary, { maxBytes, maxFieldBytes, tempDir } = {}) {
   const fields = {};
   const files = [];
   const tempFiles = new Set();
   const boundaryMarker = Buffer.from(`--${boundary}`);
   const boundaryPrefix = Buffer.from(`\r\n--${boundary}`);
   const headerSeparator = Buffer.from('\r\n\r\n');
-  const uploadRoot = tempDir || join(PATHS.DATA_ROOT, 'uploads');
+  const uploadRoot = tempDir || PATHS.UPLOADS_ROOT;
 
   await mkdir(uploadRoot, { recursive: true });
 
@@ -161,6 +206,11 @@ async function readMultipartStream(req, boundary, { maxBytes, tempDir } = {}) {
       await writeStreamChunk(current.stream, data);
       return;
     }
+    const nextSize = current.size + data.length;
+    if (isFieldLimitExceeded(maxFieldBytes, nextSize)) {
+      throw createFieldTooLargeError(current.fieldName, maxFieldBytes);
+    }
+    current.size = nextSize;
     current.chunks.push(data);
   };
 
@@ -240,7 +290,7 @@ async function readMultipartStream(req, boundary, { maxBytes, tempDir } = {}) {
             size: 0,
           };
         } else {
-          current = { skip: false, isFile: false, fieldName, chunks: [] };
+          current = { skip: false, isFile: false, fieldName, chunks: [], size: 0 };
         }
         state = 'body';
       }
@@ -331,4 +381,17 @@ async function cleanupTempFiles(tempFiles) {
     tasks.push(unlink(filePath).catch(() => null));
   }
   await Promise.all(tasks);
+}
+
+function isFieldLimitExceeded(maxFieldBytes, size) {
+  if (!Number.isFinite(maxFieldBytes) || maxFieldBytes <= 0) return false;
+  return size > maxFieldBytes;
+}
+
+function createFieldTooLargeError(fieldName, maxFieldBytes) {
+  const error = new Error('field_too_large');
+  error.code = 'field_too_large';
+  error.fieldName = fieldName;
+  error.maxFieldBytes = maxFieldBytes;
+  return error;
 }

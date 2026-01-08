@@ -37,6 +37,8 @@ export const DATA_DEFAULTS = {
 export const MEDIA_DEFAULTS = {
   maxBytes: 10 * 1024 * 1024,
   reportThreshold: 3,
+  maxFieldBytes: 64 * 1024,
+  uploadRetentionHours: 24,
 };
 
 export const PATHS = {
@@ -44,6 +46,7 @@ export const PATHS = {
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
+  UPLOADS_ROOT: join(ROOT_DIR, 'data', 'uploads'),
   MEDIA_ROOT: join(ROOT_DIR, 'data', 'media'),
   EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
   DATA_SQLITE: join(ROOT_DIR, 'data', 'state.sqlite'),
@@ -98,6 +101,11 @@ export const DATA = {
 export const MEDIA = {
   maxBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_MAX_BYTES, MEDIA_DEFAULTS.maxBytes),
   reportThreshold: parseNumberEnv(process.env.SOCIAL_MEDIA_REPORT_THRESHOLD, MEDIA_DEFAULTS.reportThreshold),
+  maxFieldBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_BYTES, MEDIA_DEFAULTS.maxFieldBytes),
+  uploadRetentionHours: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS,
+    MEDIA_DEFAULTS.uploadRetentionHours,
+  ),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';

@@ -106,7 +106,11 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   let files = [];
   if (contentType.includes('multipart/form-data')) {
     try {
-      const parsed = await readMultipartForm(req, { maxBytes: MEDIA.maxBytes + 512 * 1024, streamFiles: true });
+      const parsed = await readMultipartForm(req, {
+        maxBytes: MEDIA.maxBytes + 512 * 1024,
+        maxFieldBytes: MEDIA.maxFieldBytes,
+        streamFiles: true,
+      });
       body = parsed.fields || {};
       files = parsed.files || [];
     } catch (error) {
@@ -114,6 +118,12 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
         return sendJson(res, 413, {
           error: 'media_too_large',
           message: `Upload exceeds the ${Math.round(MEDIA.maxBytes / (1024 * 1024))}MB limit.`,
+        });
+      }
+      if (error.code === 'field_too_large') {
+        return sendJson(res, 413, {
+          error: 'field_too_large',
+          message: `Form field exceeds the ${Math.round(MEDIA.maxFieldBytes / 1024)}KB limit.`,
         });
       }
       throw error;

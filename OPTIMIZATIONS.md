@@ -45,7 +45,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
-- Cap multipart field sizes or stream large text fields to disk to avoid memory spikes from oversized form inputs.
+- Limit total multipart field bytes and field counts to avoid many small fields bypassing per-field caps.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
@@ -63,3 +63,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Rendered gate reason callout rows only when present to remove blank lines across modules.
 - Reused a shared `Intl.DateTimeFormat` instance to reduce locale formatting overhead in list renders.
 - Streamed multipart uploads to temporary files to avoid buffering large media uploads in memory.
+- Added multipart text-field size guards to avoid oversized form memory spikes.
+- Added startup cleanup for stale temp uploads left behind by crashes or aborted requests.
