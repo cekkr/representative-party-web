@@ -17,9 +17,39 @@ export async function startServer() {
   // wire outbound transports (email/SMS/webhook); defaults log-only if not configured
   state.outbound = await loadOutboundTransports();
   const uploadRetentionMs = MEDIA.uploadRetentionHours * 60 * 60 * 1000;
+  const recordUploadCleanup = ({ result, error, skippedReason } = {}) => {
+    const now = new Date().toISOString();
+    const prev = state.uploadCleanup || {};
+    const next = { ...prev, lastRunAt: now };
+    if (skippedReason) {
+      next.lastSkippedAt = now;
+      next.lastSkipReason = skippedReason;
+    }
+    if (result) {
+      next.lastSuccessAt = now;
+      next.lastResult = result;
+      next.lastError = null;
+      next.lastErrorAt = null;
+    }
+    if (error) {
+      next.lastErrorAt = now;
+      next.lastError = error?.message || String(error);
+    }
+    state.uploadCleanup = next;
+  };
   const cleanupUploads = async () => {
-    if (!Number.isFinite(uploadRetentionMs) || uploadRetentionMs <= 0) return;
-    await cleanupTempUploads({ maxAgeMs: uploadRetentionMs });
+    if (!Number.isFinite(uploadRetentionMs) || uploadRetentionMs <= 0) {
+      recordUploadCleanup({ skippedReason: 'retention_disabled' });
+      return null;
+    }
+    try {
+      const result = await cleanupTempUploads({ maxAgeMs: uploadRetentionMs });
+      recordUploadCleanup({ result });
+      return result;
+    } catch (error) {
+      recordUploadCleanup({ error });
+      throw error;
+    }
   };
   try {
     await cleanupUploads();
@@ -27,7 +57,12 @@ export async function startServer() {
     console.warn('[uploads] temp cleanup failed', error);
   }
   const cleanupIntervalMs = MEDIA.uploadCleanupIntervalMinutes * 60 * 1000;
-  if (Number.isFinite(cleanupIntervalMs) && cleanupIntervalMs > 0) {
+  const shouldScheduleCleanup =
+    Number.isFinite(cleanupIntervalMs) &&
+    cleanupIntervalMs > 0 &&
+    Number.isFinite(uploadRetentionMs) &&
+    uploadRetentionMs > 0;
+  if (shouldScheduleCleanup) {
     state.uploadCleanupInterval = setInterval(() => {
       cleanupUploads().catch((error) => {
         console.warn('[uploads] temp cleanup failed', error);

@@ -447,11 +447,13 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
   }
 
   const ok = errors.length === 0;
+  const durationMs = computeDurationMs(startedAt, finishedAt);
   return {
     ok,
     reason,
     startedAt,
     finishedAt,
+    durationMs,
     peers: peers.length,
     ledger,
     votes,
@@ -517,11 +519,13 @@ function summarizePullResults({ peerResults, peers, reason, startedAt, finishedA
   }
 
   const ok = errors.length === 0;
+  const durationMs = computeDurationMs(startedAt, finishedAt);
   return {
     ok,
     reason,
     startedAt,
     finishedAt,
+    durationMs,
     peers: peers.length,
     ledger,
     votes,
@@ -538,11 +542,13 @@ function buildError(result, scope) {
 }
 
 function buildSkippedSummary({ reason, startedAt, finishedAt, skip }) {
+  const durationMs = computeDurationMs(startedAt, finishedAt);
   return {
     ok: false,
     reason,
     startedAt,
     finishedAt,
+    durationMs,
     peers: 0,
     ledger: { sent: 0, ok: 0, failed: 0, added: 0 },
     votes: { sent: 0, ok: 0, failed: 0, skipped: true, added: 0, updated: 0 },
@@ -553,11 +559,13 @@ function buildSkippedSummary({ reason, startedAt, finishedAt, skip }) {
 }
 
 function buildErrorSummary({ reason, startedAt, finishedAt, error, peers }) {
+  const durationMs = computeDurationMs(startedAt, finishedAt);
   return {
     ok: false,
     reason,
     startedAt,
     finishedAt,
+    durationMs,
     peers: peers.length,
     ledger: { sent: peers.length, ok: 0, failed: peers.length, added: 0 },
     votes: { sent: peers.length, ok: 0, failed: peers.length, skipped: false, added: 0, updated: 0 },
@@ -640,4 +648,11 @@ function shouldSkipResponse(status, error, { skipNotFound = false } = {}) {
   if (normalized.includes('module disabled') || normalized.includes('gossip disabled')) return true;
   if (normalized.includes('gossip ingestion is disabled')) return true;
   return false;
+}
+
+function computeDurationMs(startedAt, finishedAt) {
+  const start = Date.parse(startedAt || '');
+  const finish = Date.parse(finishedAt || '');
+  if (!Number.isFinite(start) || !Number.isFinite(finish)) return null;
+  return Math.max(0, finish - start);
 }

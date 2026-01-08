@@ -165,8 +165,10 @@ export async function cleanupTempUploads({ maxAgeMs = 24 * 60 * 60 * 1000, tempD
   const now = Date.now();
   let cleaned = 0;
   let skipped = 0;
+  let scanned = 0;
   for (const entry of entries) {
     if (!entry.isFile() || !entry.name.endsWith('.upload')) continue;
+    scanned += 1;
     const filePath = join(uploadRoot, entry.name);
     let info;
     try {
@@ -182,7 +184,7 @@ export async function cleanupTempUploads({ maxAgeMs = 24 * 60 * 60 * 1000, tempD
       skipped += 1;
     }
   }
-  return { scanned: entries.length, cleaned, skipped };
+  return { scanned, cleaned, skipped };
 }
 
 function splitMultipart(buffer, boundary) {

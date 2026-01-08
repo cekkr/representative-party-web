@@ -47,7 +47,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Current status snapshot (Phase 1 largely shipped)
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default with view-request notifications, blockable after reports), gated by the same role/ban checks.
-- Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads.
+- Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads; cleanup stats surface in `/health` and `/admin`.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
 - Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags + evidence prompts, argument-map linking, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
@@ -57,7 +57,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
-- Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
+- Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 
 ## Near-term next steps (Phase 2 focus)
@@ -69,7 +69,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Add an optional libp2p-backed Circle key generator so P2P rings are not anchored to the first provider and can persist if a seed provider shuts down.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
-- Next-next steps: expose upload cleanup stats in `/health` + `/admin`, add request-level multipart limits for non-media endpoints, and add integration tests for oversized multipart fields + cleanup scheduling.
+- Next-next steps: add request-level multipart limits for non-media endpoints, and add integration tests for oversized multipart fields + cleanup scheduling.
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.

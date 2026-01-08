@@ -1,4 +1,4 @@
-import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
+import { DATA_DEFAULTS, MEDIA, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
@@ -1025,6 +1025,19 @@ function buildAdminViewModel(
   const metricsList = renderOpsMetrics(metricsSnapshot);
   const socialMediaList = renderSocialMediaList(state.socialMedia || []);
   const socialMediaCount = (state.socialMedia || []).length;
+  const uploadRetentionHours = MEDIA.uploadRetentionHours;
+  const uploadIntervalMinutes = MEDIA.uploadCleanupIntervalMinutes;
+  const uploadCleanup = state.uploadCleanup || {};
+  const uploadCleanupEnabled = Number.isFinite(uploadRetentionHours) && uploadRetentionHours > 0;
+  const uploadCleanupScheduled =
+    uploadCleanupEnabled && Number.isFinite(uploadIntervalMinutes) && uploadIntervalMinutes > 0;
+  let uploadCleanupConfigNote = 'Upload cleanup disabled (retention is off).';
+  if (uploadCleanupEnabled && uploadCleanupScheduled) {
+    uploadCleanupConfigNote = `Retention: ${uploadRetentionHours}h · Interval: every ${uploadIntervalMinutes}m`;
+  } else if (uploadCleanupEnabled) {
+    uploadCleanupConfigNote = `Retention: ${uploadRetentionHours}h · Interval disabled (startup cleanup only).`;
+  }
+  const uploadCleanupSummary = renderUploadCleanupSummary(uploadCleanup);
   const gossipPushSummary = renderGossipSummary(state.gossipState, { emptyLabel: 'No outbound gossip runs yet.' });
   const gossipPushPeers = renderGossipPeers(state.gossipState, { emptyLabel: 'No outbound peer results recorded yet.' });
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
@@ -1186,6 +1199,8 @@ function buildAdminViewModel(
     metricsNote: buildMetricsNote(metricsSnapshot),
     socialMediaList,
     socialMediaCount,
+    uploadCleanupSummary,
+    uploadCleanupConfigNote,
     gossipPushSummary,
     gossipPushPeers,
     gossipPullSummary,
@@ -2063,6 +2078,33 @@ function renderOutboundSummary(summary = {}) {
   return `<ul class="stack small">${items}</ul>`;
 }
 
+function renderUploadCleanupSummary(uploadCleanup = {}) {
+  if (!uploadCleanup.lastRunAt && !uploadCleanup.lastErrorAt && !uploadCleanup.lastSkippedAt) {
+    return '<p class="muted small">No upload cleanup runs recorded yet.</p>';
+  }
+  const lines = [];
+  if (uploadCleanup.lastRunAt) {
+    lines.push(`Last run: ${formatTimestamp(uploadCleanup.lastRunAt)}`);
+  }
+  if (uploadCleanup.lastSuccessAt) {
+    lines.push(`Last success: ${formatTimestamp(uploadCleanup.lastSuccessAt)}`);
+  }
+  const lastResult = uploadCleanup.lastResult || null;
+  if (lastResult) {
+    const scanned = Number(lastResult.scanned || 0);
+    const cleaned = Number(lastResult.cleaned || 0);
+    const kept = Number(lastResult.skipped || 0);
+    lines.push(`Last result: scanned ${scanned}, cleaned ${cleaned}, kept ${kept}`);
+  }
+  if (uploadCleanup.lastSkipReason) {
+    lines.push(`Last skip: ${uploadCleanup.lastSkipReason}`);
+  }
+  if (uploadCleanup.lastError) {
+    lines.push(`Last error: ${uploadCleanup.lastError}`);
+  }
+  return lines.map((line) => `<p class="muted small">${escapeHtml(line)}</p>`).join('');
+}
+
 function renderOpsMetrics(metrics = {}) {
   const moduleDisabled = metrics.moduleDisabled || {};
   const rateLimit = metrics.rateLimit || {};
@@ -2168,6 +2210,16 @@ function formatBytes(bytes) {
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
   const mb = kb / 1024;
   return `${mb.toFixed(1)} MB`;
+}
+
+function formatDuration(durationMs) {
+  if (!Number.isFinite(durationMs)) return '';
+  if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
+  const seconds = durationMs / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remainder = seconds % 60;
+  return `${minutes}m ${remainder.toFixed(1)}s`;
 }
 
 function renderTransactionSummariesList(entries = []) {
@@ -2358,6 +2410,9 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
       ? 'transactions skipped'
       : `transactions ${transactions.ok || 0}/${transactions.sent || 0} ok${transactionTail}`;
     lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok${ledgerTail} · ${voteLine} · ${transactionLine}`);
+    if (Number.isFinite(gossipState.lastSummary.durationMs)) {
+      lines.push(`Duration: ${formatDuration(gossipState.lastSummary.durationMs)}`);
+    }
   }
   if (gossipState.lastError) {
     lines.push(`Last error: ${gossipState.lastError}`);

@@ -1,4 +1,4 @@
-import { POLICIES } from '../../../config.js';
+import { MEDIA, POLICIES } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
@@ -12,6 +12,12 @@ export function renderHealth({ res, state }) {
   const outboundSummary = formatGossipState(state.gossipState);
   const pullSummary = formatGossipState(state.gossipPullState);
   const peerHealthSummary = summarizePeerHealth(listPeerHealth(state), { limit: 20 });
+  const uploadCleanup = state.uploadCleanup || {};
+  const retentionHours = MEDIA.uploadRetentionHours;
+  const intervalMinutes = MEDIA.uploadCleanupIntervalMinutes;
+  const uploadsCleanupEnabled = Number.isFinite(retentionHours) && retentionHours > 0;
+  const uploadsCleanupScheduled =
+    uploadsCleanupEnabled && Number.isFinite(intervalMinutes) && intervalMinutes > 0;
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -65,6 +71,21 @@ export function renderHealth({ res, state }) {
     outbound: {
       deliveries: summarizeOutboundDeliveries(state),
     },
+    uploads: {
+      cleanup: {
+        enabled: uploadsCleanupEnabled,
+        scheduled: uploadsCleanupScheduled,
+        retentionHours,
+        intervalMinutes,
+        lastRunAt: uploadCleanup.lastRunAt || null,
+        lastSuccessAt: uploadCleanup.lastSuccessAt || null,
+        lastErrorAt: uploadCleanup.lastErrorAt || null,
+        lastError: uploadCleanup.lastError || null,
+        lastResult: uploadCleanup.lastResult || null,
+        lastSkippedAt: uploadCleanup.lastSkippedAt || null,
+        lastSkipReason: uploadCleanup.lastSkipReason || null,
+      },
+    },
     metrics: getMetricsSnapshot(state),
   });
 }
@@ -84,6 +105,7 @@ function formatGossipState(gossipState = {}) {
       transactions: gossipState.lastSummary.transactions,
       skipped: gossipState.lastSummary.skipped || null,
       reason: gossipState.lastSummary.reason,
+      durationMs: gossipState.lastSummary.durationMs ?? null,
     },
   };
 }

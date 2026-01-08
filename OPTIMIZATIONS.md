@@ -38,6 +38,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
+- Persist upload cleanup stats (last run counts + errors) in settings/metrics so `/health` survives restarts and dashboards can trend them.
 
 ## Storage & IO
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
