@@ -111,6 +111,8 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
         maxFieldBytes: MEDIA.maxFieldBytes,
         maxFieldBytesTotal: MEDIA.maxFieldBytesTotal,
         maxFieldCount: MEDIA.maxFieldCount,
+        maxFieldNameBytes: MEDIA.maxFieldNameBytes,
+        maxHeaderBytes: MEDIA.maxHeaderBytes,
         streamFiles: true,
       });
       body = parsed.fields || {};
@@ -138,6 +140,18 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
         return sendJson(res, 413, {
           error: 'too_many_fields',
           message: `Form exceeds the ${MEDIA.maxFieldCount} field limit.`,
+        });
+      }
+      if (error.code === 'field_name_too_large') {
+        return sendJson(res, 413, {
+          error: 'field_name_too_large',
+          message: `Field name exceeds the ${MEDIA.maxFieldNameBytes} byte limit.`,
+        });
+      }
+      if (error.code === 'headers_too_large') {
+        return sendJson(res, 413, {
+          error: 'headers_too_large',
+          message: `Form headers exceed the ${Math.round(MEDIA.maxHeaderBytes / 1024)}KB limit.`,
         });
       }
       throw error;

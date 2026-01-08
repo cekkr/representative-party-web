@@ -40,6 +40,8 @@ export const MEDIA_DEFAULTS = {
   maxFieldBytes: 64 * 1024,
   maxFieldBytesTotal: 128 * 1024,
   maxFieldCount: 40,
+  maxFieldNameBytes: 128,
+  maxHeaderBytes: 8 * 1024,
   uploadRetentionHours: 24,
   uploadCleanupIntervalMinutes: 30,
 };
@@ -110,6 +112,11 @@ export const MEDIA = {
     MEDIA_DEFAULTS.maxFieldBytesTotal,
   ),
   maxFieldCount: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_COUNT, MEDIA_DEFAULTS.maxFieldCount),
+  maxFieldNameBytes: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES,
+    MEDIA_DEFAULTS.maxFieldNameBytes,
+  ),
+  maxHeaderBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_HEADER_MAX_BYTES, MEDIA_DEFAULTS.maxHeaderBytes),
   uploadRetentionHours: parseNumberEnv(
     process.env.SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS,
     MEDIA_DEFAULTS.uploadRetentionHours,

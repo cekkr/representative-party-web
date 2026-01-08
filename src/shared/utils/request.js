@@ -9,6 +9,8 @@ import { PATHS, PORT } from '../../config.js';
 const DEFAULT_FIELD_MAX_BYTES = 64 * 1024;
 const DEFAULT_FIELD_TOTAL_MAX_BYTES = 128 * 1024;
 const DEFAULT_FIELD_MAX_COUNT = 40;
+const DEFAULT_FIELD_NAME_MAX_BYTES = 128;
+const DEFAULT_HEADER_MAX_BYTES = 8 * 1024;
 
 export async function readRequestBody(req) {
   const chunks = [];
@@ -42,6 +44,8 @@ export async function readMultipartForm(
     maxFieldBytes = DEFAULT_FIELD_MAX_BYTES,
     maxFieldBytesTotal = DEFAULT_FIELD_TOTAL_MAX_BYTES,
     maxFieldCount = DEFAULT_FIELD_MAX_COUNT,
+    maxFieldNameBytes = DEFAULT_FIELD_NAME_MAX_BYTES,
+    maxHeaderBytes = DEFAULT_HEADER_MAX_BYTES,
     streamFiles = false,
     tempDir,
   } = {},
@@ -56,6 +60,8 @@ export async function readMultipartForm(
       maxFieldBytes,
       maxFieldBytesTotal,
       maxFieldCount,
+      maxFieldNameBytes,
+      maxHeaderBytes,
       tempDir,
     });
   }
@@ -82,6 +88,9 @@ export async function readMultipartForm(
   for (const part of parts) {
     const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
     if (headerEnd === -1) continue;
+    if (isHeaderLimitExceeded(maxHeaderBytes, headerEnd)) {
+      throw createHeadersTooLargeError(maxHeaderBytes);
+    }
     const headerText = part.slice(0, headerEnd).toString('utf-8');
     const body = part.slice(headerEnd + 4);
     const headers = parseHeaders(headerText);
@@ -89,6 +98,9 @@ export async function readMultipartForm(
     const nameMatch = disposition.match(/name="([^"]+)"/i);
     if (!nameMatch) continue;
     const fieldName = nameMatch[1];
+    if (isFieldNameLimitExceeded(maxFieldNameBytes, fieldName)) {
+      throw createFieldNameTooLargeError(maxFieldNameBytes);
+    }
     const filenameMatch = disposition.match(/filename="([^"]*)"/i);
     const filename = filenameMatch ? filenameMatch[1] : '';
     if (filename) {
@@ -210,7 +222,7 @@ function parseHeaders(text) {
 async function readMultipartStream(
   req,
   boundary,
-  { maxBytes, maxFieldBytes, maxFieldBytesTotal, maxFieldCount, tempDir } = {},
+  { maxBytes, maxFieldBytes, maxFieldBytesTotal, maxFieldCount, maxFieldNameBytes, maxHeaderBytes, tempDir } = {},
 ) {
   const fields = {};
   const files = [];
@@ -297,6 +309,9 @@ async function readMultipartStream(
       if (state === 'headers') {
         const headerEnd = buffer.indexOf(headerSeparator);
         if (headerEnd === -1) return;
+        if (isHeaderLimitExceeded(maxHeaderBytes, headerEnd)) {
+          throw createHeadersTooLargeError(maxHeaderBytes);
+        }
         const headerText = buffer.slice(0, headerEnd).toString('utf-8');
         const headers = parseHeaders(headerText);
         buffer = buffer.slice(headerEnd + headerSeparator.length);
@@ -310,6 +325,9 @@ async function readMultipartStream(
           current = { skip: true, isFile: false };
           state = 'body';
           continue;
+        }
+        if (isFieldNameLimitExceeded(maxFieldNameBytes, fieldName)) {
+          throw createFieldNameTooLargeError(maxFieldNameBytes);
         }
         if (filename) {
           const tempPath = join(uploadRoot, `${randomUUID()}.upload`);
@@ -428,6 +446,16 @@ function isFieldLimitExceeded(maxFieldBytes, size) {
   return size > maxFieldBytes;
 }
 
+function isFieldNameLimitExceeded(maxFieldNameBytes, value = '') {
+  if (!Number.isFinite(maxFieldNameBytes) || maxFieldNameBytes <= 0) return false;
+  return Buffer.byteLength(String(value), 'utf-8') > maxFieldNameBytes;
+}
+
+function isHeaderLimitExceeded(maxHeaderBytes, size) {
+  if (!Number.isFinite(maxHeaderBytes) || maxHeaderBytes <= 0) return false;
+  return size > maxHeaderBytes;
+}
+
 function isFieldTotalLimitExceeded(maxFieldBytesTotal, size) {
   if (!Number.isFinite(maxFieldBytesTotal) || maxFieldBytesTotal <= 0) return false;
   return size > maxFieldBytesTotal;
@@ -446,6 +474,13 @@ function createFieldTooLargeError(fieldName, maxFieldBytes) {
   return error;
 }
 
+function createFieldNameTooLargeError(maxFieldNameBytes) {
+  const error = new Error('field_name_too_large');
+  error.code = 'field_name_too_large';
+  error.maxFieldNameBytes = maxFieldNameBytes;
+  return error;
+}
+
 function createFieldTotalTooLargeError(maxFieldBytesTotal) {
   const error = new Error('fields_too_large');
   error.code = 'fields_too_large';
@@ -457,5 +492,12 @@ function createFieldCountTooLargeError(maxFieldCount) {
   const error = new Error('too_many_fields');
   error.code = 'too_many_fields';
   error.maxFieldCount = maxFieldCount;
+  return error;
+}
+
+function createHeadersTooLargeError(maxHeaderBytes) {
+  const error = new Error('headers_too_large');
+  error.code = 'headers_too_large';
+  error.maxHeaderBytes = maxHeaderBytes;
   return error;
 }

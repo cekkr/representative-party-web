@@ -45,7 +45,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Support gzip for ledger/transactions exports to reduce bandwidth usage.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
-- Limit multipart field name sizes to avoid oversized metadata headers.
+- Limit multipart filename length to avoid oversized metadata headers.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
@@ -67,3 +67,4 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added startup cleanup for stale temp uploads left behind by crashes or aborted requests.
 - Enforced per-request multipart field byte totals and field count caps to avoid many small fields bypassing per-field limits.
 - Added periodic cleanup for stale temp uploads in long-running servers.
+- Added multipart field-name and header size caps to reduce oversized multipart metadata.
