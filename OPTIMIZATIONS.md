@@ -34,6 +34,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
 - Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
+- Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.
 
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
