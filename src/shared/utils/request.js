@@ -4,7 +4,7 @@ import { mkdir, readdir, stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { URLSearchParams } from 'node:url';
 
-import { PATHS, PORT } from '../../config.js';
+import { PATHS, PORT, REQUEST_BODY } from '../../config.js';
 
 const DEFAULT_FIELD_MAX_BYTES = 64 * 1024;
 const DEFAULT_FIELD_TOTAL_MAX_BYTES = 128 * 1024;
@@ -12,16 +12,44 @@ const DEFAULT_FIELD_MAX_COUNT = 40;
 const DEFAULT_FIELD_NAME_MAX_BYTES = 128;
 const DEFAULT_HEADER_MAX_BYTES = 8 * 1024;
 
-export async function readRequestBody(req) {
+export async function readRequestBody(
+  req,
+  { maxBytes = REQUEST_BODY.maxBytes, rejectMultipart = REQUEST_BODY.rejectMultipart } = {},
+) {
   const chunks = [];
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
+  if (rejectMultipart && contentType.includes('multipart/form-data')) {
+    const error = new Error('multipart_not_supported');
+    error.code = 'multipart_not_supported';
+    throw error;
+  }
+  const maxBytesLimit = Number.isFinite(maxBytes) ? maxBytes : REQUEST_BODY.maxBytes;
+  if (Number.isFinite(maxBytesLimit) && maxBytesLimit > 0) {
+    const contentLength = Number(req.headers['content-length'] || 0);
+    if (Number.isFinite(contentLength) && contentLength > maxBytesLimit) {
+      const error = new Error('payload_too_large');
+      error.code = 'payload_too_large';
+      error.maxBytes = maxBytesLimit;
+      error.contentLength = contentLength;
+      throw error;
+    }
+  }
+  let total = 0;
   for await (const chunk of req) {
+    total += chunk.length;
+    if (Number.isFinite(maxBytesLimit) && maxBytesLimit > 0 && total > maxBytesLimit) {
+      const error = new Error('payload_too_large');
+      error.code = 'payload_too_large';
+      error.maxBytes = maxBytesLimit;
+      throw error;
+    }
     chunks.push(chunk);
   }
   const raw = Buffer.concat(chunks).toString('utf-8');
-  const type = req.headers['content-type'] || '';
+  const type = contentType;
   if (!raw) return {};
 
-  if (type.includes('application/json')) {
+  if (type.includes('application/json') || type.includes('+json')) {
     try {
       return JSON.parse(raw);
     } catch (error) {

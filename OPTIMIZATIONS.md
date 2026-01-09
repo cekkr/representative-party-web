@@ -47,6 +47,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
 - Limit multipart filename length to avoid oversized metadata headers.
+- Stream JSON parsing for ActivityPub/petitions and allow per-endpoint body limits to avoid buffering large payloads in memory.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.

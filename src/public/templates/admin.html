@@ -17,6 +17,7 @@
     <p class="muted small">{{notes}}</p>
     <p class="muted small">{{firstRunNote}}</p>
   </div>
+  {{circleKeyCallout}}
   <p class="muted small">{{flash}}</p>
   <form class="stack install-wizard" method="post" action="/admin" data-enhance="admin" data-install-wizard data-install-mode="{{installWizardMode}}">
     <input type="hidden" name="intent" value="settings" />
@@ -375,7 +376,8 @@
       </label>
     </div>
     <label class="field">
-      <span>Ring provider key ids (one per line)</span>
+      <span>Ring provider public keys (one per block)</span>
+      <span class="muted small">Paste full PEM blocks separated by blank lines (or one-line PEM with \n escapes).</span>
       <textarea name="providerBlindRingKeys" rows="4" placeholder="provider-key-a">{{providerBlindRingKeys}}</textarea>
     </label>
     <div class="form-grid">

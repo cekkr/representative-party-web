@@ -1,6 +1,6 @@
 import http from 'node:http';
 
-import { HOST, MEDIA, PORT } from '../config.js';
+import { HOST, MEDIA, PORT, REQUEST_BODY } from '../config.js';
 import { loadExtensions } from '../modules/extensions/registry.js';
 import { startGossipScheduler } from '../modules/federation/gossip.js';
 import { loadOutboundTransports } from '../modules/messaging/transports.js';
@@ -75,8 +75,26 @@ export async function startServer() {
 
   const server = http.createServer((req, res) => {
     routeRequest(req, res, state).catch((error) => {
+      if (error?.code === 'payload_too_large') {
+        const maxBytes = Number.isFinite(error.maxBytes) ? error.maxBytes : REQUEST_BODY.maxBytes;
+        const limitLabel =
+          Number.isFinite(maxBytes) && maxBytes >= 1024 * 1024
+            ? `${Math.round((maxBytes / (1024 * 1024)) * 10) / 10}MB`
+            : `${Math.round(maxBytes / 1024)}KB`;
+        return sendJson(res, 413, {
+          error: 'payload_too_large',
+          message: `Request exceeds the ${limitLabel} limit.`,
+          maxBytes,
+        });
+      }
+      if (error?.code === 'multipart_not_supported') {
+        return sendJson(res, 415, {
+          error: 'multipart_not_supported',
+          message: 'Multipart form data is not supported for this endpoint.',
+        });
+      }
       console.error(error);
-      sendJson(res, 500, { error: 'internal_error', detail: error.message });
+      return sendJson(res, 500, { error: 'internal_error', detail: error.message });
     });
   });
 

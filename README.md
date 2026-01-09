@@ -117,7 +117,7 @@ On first run, visit `/admin` to complete the installation wizard (Circle basics,
 DATA_MODE=centralized DATA_ADAPTER=memory ENFORCE_CIRCLE=false npm start
 
 # Verified Circle with strict validation + signing
-CIRCLE_PRIVATE_KEY=./priv.pem CIRCLE_PUBLIC_KEY=./pub.pem   DATA_VALIDATION_LEVEL=strict ENFORCE_CIRCLE=true npm start
+CIRCLE_PRIVATE_KEY="$(cat ./priv.pem)" CIRCLE_PUBLIC_KEY="$(cat ./pub.pem)"   DATA_VALIDATION_LEVEL=strict ENFORCE_CIRCLE=true npm start
 ```
 
 ```bash
@@ -144,6 +144,11 @@ npm run db:check
 - Social media uploads stream to `src/data/uploads` before moving into `src/data/media`; stale temp files are pruned on startup.
 - Cleanup stats (last run + cleaned counts) are visible in `/health` and `/admin`.
 - Knobs: `SOCIAL_MEDIA_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_COUNT`, `SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES`, `SOCIAL_MEDIA_HEADER_MAX_BYTES`, `SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS`, `SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES`.
+
+### Request body safety
+
+- Non-media endpoints enforce `REQUEST_BODY_MAX_BYTES` (default 1MB) and reject multipart form data by default.
+- Set `REQUEST_BODY_REJECT_MULTIPART=false` if you need multipart payloads outside the social media uploads path.
 
 ### Useful endpoints
 
@@ -278,9 +283,10 @@ Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same previe
 - Circle/policy: `ENFORCE_CIRCLE`, `CIRCLE_POLICY_ID`, `CIRCLE_ISSUER`, `GOSSIP_INTERVAL_SECONDS` (issuer labels gossip envelopes; `/admin` can override it in settings)
 - Topic gardener: `TOPIC_GARDENER_SYNC_SECONDS` (poll `/operations` for rename/merge/split suggestions)
 - Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`)
-- Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM)
+- Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM). Use `npm run keys:circle` for PEM + .env‑ready output (optional libp2p ring ID included).
 - Outbound delivery: `OUTBOUND_EMAIL_WEBHOOK`, `OUTBOUND_SMS_WEBHOOK`, `OUTBOUND_WEBHOOK_HEADERS`, `OUTBOUND_TRANSPORT_MODULE`
 - Ops metrics: `METRICS_SNAPSHOT_INTERVAL_SECONDS` (rolling bucket size), `METRICS_SNAPSHOT_RETENTION_HOURS` (retention window)
+- Request body limits: `REQUEST_BODY_MAX_BYTES` (default 1MB), `REQUEST_BODY_REJECT_MULTIPART` (default true)
 - Persistence:
   - `DATA_MODE` (`centralized|hybrid|p2p`)
   - `DATA_ADAPTER` (`json|memory|sql|kv|mysql|mongodb`)
@@ -300,13 +306,13 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - **Local messaging sandbox (no verification)**  
   `DATA_MODE=centralized DATA_ADAPTER=memory ENFORCE_CIRCLE=false` — exercise UI flows without writing to disk.
 - **Verified Circle, single provider**  
-  `DATA_MODE=centralized DATA_ADAPTER=json ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=party-circle CIRCLE_PUBLIC_KEY=/path/pub.pem CIRCLE_PRIVATE_KEY=/path/priv.pem` — strict gates + signed vote envelopes and ledger exports.
+  `DATA_MODE=centralized DATA_ADAPTER=json ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=party-circle CIRCLE_PUBLIC_KEY="$(cat /path/pub.pem)" CIRCLE_PRIVATE_KEY="$(cat /path/priv.pem)"` — strict gates + signed vote envelopes and ledger exports.
 - **Hardened policy via extension**  
   Add `CIRCLE_EXTENSIONS=sample-policy-tighten` (or a custom module under `src/modules/extensions/`) to layer org‑specific checks without forking core code; toggles are also exposed in `/extensions` and `/admin`.
 - **Hybrid redundancy (canonical + gossip)**  
   `DATA_MODE=hybrid DATA_ADAPTER=sql DATA_SQLITE_FILE=./data/party.db DATA_VALIDATION_LEVEL=observe GOSSIP_INTERVAL_SECONDS=30` — keep a SQL canonical store while ingesting gossip as preview data until validated.
 - **P2P‑first ring**  
-  `DATA_MODE=p2p DATA_ADAPTER=kv DATA_KV_FILE=./data/ring.json DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false CIRCLE_PUBLIC_KEY=/path/pub.pem` — gossip‑first sync and only accept signed/validated envelopes.
+  `DATA_MODE=p2p DATA_ADAPTER=kv DATA_KV_FILE=./data/ring.json DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false CIRCLE_PUBLIC_KEY="$(cat /path/pub.pem)"` — gossip‑first sync and only accept signed/validated envelopes.
 - **Topic/delegation experiments**  
   `DATA_PREVIEW=true DATA_VALIDATION_LEVEL=observe` — allow preview entries from topic gardeners or classification helpers; UI marks previews and replication filters them when disabled.
 
@@ -356,7 +362,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - **Groups UI**: closed elections surface the winner, method, and round count directly in the group panel, and closing an election auto-updates the delegate cachet for that topic.
 - **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. A topic registry persists ids/path metadata so SSR views can render breadcrumbs. Configure anchors/pins + optional helper URL via `/admin`; the helper runs from `src/infra/workers/topic-gardener/server.py` with scheduled refactor operations, and `/admin` surfaces pending rename/merge/split suggestions plus topic history diffs for review.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; `/notifications/preferences` stores per-user proposal comment alert preferences; backing store handled by `src/modules/messaging/notifications.js`.
-- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, issuer (public URL for gossip envelopes), peers, extensions, core modules (petitions/votes/delegation/groups/federation/topic gardener/social), default group policy, topic gardener, gossip sync controls, media moderation (reports + view requests), upload cleanup status, outbound delivery summaries, runtime ops metrics (module-disabled + rate-limit counters) plus retention/interval settings, and session overrides without editing JSON. Topic gardener review includes preview panels with confirmation for merge/split, pending rename/merge/split suggestions, a topic history diff view, and a manual sync button. Gossip push/pull controls disable when federation is off or data mode is centralized.
+- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, issuer (public URL for gossip envelopes), peers, extensions, core modules (petitions/votes/delegation/groups/federation/topic gardener/social), default group policy, topic gardener, gossip sync controls, media moderation (reports + view requests), upload cleanup status, outbound delivery summaries, runtime ops metrics (module-disabled + rate-limit counters) plus retention/interval settings, and session overrides without editing JSON. Topic gardener review includes preview panels with confirmation for merge/split, pending rename/merge/split suggestions, a topic history diff view, and a manual sync button. Gossip push/pull controls disable when federation is off or data mode is centralized. Signing key status + keygen hints surface here; provider-blind ring keys accept PEM blocks separated by blank lines (or one-line PEM with `\n` escapes).
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors and `/ap/actors/{hash}/outbox` serves per-actor posts via `src/modules/federation/activitypub.js`; `/ap/outbox` serves a global collection; `/ap/objects/{id}` serves local note objects; `/ap/inbox` ingests preview social notes (ignores direct payloads not addressed to a local actor) and triggers mention/direct notifications. ActivityPub endpoints require federation + social modules to be enabled.
 - **Transactions registry:** `/transactions` lists local, stamped entries for sensitive actions (petition drafts/status changes, votes, delegation overrides); `/transactions/export` emits a signed digest envelope, `/transactions/ledger` serves the envelope to peers, and `/transactions/gossip` ingests summaries for cross-provider reconciliation.
 

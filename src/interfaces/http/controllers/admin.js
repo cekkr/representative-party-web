@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { DATA_DEFAULTS, MEDIA, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
@@ -321,6 +323,99 @@ function formatMultilineList(list = []) {
   return (list || []).join('\n');
 }
 
+function parseRingKeyList(value, { maxLength = 4096, fallback = [] } = {}) {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((entry) => sanitizeText(entry, maxLength)).filter(Boolean);
+    return cleaned.length ? dedupe(cleaned) : dedupe(fallback);
+  }
+  if (value === undefined || value === null) {
+    return dedupe(fallback);
+  }
+  const text = String(value || '');
+  if (!text.trim()) return [];
+
+  const lines = text.split('\n');
+  const keys = [];
+  let buffer = [];
+  let inPem = false;
+
+  const flushBuffer = () => {
+    if (!buffer.length) return;
+    keys.push(buffer.join('\n'));
+    buffer = [];
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line && !inPem) {
+      flushBuffer();
+      continue;
+    }
+    if (line.startsWith('-----BEGIN ')) {
+      inPem = true;
+      buffer = [line];
+      if (line.includes('-----END ')) {
+        inPem = false;
+        flushBuffer();
+      }
+      continue;
+    }
+    if (inPem) {
+      buffer.push(line);
+      if (line.startsWith('-----END ')) {
+        inPem = false;
+        flushBuffer();
+      }
+      continue;
+    }
+    if (line.includes(',')) {
+      line
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .forEach((entry) => keys.push(entry));
+      continue;
+    }
+    keys.push(line);
+  }
+  flushBuffer();
+
+  const cleaned = keys.map((entry) => sanitizeText(entry, maxLength)).filter(Boolean);
+  return dedupe(cleaned);
+}
+
+function formatRingKeyList(list = []) {
+  return (list || []).filter(Boolean).join('\n\n');
+}
+
+function buildCircleKeyCallout() {
+  const hasPrivate = Boolean(process.env.CIRCLE_PRIVATE_KEY);
+  const hasPublic = Boolean(process.env.CIRCLE_PUBLIC_KEY);
+  let status = 'missing (public + private)';
+  if (hasPrivate && hasPublic) {
+    status = 'loaded (public + private)';
+  } else if (hasPublic) {
+    status = 'public loaded, private missing';
+  } else if (hasPrivate) {
+    status = 'private loaded, public missing';
+  }
+  const fingerprint = hasPublic ? fingerprintKey(process.env.CIRCLE_PUBLIC_KEY) : '';
+  const lines = [`<p class="muted small">Signing keys: ${escapeHtml(status)}</p>`];
+  if (fingerprint) {
+    lines.push(`<p class="muted small">Public key fingerprint: ${escapeHtml(fingerprint)}</p>`);
+  }
+  if (!hasPrivate || !hasPublic) {
+    lines.push('<p class="muted small">Unsigned envelopes until both keys are set.</p>');
+  }
+  lines.push('<p class="muted small">Keygen: <code>node scripts/circle-keygen.js</code> prints PEM + .env-ready values.</p>');
+  return `<div class="callout">${lines.join('')}</div>`;
+}
+
+function fingerprintKey(publicKey = '') {
+  const normalized = String(publicKey || '').replace(/\\n/g, '\n');
+  return createHash('sha256').update(normalized).digest('hex').slice(0, 12);
+}
+
 function parseAuditMembers(raw) {
   const errors = [];
   const members = [];
@@ -554,9 +649,9 @@ async function updateProviderBlind(state, body) {
     max: 256,
     label: 'Ring size cap',
   });
-  const ringKeysInput = body.providerBlindRingKeys ?? formatMultilineList(prev.ring.keys);
-  const ringKeys = parseMultilineList(ringKeysInput, {
-    maxLength: 120,
+  const ringKeysInput = body.providerBlindRingKeys ?? formatRingKeyList(prev.ring.keys);
+  const ringKeys = parseRingKeyList(ringKeysInput, {
+    maxLength: 4096,
     fallback: prev.ring.keys,
   }).slice(0, ringMaxSizeResult.value ?? prev.ring.maxSize);
 
@@ -1015,6 +1110,7 @@ function buildAdminViewModel(
   const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
+  const circleKeyCallout = buildCircleKeyCallout();
   const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
   const transactionSummariesList = renderTransactionSummariesList(
     filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),
@@ -1081,7 +1177,7 @@ function buildAdminViewModel(
   const providerBlindRingId = providerBlindRingIdValue ?? providerBlind.ring.currentId;
   const providerBlindRingEpoch = providerBlindRingEpochValue ?? String(providerBlind.ring.epochSeconds || '');
   const providerBlindRingMaxSize = providerBlindRingMaxSizeValue ?? String(providerBlind.ring.maxSize || '');
-  const providerBlindRingKeys = providerBlindRingKeysValue ?? formatMultilineList(providerBlind.ring.keys || []);
+  const providerBlindRingKeys = providerBlindRingKeysValue ?? formatRingKeyList(providerBlind.ring.keys || []);
   const providerBlindAuditThreshold = providerBlindAuditThresholdValue ?? String(providerBlind.audit.threshold || '');
   const providerBlindAuditMembers = providerBlindAuditMembersValue ?? formatAuditMembers(providerBlind.audit.members || []);
   const providerBlindAuditRequireReason =
@@ -1124,6 +1220,7 @@ function buildAdminViewModel(
     ledgerEntries: policy.ledgerEntries,
     notes: effective.notes,
     firstRunNote: effective.initialized ? '' : 'First installation mode: use the admin wizard to configure and persist Circle settings.',
+    circleKeyCallout,
     flash,
     postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',

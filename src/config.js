@@ -46,6 +46,11 @@ export const MEDIA_DEFAULTS = {
   uploadCleanupIntervalMinutes: 30,
 };
 
+export const REQUEST_BODY_DEFAULTS = {
+  maxBytes: 1024 * 1024,
+  rejectMultipart: true,
+};
+
 export const PATHS = {
   ROOT: ROOT_DIR,
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
@@ -125,6 +130,11 @@ export const MEDIA = {
     process.env.SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES,
     MEDIA_DEFAULTS.uploadCleanupIntervalMinutes,
   ),
+};
+
+export const REQUEST_BODY = {
+  maxBytes: parseNumberEnv(process.env.REQUEST_BODY_MAX_BYTES, REQUEST_BODY_DEFAULTS.maxBytes),
+  rejectMultipart: parseBooleanEnv(process.env.REQUEST_BODY_REJECT_MULTIPART, REQUEST_BODY_DEFAULTS.rejectMultipart),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';

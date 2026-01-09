@@ -101,7 +101,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
     });
   }
 
-  const contentType = req.headers['content-type'] || '';
+  const contentType = String(req.headers['content-type'] || '').toLowerCase();
   let body = {};
   let files = [];
   if (contentType.includes('multipart/form-data')) {
