@@ -1,7 +1,11 @@
-import { createHash } from 'node:crypto';
-
 import { DATA_DEFAULTS, MEDIA, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
+import {
+  applySigningKeysToEnv,
+  fingerprintPublicKey,
+  generateSigningKeyPair,
+  resolveSigningKeys,
+} from '../../../modules/circle/signingKeys.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
 import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
 import { getGovernanceSettings, normalizeGovernanceSettings } from '../../../modules/governance/constitution.js';
@@ -113,6 +117,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'provider-blind') {
     const result = await updateProviderBlind(state, body);
+    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+  }
+  if (intent === 'signing-keys') {
+    const result = await updateSigningKeys(state, body);
     return renderAdminPage({ res, state, wantsPartial, viewModel: result });
   }
   if (intent === 'media-moderate') {
@@ -388,9 +396,10 @@ function formatRingKeyList(list = []) {
   return (list || []).filter(Boolean).join('\n\n');
 }
 
-function buildCircleKeyCallout() {
-  const hasPrivate = Boolean(process.env.CIRCLE_PRIVATE_KEY);
-  const hasPublic = Boolean(process.env.CIRCLE_PUBLIC_KEY);
+function buildCircleKeyCallout(state) {
+  const info = resolveSigningKeys(state);
+  const hasPrivate = info.hasPrivate;
+  const hasPublic = info.hasPublic;
   let status = 'missing (public + private)';
   if (hasPrivate && hasPublic) {
     status = 'loaded (public + private)';
@@ -399,21 +408,25 @@ function buildCircleKeyCallout() {
   } else if (hasPrivate) {
     status = 'private loaded, public missing';
   }
-  const fingerprint = hasPublic ? fingerprintKey(process.env.CIRCLE_PUBLIC_KEY) : '';
+  const fingerprint = hasPublic ? info.fingerprint : '';
+  const sourceLine = info.source === 'missing' ? '' : `Source: ${info.source}`;
+  const settingsPresent = Boolean(info.stored.privateKey || info.stored.publicKey);
+  const envPresent = Boolean(info.env.privateKey || info.env.publicKey);
   const lines = [`<p class="muted small">Signing keys: ${escapeHtml(status)}</p>`];
+  if (sourceLine) {
+    lines.push(`<p class="muted small">${escapeHtml(sourceLine)}</p>`);
+  }
   if (fingerprint) {
     lines.push(`<p class="muted small">Public key fingerprint: ${escapeHtml(fingerprint)}</p>`);
+  }
+  if (settingsPresent && envPresent) {
+    lines.push('<p class="muted small">Settings keys exist but env will override after restart.</p>');
   }
   if (!hasPrivate || !hasPublic) {
     lines.push('<p class="muted small">Unsigned envelopes until both keys are set.</p>');
   }
-  lines.push('<p class="muted small">Keygen: <code>node scripts/circle-keygen.js</code> prints PEM + .env-ready values.</p>');
+  lines.push('<p class="muted small">Keygen: use the admin button or run <code>npm run keys:circle</code>.</p>');
   return `<div class="callout">${lines.join('')}</div>`;
-}
-
-function fingerprintKey(publicKey = '') {
-  const normalized = String(publicKey || '').replace(/\\n/g, '\n');
-  return createHash('sha256').update(normalized).digest('hex').slice(0, 12);
 }
 
 function parseAuditMembers(raw) {
@@ -794,6 +807,51 @@ async function updateProviderBlind(state, body) {
   };
 }
 
+async function updateSigningKeys(state, body) {
+  const confirmed = parseBoolean(body.signingKeysConfirm, false);
+  if (!confirmed) {
+    return {
+      flash: 'Signing keys not generated. Confirm rotation first.',
+    };
+  }
+
+  const generated = generateSigningKeyPair();
+  const now = new Date().toISOString();
+  const next = {
+    privateKey: generated.privateKey,
+    publicKey: generated.publicKey,
+    algorithm: generated.algorithm,
+    curve: generated.curve || null,
+    createdAt: now,
+    createdBy: 'admin',
+  };
+  state.settings = {
+    ...(state.settings || {}),
+    signingKeys: next,
+  };
+  applySigningKeysToEnv(next, { force: true });
+
+  const fingerprint = fingerprintPublicKey(next.publicKey);
+  recordAdminAudit(state, {
+    action: 'signing_keys.generate',
+    summary: `fingerprint=${fingerprint || 'n/a'}`,
+  });
+  await logTransaction(state, {
+    type: 'policy.signing_keys.generate',
+    actorHash: 'admin',
+    payload: {
+      fingerprint: fingerprint || null,
+      algorithm: next.algorithm,
+      curve: next.curve,
+    },
+  });
+  await persistSettings(state);
+
+  return {
+    flash: `Signing keys generated and saved. Fingerprint: ${fingerprint || 'n/a'}.`,
+  };
+}
+
 async function updateSession(state, body) {
   const sessionId = sanitizeText(body.sessionId || '', 72);
   const defaultRole = resolveDefaultActorRole(state);
@@ -1110,7 +1168,7 @@ function buildAdminViewModel(
   const auditEntries = Array.isArray(state.settings?.auditLog) ? state.settings.auditLog : [];
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
-  const circleKeyCallout = buildCircleKeyCallout();
+  const circleKeyCallout = buildCircleKeyCallout(state);
   const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
   const transactionSummariesList = renderTransactionSummariesList(
     filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),

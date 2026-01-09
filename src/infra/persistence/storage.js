@@ -1,4 +1,5 @@
 import { DATA, DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
+import { ensureSigningKeysInEnv } from '../../modules/circle/signingKeys.js';
 import { runMigrations } from './migrations.js';
 import { createStateStore } from './store.js';
 
@@ -20,6 +21,7 @@ export async function initState() {
   state.store = store;
   state.dataConfig = deriveDataConfig(state.settings);
   state.settings = { ...(state.settings || {}), data: state.dataConfig };
+  ensureSigningKeysInEnv(state);
   state.issuer = state.settings?.issuer || process.env.CIRCLE_ISSUER || state.issuer || 'local-circle';
   return state;
 }

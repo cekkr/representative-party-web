@@ -61,6 +61,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 - Optional Circle key generator ships with libp2p-backed ring identity output; `/admin` surfaces signing key status and accepts PEM ring key blocks.
+- `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
 
 ## Near-term next steps (Phase 2 focus)
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.

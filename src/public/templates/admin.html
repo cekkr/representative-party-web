@@ -19,6 +19,18 @@
   </div>
   {{circleKeyCallout}}
   <p class="muted small">{{flash}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="signing-keys" />
+    <p class="muted small">Generate or rotate the signing keypair. Keys are stored in settings and loaded into memory immediately.</p>
+    <label class="field checkbox">
+      <input type="checkbox" name="signingKeysConfirm" />
+      <span>Confirm key generation (overwrites existing keys)</span>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Generate signing keys</button>
+    </div>
+    <p class="muted small">If `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` env vars are set, they override settings on restart.</p>
+  </form>
   <form class="stack install-wizard" method="post" action="/admin" data-enhance="admin" data-install-wizard data-install-mode="{{installWizardMode}}">
     <input type="hidden" name="intent" value="settings" />
     {{installWizardIntro}}
