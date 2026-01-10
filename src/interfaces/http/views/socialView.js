@@ -30,7 +30,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(post.authorHandle || 'anon')}</span>
+            <span class="pill">${escapeHtml(post.authorHandle || 'anonymous')}</span>
             ${visibilityPill}
             ${replyPill}
             ${resharePill}

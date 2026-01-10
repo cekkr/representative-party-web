@@ -2,16 +2,20 @@ import { randomUUID } from 'node:crypto';
 
 import { persistSignatures, persistPetitions } from '../../infra/persistence/storage.js';
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
-import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
+import { countVisibleEntries, someVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { logTransaction } from '../transactions/registry.js';
 
 export function countSignatures(petitionId, state) {
-  return filterVisibleEntries(state.signatures, state).filter((s) => s.petitionId === petitionId).length;
+  return countVisibleEntries(state.signatures, state, (s) => s.petitionId === petitionId);
 }
 
 export function hasSigned(petitionId, person, state) {
   if (!person?.pidHash) return false;
-  return filterVisibleEntries(state.signatures, state).some((s) => s.petitionId === petitionId && s.authorHash === person.pidHash);
+  return someVisibleEntries(
+    state.signatures,
+    state,
+    (s) => s.petitionId === petitionId && s.authorHash === person.pidHash,
+  );
 }
 
 export async function signPetition({ petition, person, state }) {

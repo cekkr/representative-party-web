@@ -150,7 +150,7 @@ async function renderForumPage({ req, res, state, wantsPartial, person }) {
 }
 
 function filterForumEntries(state) {
-  return filterVisibleEntries(state.discussions, state).filter((entry) => {
+  return filterVisibleEntries(state.discussions, state, (entry) => {
     if (entry.petitionId) return false;
     if (entry.stance === 'article' || entry.stance === 'comment') return true;
     return Boolean(entry.parentId);

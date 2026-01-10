@@ -19,12 +19,12 @@ export function buildDelegateProfile(state, delegateHash) {
   const incomingTopics = summarizeTopics(incoming);
   const outgoingTopics = summarizeTopics(outgoing);
 
-  const votes = filterVisibleEntries(state.votes || [], state).filter((vote) => vote.authorHash === normalizedHash);
+  const votes = filterVisibleEntries(state.votes || [], state, (vote) => vote.authorHash === normalizedHash);
   const voteSummary = summarizeVotes(votes);
 
-  const petitions = filterVisibleEntries(state.petitions || [], state).filter((petition) => petition.authorHash === normalizedHash);
-  const discussions = filterVisibleEntries(state.discussions || [], state).filter((entry) => entry.authorHash === normalizedHash);
-  const socialPosts = filterVisibleEntries(state.socialPosts || [], state).filter((post) => post.authorHash === normalizedHash);
+  const petitions = filterVisibleEntries(state.petitions || [], state, (petition) => petition.authorHash === normalizedHash);
+  const discussions = filterVisibleEntries(state.discussions || [], state, (entry) => entry.authorHash === normalizedHash);
+  const socialPosts = filterVisibleEntries(state.socialPosts || [], state, (post) => post.authorHash === normalizedHash);
 
   const groupEndorsements = listGroupEndorsements(state, normalizedHash);
   const electionWins = listElectionWins(state, normalizedHash);
@@ -133,7 +133,7 @@ function listGroupEndorsements(state, delegateHash) {
 }
 
 function listElectionWins(state, delegateHash) {
-  const elections = filterVisibleEntries(state.groupElections || [], state).filter((entry) => entry.status === 'closed');
+  const elections = filterVisibleEntries(state.groupElections || [], state, (entry) => entry.status === 'closed');
   const wins = [];
   for (const election of elections) {
     const winner = pickWinner(election, state);

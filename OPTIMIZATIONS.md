@@ -14,6 +14,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache outbound delivery summaries instead of scanning the full transactions list on every `/admin` or `/health` render.
 - Pre-render or memoize petition evidence link lists (sanitized anchors) to avoid repeated normalization on each petitions render.
 - Cache petition discussion stance counts (support/concern/question/note) to avoid recomputing summaries on every render.
+- Precompute petition comment summaries (last comment time, stance counts, argument node totals) per petition to reduce repeated passes during render.
 - Cache vote and signature tallies per petition (or update incrementally on new votes/signatures) to avoid full scans on every proposal render.
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
@@ -21,6 +22,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.
+- Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.

@@ -30,7 +30,11 @@ export async function createNotificationWithOutbound(state, notification, contac
 
 export function listNotificationsForPerson(state, person) {
   if (!person || !person.pidHash) return [];
-  return filterVisibleEntries(state.notifications, state).filter((n) => n.recipientHash === person.pidHash || n.recipientHash === 'broadcast');
+  return filterVisibleEntries(
+    state.notifications,
+    state,
+    (n) => n.recipientHash === person.pidHash || n.recipientHash === 'broadcast',
+  );
 }
 
 export async function markAllRead(state, person) {

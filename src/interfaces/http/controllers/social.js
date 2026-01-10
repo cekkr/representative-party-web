@@ -12,10 +12,9 @@ import {
   DEFAULT_FOLLOW_TYPES,
   ensureFollowEdge,
   findSessionByHandle,
-  listFollowersOf,
-  listFollowsFor,
   normalizeFollowType,
   removeFollowEdge,
+  summarizeFollows,
 } from '../../../modules/social/followGraph.js';
 import { buildFeed, createPost, findPost } from '../../../modules/social/posts.js';
 import {
@@ -44,7 +43,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const followStats = person ? summarizeFollows(state, person.pidHash) : emptyFollowStats();
+  const followStats = summarizeFollows(state, person?.pidHash);
   const allFollows = followStats.follows;
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows: allFollows });
   const followTypeByHash = followStats.followTypeByHash;
@@ -553,12 +552,11 @@ export async function listRelationships({ req, res, state }) {
     return sendJson(res, 404, { error: 'handle_not_found', message: 'Handle not found.' });
   }
 
-  const follows = listFollowsFor(state, targetSession.pidHash);
-  const followers = listFollowersOf(state, targetSession.pidHash);
+  const followStats = summarizeFollows(state, targetSession.pidHash);
   return sendJson(res, 200, {
     handle: targetSession.handle,
-    follows,
-    followers,
+    follows: followStats.follows,
+    followers: followStats.followers,
   });
 }
 
@@ -602,36 +600,6 @@ function buildMediaLookup(posts = [], mediaEntries = []) {
 function buildFollowTypeList(counts = new Map()) {
   const extraTypes = [...counts.keys()].filter((type) => !DEFAULT_FOLLOW_TYPES.includes(type)).sort();
   return [...DEFAULT_FOLLOW_TYPES, ...extraTypes];
-}
-
-function summarizeFollows(state, personHash) {
-  const follows = [];
-  const followTypeCounts = new Map();
-  const followTypeByHash = new Map();
-  let followerCount = 0;
-  for (const edge of state.socialFollows || []) {
-    if (!edge) continue;
-    if (edge.followerHash === personHash) {
-      follows.push(edge);
-      const type = normalizeFollowType(edge.type || 'circle');
-      followTypeCounts.set(type, (followTypeCounts.get(type) || 0) + 1);
-      if (edge.targetHash) {
-        followTypeByHash.set(edge.targetHash, type);
-      }
-    } else if (edge.targetHash === personHash) {
-      followerCount += 1;
-    }
-  }
-  return { follows, followTypeCounts, followTypeByHash, followerCount };
-}
-
-function emptyFollowStats() {
-  return {
-    follows: [],
-    followTypeCounts: new Map(),
-    followTypeByHash: new Map(),
-    followerCount: 0,
-  };
 }
 
 function buildFollowTypeAllLabel(count) {

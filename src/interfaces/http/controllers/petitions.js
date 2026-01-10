@@ -46,8 +46,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const showDelegation = delegationEnabled && groupsEnabled;
   const signatures = filterVisibleEntries(state.signatures, state);
   const delegations = filterVisibleEntries(state.delegations, state);
-  const discussionEntries = filterVisibleEntries(state.discussions, state);
-  const petitionComments = discussionEntries.filter((entry) => entry.petitionId);
+  const petitionComments = filterVisibleEntries(state.discussions, state, (entry) => Boolean(entry.petitionId));
   const commentsByPetition = groupCommentsByPetition(petitionComments);
   const conflicts = delegationEnabled ? delegations?.filter((d) => d.conflict) || [] : [];
   let suggestions = 'Delegation module disabled.';

@@ -62,3 +62,29 @@ export function listFollowersOf(state, targetHash) {
 export function findSessionByHandle(state, handle) {
   return lookupSessionByHandle(state, handle);
 }
+
+export function summarizeFollows(state, personHash) {
+  const summary = {
+    follows: [],
+    followers: [],
+    followTypeCounts: new Map(),
+    followTypeByHash: new Map(),
+    followerCount: 0,
+  };
+  if (!personHash) return summary;
+  for (const edge of state.socialFollows || []) {
+    if (!edge) continue;
+    if (edge.followerHash === personHash) {
+      summary.follows.push(edge);
+      const type = normalizeFollowType(edge.type || 'circle');
+      summary.followTypeCounts.set(type, (summary.followTypeCounts.get(type) || 0) + 1);
+      if (edge.targetHash) {
+        summary.followTypeByHash.set(edge.targetHash, type);
+      }
+    } else if (edge.targetHash === personHash) {
+      summary.followers.push(edge);
+    }
+  }
+  summary.followerCount = summary.followers.length;
+  return summary;
+}

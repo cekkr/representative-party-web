@@ -83,8 +83,7 @@ export function resolveNotificationPreferences(state, { sessionId, handle } = {}
 }
 
 export function summarizeOutboundDeliveries(state, { limit = 200 } = {}) {
-  const entries = filterVisibleEntries(state?.transactions || [], state)
-    .filter((entry) => entry?.type === 'outbound_delivery')
+  const entries = filterVisibleEntries(state?.transactions || [], state, (entry) => entry?.type === 'outbound_delivery')
     .slice(0, limit);
   const summary = {
     sampleSize: entries.length,

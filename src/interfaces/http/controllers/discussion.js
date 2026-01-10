@@ -113,7 +113,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
   const postingReasonLine = renderCalloutRow(postingReason);
 
-  const baseEntries = filterVisibleEntries(state.discussions, state).filter((entry) => {
+  const baseEntries = filterVisibleEntries(state.discussions, state, (entry) => {
     if (entry.petitionId) return false;
     if (entry.parentId) return false;
     if (entry.stance === 'article' || entry.stance === 'comment') return false;
