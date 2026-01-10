@@ -37,7 +37,13 @@ export function getProviderBlindSettings(state) {
 export function normalizeProviderBlindSettings(raw = {}) {
   const defaults = getProviderBlindDefaults();
   const mode = normalizeMode(raw.mode, defaults.mode);
-  const ring = normalizeRing(raw.ring || {}, defaults.ring);
+  const ringInput = raw.ring || {};
+  const envRingId = resolveEnvRingId();
+  const ringSeed = { ...ringInput };
+  if (!ringSeed.currentId && !ringSeed.ringId && envRingId) {
+    ringSeed.currentId = envRingId;
+  }
+  const ring = normalizeRing(ringSeed, defaults.ring);
   const rings = normalizeRingRegistry(raw.rings || raw.ringRegistry || [], { maxSize: ring.maxSize });
   const audit = normalizeAudit(raw.audit || {}, defaults.audit);
   const transport = normalizeTransport(raw.transport || {}, defaults.transport);
@@ -192,6 +198,10 @@ export function mergeProviderBlindAnnouncement(providerBlind, announcement) {
 function normalizeMode(value, fallback) {
   const text = String(value || '').trim().toLowerCase();
   return PROVIDER_BLIND_MODES.has(text) ? text : fallback;
+}
+
+function resolveEnvRingId() {
+  return sanitizeToken(process.env.CIRCLE_RING_ID || '', 64);
 }
 
 function normalizeRing(raw = {}, fallback) {

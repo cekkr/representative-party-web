@@ -9,6 +9,7 @@ import {
   verifyTransactionsEnvelope,
 } from '../src/modules/transactions/registry.js';
 import { ingestLedgerGossip } from '../src/modules/federation/ingest.js';
+import { normalizeProviderBlindSettings } from '../src/modules/circle/ringRegistry.js';
 
 function withSigningKeys() {
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
@@ -141,6 +142,21 @@ test('provider-blind observe emits ring + issuer signatures for transaction enve
   } finally {
     process.env.CIRCLE_PRIVATE_KEY = prevPrivate;
     process.env.CIRCLE_PUBLIC_KEY = prevPublic;
+  }
+});
+
+test('provider-blind ring id falls back to CIRCLE_RING_ID', () => {
+  const prev = process.env.CIRCLE_RING_ID;
+  process.env.CIRCLE_RING_ID = 'ring-env-01';
+  try {
+    const normalized = normalizeProviderBlindSettings({ mode: 'observe', ring: {} });
+    assert.equal(normalized.ring.currentId, 'ring-env-01');
+  } finally {
+    if (prev === undefined) {
+      delete process.env.CIRCLE_RING_ID;
+    } else {
+      process.env.CIRCLE_RING_ID = prev;
+    }
   }
 });
 

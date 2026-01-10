@@ -99,7 +99,7 @@ async function printLibp2pIdentity() {
     console.log(`CIRCLE_RING_ID="${peerId}"`);
     console.log(`CIRCLE_RING_PRIVATE_KEY="${privateB64}"`);
     console.log(`CIRCLE_RING_PUBLIC_KEY="${publicB64}"`);
-    console.log('# Paste CIRCLE_RING_ID into /admin -> Provider-blind mode ring ID.');
+    console.log('# Set CIRCLE_RING_ID to prefill /admin -> Provider-blind mode ring ID.');
   } catch (error) {
     console.log('# libp2p ring identity unavailable (install @libp2p/crypto and @libp2p/peer-id)');
     console.log(`# ${error?.message || error}`);

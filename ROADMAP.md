@@ -60,7 +60,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
-- Optional Circle key generator ships with libp2p-backed ring identity output; `/admin` surfaces signing key status and accepts PEM ring key blocks.
+- Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
 
 ## Near-term next steps (Phase 2 focus)
