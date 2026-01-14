@@ -16,7 +16,7 @@ import {
   removeFollowEdge,
   summarizeFollows,
 } from '../../../modules/social/followGraph.js';
-import { buildFeed, createPost, findPost } from '../../../modules/social/posts.js';
+import { buildFeed, createPost, findPost, invalidatePostIndex } from '../../../modules/social/posts.js';
 import {
   createMedia,
   findMedia,
@@ -49,7 +49,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const followTypeByHash = followStats.followTypeByHash;
   const followTypeCounts = followStats.followTypeCounts;
   const followTypeList = buildFollowTypeList(followTypeCounts);
-  const mediaById = buildMediaLookup(feed, state.socialMedia);
+  const mediaById = buildMediaLookup(feed, state);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
   const postingReasonLine = renderCalloutRow(postingReason);
@@ -232,6 +232,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
       persist: false,
     });
     state.socialPosts = [post, ...(state.socialPosts || [])];
+    invalidatePostIndex(state);
     await persistSocialPosts(state);
     if (mediaEntries.length) {
       await persistSocialMedia(state);
@@ -571,8 +572,8 @@ function renderFollowTypeOptions(selectedType = '', counts = new Map(), { includ
   }).join('\n');
 }
 
-function buildMediaLookup(posts = [], mediaEntries = []) {
-  if (!posts.length || !mediaEntries?.length) return new Map();
+function buildMediaLookup(posts = [], state) {
+  if (!posts.length) return new Map();
   const needed = new Set();
   for (const post of posts) {
     if (Array.isArray(post.mediaIds)) {
@@ -588,11 +589,10 @@ function buildMediaLookup(posts = [], mediaEntries = []) {
   }
   if (!needed.size) return new Map();
   const lookup = new Map();
-  for (const media of mediaEntries) {
-    if (!media?.id) continue;
-    if (!needed.has(media.id)) continue;
-    lookup.set(media.id, media);
-    if (lookup.size >= needed.size) break;
+  for (const mediaId of needed) {
+    const media = findMedia(state, mediaId);
+    if (!media) continue;
+    lookup.set(mediaId, media);
   }
   return lookup;
 }

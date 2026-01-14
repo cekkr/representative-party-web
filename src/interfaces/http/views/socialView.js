@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderEmptyState, renderIssuerPill } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill } from './shared.js';
 
 export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
   if (!posts || posts.length === 0) {
@@ -51,7 +51,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
           ${mentionsLine}
           ${tagsLine}
-          <p class="muted small">Author hash: ${escapeHtml(post.authorHash)}</p>
+          ${renderAuthorHashLine(post.authorHash)}
           ${enableReplies ? renderReplyForm(post) : ''}
           ${enableReplies && !mediaHasBlocked ? renderReshareForm(post) : ''}
         </article>

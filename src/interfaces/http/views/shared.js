@@ -40,6 +40,13 @@ export function renderCalloutRow(message, { className = 'muted small' } = {}) {
   return `<p class="${className}">${escapeHtml(String(text))}</p>`;
 }
 
+export function renderAuthorHashLine(value, { size = 'small', label = 'Author hash' } = {}) {
+  const resolved = value === null || value === undefined ? '' : String(value);
+  if (!resolved) return '';
+  const className = size === 'tiny' ? 'muted tiny' : 'muted small';
+  return `<p class="${className}">${escapeHtml(label)}: ${escapeHtml(resolved)}</p>`;
+}
+
 function buildTopicCacheKey(entry) {
   if (entry?.topicId) return `id:${entry.topicId}`;
   if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {

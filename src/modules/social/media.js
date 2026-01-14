@@ -7,6 +7,8 @@ import { getEffectivePolicy } from '../circle/policy.js';
 import { stampLocalEntry } from '../federation/replication.js';
 import { sanitizeText } from '../../shared/utils/text.js';
 
+const EMPTY_MEDIA_INDEX = { byId: new Map(), version: 0, size: 0 };
+
 const ALLOWED_MEDIA_TYPES = new Set([
   'image/jpeg',
   'image/png',
@@ -31,7 +33,14 @@ const EXTENSION_BY_TYPE = {
 
 export function findMedia(state, mediaId) {
   if (!mediaId) return null;
-  return (state.socialMedia || []).find((entry) => entry.id === mediaId) || null;
+  const index = getMediaIndex(state);
+  return index.byId.get(mediaId) || null;
+}
+
+export function invalidateMediaIndex(state) {
+  if (!state) return;
+  state.mediaIndexVersion = (state.mediaIndexVersion || 0) + 1;
+  state.mediaIndexCache = null;
 }
 
 export function listMediaForPost(state, post) {
@@ -196,6 +205,22 @@ function upsertMedia(state, entry) {
   } else {
     state.socialMedia.unshift(entry);
   }
+  invalidateMediaIndex(state);
+}
+
+function getMediaIndex(state) {
+  if (!state?.socialMedia) return EMPTY_MEDIA_INDEX;
+  const version = state.mediaIndexVersion || 0;
+  const size = state.socialMedia.length || 0;
+  const cached = state.mediaIndexCache;
+  if (cached && cached.version === version && cached.size === size) return cached;
+  const byId = new Map();
+  for (const media of state.socialMedia || []) {
+    if (media?.id) byId.set(media.id, media);
+  }
+  const index = { byId, version, size };
+  state.mediaIndexCache = index;
+  return index;
 }
 
 function normalizeFilename(name = '') {

@@ -7,6 +7,7 @@ import { listFollowsFor, normalizeFollowType } from './followGraph.js';
 import { getEffectivePolicy } from '../circle/policy.js';
 
 const MAX_POST_LENGTH = 560;
+const EMPTY_POST_INDEX = { byId: new Map(), version: 0, size: 0 };
 const MENTION_REGEX = /@([a-zA-Z0-9._-]{2,64})/g;
 const TAG_REGEX = /#([a-zA-Z0-9_-]{2,48})/g;
 
@@ -99,6 +100,7 @@ export function createPost(
 
   if (persist) {
     state.socialPosts = [entry, ...(state.socialPosts || [])];
+    invalidatePostIndex(state);
   }
   return entry;
 }
@@ -144,7 +146,15 @@ export function buildFeed(state, person, { followType, follows } = {}) {
 }
 
 export function findPost(state, postId) {
-  return (state.socialPosts || []).find((post) => post.id === postId);
+  if (!postId) return null;
+  const index = getPostIndex(state);
+  return index.byId.get(postId) || null;
+}
+
+export function invalidatePostIndex(state) {
+  if (!state) return;
+  state.socialPostIndexVersion = (state.socialPostIndexVersion || 0) + 1;
+  state.socialPostIndexCache = null;
 }
 
 export function extractMentions(content = '') {
@@ -165,4 +175,19 @@ export function extractTags(content = '') {
     tags.add(match[1].toLowerCase());
   }
   return [...tags];
+}
+
+function getPostIndex(state) {
+  if (!state?.socialPosts) return EMPTY_POST_INDEX;
+  const version = state.socialPostIndexVersion || 0;
+  const size = state.socialPosts.length || 0;
+  const cached = state.socialPostIndexCache;
+  if (cached && cached.version === version && cached.size === size) return cached;
+  const byId = new Map();
+  for (const post of state.socialPosts || []) {
+    if (post?.id) byId.set(post.id, post);
+  }
+  const index = { byId, version, size };
+  state.socialPostIndexCache = index;
+  return index;
 }

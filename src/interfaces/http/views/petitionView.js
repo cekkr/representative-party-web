@@ -5,7 +5,7 @@ import {
   listCommentStances,
   normalizeCommentStance,
 } from '../../../modules/petitions/commentStance.js';
-import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -98,7 +98,7 @@ export function renderPetitionList(
           ${structuredOutline}
           ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
-          <p class="muted small">Author hash: ${escapeHtml(petition.authorHash || 'anonymous')}</p>
+          ${renderAuthorHashLine(petition.authorHash || 'anonymous')}
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
           ${
             hasSigned
@@ -431,7 +431,7 @@ function renderPetitionComments(comments) {
           <p>${escapeHtml(comment.content)}</p>
           ${renderEvidenceLinks(evidenceLinks)}
           ${argumentId}
-          <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
+          ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
         </article>
       `;
     })
@@ -642,7 +642,7 @@ function renderArgumentNode(node, childMap, visited, depth) {
     ? `Builds on ${escapeHtml(String(node.argumentParentId).slice(0, 8))}`
     : '';
   const content = node.content ? `<p>${escapeHtml(node.content)}</p>` : '';
-  const author = node.authorHash ? `<p class="muted tiny">Author hash: ${escapeHtml(node.authorHash)}</p>` : '';
+  const author = renderAuthorHashLine(node.authorHash, { size: 'tiny' });
   const children = childMap.get(node.id) || [];
   const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1)).join('');
   const childBlock = childItems ? `<ul class="argument-children">${childItems}</ul>` : '';

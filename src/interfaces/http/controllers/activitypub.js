@@ -8,6 +8,7 @@ import { filterVisibleEntries, findVisibleEntry } from '../../../modules/federat
 import { recordPeerFailure, recordPeerSuccess } from '../../../modules/federation/quarantine.js';
 import { findSessionByHash } from '../../../modules/identity/sessions.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
+import { invalidatePostIndex } from '../../../modules/social/posts.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -51,6 +52,7 @@ export async function inbox({ req, res, state }) {
   }
 
   state.socialPosts = [entry, ...(state.socialPosts || [])];
+  invalidatePostIndex(state);
   await persistSocialPosts(state);
   await logTransaction(state, {
     type: 'activitypub_inbox',

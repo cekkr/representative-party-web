@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
-import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderForum(entries, person, state) {
   const { threads, commentsByThread } = splitForumEntries(entries);
@@ -33,7 +33,7 @@ function renderThreads(threads, commentsByThread, state) {
           </div>
           <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
           <p>${escapeHtml(thread.content)}</p>
-          <p class="muted small">Author hash: ${escapeHtml(thread.authorHash || 'anonymous')}</p>
+          ${renderAuthorHashLine(thread.authorHash || 'anonymous')}
           <form class="stack" method="post" action="/forum/comment" data-enhance="forum">
             <input type="hidden" name="parentId" value="${escapeHtml(thread.id)}" />
             <label class="field">
@@ -83,7 +83,7 @@ function renderComments(comments) {
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <p>${escapeHtml(comment.content)}</p>
-          <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
+          ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
         </article>
       `;
     })

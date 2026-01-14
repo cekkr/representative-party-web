@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderDiscussionList(entries, state) {
   if (!entries.length) {
@@ -22,7 +22,7 @@ export function renderDiscussionList(entries, state) {
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <p>${escapeHtml(entry.content)}</p>
-          <p class="muted small">Author hash: ${escapeHtml(entry.authorHash)}</p>
+          ${renderAuthorHashLine(entry.authorHash)}
         </article>
       `;
     })
