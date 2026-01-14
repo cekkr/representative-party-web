@@ -63,6 +63,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
 - **Libp2p readiness (optional)**: dependency included to evaluate P2P transport and future Circle key continuity not tied to the first provider.
 - **Peer ledger audits**: peer health tracks last ledger hash snapshots (match/mismatch) in `/admin` and `/health`.
+- **Peer capability hints**: ledger gossip includes module/data-mode snapshots so `/admin` can show peer capabilities and gossip skips disabled endpoints.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
@@ -150,6 +151,10 @@ npm run db:check
 - Non-media endpoints enforce `REQUEST_BODY_MAX_BYTES` (default 1MB) and reject multipart form data by default.
 - Set `REQUEST_BODY_REJECT_MULTIPART=false` if you need multipart payloads outside the social media uploads path.
 
+### Gossip hint cache
+
+- `GOSSIP_PEER_CAPABILITIES_MAX_AGE_HOURS` controls how long cached peer capability hints are trusted before re-probing (default 168h).
+
 ### Useful endpoints
 
 - `/` landing, `/health` metrics
@@ -162,7 +167,7 @@ npm run db:check
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
 - `/admin` settings, first-run installation wizard, policy toggles, rate-limit overrides, and audit summaries; `/extensions` extension toggles
 - `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
-- `/circle/*` gossip/ledger/peers (federation scaffolding), `/ap/*` ActivityPub endpoints (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` ingesting preview social notes for local recipients)
+- `/circle/*` gossip/ledger/peers (federation scaffolding + peer capability hints), `/ap/*` ActivityPub endpoints (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` ingesting preview social notes for local recipients)
 
 ---
 
@@ -353,7 +358,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 ## Capabilities by module (endpoints + internals)
 
 - **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/controllers/auth.js`. Pending sessions can be resumed with `?session={id}`.
-- **Uniqueness Ledger + circle sync:** ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
+- **Uniqueness Ledger + circle sync:** ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes + capability hints, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
 - **Policy gates:** role-aware checks (person/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
 - **Social feed & follows:** `/social/*` handles short posts + replies + reshares driven by typed follows (circle/interest/info/alerts), plus optional photo/video uploads. Media stays provider-local, locks by default until viewers request access (view requests notify authors), and can be blocked after mass reports or manual review. Follow edges and micro-posts persist through `src/infra/persistence/storage.js`; the feed filter surfaces per-type counts so users can see coverage at a glance, and UX keeps this lane scoped to small talk/info so petitions/votes remain distinct.
@@ -416,7 +421,7 @@ Adapter notes:
 
 - **Centralized profile**: `DATA_MODE=centralized` with any adapter; gossip is off (no ingest), all writes go to the chosen store. Best for single‑provider deployments and local dev. Back up `src/data/` (or the DB/KV file) regularly.
 - **Hybrid profile**: `DATA_MODE=hybrid` keeps a canonical adapter (JSON/SQL/KV/MySQL/MongoDB) while accepting gossip for redundancy/audit. Pair with `DATA_VALIDATION_LEVEL=observe|strict` to decide if gossip is stored as preview or rejected; `DATA_PREVIEW=true` allows staging until validated. Control push/pull frequency with `GOSSIP_INTERVAL_SECONDS`.
-- **P2P profile**: `DATA_MODE=p2p` treats gossip as primary, with an optional local cache. Combine with `DATA_PREVIEW=false` and `DATA_VALIDATION_LEVEL=strict` to only accept signed, validated envelopes. Peers listed in `/circle/peers` seed synchronization; replication logic lives in `src/modules/federation/replication.js`.
+- **P2P profile**: `DATA_MODE=p2p` treats gossip as primary, with an optional local cache. Combine with `DATA_PREVIEW=false` and `DATA_VALIDATION_LEVEL=strict` to only accept signed, validated envelopes. Peers listed in `/circle/peers` seed synchronization (including cached capability hints); replication logic lives in `src/modules/federation/replication.js`.
 
 ### Signing & provenance
 
@@ -457,7 +462,7 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 
 - **No raw PID/PII**: persist only blinded hashes. Treat any provider‑local optional fields (email, personal details) as *local only* and never gossip them.
 - **Peers are hints, not trust anchors**: federation tooling should assume peers can be wrong or malicious; strict validation and quarantine are part of the intended hardening path.
-- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status + durations, peer health reset actions, recent transactions, outbound delivery summaries, upload cleanup stats, and runtime ops counters; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts, gossip durations, outbound delivery stats, upload cleanup stats, and ops metrics for dashboards, including last peer ledger hash snapshots (match/mismatch). Gossip sync skips peers that disable modules or gossip, so peer health reflects real failures.
+- **Audit visibility**: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status + durations, peer health reset actions, peer capability hints, recent transactions, outbound delivery summaries, upload cleanup stats, and runtime ops counters; `/transactions`, `/transactions/export`, `/transactions/ledger`, and `/transactions/gossip` provide JSON and signed summaries for reconciliation. `/health` exposes peer health summaries plus vote/transactions gossip added/updated counts, gossip durations, outbound delivery stats, upload cleanup stats, and ops metrics for dashboards, including last peer ledger hash snapshots (match/mismatch). Gossip sync skips peers that disable modules or gossip, so peer health reflects real failures.
 - **Gossip resilience**: optional endpoints (votes/transactions) that are missing or disabled are treated as skipped for peer health scoring, so messaging-only peers do not get penalized.
 - **Backups**: if you run with JSON/KV storage, schedule backups of `src/data/` (or your DB/KV file), especially before migrations.
 - **Ops metrics persistence**: module-disabled + rate-limit counters are snapshotted into `settings.json` on a rolling window (`METRICS_SNAPSHOT_INTERVAL_SECONDS`, `METRICS_SNAPSHOT_RETENTION_HOURS`) so restarts keep recent trends.

@@ -6,6 +6,7 @@ import { mergeProviderBlindAnnouncement } from '../circle/ringRegistry.js';
 import { decideStatus, getReplicationProfile } from './replication.js';
 import { normalizePeerUrl } from './peers.js';
 import { isPeerQuarantined, recordPeerFailure, recordPeerLedger, recordPeerSuccess, resolvePeerKey } from './quarantine.js';
+import { recordPeerCapabilities } from './capabilities.js';
 
 const MAX_PEER_HINTS = 25;
 
@@ -62,6 +63,19 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
     const merged = mergeProviderBlindAnnouncement(state.settings?.providerBlind || {}, providerBlindHint);
     if (merged.updated) {
       state.settings = { ...(state.settings || {}), providerBlind: merged.settings };
+      await persistSettings(state);
+    }
+  }
+
+  if (peerKey && envelope?.capabilities) {
+    const ringId = providerBlindHint?.ring?.id || providerBlindHint?.ring?.currentId || null;
+    const capabilitiesUpdate = recordPeerCapabilities(state, peerKey, {
+      ...envelope.capabilities,
+      policy: envelope.policy || null,
+      issuer: envelope.issuer || null,
+      ringId,
+    });
+    if (capabilitiesUpdate.updated) {
       await persistSettings(state);
     }
   }

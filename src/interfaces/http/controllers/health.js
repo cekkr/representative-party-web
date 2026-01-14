@@ -2,6 +2,7 @@ import { MEDIA, POLICIES } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
+import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
 import { getMetricsSnapshot } from '../../../modules/ops/metrics.js';
@@ -12,6 +13,7 @@ export function renderHealth({ res, state }) {
   const outboundSummary = formatGossipState(state.gossipState);
   const pullSummary = formatGossipState(state.gossipPullState);
   const peerHealthSummary = summarizePeerHealth(listPeerHealth(state), { limit: 20 });
+  const peerCapabilities = listPeerCapabilities(state);
   const uploadCleanup = state.uploadCleanup || {};
   const retentionHours = MEDIA.uploadRetentionHours;
   const intervalMinutes = MEDIA.uploadCleanupIntervalMinutes;
@@ -52,6 +54,9 @@ export function renderHealth({ res, state }) {
       outbound: outboundSummary,
       pull: pullSummary,
       peerHealth: peerHealthSummary,
+      peerCapabilities: {
+        count: Object.keys(peerCapabilities || {}).length,
+      },
     },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,

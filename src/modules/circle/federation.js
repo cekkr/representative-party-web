@@ -3,6 +3,7 @@ import { createHash, createSign, createVerify } from 'node:crypto';
 import { ISSUER, POLICIES } from '../../config.js';
 import { getEffectivePolicy } from './policy.js';
 import { buildProviderBlindAnnouncement } from './ringRegistry.js';
+import { buildCapabilitiesSnapshot } from '../federation/capabilities.js';
 
 export function computeLedgerHash(entries = []) {
   const normalized = [...(entries || [])].map((entry) => String(entry));
@@ -14,6 +15,7 @@ export function buildLedgerEnvelope(state) {
   const policy = getEffectivePolicy(state);
   const issuer = state?.issuer || ISSUER;
   const entries = [...state.uniquenessLedger].map((entry) => String(entry)).sort();
+  const capabilities = buildCapabilitiesSnapshot(state);
   const envelope = {
     id: `ledger-${Date.now()}`,
     issuer,
@@ -28,6 +30,9 @@ export function buildLedgerEnvelope(state) {
     ledgerHash: computeLedgerHash(entries),
     peers: [...state.peers],
   };
+  if (capabilities) {
+    envelope.capabilities = capabilities;
+  }
   const providerBlind = buildProviderBlindAnnouncement(state?.settings?.providerBlind);
   if (providerBlind) {
     envelope.providerBlind = providerBlind;

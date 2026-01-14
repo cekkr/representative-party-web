@@ -44,6 +44,7 @@ import {
 import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
 import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
 import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
+import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
 import { normalizePeerUrl } from '../../../modules/federation/peers.js';
 import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../../modules/federation/quarantine.js';
 import {
@@ -1207,7 +1208,8 @@ function buildAdminViewModel(
   const gossipPushDisabledAttr = gossipAllowed ? '' : 'disabled';
   const gossipPullDisabledAttr = gossipAllowed ? '' : 'disabled';
   const peerHealth = listPeerHealth(state);
-  const peerHealthList = renderPeerHealthList(peerHealth);
+  const peerCapabilities = listPeerCapabilities(state);
+  const peerHealthList = renderPeerHealthList(peerHealth, peerCapabilities);
   const peerHealthOptions = renderPeerHealthOptions(peerHealth, state.peers);
   const peerHealthCount = Object.keys(peerHealth || {}).length;
   const peerHealthResetDisabledAttr = peerHealthCount ? '' : 'disabled';
@@ -2594,7 +2596,7 @@ function renderGossipPeers(gossipState = {}, { emptyLabel = 'No peer results rec
   return `<ul class="stack small">${items}</ul>`;
 }
 
-function renderPeerHealthList(peerHealth = {}) {
+function renderPeerHealthList(peerHealth = {}, peerCapabilities = {}) {
   const entries = Object.entries(peerHealth || {});
   if (!entries.length) {
     return '<p class="muted small">No peer health records yet.</p>';
@@ -2612,12 +2614,55 @@ function renderPeerHealthList(peerHealth = {}) {
       const ledgerNote = ledgerShort
         ? `ledger ${ledgerShort} (${ledgerMatch})`
         : 'ledger unknown';
+      const caps = peerCapabilities ? peerCapabilities[peer] : null;
+      const capsLine = formatPeerCapabilities(caps);
       return `<li><strong>${escapeHtml(peer)}</strong> · score ${score} · ${escapeHtml(status)} · ${escapeHtml(
         lastFailure,
-      )} · ${escapeHtml(ledgerNote)}</li>`;
+      )} · ${escapeHtml(ledgerNote)}${capsLine ? ` · ${escapeHtml(capsLine)}` : ''}</li>`;
     })
     .join('');
   return `<ul class="stack small">${items}</ul>`;
+}
+
+function formatPeerCapabilities(capabilities) {
+  if (!capabilities || typeof capabilities !== 'object') return '';
+  const parts = [];
+  if (capabilities.policy?.id) {
+    const version = Number.isFinite(Number(capabilities.policy.version)) ? Number(capabilities.policy.version) : 0;
+    parts.push(`policy ${capabilities.policy.id}@${version}`);
+  }
+  if (capabilities.replication) {
+    parts.push(`data ${formatReplicationSnapshot(capabilities.replication)}`);
+  }
+  if (capabilities.modules) {
+    parts.push(`modules ${formatModuleSummary(capabilities.modules)}`);
+  }
+  if (capabilities.ringId) {
+    parts.push(`ring ${capabilities.ringId}`);
+  }
+  if (capabilities.issuer) {
+    parts.push(`issuer ${capabilities.issuer}`);
+  }
+  return parts.length ? `caps ${parts.join(' · ')}` : '';
+}
+
+function formatModuleSummary(modules) {
+  if (!modules || typeof modules !== 'object') return 'unknown';
+  const disabled = Object.entries(modules)
+    .filter(([, enabled]) => enabled === false)
+    .map(([key]) => key);
+  if (!disabled.length) return 'all on';
+  return `off: ${disabled.join(', ')}`;
+}
+
+function formatReplicationSnapshot(replication = {}) {
+  const mode = replication.mode || 'unknown';
+  const adapter = replication.adapter || 'unknown';
+  const validation = replication.validationLevel || 'unknown';
+  const previews =
+    typeof replication.allowPreviews === 'boolean' ? (replication.allowPreviews ? 'previews on' : 'previews off') : '';
+  const extras = previews ? `, ${previews}` : '';
+  return `${mode}/${adapter} (${validation}${extras})`;
 }
 
 function renderPeerHealthOptions(peerHealth = {}, peers = new Set()) {

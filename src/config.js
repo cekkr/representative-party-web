@@ -23,6 +23,10 @@ export const POLICIES = {
   requireVerification: true,
   enforceCircle: process.env.ENFORCE_CIRCLE === 'true',
   gossipIntervalSeconds: Number(process.env.GOSSIP_INTERVAL_SECONDS || 300),
+  gossipPeerCapabilitiesMaxAgeHours: parseNumberEnv(
+    process.env.GOSSIP_PEER_CAPABILITIES_MAX_AGE_HOURS,
+    168,
+  ),
 };
 
 export const TOPIC_GARDENER_SYNC_SECONDS = Number(process.env.TOPIC_GARDENER_SYNC_SECONDS || 120);

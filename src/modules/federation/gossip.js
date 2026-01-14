@@ -9,6 +9,7 @@ import { buildTransactionsPayload, ingestTransactionsSummary } from '../transact
 import { ingestLedgerGossip, ingestVoteGossip } from './ingest.js';
 import { collectGossipPeers } from './peers.js';
 import { isPeerQuarantined, recordPeerFailure, recordPeerLedger, recordPeerSuccess } from './quarantine.js';
+import { getPeerCapabilities } from './capabilities.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './replication.js';
 
 const DEFAULT_TIMEOUT_MS = 8000;
@@ -62,7 +63,11 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
   let summary;
   try {
     peerResults = await Promise.all(
-      peers.map((peer) => pushToPeer(peer, { ledgerPayload, votesPayload, transactionsPayload, timeoutMs })),
+      peers.map((peer) => {
+        const capabilities = getPeerCapabilities(state, peer);
+        const payloads = selectPeerPayloads({ ledgerPayload, votesPayload, transactionsPayload, capabilities });
+        return pushToPeer(peer, { ...payloads, timeoutMs });
+      }),
     );
     const finishedAt = new Date().toISOString();
     summary = summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload });
@@ -199,6 +204,40 @@ function buildVotesPayload(state) {
   return { entries };
 }
 
+function selectPeerPayloads({ ledgerPayload, votesPayload, transactionsPayload, capabilities }) {
+  if (!canSendLedger(capabilities)) {
+    return { ledgerPayload: null, votesPayload: null, transactionsPayload: null };
+  }
+  const sendVotes = Boolean(votesPayload && canSendVotes(capabilities));
+  const sendTransactions = Boolean(transactionsPayload && canSendTransactions(capabilities));
+  return {
+    ledgerPayload,
+    votesPayload: sendVotes ? votesPayload : null,
+    transactionsPayload: sendTransactions ? transactionsPayload : null,
+  };
+}
+
+function canSendLedger(capabilities) {
+  if (!capabilities) return true;
+  const replicationMode = capabilities.replication?.mode;
+  if (replicationMode === 'centralized') return false;
+  if (capabilities.modules && capabilities.modules.federation === false) return false;
+  return true;
+}
+
+function canSendVotes(capabilities) {
+  if (!capabilities) return true;
+  if (capabilities.modules?.votes === false) return false;
+  if (capabilities.modules?.petitions === false) return false;
+  return true;
+}
+
+function canSendTransactions(capabilities) {
+  if (!capabilities) return true;
+  if (capabilities.modules?.federation === false) return false;
+  return true;
+}
+
 async function pushToPeer(peer, { ledgerPayload, votesPayload, transactionsPayload, timeoutMs }) {
   const ledger = await sendPayload(peer, '/circle/gossip', ledgerPayload, timeoutMs);
   const votes = await sendPayload(peer, '/votes/gossip', votesPayload, timeoutMs, { skipNotFound: true });
@@ -275,8 +314,10 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
     }
   }
 
+  const capabilities = getPeerCapabilities(state, peer);
+
   let votes = { skipped: true };
-  if (isModuleEnabled(state, 'votes')) {
+  if (isModuleEnabled(state, 'votes') && canSendVotes(capabilities)) {
     const votesResponse = await fetchJson(`${peer}/votes/ledger`, timeoutMs);
     votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
     if (shouldSkipResponse(votesResponse.status, votesResponse.error, { skipNotFound: true })) {
@@ -299,7 +340,7 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   }
 
   let transactions = { skipped: true };
-  if (isModuleEnabled(state, 'federation')) {
+  if (isModuleEnabled(state, 'federation') && canSendTransactions(capabilities)) {
     const transactionsResponse = await fetchJson(`${peer}/transactions/ledger`, timeoutMs);
     transactions = { ok: false, status: transactionsResponse.status, error: transactionsResponse.error };
     if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error, { skipNotFound: true })) {

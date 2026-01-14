@@ -3,6 +3,7 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { buildLedgerEnvelope } from '../../../modules/circle/federation.js';
 import { ingestLedgerGossip } from '../../../modules/federation/ingest.js';
 import { getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -48,7 +49,11 @@ export function listPeers({ res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
-  return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });
+  return sendJson(res, 200, {
+    peers: [...state.peers],
+    replication: getReplicationProfile(state),
+    peerCapabilities: listPeerCapabilities(state),
+  });
 }
 
 export async function registerPeer({ req, res, state }) {
