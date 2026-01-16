@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderForum(entries, person, state) {
   const { threads, commentsByThread } = splitForumEntries(entries);
@@ -27,7 +27,7 @@ function renderThreads(threads, commentsByThread, state) {
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(topicLabel)}</span>
             <span class="pill ghost">Article</span>
-            ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(thread)}
             ${renderIssuerPill(thread)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
@@ -78,7 +78,7 @@ function renderComments(comments) {
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
-            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(comment)}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>

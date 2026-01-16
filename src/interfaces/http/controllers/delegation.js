@@ -12,7 +12,7 @@ import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
 import { buildTopicOptions, renderTopicDatalist } from '../views/topicHelpers.js';
-import { renderIssuerPill } from '../views/shared.js';
+import { renderIssuerPill, renderPreviewPill } from '../views/shared.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function resolveConflict({ req, res, state }) {
@@ -118,7 +118,7 @@ function renderDelegationList(delegations = []) {
       const profileLink = entry.delegateHash
         ? `<a class="muted tiny" href="/delegates/${delegateHash}" data-partial>Profile</a>`
         : '';
-      const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const previewPill = renderPreviewPill(entry);
       const issuerPill = renderIssuerPill(entry);
       return `
         <div class="list-row">

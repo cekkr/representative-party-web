@@ -4,6 +4,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## Performance
 - Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
+- Cache rendered navigation links keyed by module settings to avoid rebuilding nav HTML on every request.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
 - Cache per-handle follow-type counts (or increment on follow/unfollow) to avoid recomputing tallies on every social feed render.
 - Cache normalized topic keys in entries to avoid repeated normalization and filtering in topic views.
@@ -32,6 +33,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
 - Consolidate repeated "hash-only guarantee" and verification copy into shared view strings to keep copy consistent.
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
+- Evaluate libp2p (gossipsub + peer discovery) as a resilient transport/ring-identity scaffold alongside HTTP gossip.
 
 ## UX Consistency
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
@@ -76,3 +78,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Enforced per-request multipart field byte totals and field count caps to avoid many small fields bypassing per-field limits.
 - Added periodic cleanup for stale temp uploads in long-running servers.
 - Added multipart field-name and header size caps to reduce oversized multipart metadata.
+- Centralized preview-pill rendering in shared view helpers for consistent UX copy.
+- Reused a shared `formatBytes()` helper for admin and social media rendering.
+- Combined petition comment argument/last-activity scans into a single summary pass.

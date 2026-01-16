@@ -1,6 +1,6 @@
-import { escapeHtml } from '../../../shared/utils/text.js';
+import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
 
 export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
   if (!posts || posts.length === 0) {
@@ -17,7 +17,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           : '<span class="pill ghost">Public</span>';
       const replyPill = post.replyTo ? `<span class="pill ghost">Reply</span>` : '';
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
-      const previewPill = post.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const previewPill = renderPreviewPill(post);
       const inboundPill = post.activityPub?.inbound ? '<span class="pill ghost">ActivityPub</span>' : '';
       const createdAt = formatTimestamp(post.createdAt);
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
@@ -216,13 +216,4 @@ function renderMediaReportForm(media) {
 function hasBlockedMediaIds(mediaIds = [], mediaById) {
   if (!mediaIds.length || !mediaById) return false;
   return mediaIds.some((mediaId) => mediaById.get(mediaId)?.status === 'blocked');
-}
-
-function formatBytes(bytes) {
-  if (!bytes || Number.isNaN(bytes)) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
 }

@@ -5,7 +5,7 @@ import {
   listCommentStances,
   normalizeCommentStance,
 } from '../../../modules/petitions/commentStance.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill, resolveTopicBreadcrumb } from './shared.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -50,8 +50,7 @@ export function renderPetitionList(
       const signatureCount = signatureSummary.count;
       const hasSigned = signatureSummary.signed;
       const comments = commentsByPetition.get(petition.id) || [];
-      const argumentCount = countArgumentNodes(comments);
-      const lastCommentAt = getLastCommentAt(comments);
+      const { argumentCount, lastCommentAt } = summarizeComments(comments);
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
       const anchorId = `petition-${petition.id}`;
       const proposalText = petition.freeze?.body ?? petition.body;
@@ -74,7 +73,7 @@ export function renderPetitionList(
         <article class="discussion" id="${escapeHtml(anchorId)}">
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(statusLabel)}</span>
-            ${petition.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(petition)}
             ${renderIssuerPill(petition)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             ${renderUpdatedMeta(petition)}
@@ -422,7 +421,7 @@ function renderPetitionComments(comments) {
             ${factCheckPill}
             ${argumentPill}
             ${evidencePill}
-            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(comment)}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
@@ -487,7 +486,7 @@ export function renderProposalDiscussionFeed(items) {
             ${factCheckPill}
             ${argumentPill}
             ${evidencePill}
-            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(comment)}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             ${permalink}
@@ -532,16 +531,20 @@ function formatStageLabel(stage) {
   return stage.charAt(0).toUpperCase() + stage.slice(1);
 }
 
-function getLastCommentAt(comments) {
-  if (!comments.length) return '';
+function summarizeComments(comments = []) {
+  if (!comments.length) return { argumentCount: 0, lastCommentAt: '' };
   let latest = 0;
+  let argumentCount = 0;
   for (const comment of comments) {
-    const time = Date.parse(comment.createdAt || '');
+    if (comment?.argumentTitle || comment?.argumentParentId) {
+      argumentCount += 1;
+    }
+    const time = Date.parse(comment?.createdAt || '');
     if (!Number.isNaN(time) && time > latest) {
       latest = time;
     }
   }
-  return latest ? formatTimestamp(latest) : '';
+  return { argumentCount, lastCommentAt: latest ? formatTimestamp(latest) : '' };
 }
 
 function renderCommentStanceOptions(selected = 'comment') {
@@ -569,16 +572,6 @@ function renderCommentStanceSummary(comments) {
   if (counts.question) parts.push(`Question ${counts.question}`);
   if (counts.comment) parts.push(`Notes ${counts.comment}`);
   return parts.join(' · ');
-}
-
-function countArgumentNodes(comments = []) {
-  let count = 0;
-  for (const comment of comments) {
-    if (comment?.argumentTitle || comment?.argumentParentId) {
-      count += 1;
-    }
-  }
-  return count;
 }
 
 function collectArgumentNodes(comments = []) {
@@ -634,7 +627,7 @@ function renderArgumentNode(node, childMap, visited, depth) {
   const stanceLabel = getCommentStanceLabel(node.stance);
   const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
   const factCheckPill = node.factCheck ? '<span class="pill warning">Fact check</span>' : '';
-  const previewPill = node.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+  const previewPill = renderPreviewPill(node);
   const createdAt = formatTimestamp(node.createdAt);
   const title = node.argumentTitle || 'Argument note';
   const shortId = String(node.id || '').slice(0, 8);

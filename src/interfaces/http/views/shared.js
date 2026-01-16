@@ -28,6 +28,13 @@ export function renderIssuerPill(entry) {
   return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
 }
 
+export function renderPreviewPill(entry) {
+  if (entry?.validationStatus === 'preview') {
+    return '<span class="pill warning">Preview</span>';
+  }
+  return '';
+}
+
 export function renderEmptyState(message, { size = 'normal' } = {}) {
   if (!message) return '';
   const sizeClass = size === 'small' ? 'muted small' : size === 'tiny' ? 'muted tiny' : 'muted';

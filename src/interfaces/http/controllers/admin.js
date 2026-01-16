@@ -69,10 +69,11 @@ import {
 } from '../../../modules/structure/structureManager.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, formatBytes, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
+import { renderPreviewPill } from '../views/shared.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 
@@ -2360,15 +2361,6 @@ function renderSocialMediaList(entries = []) {
     .join('\n');
 }
 
-function formatBytes(bytes) {
-  if (!bytes || Number.isNaN(bytes)) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
-}
-
 function formatDuration(durationMs) {
   if (!Number.isFinite(durationMs)) return '';
   if (durationMs < 1000) return `${Math.round(durationMs)}ms`;
@@ -2393,7 +2385,7 @@ function renderTransactionSummariesList(entries = []) {
       const receivedAt = escapeHtml(
         formatTimestamp(entry.receivedAt || entry.issuedAt || Date.now()),
       );
-      const previewPill = entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const previewPill = renderPreviewPill(entry);
       const signaturePill = entry.verification?.skipped ? '<span class="pill ghost">unsigned</span>' : '';
       const peerLabel = entry.peer ? `Peer ${escapeHtml(String(entry.peer))}` : '';
       return `

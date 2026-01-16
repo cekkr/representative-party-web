@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill, resolveTopicBreadcrumb } from './shared.js';
 
 export function renderDiscussionList(entries, state) {
   if (!entries.length) {
@@ -17,7 +17,7 @@ export function renderDiscussionList(entries, state) {
           <div class="discussion__meta">
             <span class="pill">${escapeHtml(topicLabel)}</span>
             <span class="pill ghost">${escapeHtml(entry.stance)}</span>
-            ${entry.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(entry)}
             ${renderIssuerPill(entry)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>

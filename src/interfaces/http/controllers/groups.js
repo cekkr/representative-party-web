@@ -21,7 +21,7 @@ import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
-import { renderIssuerPill } from '../views/shared.js';
+import { renderIssuerPill, renderPreviewPill } from '../views/shared.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
@@ -318,7 +318,7 @@ function renderGroupList(groups, person, state) {
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill">Group</span>
-            ${group.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
+            ${renderPreviewPill(group)}
             <span class="muted small">${topicLabel}</span>
           </div>
           <h3>${name}</h3>
@@ -391,7 +391,7 @@ function renderElections(elections, person, state) {
   return elections
     .map((election) => {
       const tally = election.votes || [];
-      const previewPill = election.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const previewPill = renderPreviewPill(election);
       const issuerPill = renderIssuerPill(election);
       const topicLabel = escapeHtml(election.topic || 'general');
       const statusLabel = escapeHtml(election.status || 'open');
