@@ -47,7 +47,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 
 ## Highlights
 
-- **Messaging‑first kernel**: discussion + forum + notifications work alone, with evidence/citation links supported on discussion notes.
+- **Messaging‑first kernel**: discussion + forum + notifications work alone, with evidence/citation links supported on discussion notes and forum comments.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Provider-blind option (scaffold)**: `/admin` policy fields for observe/strict, ring registry gossip, and ringSignature placeholders for votes/transactions; issuer escrow + mixnet transport planned.
@@ -186,7 +186,7 @@ npm run db:check
 ## Modules at a glance
 
 ### Always‑on value (messaging kernel)
-- **Discussion + forum**: threaded posts/comments with SSR UI, plus optional evidence links on discussion notes.
+- **Discussion + forum**: threaded posts/comments with SSR UI, plus optional evidence links on discussion notes and forum comments.
 - **Notifications**: internal read/unread registry and preferences.
 - **Profile attributes**: schema‑driven provider‑local fields with self‑service editing under `/profile`, schema versioning, and inline validation.
 - **Social feed**: micro‑post lane with typed follows (circle/interest/info/alerts) kept separate from petitions/votes, with locked media view requests notifying authors.

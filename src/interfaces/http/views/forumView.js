@@ -1,7 +1,14 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill, resolveTopicBreadcrumb } from './shared.js';
+import {
+  renderAuthorHashLine,
+  renderEmptyState,
+  renderEvidenceLinks,
+  renderIssuerPill,
+  renderPreviewPill,
+  resolveTopicBreadcrumb,
+} from './shared.js';
 
 export function renderForum(entries, person, state) {
   const { threads, commentsByThread } = splitForumEntries(entries);
@@ -40,6 +47,11 @@ function renderThreads(threads, commentsByThread, state) {
               <span>Comment</span>
               <textarea name="content" rows="2" placeholder="Add your view" required></textarea>
             </label>
+            <label class="field">
+              <span>Evidence / citations (optional)</span>
+              <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
+            </label>
+            <p class="muted small">One URL per line.</p>
             <button class="ghost" type="submit">Comment</button>
           </form>
           <div class="discussion-list">
@@ -74,15 +86,20 @@ function renderComments(comments) {
   return comments
     .map((comment) => {
       const createdAt = formatTimestamp(comment.createdAt);
+      const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
+      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
+      const evidenceBlock = renderEvidenceLinks(evidenceLinks);
       return `
         <article class="discussion">
           <div class="discussion__meta">
             <span class="pill ghost">Comment</span>
+            ${evidencePill}
             ${renderPreviewPill(comment)}
             ${renderIssuerPill(comment)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           <p>${escapeHtml(comment.content)}</p>
+          ${evidenceBlock}
           ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
         </article>
       `;

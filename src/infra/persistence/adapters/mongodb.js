@@ -16,6 +16,7 @@ const KEYS = [
   'socialFollows',
   'socialPosts',
   'socialMedia',
+  'activityPubIndex',
   'transactions',
   'transactionSummaries',
   'profileStructures',
@@ -152,6 +153,10 @@ class MongoStateStore {
     await this.writeDoc('socialMedia', entries);
   }
 
+  async saveActivityPubIndex(index) {
+    await this.writeDoc('activityPubIndex', index ?? null);
+  }
+
   async saveTransactions(entries) {
     await this.writeDoc('transactions', entries);
   }
@@ -186,6 +191,7 @@ class MongoStateStore {
 function defaultForKey(key) {
   if (key === 'meta') return { schemaVersion: 0, migrations: [] };
   if (key === 'settings') return { initialized: false };
+  if (key === 'activityPubIndex') return null;
   return [];
 }
 

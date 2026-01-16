@@ -8,7 +8,7 @@ import { getEffectivePolicy } from '../circle/policy.js';
 
 const MAX_POST_LENGTH = 560;
 const EMPTY_POST_INDEX = { byId: new Map(), version: 0, size: 0 };
-const EMPTY_ACTIVITYPUB_INDEX = { byObjectId: new Map(), byActivityId: new Map(), version: 0, size: 0 };
+const EMPTY_ACTIVITYPUB_INDEX = { byObjectId: new Map(), byActivityId: new Map(), version: 0, size: 0, headId: '', tailId: '' };
 const MENTION_REGEX = /@([a-zA-Z0-9._-]{2,64})/g;
 const TAG_REGEX = /#([a-zA-Z0-9_-]{2,48})/g;
 
@@ -189,6 +189,15 @@ export function isDuplicateActivityPub(state, activityPub = {}) {
   return false;
 }
 
+export function buildActivityPubIndexSnapshot(state) {
+  if (!state) return null;
+  const posts = state.socialPosts || [];
+  const index = getActivityPubIndex(state);
+  const snapshot = buildActivityPubSnapshotFromIndex(index, posts);
+  state.activityPubIndex = snapshot;
+  return snapshot;
+}
+
 function getPostIndex(state) {
   if (!state?.socialPosts) return EMPTY_POST_INDEX;
   const version = state.socialPostIndexVersion || 0;
@@ -206,19 +215,84 @@ function getPostIndex(state) {
 
 function getActivityPubIndex(state) {
   if (!state?.socialPosts) return EMPTY_ACTIVITYPUB_INDEX;
+  const posts = state.socialPosts || [];
   const version = state.socialPostIndexVersion || 0;
-  const size = state.socialPosts.length || 0;
+  const size = posts.length || 0;
+  const headId = resolveHeadId(posts);
+  const tailId = resolveTailId(posts);
   const cached = state.activityPubIndexCache;
-  if (cached && cached.version === version && cached.size === size) return cached;
+  if (cached && cached.version === version && cached.size === size && cached.headId === headId && cached.tailId === tailId) {
+    return cached;
+  }
+
+  const snapshot = state.activityPubIndex;
+  if (isActivityPubSnapshotValid(snapshot, posts)) {
+    const { byObjectId, byActivityId } = buildActivityPubIndexFromSnapshot(snapshot);
+    const index = { byObjectId, byActivityId, version, size, headId, tailId };
+    state.activityPubIndexCache = index;
+    return index;
+  }
+
+  const built = buildActivityPubIndexFromPosts(posts);
+  const index = { byObjectId: built.byObjectId, byActivityId: built.byActivityId, version, size, headId, tailId };
+  state.activityPubIndexCache = index;
+  state.activityPubIndex = built.snapshot;
+  return index;
+}
+
+function buildActivityPubIndexFromPosts(posts = []) {
   const byObjectId = new Map();
   const byActivityId = new Map();
-  for (const post of state.socialPosts || []) {
+  for (const post of posts || []) {
     const meta = post?.activityPub;
     if (!meta) continue;
     if (meta.objectId) byObjectId.set(meta.objectId, post.id || true);
     if (meta.activityId) byActivityId.set(meta.activityId, post.id || true);
   }
-  const index = { byObjectId, byActivityId, version, size };
-  state.activityPubIndexCache = index;
-  return index;
+  const snapshot = buildActivityPubSnapshotFromIndex({ byObjectId, byActivityId }, posts);
+  return { byObjectId, byActivityId, snapshot };
+}
+
+function buildActivityPubIndexFromSnapshot(snapshot = {}) {
+  const byObjectId = new Map();
+  const byActivityId = new Map();
+  const objectIds = Array.isArray(snapshot.objectIds) ? snapshot.objectIds : [];
+  const activityIds = Array.isArray(snapshot.activityIds) ? snapshot.activityIds : [];
+  for (const objectId of objectIds) {
+    if (objectId) byObjectId.set(objectId, true);
+  }
+  for (const activityId of activityIds) {
+    if (activityId) byActivityId.set(activityId, true);
+  }
+  return { byObjectId, byActivityId };
+}
+
+function buildActivityPubSnapshotFromIndex(index, posts = []) {
+  const size = posts.length || 0;
+  return {
+    objectIds: Array.from(index.byObjectId.keys()),
+    activityIds: Array.from(index.byActivityId.keys()),
+    size,
+    headId: resolveHeadId(posts),
+    tailId: resolveTailId(posts),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function isActivityPubSnapshotValid(snapshot, posts = []) {
+  if (!snapshot || typeof snapshot !== 'object') return false;
+  if (!Array.isArray(snapshot.objectIds) || !Array.isArray(snapshot.activityIds)) return false;
+  const size = posts.length || 0;
+  if ((snapshot.size || 0) !== size) return false;
+  if ((snapshot.headId || '') !== resolveHeadId(posts)) return false;
+  if ((snapshot.tailId || '') !== resolveTailId(posts)) return false;
+  return true;
+}
+
+function resolveHeadId(posts) {
+  return posts.length ? posts[0]?.id || '' : '';
+}
+
+function resolveTailId(posts) {
+  return posts.length ? posts[posts.length - 1]?.id || '' : '';
 }

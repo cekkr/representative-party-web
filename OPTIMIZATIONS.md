@@ -82,3 +82,4 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Combined petition comment argument/last-activity scans into a single summary pass.
 - Centralized evidence-link rendering across discussion/petition views for consistent output.
 - Indexed ActivityPub object/activity ids to avoid scanning `state.socialPosts` during duplicate detection.
+- Persisted ActivityPub object/activity id index snapshots to skip rebuilds on restart.

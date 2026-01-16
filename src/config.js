@@ -85,6 +85,7 @@ export const FILES = {
   socialFollows: join(PATHS.DATA_ROOT, 'social-follows.json'),
   socialPosts: join(PATHS.DATA_ROOT, 'social-posts.json'),
   socialMedia: join(PATHS.DATA_ROOT, 'social-media.json'),
+  activityPubIndex: join(PATHS.DATA_ROOT, 'activitypub-index.json'),
   transactions: join(PATHS.DATA_ROOT, 'transactions.json'),
   transactionSummaries: join(PATHS.DATA_ROOT, 'transaction-summaries.json'),
   profileStructures: join(PATHS.DATA_ROOT, 'profile-structures.json'),

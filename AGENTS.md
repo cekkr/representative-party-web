@@ -58,7 +58,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
 - Layout must show Circle policy flag, verified handle when present, ledger/actor/discussion counts for accountability cues, and gossip ingest state.
 - UI copy should use “user” vs “person” labels based on Circle enforcement (person only when civic/party mode is strict).
-- Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash; optional evidence/citation links are supported.
+- Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash; optional evidence/citation links are supported on discussion notes and forum comments.
 - Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
 - Delegation UI: group recommendations show election-winner metadata so users can see why a suggestion was picked.
 

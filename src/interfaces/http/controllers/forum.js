@@ -9,7 +9,7 @@ import { persistDiscussions } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { renderForum } from '../views/forumView.js';
 import { renderPage } from '../views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
@@ -99,6 +99,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   const body = await readRequestBody(req);
   const parentId = sanitizeText(body.parentId || '', 120);
   const content = sanitizeText(body.content || '', 800);
+  const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   if (!parentId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
@@ -122,6 +123,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
     stance: 'comment',
     title: '',
     content,
+    evidenceLinks,
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     parentId,
@@ -134,7 +136,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   await logTransaction(state, {
     type: 'forum_comment',
     actorHash: person?.pidHash || 'anonymous',
-    payload: { threadId: parentId },
+    payload: { threadId: parentId, evidenceCount: evidenceLinks.length },
   });
   if (wantsPartial) {
     return renderForumPage({ req, res, state, wantsPartial, person });
