@@ -8,6 +8,7 @@ import { getEffectivePolicy } from '../circle/policy.js';
 
 const MAX_POST_LENGTH = 560;
 const EMPTY_POST_INDEX = { byId: new Map(), version: 0, size: 0 };
+const EMPTY_ACTIVITYPUB_INDEX = { byObjectId: new Map(), byActivityId: new Map(), version: 0, size: 0 };
 const MENTION_REGEX = /@([a-zA-Z0-9._-]{2,64})/g;
 const TAG_REGEX = /#([a-zA-Z0-9_-]{2,48})/g;
 
@@ -155,6 +156,7 @@ export function invalidatePostIndex(state) {
   if (!state) return;
   state.socialPostIndexVersion = (state.socialPostIndexVersion || 0) + 1;
   state.socialPostIndexCache = null;
+  state.activityPubIndexCache = null;
 }
 
 export function extractMentions(content = '') {
@@ -177,6 +179,16 @@ export function extractTags(content = '') {
   return [...tags];
 }
 
+export function isDuplicateActivityPub(state, activityPub = {}) {
+  const objectId = activityPub?.objectId;
+  const activityId = activityPub?.activityId;
+  if (!objectId && !activityId) return false;
+  const index = getActivityPubIndex(state);
+  if (objectId && index.byObjectId.has(objectId)) return true;
+  if (activityId && index.byActivityId.has(activityId)) return true;
+  return false;
+}
+
 function getPostIndex(state) {
   if (!state?.socialPosts) return EMPTY_POST_INDEX;
   const version = state.socialPostIndexVersion || 0;
@@ -189,5 +201,24 @@ function getPostIndex(state) {
   }
   const index = { byId, version, size };
   state.socialPostIndexCache = index;
+  return index;
+}
+
+function getActivityPubIndex(state) {
+  if (!state?.socialPosts) return EMPTY_ACTIVITYPUB_INDEX;
+  const version = state.socialPostIndexVersion || 0;
+  const size = state.socialPosts.length || 0;
+  const cached = state.activityPubIndexCache;
+  if (cached && cached.version === version && cached.size === size) return cached;
+  const byObjectId = new Map();
+  const byActivityId = new Map();
+  for (const post of state.socialPosts || []) {
+    const meta = post?.activityPub;
+    if (!meta) continue;
+    if (meta.objectId) byObjectId.set(meta.objectId, post.id || true);
+    if (meta.activityId) byActivityId.set(meta.activityId, post.id || true);
+  }
+  const index = { byObjectId, byActivityId, version, size };
+  state.activityPubIndexCache = index;
   return index;
 }

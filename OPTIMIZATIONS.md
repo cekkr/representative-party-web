@@ -25,7 +25,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 - Store a stable fingerprint for peer capability snapshots to avoid repeated JSON stringify comparisons on every gossip ingest.
-- Maintain ActivityPub objectId/activityId indexes for inbound notes to avoid scanning `state.socialPosts` in duplicate detection.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -81,3 +80,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralized preview-pill rendering in shared view helpers for consistent UX copy.
 - Reused a shared `formatBytes()` helper for admin and social media rendering.
 - Combined petition comment argument/last-activity scans into a single summary pass.
+- Centralized evidence-link rendering across discussion/petition views for consistent output.
+- Indexed ActivityPub object/activity ids to avoid scanning `state.socialPosts` during duplicate detection.

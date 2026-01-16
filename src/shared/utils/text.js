@@ -3,6 +3,29 @@ export function sanitizeText(value, maxLength) {
   return text.slice(0, maxLength);
 }
 
+export function parseEvidenceLinks(rawInput, { limit = 8, maxLength = 320 } = {}) {
+  if (!rawInput) return [];
+  const rawLines = Array.isArray(rawInput) ? rawInput : String(rawInput).split(/[\n,]/);
+  const links = [];
+  const seen = new Set();
+  for (const raw of rawLines) {
+    const trimmed = sanitizeText(String(raw || '').trim(), maxLength);
+    if (!trimmed) continue;
+    if (!/^https?:\/\//i.test(trimmed)) continue;
+    let normalized = trimmed;
+    try {
+      normalized = new URL(trimmed).toString();
+    } catch (_error) {
+      continue;
+    }
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    links.push(normalized);
+    if (links.length >= limit) break;
+  }
+  return links;
+}
+
 export function escapeHtml(value) {
   return value
     .replace(/&/g, '&amp;')

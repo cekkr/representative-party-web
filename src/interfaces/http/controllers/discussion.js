@@ -10,7 +10,7 @@ import { persistDiscussions, persistProfileAttributes } from '../../../infra/per
 import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
 import { renderDiscussionList } from '../views/discussionView.js';
@@ -70,6 +70,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
   const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
   const stance = sanitizeText(body.stance || 'neutral', 40);
   const content = sanitizeText(body.content || '', 800);
+  const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   const policy = getCirclePolicyState(state);
 
   if (!content) {
@@ -83,6 +84,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
     topicPath,
     stance,
     content,
+    evidenceLinks,
     authorHash: person?.pidHash || 'anonymous',
     createdAt: new Date().toISOString(),
     policyId: policy.id,
@@ -94,7 +96,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
   await logTransaction(state, {
     type: 'discussion_post',
     actorHash: person?.pidHash || 'anonymous',
-    payload: { discussionId: entry.id, topic, stance },
+    payload: { discussionId: entry.id, topic, stance, evidenceCount: evidenceLinks.length },
   });
 
   if (wantsPartial) {

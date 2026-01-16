@@ -45,7 +45,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Implementation Roadmap
 
 ## Current status snapshot (Phase 1 largely shipped)
-- Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
+- Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation; discussion notes accept optional evidence/citation links.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default with view-request notifications, blockable after reports), gated by the same role/ban checks.
 - Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads; cleanup stats surface in `/health` and `/admin`.
 - Request body limits now cap non-media payloads and reject unexpected multipart forms.

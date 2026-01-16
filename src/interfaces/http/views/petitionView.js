@@ -5,7 +5,14 @@ import {
   listCommentStances,
   normalizeCommentStance,
 } from '../../../modules/petitions/commentStance.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill, resolveTopicBreadcrumb } from './shared.js';
+import {
+  renderAuthorHashLine,
+  renderEmptyState,
+  renderEvidenceLinks,
+  renderIssuerPill,
+  renderPreviewPill,
+  resolveTopicBreadcrumb,
+} from './shared.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -435,25 +442,6 @@ function renderPetitionComments(comments) {
       `;
     })
     .join('\n');
-}
-
-function renderEvidenceLinks(links = [], { limit = 4 } = {}) {
-  const filtered = Array.isArray(links)
-    ? links.filter((link) => typeof link === 'string' && /^https?:\/\//i.test(link))
-    : [];
-  const items = filtered.slice(0, limit).map((link) => {
-    const safeLink = escapeHtml(link);
-    return `<li><a class="muted small" href="${safeLink}" target="_blank" rel="noreferrer">${safeLink}</a></li>`;
-  });
-  if (!items.length) return '';
-  return `
-    <div class="stack">
-      <p class="muted small">Evidence</p>
-      <ul class="plain small">
-        ${items.join('')}
-      </ul>
-    </div>
-  `;
 }
 
 export function renderProposalDiscussionFeed(items) {

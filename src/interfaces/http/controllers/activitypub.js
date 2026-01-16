@@ -8,7 +8,7 @@ import { filterVisibleEntries, findVisibleEntry } from '../../../modules/federat
 import { recordPeerFailure, recordPeerSuccess } from '../../../modules/federation/quarantine.js';
 import { findSessionByHash } from '../../../modules/identity/sessions.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
-import { invalidatePostIndex } from '../../../modules/social/posts.js';
+import { invalidatePostIndex, isDuplicateActivityPub } from '../../../modules/social/posts.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -47,7 +47,7 @@ export async function inbox({ req, res, state }) {
     const updated = recordPeerSuccess(state, peerKey).updated;
     if (updated) await persistSettings(state);
   }
-  if (isDuplicateInbound(state, entry.activityPub)) {
+  if (isDuplicateActivityPub(state, entry.activityPub)) {
     return sendJson(res, 202, { status: 'duplicate', objectId: entry.activityPub?.objectId || null });
   }
 
@@ -155,18 +155,6 @@ function normalizeBody(body) {
     }
   }
   return {};
-}
-
-function isDuplicateInbound(state, activityPub = {}) {
-  const objectId = activityPub?.objectId;
-  const activityId = activityPub?.activityId;
-  if (!objectId && !activityId) return false;
-  return (state.socialPosts || []).some((post) => {
-    const meta = post.activityPub || {};
-    if (objectId && meta.objectId === objectId) return true;
-    if (activityId && meta.activityId === activityId) return true;
-    return false;
-  });
 }
 
 function ensureActivityPubModules(state, res) {

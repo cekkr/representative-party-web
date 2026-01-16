@@ -18,7 +18,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federati
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
@@ -798,29 +798,6 @@ function buildFreezeSnapshot(petition, person) {
         ? petition.topicPath
         : [],
   };
-}
-
-function parseEvidenceLinks(rawInput) {
-  if (!rawInput) return [];
-  const rawLines = Array.isArray(rawInput) ? rawInput : String(rawInput).split(/[\n,]/);
-  const links = [];
-  const seen = new Set();
-  for (const raw of rawLines) {
-    const trimmed = sanitizeText(String(raw || '').trim(), 320);
-    if (!trimmed) continue;
-    if (!/^https?:\/\//i.test(trimmed)) continue;
-    let normalized = trimmed;
-    try {
-      normalized = new URL(trimmed).toString();
-    } catch (_error) {
-      continue;
-    }
-    if (seen.has(normalized)) continue;
-    seen.add(normalized);
-    links.push(normalized);
-    if (links.length >= 8) break;
-  }
-  return links;
 }
 
 function parseStructuredFields(body = {}, fallback = {}) {

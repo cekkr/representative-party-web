@@ -54,6 +54,26 @@ export function renderAuthorHashLine(value, { size = 'small', label = 'Author ha
   return `<p class="${className}">${escapeHtml(label)}: ${escapeHtml(resolved)}</p>`;
 }
 
+export function renderEvidenceLinks(links = [], { limit = 4, label = 'Evidence' } = {}) {
+  const filtered = Array.isArray(links)
+    ? links.filter((link) => typeof link === 'string' && /^https?:\/\//i.test(link))
+    : [];
+  const items = filtered.slice(0, limit).map((link) => {
+    const safeLink = escapeHtml(link);
+    return `<li><a class="muted small" href="${safeLink}" target="_blank" rel="noreferrer">${safeLink}</a></li>`;
+  });
+  if (!items.length) return '';
+  const labelLine = label ? `<p class="muted small">${escapeHtml(label)}</p>` : '';
+  return `
+    <div class="stack">
+      ${labelLine}
+      <ul class="plain small">
+        ${items.join('')}
+      </ul>
+    </div>
+  `;
+}
+
 function buildTopicCacheKey(entry) {
   if (entry?.topicId) return `id:${entry.topicId}`;
   if (Array.isArray(entry?.topicPath) && entry.topicPath.length) {
