@@ -76,9 +76,18 @@ class MongoStateStore {
   }
 
   async saveData(data) {
+    const ops = [];
     for (const key of KEYS) {
-      await this.writeDoc(key, data[key] ?? defaultForKey(key));
+      ops.push({
+        updateOne: {
+          filter: { _id: key },
+          update: { $set: { value: data[key] ?? defaultForKey(key) } },
+          upsert: true,
+        },
+      });
     }
+    if (!ops.length) return;
+    await this.collection.bulkWrite(ops, { ordered: true });
   }
 
   async saveMeta(meta) {
@@ -185,6 +194,22 @@ class MongoStateStore {
 
   async writeDoc(key, value) {
     await this.collection.updateOne({ _id: key }, { $set: { value } }, { upsert: true });
+  }
+
+  async dropStore() {
+    if (!this.collection) return;
+    try {
+      await this.collection.drop();
+    } catch (error) {
+      if (error?.codeName === 'NamespaceNotFound' || error?.message?.includes('ns not found')) return;
+      throw error;
+    }
+  }
+
+  async close() {
+    if (this.client?.close) {
+      await this.client.close();
+    }
   }
 }
 

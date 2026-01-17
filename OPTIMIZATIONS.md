@@ -84,3 +84,4 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Persisted ActivityPub object/activity id index snapshots to skip rebuilds on restart.
 - Added gzip responses for ledger, vote, and transaction exports when requested.
 - Skipped gzip compression for small JSON exports (2KB threshold) to avoid CPU overhead.
+- Batched MySQL/MongoDB saveData writes and added adapter drop/close helpers for cleaner test runs.

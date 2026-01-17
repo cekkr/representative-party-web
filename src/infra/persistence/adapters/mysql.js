@@ -67,9 +67,8 @@ class MysqlStateStore {
   }
 
   async saveData(data) {
-    for (const key of KEYS) {
-      await this.writeJson(key, data[key] ?? defaultForKey(key));
-    }
+    const entries = KEYS.map((key) => [key, data[key] ?? defaultForKey(key)]);
+    await this.writeManyJson(entries);
   }
 
   async saveMeta(meta) {
@@ -184,11 +183,41 @@ class MysqlStateStore {
   }
 
   async writeJson(key, value) {
-    const payload = JSON.stringify(value, null, 0);
+    const payload = serializeJson(value);
     await this.pool.query(
       `INSERT INTO \`${this.table}\` (\`key\`, \`value\`) VALUES (?, ?) ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`,
       [key, payload],
     );
+  }
+
+  async writeManyJson(entries = []) {
+    if (!entries.length) return;
+    const placeholders = [];
+    const values = [];
+    for (const [key, value] of entries) {
+      placeholders.push('(?, ?)');
+      values.push(key, serializeJson(value));
+    }
+    const sql = `INSERT INTO \`${this.table}\` (\`key\`, \`value\`) VALUES ${placeholders.join(', ')} ON DUPLICATE KEY UPDATE \`value\` = VALUES(\`value\`)`;
+    try {
+      await this.pool.query(sql, values);
+    } catch (error) {
+      if (!shouldFallbackBulk(error)) throw error;
+      for (const [key, value] of entries) {
+        await this.writeJson(key, value);
+      }
+    }
+  }
+
+  async dropStore() {
+    if (!this.pool) return;
+    await this.pool.query(`DROP TABLE IF EXISTS \`${this.table}\``);
+  }
+
+  async close() {
+    if (this.pool?.end) {
+      await this.pool.end();
+    }
   }
 }
 
@@ -208,6 +237,17 @@ function parseJson(payload, fallback, key) {
     console.warn(`[mysql adapter] Failed to parse key "${key}", using fallback`, error);
     return fallback;
   }
+}
+
+function serializeJson(value) {
+  return JSON.stringify(value ?? null, null, 0);
+}
+
+function shouldFallbackBulk(error) {
+  const code = error?.code || '';
+  if (code === 'ER_NET_PACKET_TOO_LARGE') return true;
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('max_allowed_packet') || message.includes('packet');
 }
 
 async function loadMysql() {

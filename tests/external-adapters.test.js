@@ -89,6 +89,13 @@ function buildMongoEnv() {
 }
 
 async function closeStore(store) {
+  if (store?.dropStore) {
+    await store.dropStore();
+  }
+  if (store?.close) {
+    await store.close();
+    return;
+  }
   if (store?.pool?.end) {
     await store.pool.end();
   }
