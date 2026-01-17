@@ -144,7 +144,7 @@ npm run db:check
 
 - Social media uploads stream to `src/data/uploads` before moving into `src/data/media`; stale temp files are pruned on startup.
 - Cleanup stats (last run + cleaned counts) are visible in `/health` and `/admin`.
-- Knobs: `SOCIAL_MEDIA_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_COUNT`, `SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES`, `SOCIAL_MEDIA_HEADER_MAX_BYTES`, `SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS`, `SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES`.
+- Knobs: `SOCIAL_MEDIA_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES`, `SOCIAL_MEDIA_FIELD_MAX_COUNT`, `SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES`, `SOCIAL_MEDIA_HEADER_MAX_BYTES`, `SOCIAL_MEDIA_FILENAME_MAX_BYTES`, `SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS`, `SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES`.
 
 ### Request body safety
 
@@ -276,7 +276,7 @@ Two switches gate uncertified data:
 
 This allows deployments to experiment with helpers (topic gardeners, classification) and federation inputs *without silently treating them as authoritative*.
 
-Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same preview gating and omit preview entries when `DATA_PREVIEW=false`.
+Ledger exports (`/circle/ledger`, `/votes/ledger`, `/transactions/ledger`) respect preview gating and omit preview entries when `DATA_PREVIEW=false`; they also gzip-compress responses when `Accept-Encoding: gzip` is provided.
 
 ---
 
@@ -302,7 +302,7 @@ Ledger exports (`/votes/ledger`, `/transactions/ledger`) respect the same previe
   - MySQL: `DATA_MYSQL_URL` (include the database in the URL) or `DATA_MYSQL_HOST` + `DATA_MYSQL_USER` + `DATA_MYSQL_DATABASE` (optional `DATA_MYSQL_PORT`, `DATA_MYSQL_PASSWORD`, `DATA_MYSQL_TABLE`)
   - MongoDB: `DATA_MONGO_URL` (include the database or set `DATA_MONGO_DB`, plus optional `DATA_MONGO_COLLECTION`)
 - Rate limits: per‑action overrides via `/admin` (stored in `settings.rateLimits`)
-- Social/media: `SOCIAL_MEDIA_MAX_BYTES` (default 10MB), `SOCIAL_MEDIA_REPORT_THRESHOLD` (default 3)
+- Social/media: `SOCIAL_MEDIA_MAX_BYTES` (default 10MB), `SOCIAL_MEDIA_REPORT_THRESHOLD` (default 3), `SOCIAL_MEDIA_FILENAME_MAX_BYTES` (default 256)
 
 Provider settings are persisted in `src/data/settings.json` and can be edited via `/admin`.
 

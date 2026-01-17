@@ -25,6 +25,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 - Store a stable fingerprint for peer capability snapshots to avoid repeated JSON stringify comparisons on every gossip ingest.
+- Skip gzip compression for small JSON exports to avoid CPU overhead on tiny payloads.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -50,10 +51,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Storage & IO
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
-- Support gzip for ledger/transactions exports to reduce bandwidth usage.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
-- Limit multipart filename length to avoid oversized metadata headers.
 - Stream JSON parsing for ActivityPub/petitions and allow per-endpoint body limits to avoid buffering large payloads in memory.
 
 ## Completed
@@ -77,9 +76,11 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Enforced per-request multipart field byte totals and field count caps to avoid many small fields bypassing per-field limits.
 - Added periodic cleanup for stale temp uploads in long-running servers.
 - Added multipart field-name and header size caps to reduce oversized multipart metadata.
+- Added multipart filename length caps to block oversized upload metadata.
 - Centralized preview-pill rendering in shared view helpers for consistent UX copy.
 - Reused a shared `formatBytes()` helper for admin and social media rendering.
 - Combined petition comment argument/last-activity scans into a single summary pass.
 - Centralized evidence-link rendering across discussion/petition views for consistent output.
 - Indexed ActivityPub object/activity ids to avoid scanning `state.socialPosts` during duplicate detection.
 - Persisted ActivityPub object/activity id index snapshots to skip rebuilds on restart.
+- Added gzip responses for ledger, vote, and transaction exports when requested.

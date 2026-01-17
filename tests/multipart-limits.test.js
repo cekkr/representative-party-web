@@ -23,6 +23,36 @@ function buildMultipart(fields = []) {
   };
 }
 
+function buildMultipartWithFile({
+  fields = [],
+  fileField = 'media',
+  filename = 'upload.txt',
+  contentType = 'text/plain',
+  data = 'file',
+} = {}) {
+  const boundary = `----rpw-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  const chunks = [];
+  for (const { name, value } of fields) {
+    chunks.push(Buffer.from(`--${boundary}\r\n`));
+    chunks.push(Buffer.from(`Content-Disposition: form-data; name="${name}"\r\n\r\n`));
+    chunks.push(Buffer.from(`${value}\r\n`));
+  }
+  chunks.push(Buffer.from(`--${boundary}\r\n`));
+  chunks.push(
+    Buffer.from(
+      `Content-Disposition: form-data; name="${fileField}"; filename="${filename}"\r\n` +
+        `Content-Type: ${contentType}\r\n\r\n`,
+    ),
+  );
+  chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf-8'));
+  chunks.push(Buffer.from('\r\n'));
+  chunks.push(Buffer.from(`--${boundary}--\r\n`));
+  return {
+    body: Buffer.concat(chunks),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
 async function waitForRemoval(filePath, timeoutMs = 2000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -95,6 +125,39 @@ test('social multipart rejects too many fields', async (t) => {
 
   assert.equal(response.status, 413);
   assert.equal(payload.error, 'too_many_fields');
+});
+
+test('social multipart rejects filename over limit', async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({
+    port,
+    dataAdapter: 'memory',
+    extraEnv: {
+      SOCIAL_MEDIA_FILENAME_MAX_BYTES: '8',
+      SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_COUNT: '10',
+    },
+  });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'multipart-filename' });
+  const { body, contentType } = buildMultipartWithFile({
+    fields: [{ name: 'content', value: 'hello' }],
+    filename: 'toolongname.png',
+    contentType: 'image/png',
+    data: 'tiny',
+  });
+
+  const response = await fetch(`${server.baseUrl}/social/post`, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType, Cookie: session.cookie },
+    body,
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 413);
+  assert.equal(payload.error, 'filename_too_large');
 });
 
 test('periodic upload cleanup removes stale temp files', async (t) => {

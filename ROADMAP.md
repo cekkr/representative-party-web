@@ -48,6 +48,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation; discussion notes and forum comments accept optional evidence/citation links.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default with view-request notifications, blockable after reports), gated by the same role/ban checks.
 - Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads; cleanup stats surface in `/health` and `/admin`.
+- Media uploads enforce filename length caps to prevent oversized multipart metadata.
 - Request body limits now cap non-media payloads and reject unexpected multipart forms.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
 - Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags + evidence prompts, argument-map linking, transactions log + gossip summaries, and admin controls.
@@ -60,6 +61,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
 - Peer capability snapshots (module toggles + data mode) are gossiped alongside ledgers, cached per peer, surfaced in `/admin`, and used to skip disabled endpoints.
+- Ledger/vote/transaction exports gzip-compress when clients request `Accept-Encoding: gzip` for leaner gossip syncs.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 - Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).

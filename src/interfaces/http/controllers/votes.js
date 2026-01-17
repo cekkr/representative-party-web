@@ -1,13 +1,13 @@
 import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
 import { getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { sendJson } from '../../../shared/utils/http.js';
+import { sendJson, sendJsonWithEncoding } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { ingestVoteGossip } from '../../../modules/federation/ingest.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
-export function exportVotes({ res, state }) {
+export function exportVotes({ req, res, state }) {
   if (!isModuleEnabled(state, 'votes')) {
     return sendModuleDisabledJson({ res, moduleKey: 'votes', state });
   }
@@ -25,7 +25,11 @@ export function exportVotes({ res, state }) {
     return vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
   });
   const hasPreview = envelopes.some((entry) => entry?.status === 'preview');
-  return sendJson(res, 200, { entries: envelopes, status: hasPreview ? 'preview' : 'validated', replication: getReplicationProfile(state) });
+  return sendJsonWithEncoding(req, res, 200, {
+    entries: envelopes,
+    status: hasPreview ? 'preview' : 'validated',
+    replication: getReplicationProfile(state),
+  }, { allowGzip: true });
 }
 
 export async function gossipVotes({ req, res, state }) {

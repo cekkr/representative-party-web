@@ -18,7 +18,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federati
 import { logTransaction } from '../../../modules/transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../views/petitionView.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
@@ -104,19 +104,54 @@ function renderSuggestions(person, state) {
   const conflictNote = rec.conflict
     ? `<p class="muted small">Conflict detected (${rec.conflictRule || 'highest_priority'}). Choose a delegate to resolve.</p>`
     : '';
+  const options = rec.suggestions
+    .map((suggestion) => {
+      const label = formatSuggestionLabel(suggestion);
+      return `<option value="${escapeHtml(suggestion.delegateHash)}">${escapeHtml(label)}</option>`;
+    })
+    .join('');
   return `
     <form data-enhance="delegation-conflict" action="/delegation/conflict" method="post" class="stack">
       <label>Select delegate for topic "general"</label>
       <select name="delegateHash">
-        ${rec.suggestions
-          .map((s) => `<option value="${s.delegateHash}">${s.delegateHash} (prio ${s.priority} via group ${s.groupId || ''})</option>`)
-          .join('')}
+        ${options}
       </select>
       ${conflictNote}
       <input type="hidden" name="topic" value="general" />
       <button class="ghost" type="submit">Use delegate</button>
     </form>
   `;
+}
+
+function formatSuggestionLabel(suggestion = {}) {
+  const meta = formatSuggestionMeta(suggestion);
+  const base = suggestion.delegateHash || 'delegate';
+  return meta ? `${base} (${meta})` : base;
+}
+
+function formatSuggestionMeta(suggestion = {}) {
+  const parts = [];
+  if (suggestion.groupId) {
+    parts.push(`group ${suggestion.groupId}`);
+  }
+  const isElection = suggestion.provider === 'group-election' || suggestion.electionId;
+  if (isElection) {
+    const electionBits = ['election winner'];
+    if (suggestion.electionMethod) {
+      electionBits.push(`method ${suggestion.electionMethod}`);
+    }
+    if (suggestion.electionId) {
+      electionBits.push(`id ${String(suggestion.electionId).slice(0, 8)}`);
+    }
+    parts.push(electionBits.join(' - '));
+  } else {
+    const priority = Number.isFinite(suggestion.priority) ? suggestion.priority : 0;
+    parts.push(`priority ${priority}`);
+    if (suggestion.provider) {
+      parts.push(`source ${suggestion.provider}`);
+    }
+  }
+  return parts.join(' | ');
 }
 
 export async function submitPetition({ req, res, state, wantsPartial }) {

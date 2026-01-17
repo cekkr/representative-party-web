@@ -11,6 +11,7 @@ const DEFAULT_FIELD_TOTAL_MAX_BYTES = 128 * 1024;
 const DEFAULT_FIELD_MAX_COUNT = 40;
 const DEFAULT_FIELD_NAME_MAX_BYTES = 128;
 const DEFAULT_HEADER_MAX_BYTES = 8 * 1024;
+const DEFAULT_FILENAME_MAX_BYTES = 256;
 
 export async function readRequestBody(
   req,
@@ -74,6 +75,7 @@ export async function readMultipartForm(
     maxFieldCount = DEFAULT_FIELD_MAX_COUNT,
     maxFieldNameBytes = DEFAULT_FIELD_NAME_MAX_BYTES,
     maxHeaderBytes = DEFAULT_HEADER_MAX_BYTES,
+    maxFilenameBytes = DEFAULT_FILENAME_MAX_BYTES,
     streamFiles = false,
     tempDir,
   } = {},
@@ -90,6 +92,7 @@ export async function readMultipartForm(
       maxFieldCount,
       maxFieldNameBytes,
       maxHeaderBytes,
+      maxFilenameBytes,
       tempDir,
     });
   }
@@ -131,6 +134,9 @@ export async function readMultipartForm(
     }
     const filenameMatch = disposition.match(/filename="([^"]*)"/i);
     const filename = filenameMatch ? filenameMatch[1] : '';
+    if (filename && isFilenameLimitExceeded(maxFilenameBytes, filename)) {
+      throw createFilenameTooLargeError(maxFilenameBytes);
+    }
     if (filename) {
       files.push({
         fieldName,
@@ -252,7 +258,16 @@ function parseHeaders(text) {
 async function readMultipartStream(
   req,
   boundary,
-  { maxBytes, maxFieldBytes, maxFieldBytesTotal, maxFieldCount, maxFieldNameBytes, maxHeaderBytes, tempDir } = {},
+  {
+    maxBytes,
+    maxFieldBytes,
+    maxFieldBytesTotal,
+    maxFieldCount,
+    maxFieldNameBytes,
+    maxHeaderBytes,
+    maxFilenameBytes,
+    tempDir,
+  } = {},
 ) {
   const fields = {};
   const files = [];
@@ -358,6 +373,9 @@ async function readMultipartStream(
         }
         if (isFieldNameLimitExceeded(maxFieldNameBytes, fieldName)) {
           throw createFieldNameTooLargeError(maxFieldNameBytes);
+        }
+        if (filename && isFilenameLimitExceeded(maxFilenameBytes, filename)) {
+          throw createFilenameTooLargeError(maxFilenameBytes);
         }
         if (filename) {
           const tempPath = join(uploadRoot, `${randomUUID()}.upload`);
@@ -481,6 +499,11 @@ function isFieldNameLimitExceeded(maxFieldNameBytes, value = '') {
   return Buffer.byteLength(String(value), 'utf-8') > maxFieldNameBytes;
 }
 
+function isFilenameLimitExceeded(maxFilenameBytes, value = '') {
+  if (!Number.isFinite(maxFilenameBytes) || maxFilenameBytes <= 0) return false;
+  return Buffer.byteLength(String(value), 'utf-8') > maxFilenameBytes;
+}
+
 function isHeaderLimitExceeded(maxHeaderBytes, size) {
   if (!Number.isFinite(maxHeaderBytes) || maxHeaderBytes <= 0) return false;
   return size > maxHeaderBytes;
@@ -508,6 +531,13 @@ function createFieldNameTooLargeError(maxFieldNameBytes) {
   const error = new Error('field_name_too_large');
   error.code = 'field_name_too_large';
   error.maxFieldNameBytes = maxFieldNameBytes;
+  return error;
+}
+
+function createFilenameTooLargeError(maxFilenameBytes) {
+  const error = new Error('filename_too_large');
+  error.code = 'filename_too_large';
+  error.maxFilenameBytes = maxFilenameBytes;
   return error;
 }
 
