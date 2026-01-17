@@ -3,6 +3,7 @@ import http from 'node:http';
 import test from 'node:test';
 import { gunzipSync } from 'node:zlib';
 
+import { createVerifiedSession } from './helpers/auth.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 
 async function fetchGzipJson(url) {
@@ -39,18 +40,26 @@ async function fetchGzipJson(url) {
   });
 }
 
-test('ledger and transactions exports gzip when requested', async (t) => {
+test('gzip exports skip small payloads and compress large ledgers', async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
   t.after(async () => server.stop());
 
   const ledger = await fetchGzipJson(`${server.baseUrl}/circle/ledger`);
   assert.equal(ledger.status, 200);
-  assert.ok(String(ledger.headers['content-encoding'] || '').includes('gzip'));
+  assert.equal(String(ledger.headers['content-encoding'] || '').includes('gzip'), false);
   assert.ok(ledger.payload?.envelope);
 
   const transactions = await fetchGzipJson(`${server.baseUrl}/transactions/ledger`);
   assert.equal(transactions.status, 200);
-  assert.ok(String(transactions.headers['content-encoding'] || '').includes('gzip'));
+  assert.equal(String(transactions.headers['content-encoding'] || '').includes('gzip'), false);
   assert.ok(transactions.payload?.envelope);
+
+  const largeHash = 'x'.repeat(2048);
+  await createVerifiedSession(server.baseUrl, { pidHash: largeHash });
+
+  const largeLedger = await fetchGzipJson(`${server.baseUrl}/circle/ledger`);
+  assert.equal(largeLedger.status, 200);
+  assert.ok(String(largeLedger.headers['content-encoding'] || '').includes('gzip'));
+  assert.ok(largeLedger.payload?.envelope);
 });

@@ -1,5 +1,7 @@
 import { gzipSync } from 'node:zlib';
 
+const DEFAULT_GZIP_MIN_BYTES = 2048;
+
 export function sendHtml(res, html, headers = {}, status = 200) {
   res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8', ...headers });
   res.end(html);
@@ -10,10 +12,12 @@ export function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload, null, 2));
 }
 
-export function sendJsonWithEncoding(req, res, status, payload, { allowGzip = false } = {}) {
+export function sendJsonWithEncoding(req, res, status, payload, { allowGzip = false, minBytes } = {}) {
   const json = JSON.stringify(payload, null, 2);
+  const byteLength = Buffer.byteLength(json);
   const headers = { 'Content-Type': 'application/json; charset=utf-8', Vary: 'Accept-Encoding' };
-  if (allowGzip && clientAcceptsGzip(req)) {
+  const threshold = normalizeGzipThreshold(minBytes);
+  if (allowGzip && clientAcceptsGzip(req) && byteLength >= threshold) {
     const compressed = gzipSync(json);
     res.writeHead(status, {
       ...headers,
@@ -59,4 +63,11 @@ function clientAcceptsGzip(req) {
     return Number.isFinite(value) ? value > 0 : true;
   }
   return false;
+}
+
+function normalizeGzipThreshold(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return DEFAULT_GZIP_MIN_BYTES;
+  if (parsed <= 0) return 0;
+  return Math.floor(parsed);
 }

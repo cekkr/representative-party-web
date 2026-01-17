@@ -276,7 +276,7 @@ Two switches gate uncertified data:
 
 This allows deployments to experiment with helpers (topic gardeners, classification) and federation inputs *without silently treating them as authoritative*.
 
-Ledger exports (`/circle/ledger`, `/votes/ledger`, `/transactions/ledger`) respect preview gating and omit preview entries when `DATA_PREVIEW=false`; they also gzip-compress responses when `Accept-Encoding: gzip` is provided.
+Ledger exports (`/circle/ledger`, `/votes/ledger`, `/transactions/ledger`) respect preview gating and omit preview entries when `DATA_PREVIEW=false`; they gzip-compress responses when `Accept-Encoding: gzip` is provided and the payload is at least ~2KB.
 
 ---
 
