@@ -125,6 +125,7 @@ const CHILD_SECTIONS = {
     { label: 'Gossip sync', href: '/admin#federation-gossip', partial: true },
     { label: 'Provider-blind', href: '/admin#provider-blind', partial: true },
     { label: 'Modules', href: '/admin#modules', partial: true },
+    { label: 'Composer', href: '/admin#composer', partial: true },
     { label: 'Rate limits', href: '/admin#rate-limits', partial: true },
     { label: 'Social media', href: '/admin#social-media', partial: true },
     { label: 'Upload cleanup', href: '/admin#upload-cleanup', partial: true },
@@ -143,7 +144,10 @@ const CHILD_SECTIONS = {
 
 export function renderNav(state, context = {}) {
   const modules = resolveModuleSettings(state);
+  const composerSettings = resolveComposerSettings(state);
   const navContext = resolveNavContext(state, context);
+  navContext.quickOrder = composerSettings.quickActionsOrder;
+  navContext.sideOrder = composerSettings.sideNavOrder;
   const sideNav = renderSideNav(modules, navContext);
   const quickLinks = renderQuickLinks(modules, navContext);
   return { sideNav, quickLinks };
@@ -160,8 +164,9 @@ function renderNavGroup(group, byKey, modules, navContext) {
   const items = group.keys
     .map((key) => byKey.get(key))
     .filter((item) => item && isItemAllowed(item, modules, navContext));
-  if (!items.length) return '';
-  const links = items.map((item) => renderSideItem(item, modules, navContext)).join('\n');
+  const orderedItems = applyOrder(items, navContext.sideOrder);
+  if (!orderedItems.length) return '';
+  const links = orderedItems.map((item) => renderSideItem(item, modules, navContext)).join('\n');
   return `
     <div class="side-nav__group">
       <p class="eyebrow">${group.label}</p>
@@ -185,12 +190,14 @@ function renderSideItem(item, modules, navContext) {
 
 function renderQuickLinks(modules, navContext) {
   const globalLinks = QUICK_ACTIONS.filter((item) => isItemAllowed(item, modules, navContext));
+  const orderedGlobal = applyOrder(globalLinks, navContext.quickOrder);
   const contextLinks = Object.entries(CONTEXT_ACTIONS)
     .flatMap(([section, items]) =>
       items.filter((item) => isItemAllowed(item, modules, navContext)).map((item) => ({ ...item, section })),
     );
-  const globalHtml = globalLinks.map((item) => renderLink(item, { className: 'quick-link' })).join('\n');
-  const contextHtml = contextLinks
+  const orderedContext = applyOrder(contextLinks, navContext.quickOrder);
+  const globalHtml = orderedGlobal.map((item) => renderLink(item, { className: 'quick-link' })).join('\n');
+  const orderedContextHtml = orderedContext
     .map((item) =>
       renderLink(item, {
         className: 'quick-link quick-link--context',
@@ -198,7 +205,7 @@ function renderQuickLinks(modules, navContext) {
       }),
     )
     .join('\n');
-  return [globalHtml, contextHtml].filter(Boolean).join('\n');
+  return [globalHtml, orderedContextHtml].filter(Boolean).join('\n');
 }
 
 function renderLink(item, { className, extraAttrs = [] } = {}) {
@@ -228,6 +235,34 @@ function isItemAllowed(item, modules, navContext) {
   if (item.hideWhenVerified && navContext.isVerified) return false;
   if (item.requiresModerate && !navContext.canModerate) return false;
   return true;
+}
+
+function applyOrder(items, order = []) {
+  if (!order || !order.length) return items;
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const ordered = [];
+  for (const key of order) {
+    const match = byKey.get(key);
+    if (match) {
+      ordered.push(match);
+      byKey.delete(key);
+    }
+  }
+  for (const item of items) {
+    if (byKey.has(item.key)) {
+      ordered.push(item);
+      byKey.delete(item.key);
+    }
+  }
+  return ordered;
+}
+
+function resolveComposerSettings(state) {
+  const composer = state?.settings?.composer || {};
+  return {
+    quickActionsOrder: Array.isArray(composer.quickActionsOrder) ? composer.quickActionsOrder : [],
+    sideNavOrder: Array.isArray(composer.sideNavOrder) ? composer.sideNavOrder : [],
+  };
 }
 
 function resolveNavContext(state, context = {}) {

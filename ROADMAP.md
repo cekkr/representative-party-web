@@ -68,6 +68,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
+- Admin Composer: ship a theme/layout composer with custom CSS overrides, quick-action/nav ordering, and a drag-and-drop layout builder for public sections (starting with social + forum panels).
 - Theme-level verbosity controls: persist a compact/verbose UI setting (and per-user overrides) to hide optional telemetry and developer-facing callouts.
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.

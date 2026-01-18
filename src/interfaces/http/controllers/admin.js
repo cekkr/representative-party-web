@@ -111,6 +111,10 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     const result = await updateModules(state, body);
     return renderWithPerson(result);
   }
+  if (intent === 'composer') {
+    const result = await updateComposerSettings(state, body);
+    return renderWithPerson(result);
+  }
   if (intent === 'rate-limits') {
     const result = await updateRateLimits(state, body);
     return renderWithPerson(result);
@@ -308,8 +312,17 @@ function parseList(value, fallback = []) {
   return parts.length ? dedupe(parts) : dedupe(fallback);
 }
 
+function parseListAllowEmpty(value, fallback = []) {
+  if (value === '') return [];
+  return parseList(value, fallback);
+}
+
 function dedupe(list) {
   return [...new Set(list || [])];
+}
+
+function formatCsvList(list = []) {
+  return (list || []).join(', ');
 }
 
 function parseMultilineList(value, { maxLength = 120, fallback = [] } = {}) {
@@ -1008,6 +1021,57 @@ async function updateModules(state, body) {
   return { flash };
 }
 
+async function updateComposerSettings(state, body) {
+  const prev = state.settings?.composer || {};
+  const themeCss = String(body.composerThemeCss || '');
+  const limitedCss = themeCss.length > 8000 ? themeCss.slice(0, 8000) : themeCss;
+  const quickActionsOrder = parseListAllowEmpty(body.composerQuickActionsOrder, prev.quickActionsOrder || []);
+  const sideNavOrder = parseListAllowEmpty(body.composerSideNavOrder, prev.sideNavOrder || []);
+  const asideWidthInput = sanitizeText(body.composerAsideWidth || '', 12);
+  const asideWidthResult = normalizeNumericInput(asideWidthInput, {
+    fallback: null,
+    min: 240,
+    max: 600,
+    label: 'Composer panel width',
+  });
+  const errors = [...asideWidthResult.errors];
+  const pageAsideWidth = Number.isFinite(asideWidthResult.value) ? asideWidthResult.value : null;
+
+  if (errors.length) {
+    return {
+      flash: 'Composer settings not updated.',
+      composerErrors: renderValidationErrors(errors, { title: 'Composer settings' }),
+      composerThemeCssValue: limitedCss || prev.themeCss || '',
+      composerQuickActionsOrderValue: formatCsvList(quickActionsOrder),
+      composerSideNavOrderValue: formatCsvList(sideNavOrder),
+      composerAsideWidthValue: asideWidthInput,
+    };
+  }
+
+  const next = {
+    themeCss: limitedCss,
+    quickActionsOrder,
+    sideNavOrder,
+    pageAsideWidth,
+  };
+  state.settings = {
+    ...(state.settings || {}),
+    composer: next,
+  };
+  recordAdminAudit(state, {
+    action: 'composer.update',
+    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'}`,
+  });
+  await persistSettings(state);
+  return {
+    flash: 'Composer settings updated.',
+    composerThemeCssValue: next.themeCss || '',
+    composerQuickActionsOrderValue: formatCsvList(next.quickActionsOrder),
+    composerSideNavOrderValue: formatCsvList(next.sideNavOrder),
+    composerAsideWidthValue: pageAsideWidth ? String(pageAsideWidth) : '',
+  };
+}
+
 async function updateRateLimits(state, body) {
   const raw = body.rateLimitOverrides ?? '';
   const { overrides, errors } = parseRateLimitOverrides(raw);
@@ -1082,6 +1146,11 @@ function buildAdminViewModel(
     attributesSessionId,
     attributesPayloadValue,
     profileAttributeErrors,
+    composerErrors,
+    composerThemeCssValue,
+    composerQuickActionsOrderValue,
+    composerSideNavOrderValue,
+    composerAsideWidthValue,
     rateLimitOverridesValue,
     rateLimitErrors,
     opsMetricsErrors,
@@ -1258,6 +1327,13 @@ function buildAdminViewModel(
   const providerBlindTransportTimeoutMs =
     providerBlindTransportTimeoutMsValue ?? String(providerBlind.transport.timeoutMs || '');
   const providerBlindErrorsRendered = providerBlindErrors || '';
+  const composerSettings = state.settings?.composer || {};
+  const composerThemeCss = composerThemeCssValue ?? composerSettings.themeCss || '';
+  const composerQuickActionsOrder =
+    composerQuickActionsOrderValue ?? formatCsvList(composerSettings.quickActionsOrder || []);
+  const composerSideNavOrder = composerSideNavOrderValue ?? formatCsvList(composerSettings.sideNavOrder || []);
+  const composerAsideWidth = composerAsideWidthValue ?? (composerSettings.pageAsideWidth ? String(composerSettings.pageAsideWidth) : '');
+  const composerErrorsRendered = composerErrors || '';
   const installWizardActive = !effective.initialized;
   const installWizardMode = installWizardActive ? 'wizard' : 'full';
   const installWizardIntro = installWizardActive
@@ -1348,6 +1424,11 @@ function buildAdminViewModel(
     attributesSessionId: attributesSessionIdValue,
     attributesPayloadValue: attributesPayloadValueRendered,
     profileAttributeErrors: profileAttributeErrorsRendered,
+    composerThemeCss,
+    composerQuickActionsOrder,
+    composerSideNavOrder,
+    composerAsideWidth,
+    composerErrors: composerErrorsRendered,
     auditLog: renderAuditLog(auditEntries),
     transactionsList,
     transactionSummariesList,

@@ -27,6 +27,13 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   if (!layoutData.verbosityMode) {
     layoutData.verbosityMode = 'full';
   }
+  if (!layoutData.themeCss) {
+    layoutData.themeCss = String(state?.settings?.composer?.themeCss || '');
+  }
+  if (!layoutData.themeVars) {
+    const asideWidth = state?.settings?.composer?.pageAsideWidth;
+    layoutData.themeVars = asideWidth ? `--page-aside-width: ${asideWidth}px;` : '';
+  }
   return applyTemplate(layout, layoutData);
 }
 
