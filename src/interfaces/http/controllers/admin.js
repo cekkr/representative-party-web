@@ -1328,7 +1328,7 @@ function buildAdminViewModel(
     providerBlindTransportTimeoutMsValue ?? String(providerBlind.transport.timeoutMs || '');
   const providerBlindErrorsRendered = providerBlindErrors || '';
   const composerSettings = state.settings?.composer || {};
-  const composerThemeCss = composerThemeCssValue ?? composerSettings.themeCss || '';
+  const composerThemeCss = composerThemeCssValue ?? (composerSettings.themeCss || '');
   const composerQuickActionsOrder =
     composerQuickActionsOrderValue ?? formatCsvList(composerSettings.quickActionsOrder || []);
   const composerSideNavOrder = composerSideNavOrderValue ?? formatCsvList(composerSettings.sideNavOrder || []);
