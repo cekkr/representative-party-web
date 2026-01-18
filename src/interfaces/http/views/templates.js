@@ -20,7 +20,7 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.personHandle = 'Guest session';
   }
   if (!layoutData.quickLinks || !layoutData.sideNav) {
-    const nav = renderNav(state);
+    const nav = renderNav(state, layoutData);
     layoutData.quickLinks = layoutData.quickLinks || nav.quickLinks;
     layoutData.sideNav = layoutData.sideNav || nav.sideNav;
   }

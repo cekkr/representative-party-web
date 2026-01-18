@@ -1,18 +1,55 @@
 import { resolveModuleSettings } from '../../../modules/circle/modules.js';
+import { getPrivilegesForPerson } from '../../../modules/identity/privileges.js';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', partial: true, match: { path: '/', exact: true } },
-  { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, match: { prefix: '/auth' } },
-  { key: 'social', label: 'Wall', href: '/social/feed', module: 'social', partial: true, match: { prefix: '/social' } },
+  {
+    key: 'auth',
+    label: 'Wallet Login',
+    href: '/auth/eudi',
+    partial: true,
+    match: { prefix: '/auth' },
+    hideWhenVerified: true,
+  },
+  {
+    key: 'social',
+    label: 'Wall',
+    href: '/social/feed',
+    module: 'social',
+    partial: true,
+    match: { prefix: '/social' },
+    requiresVerified: true,
+  },
   { key: 'discussion', label: 'Discussion', href: '/discussion', partial: true, match: { prefix: '/discussion' } },
   { key: 'forum', label: 'Forum', href: '/forum', partial: true, match: { prefix: '/forum' } },
   { key: 'petitions', label: 'Proposals', href: '/petitions', module: 'petitions', partial: true, match: { prefix: '/petitions' } },
   { key: 'governance', label: 'Governance', href: '/governance', partial: true, match: { prefix: '/governance' } },
   { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true, match: { prefix: '/delegation' } },
   { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true, match: { prefix: '/groups' } },
-  { key: 'notifications', label: 'Notifications', href: '/notifications', partial: true, match: { prefix: '/notifications' } },
-  { key: 'profile', label: 'Profile', href: '/profile', partial: true, match: { prefix: '/profile' } },
-  { key: 'admin', label: 'Admin', href: '/admin', partial: true, match: { prefix: '/admin' } },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    href: '/notifications',
+    partial: true,
+    match: { prefix: '/notifications' },
+    requiresVerified: true,
+  },
+  {
+    key: 'profile',
+    label: 'Profile',
+    href: '/profile',
+    partial: true,
+    match: { prefix: '/profile' },
+    requiresVerified: true,
+  },
+  {
+    key: 'admin',
+    label: 'Admin',
+    href: '/admin',
+    partial: true,
+    match: { prefix: '/admin' },
+    requiresVerified: true,
+  },
   { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer', partial: false, match: { prefix: '/health' } },
 ];
 
@@ -25,16 +62,23 @@ const NAV_GROUPS = [
 
 const QUICK_ACTIONS = [
   { key: 'home', label: 'Info', href: '/', partial: true },
-  { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true },
-  { key: 'social', label: 'Wall', href: '/social/feed', module: 'social', partial: true },
+  { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, hideWhenVerified: true },
+  { key: 'social', label: 'Wall', href: '/social/feed', module: 'social', partial: true, requiresVerified: true },
   { key: 'forum', label: 'Forum', href: '/forum', partial: true },
-  { key: 'notifications', label: 'Alerts', href: '/notifications', partial: true },
-  { key: 'profile', label: 'Profile', href: '/profile', partial: true },
+  { key: 'notifications', label: 'Alerts', href: '/notifications', partial: true, requiresVerified: true },
+  { key: 'profile', label: 'Profile', href: '/profile', partial: true, requiresVerified: true },
 ];
 
 const CONTEXT_ACTIONS = {
   social: [
-    { key: 'social-compose', label: 'New Post', href: '/social/feed?compose=post#social-compose', partial: true, module: 'social' },
+    {
+      key: 'social-compose',
+      label: 'New Post',
+      href: '/social/feed?compose=post#social-compose',
+      partial: true,
+      module: 'social',
+      requiresVerified: true,
+    },
   ],
   discussion: [
     { key: 'discussion-compose', label: 'New Post', href: '/discussion?compose=post#discussion-compose', partial: true },
@@ -51,7 +95,7 @@ const CONTEXT_ACTIONS = {
       module: 'petitions',
     },
   ],
-  admin: [{ key: 'admin-modules', label: 'Modules', href: '/admin#modules', partial: true }],
+  admin: [{ key: 'admin-modules', label: 'Modules', href: '/admin#modules', partial: true, requiresVerified: true }],
 };
 
 const CHILD_SECTIONS = {
@@ -97,26 +141,27 @@ const CHILD_SECTIONS = {
   ],
 };
 
-export function renderNav(state) {
+export function renderNav(state, context = {}) {
   const modules = resolveModuleSettings(state);
-  const sideNav = renderSideNav(modules);
-  const quickLinks = renderQuickLinks(modules);
+  const navContext = resolveNavContext(state, context);
+  const sideNav = renderSideNav(modules, navContext);
+  const quickLinks = renderQuickLinks(modules, navContext);
   return { sideNav, quickLinks };
 }
 
-function renderSideNav(modules) {
+function renderSideNav(modules, navContext) {
   const byKey = new Map(NAV_ITEMS.map((item) => [item.key, item]));
-  return NAV_GROUPS.map((group) => renderNavGroup(group, byKey, modules))
+  return NAV_GROUPS.map((group) => renderNavGroup(group, byKey, modules, navContext))
     .filter(Boolean)
     .join('\n');
 }
 
-function renderNavGroup(group, byKey, modules) {
+function renderNavGroup(group, byKey, modules, navContext) {
   const items = group.keys
     .map((key) => byKey.get(key))
-    .filter((item) => item && isModuleAllowed(item, modules));
+    .filter((item) => item && isItemAllowed(item, modules, navContext));
   if (!items.length) return '';
-  const links = items.map((item) => renderSideItem(item, modules)).join('\n');
+  const links = items.map((item) => renderSideItem(item, modules, navContext)).join('\n');
   return `
     <div class="side-nav__group">
       <p class="eyebrow">${group.label}</p>
@@ -125,8 +170,8 @@ function renderNavGroup(group, byKey, modules) {
   `;
 }
 
-function renderSideItem(item, modules) {
-  const childSections = (CHILD_SECTIONS[item.key] || []).filter((child) => isModuleAllowed(child, modules));
+function renderSideItem(item, modules, navContext) {
+  const childSections = (CHILD_SECTIONS[item.key] || []).filter((child) => isItemAllowed(child, modules, navContext));
   const matchAttrs = buildMatchAttributes(item);
   return `
     <div class="side-nav__item" data-nav-section="${item.key}" ${matchAttrs}>
@@ -138,11 +183,11 @@ function renderSideItem(item, modules) {
   `;
 }
 
-function renderQuickLinks(modules) {
-  const globalLinks = QUICK_ACTIONS.filter((item) => isModuleAllowed(item, modules));
+function renderQuickLinks(modules, navContext) {
+  const globalLinks = QUICK_ACTIONS.filter((item) => isItemAllowed(item, modules, navContext));
   const contextLinks = Object.entries(CONTEXT_ACTIONS)
     .flatMap(([section, items]) =>
-      items.filter((item) => isModuleAllowed(item, modules)).map((item) => ({ ...item, section })),
+      items.filter((item) => isItemAllowed(item, modules, navContext)).map((item) => ({ ...item, section })),
     );
   const globalHtml = globalLinks.map((item) => renderLink(item, { className: 'quick-link' })).join('\n');
   const contextHtml = contextLinks
@@ -177,7 +222,47 @@ function buildMatchAttributes(item) {
   return '';
 }
 
-function isModuleAllowed(item, modules) {
-  if (!item.module) return true;
-  return modules[item.module] !== false;
+function isItemAllowed(item, modules, navContext) {
+  if (item.module && modules[item.module] === false) return false;
+  if (item.requiresVerified && !navContext.isVerified) return false;
+  if (item.hideWhenVerified && navContext.isVerified) return false;
+  if (item.requiresModerate && !navContext.canModerate) return false;
+  return true;
+}
+
+function resolveNavContext(state, context = {}) {
+  if (context.person) {
+    const privileges = getPrivilegesForPerson(context.person, state);
+    return {
+      isVerified: privileges.role !== 'guest',
+      canModerate: privileges.canModerate,
+      role: privileges.role,
+    };
+  }
+
+  const roleLabel = context.roleLabel || context.role || '';
+  const normalizedRole = roleLabel ? String(roleLabel).toLowerCase() : '';
+  const explicitVerified = typeof context.isVerified === 'boolean';
+  const isVerified = explicitVerified ? context.isVerified : normalizedRole ? normalizedRole !== 'guest' : false;
+  if (normalizedRole) {
+    return {
+      isVerified,
+      canModerate: normalizedRole === 'admin' || normalizedRole === 'moderator',
+      role: normalizedRole,
+    };
+  }
+  if (explicitVerified) {
+    return {
+      isVerified,
+      canModerate: Boolean(context.canModerate),
+      role: isVerified ? 'user' : 'guest',
+    };
+  }
+  const handle = context.personHandle || '';
+  const handleVerified = Boolean(handle && handle !== 'Guest session');
+  return {
+    isVerified: handleVerified,
+    canModerate: false,
+    role: handleVerified ? 'user' : 'guest',
+  };
 }

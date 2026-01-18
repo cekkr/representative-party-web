@@ -1,15 +1,18 @@
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
+import { getPerson } from '../../../modules/identity/person.js';
 import { buildDelegateProfile } from '../../../modules/delegation/delegateProfiles.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../views/templates.js';
+import { resolvePersonHandle } from '../views/actorLabel.js';
 import { renderModuleDisabled } from '../views/moduleGate.js';
 
 export async function renderDelegateProfile({ req, res, state, wantsPartial, params }) {
   if (!isModuleEnabled(state, 'delegation')) {
     return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'delegation' });
   }
+  const person = getPerson(req, state);
   const delegateHash = sanitizeText(params?.hash || '', 120);
   if (!delegateHash) {
     return sendJson(res, 400, { error: 'missing_delegate', message: 'Delegate hash required.' });
@@ -23,6 +26,9 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
   const html = await renderPage(
     'delegate-profile',
     {
+      person,
+      personHandle: resolvePersonHandle(person),
+      roleLabel: person?.role || 'guest',
       delegateHandle: escapeHtml(handleLabel),
       delegateHash: escapeHtml(profile.hash || delegateHash),
       delegateRole: escapeHtml(roleLabel),

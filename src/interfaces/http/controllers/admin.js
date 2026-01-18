@@ -53,6 +53,7 @@ import {
   getReplicationProfile,
   isGossipEnabled,
 } from '../../../modules/federation/replication.js';
+import { getPerson } from '../../../modules/identity/person.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
 import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
@@ -73,12 +74,14 @@ import { escapeHtml, formatBytes, sanitizeText } from '../../../shared/utils/tex
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
+import { resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPreviewPill } from '../views/shared.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
-  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null } });
+  const person = getPerson(req, state);
+  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null, person } });
 }
 
 export function exportAuditLog({ res, state }) {
@@ -89,100 +92,93 @@ export function exportAuditLog({ res, state }) {
 export async function updateAdmin({ req, res, state, wantsPartial }) {
   const body = await readRequestBody(req);
   const intent = body.intent || 'settings';
+  const person = getPerson(req, state);
+  const renderWithPerson = (viewModel) =>
+    renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person } });
   if (intent === 'session') {
     const result = await updateSession(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'structure') {
     const result = await updateStructure(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'profile-attributes') {
     const result = await updateProfileAttributes(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'modules') {
     const result = await updateModules(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'rate-limits') {
     const result = await updateRateLimits(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'ops-metrics') {
     const result = await updateOpsMetrics(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'governance') {
     const result = await updateGovernance(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'provider-blind') {
     const result = await updateProviderBlind(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'signing-keys') {
     const result = await updateSigningKeys(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'media-moderate') {
     const result = await moderateMedia(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-gardener-sync') {
     const summary = await syncTopicGardenerOperations(state, { source: 'admin' });
     const flash = formatTopicGardenerFlash(summary);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: { flash } });
+    return renderWithPerson({ flash });
   }
   if (intent === 'topic-rename-accept') {
     const result = await acceptTopicRename(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-rename-dismiss') {
     const result = await dismissTopicRename(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-merge-accept') {
     const result = await acceptTopicMerge(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-merge-dismiss') {
     const result = await dismissTopicMerge(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-split-accept') {
     const result = await acceptTopicSplit(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-split-dismiss') {
     const result = await dismissTopicSplit(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-anchor-accept') {
     const result = await acceptTopicAnchorSuggestion(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'topic-anchor-dismiss') {
     const result = await dismissTopicAnchorSuggestion(state, body);
-    return renderAdminPage({ res, state, wantsPartial, viewModel: result });
+    return renderWithPerson(result);
   }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
-    return renderAdminPage({
-      res,
-      state,
-      wantsPartial,
-      viewModel: { flash: formatGossipFlash(summary) },
-    });
+    return renderWithPerson({ flash: formatGossipFlash(summary) });
   }
   if (intent === 'gossip-pull') {
     const summary = await pullGossipNow(state, { reason: 'admin' });
-    return renderAdminPage({
-      res,
-      state,
-      wantsPartial,
-      viewModel: { flash: formatGossipFlash(summary) },
-    });
+    return renderWithPerson({ flash: formatGossipFlash(summary) });
   }
   if (intent === 'peer-health-reset') {
     const resetAll = parseBoolean(body.resetAll, false);
@@ -195,7 +191,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       await persistSettings(state);
       flash = resetAll ? 'Peer health reset for all peers.' : `Peer health reset for ${result.removed}.`;
     }
-    return renderAdminPage({ res, state, wantsPartial, viewModel: { flash } });
+    return renderWithPerson({ flash });
   }
 
   const prev = state.settings || {};
@@ -280,14 +276,18 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     flashParts.push('Wallet verification required for posting.');
   }
 
-  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: flashParts.join(' ') } });
+  return renderWithPerson({ flash: flashParts.join(' ') });
 }
 
 async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const availableExtensions = await listAvailableExtensions(state);
+  const person = viewModel.person || null;
+  const personHandle = resolvePersonHandle(person);
+  const roleLabel = person?.role || 'guest';
+  const adminView = buildAdminViewModel(state, { ...viewModel, availableExtensions });
   const html = await renderPage(
     'admin',
-    buildAdminViewModel(state, { ...viewModel, availableExtensions }),
+    { ...adminView, person, personHandle, roleLabel },
     { wantsPartial, title: 'Admin - Circle Settings', state },
   );
   return sendHtml(res, html);

@@ -22,12 +22,17 @@ export async function startAuth({ req, res, state, wantsPartial }) {
   const defaultRole = resolveDefaultActorRole(state);
 
   if (existing && existing.status === 'verified') {
+    const existingRole = existing.role || defaultRole;
+    const existingHandle = existing.handle || person?.handle || '';
     const html = await renderPage(
       'verification-complete',
       {
         pidHashShort: existing.pidHash?.slice(0, 8) || 'verified',
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
+        personHandle: existingHandle,
+        roleLabel: existingRole,
+        isVerified: true,
       },
       { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
     );
@@ -133,7 +138,14 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   const actorLabels = getActorLabels(state);
   const html = await renderPage(
     'verification-complete',
-    { pidHashShort: pidHash.slice(0, 8), ledgerNote, actorId: actor.id },
+    {
+      pidHashShort: pidHash.slice(0, 8),
+      ledgerNote,
+      actorId: actor.id,
+      personHandle: handle,
+      roleLabel: role,
+      isVerified: true,
+    },
     { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
   );
 
