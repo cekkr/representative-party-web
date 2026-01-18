@@ -1,7 +1,7 @@
 <section class="panel">
   <p class="eyebrow">Delegation</p>
   <h2>Manual delegation preferences</h2>
-  <p class="muted small">Handle: {{personHandle}} · Role: {{roleLabel}}</p>
+  <p class="muted small is-verbose">Handle: {{personHandle}} · Role: {{roleLabel}}</p>
   <p class="muted small">{{delegationStatus}}</p>
   <p class="muted small">{{delegationReason}}</p>
   <div class="callout">
@@ -47,9 +47,11 @@
   <datalist id="delegation-topics">
     {{topicDatalist}}
   </datalist>
-  <p class="muted small">Anchors: {{topicAnchors}}</p>
-  <p class="muted small">Pinned: {{topicPinned}}</p>
-  <p class="muted small">Your topics: {{topicPreferencesValue}}</p>
+  <div class="is-verbose">
+    <p class="muted small">Anchors: {{topicAnchors}}</p>
+    <p class="muted small">Pinned: {{topicPinned}}</p>
+    <p class="muted small">Your topics: {{topicPreferencesValue}}</p>
+  </div>
 </section>
 
 <section class="panel">

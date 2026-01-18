@@ -5,6 +5,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Performance
 - Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
 - Cache rendered navigation links keyed by module settings to avoid rebuilding nav HTML on every request.
+- Lazy-load heavyweight admin panels (transactions, media review, topic gardener) via partial renders to shrink initial HTML payloads.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
 - Cache per-handle follow-type counts (or increment on follow/unfollow) to avoid recomputing tallies on every social feed render.
 - Cache normalized topic keys in entries to avoid repeated normalization and filtering in topic views.

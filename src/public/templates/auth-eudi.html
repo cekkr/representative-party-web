@@ -9,13 +9,13 @@
   </div>
   <div class="grid two">
     <div>
-      <div class="callout">
+      <div class="callout is-verbose">
         <p class="muted">Session ID</p>
         <code>{{sessionId}}</code>
       </div>
       <div class="cta-row">
         <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
-        <a class="ghost" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Simulate callback</a>
+        <a class="ghost is-verbose inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Simulate callback</a>
       </div>
       <p class="muted small">If your browser blocks the deep link, copy and paste it: <span data-deep-link-fallback>{{deepLink}}</span></p>
     </div>
@@ -25,7 +25,7 @@
       <p class="muted small">Scan with an EUDI wallet to accept the credential offer.</p>
     </div>
   </div>
-  <details class="note">
+  <details class="note is-verbose">
     <summary>Credential offer payload</summary>
     <pre>{{offerPreview}}</pre>
   </details>

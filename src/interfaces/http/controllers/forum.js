@@ -15,8 +15,8 @@ import { renderPage } from '../views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
 import { recordRateLimit } from '../../../modules/ops/metrics.js';
 
-export async function renderForumRoute({ req, res, state, wantsPartial }) {
-  return renderForumPage({ req, res, state, wantsPartial });
+export async function renderForumRoute({ req, res, state, wantsPartial, url }) {
+  return renderForumPage({ req, res, state, wantsPartial, url });
 }
 
 export async function postThread({ req, res, state, wantsPartial }) {
@@ -72,7 +72,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
     payload: { threadId: entry.id, topic },
   });
   if (wantsPartial) {
-    return renderForumPage({ req, res, state, wantsPartial, person });
+    return renderForumPage({ req, res, state, wantsPartial, person, url: new URL(req.url, `http://${req.headers.host}`) });
   }
   return sendRedirect(res, '/forum');
 }
@@ -139,15 +139,22 @@ export async function postComment({ req, res, state, wantsPartial }) {
     payload: { threadId: parentId, evidenceCount: evidenceLinks.length },
   });
   if (wantsPartial) {
-    return renderForumPage({ req, res, state, wantsPartial, person });
+    return renderForumPage({ req, res, state, wantsPartial, person, url: new URL(req.url, `http://${req.headers.host}`) });
   }
   return sendRedirect(res, '/forum');
 }
 
-async function renderForumPage({ req, res, state, wantsPartial, person }) {
+async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
   const activePerson = person || getPerson(req, state);
+  const resolvedUrl = url || new URL(req.url, `http://${req.headers.host}`);
+  const composeOpen = resolvedUrl.searchParams.get('compose') ? 'open' : '';
+  const replyOpenId = resolvedUrl.searchParams.get('reply') || '';
   const forumEntries = filterForumEntries(state);
-  const html = await renderPage('forum', renderForum(forumEntries, activePerson, state), { wantsPartial, title: 'Forum', state });
+  const html = await renderPage(
+    'forum',
+    renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId }),
+    { wantsPartial, title: 'Forum', state },
+  );
   return sendHtml(res, html);
 }
 

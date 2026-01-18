@@ -19,8 +19,13 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   if (!layoutData.personHandle) {
     layoutData.personHandle = 'Guest session';
   }
-  if (!layoutData.navLinks) {
-    layoutData.navLinks = renderNav(state);
+  if (!layoutData.quickLinks || !layoutData.sideNav) {
+    const nav = renderNav(state);
+    layoutData.quickLinks = layoutData.quickLinks || nav.quickLinks;
+    layoutData.sideNav = layoutData.sideNav || nav.sideNav;
+  }
+  if (!layoutData.verbosityMode) {
+    layoutData.verbosityMode = 'full';
   }
   return applyTemplate(layout, layoutData);
 }

@@ -2,7 +2,10 @@ import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
 
-export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
+export function renderSocialPosts(
+  posts,
+  { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId } = {},
+) {
   if (!posts || posts.length === 0) {
     return renderEmptyState('No posts yet. Follow someone and start the conversation.');
   }
@@ -52,8 +55,8 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           ${mentionsLine}
           ${tagsLine}
           ${renderAuthorHashLine(post.authorHash)}
-          ${enableReplies ? renderReplyForm(post) : ''}
-          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post) : ''}
+          ${enableReplies ? renderReplyForm(post, { open: openReplyId === post.id }) : ''}
+          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
         </article>
       `;
     })
@@ -84,30 +87,34 @@ export function renderFollowList(follows) {
     .join('\n');
 }
 
-function renderReplyForm(post) {
+function renderReplyForm(post, { open = false } = {}) {
   const targetValue = post.authorHandle ? escapeHtml(post.authorHandle) : '';
+  const openAttr = open ? 'open' : '';
   return `
-    <form class="stack bordered" method="post" action="/social/reply" data-enhance="social-reply">
-      <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
-      <label class="field">
-        <span class="muted small">Reply</span>
-        <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
-      </label>
-      <div class="form-grid">
+    <details class="form-toggle form-toggle--inline" ${openAttr}>
+      <summary>Reply</summary>
+      <form class="stack" method="post" action="/social/reply" data-enhance="social-reply">
+        <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
         <label class="field">
-          <span>Visibility</span>
-          <select name="visibility">
-            <option value="public" selected>Public</option>
-            <option value="direct">Direct</option>
-          </select>
+          <span class="muted small">Reply</span>
+          <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
         </label>
-        <label class="field">
-          <span>Direct to (handle, optional)</span>
-          <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
-        </label>
-      </div>
-      <button class="ghost" type="submit">Send reply</button>
-    </form>
+        <div class="form-grid">
+          <label class="field">
+            <span>Visibility</span>
+            <select name="visibility">
+              <option value="public" selected>Public</option>
+              <option value="direct">Direct</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Direct to (handle, optional)</span>
+            <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
+          </label>
+        </div>
+        <button class="ghost" type="submit">Send reply</button>
+      </form>
+    </details>
   `;
 }
 
@@ -137,17 +144,21 @@ function renderMentions(mentions) {
   return `<p class="muted small">Mentions: ${mentions.map((m) => `@${escapeHtml(m)}`).join(', ')}</p>`;
 }
 
-function renderReshareForm(post) {
+function renderReshareForm(post, { open = false } = {}) {
   if (post.visibility === 'direct') return '';
+  const openAttr = open ? 'open' : '';
   return `
-    <form class="stack bordered" method="post" action="/social/post" data-enhance="social-reshare">
-      <input type="hidden" name="reshareOf" value="${escapeHtml(post.id)}" />
-      <label class="field">
-        <span class="muted small">Add a comment (optional)</span>
-        <textarea name="content" rows="2" placeholder="Optional comment"></textarea>
-      </label>
-      <button class="ghost" type="submit">Reshare</button>
-    </form>
+    <details class="form-toggle form-toggle--inline" ${openAttr}>
+      <summary>Reshare</summary>
+      <form class="stack" method="post" action="/social/post" data-enhance="social-reshare">
+        <input type="hidden" name="reshareOf" value="${escapeHtml(post.id)}" />
+        <label class="field">
+          <span class="muted small">Add a comment (optional)</span>
+          <textarea name="content" rows="2" placeholder="Optional comment"></textarea>
+        </label>
+        <button class="ghost" type="submit">Reshare</button>
+      </form>
+    </details>
   `;
 }
 

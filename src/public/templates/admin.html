@@ -2,7 +2,7 @@
   <p class="eyebrow">Admin</p>
   <h2>Circle settings and policy</h2>
   <p>Configure how this node enforces wallet verification, circle alignment, and peer aggregation.</p>
-  <div class="callout">
+  <div class="callout is-verbose">
     <p class="muted small">Circle name: {{circleName}}</p>
     <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
     <p class="muted small">Issuer: {{issuer}}</p>
@@ -509,7 +509,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="structure-manager">
   <p class="eyebrow">Structure manager</p>
   <h2>Profile schema (canonical + provider-local)</h2>
   <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
@@ -530,7 +530,7 @@
   {{providerFieldErrors}}
 </section>
 
-<section class="panel">
+<section class="panel" id="provider-profiles">
   <p class="eyebrow">Provider profile data</p>
   <h2>Contact/notification attributes</h2>
   <p class="muted small">Persist provider-local profile values for a session/handle (email, notification prefs). Values stay local; provider owns delivery/consent.</p>
@@ -554,7 +554,7 @@
   {{profileAttributeErrors}}
 </section>
 
-<section class="panel">
+<section class="panel" id="admin-audit">
   <p class="eyebrow">Admin audit</p>
   <h2>Recent configuration changes</h2>
   <p class="muted small">Last 10 actions are listed; older entries roll off for privacy. Includes schema and profile updates.</p>
@@ -563,7 +563,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="ops-metrics">
   <p class="eyebrow">Ops</p>
   <h2>Runtime metrics</h2>
   <p class="muted small">{{metricsNote}}</p>
@@ -572,7 +572,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="metrics-retention">
   <p class="eyebrow">Ops</p>
   <h2>Metrics retention</h2>
   <p class="muted small">Snapshots persist to <code>settings.json</code>. Interval min 60s; retention min 1h.</p>
@@ -595,7 +595,7 @@
   {{opsMetricsErrors}}
 </section>
 
-<section class="panel">
+<section class="panel" id="admin-transactions">
   <p class="eyebrow">Transactions</p>
   <h2>Recent ledgered actions</h2>
   <p class="muted small">Append-only log for sensitive actions (petitions, votes, delegations, social, groups). Export JSON for audits.</p>
@@ -608,7 +608,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="outbound-delivery">
   <p class="eyebrow">Outbound</p>
   <h2>Notification delivery</h2>
   <p class="muted small">{{outboundSummaryNote}}</p>
@@ -617,7 +617,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="transaction-summaries">
   <p class="eyebrow">Transactions gossip</p>
   <h2>Inbound summaries</h2>
   <p class="muted small">Signed summaries received from peers (digest lists + policy/profile).</p>
@@ -629,7 +629,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="extensions">
   <p class="eyebrow">Extensions</p>
   <h2>Toggle extensions</h2>
   <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>
@@ -642,7 +642,7 @@
   </form>
 </section>
 
-<section class="panel">
+<section class="panel" id="session-overrides">
   <p class="eyebrow">Session overrides</p>
   <h2>Roles and bans</h2>
   <p class="muted small">Update a session role/handle or ban a handle to exercise Circle gates without editing JSON manually.</p>

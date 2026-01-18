@@ -1,29 +1,32 @@
-<section class="panel">
+<section class="panel" id="forum-compose">
   <p class="eyebrow">Forum</p>
   <h2>Articles & commentary</h2>
-  <div class="callout">
+  <div class="callout is-verbose">
     <p class="muted small">Handle: {{personHandle}}</p>
     <p class="muted small">Role: {{roleLabel}}</p>
   </div>
-  <form class="stack" method="post" action="/forum" data-enhance="forum">
-    <div class="form-grid">
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Write a new article</summary>
+    <form class="stack" method="post" action="/forum" data-enhance="forum">
+      <div class="form-grid">
+        <label class="field">
+          <span>Title</span>
+          <input name="title" placeholder="Write a headline" required />
+        </label>
+      </div>
       <label class="field">
-        <span>Title</span>
-        <input name="title" placeholder="Write a headline" required />
+        <span>Body</span>
+        <textarea name="content" rows="4" placeholder="Share analysis, facts, or opinion" required></textarea>
       </label>
-    </div>
-    <label class="field">
-      <span>Body</span>
-      <textarea name="content" rows="4" placeholder="Share analysis, facts, or opinion" required></textarea>
-    </label>
-    <div class="cta-row">
-      <button class="cta" type="submit">Publish article</button>
-      <a class="ghost" href="/petitions" data-partial>Relate to petitions</a>
-    </div>
-  </form>
+      <div class="cta-row">
+        <button class="cta" type="submit">Publish article</button>
+        <a class="ghost" href="/petitions" data-partial>Relate to petitions</a>
+      </div>
+    </form>
+  </details>
 </section>
 
-<section class="panel">
+<section class="panel" id="forum-threads">
   <p class="eyebrow">Threads</p>
   <div class="discussion-list">
     {{threads}}

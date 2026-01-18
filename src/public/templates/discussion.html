@@ -1,8 +1,8 @@
-<section class="panel">
+<section class="panel" id="discussion-compose">
   <p class="eyebrow">Deliberation</p>
   <h2>Discussion sandbox</h2>
-  <p>Prototype debate module wired to verified sessions. Every post inherits the blinded PID hash of the {{actorLabel}}.</p>
-  <div class="callout">
+  <p class="is-verbose">Prototype debate module wired to verified sessions. Every post inherits the blinded PID hash of the {{actorLabel}}.</p>
+  <div class="callout is-verbose">
     <p class="muted">Your handle</p>
     <code>{{personHandle}}</code>
     <p class="muted small">{{personStatus}}</p>
@@ -16,42 +16,45 @@
     <p class="muted small">Ledger size: {{ledgerSize}}</p>
     <p class="muted small">{{hashOnlyMessage}}</p>
   </div>
-  <form class="stack" method="post" action="/discussion" data-enhance="discussion">
-    <div class="form-grid">
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Start a new discussion post</summary>
+    <form class="stack" method="post" action="/discussion" data-enhance="discussion">
+      <div class="form-grid">
+        <label class="field">
+          <span>Topic</span>
+          <input name="topic" list="topics-list" placeholder="Energy transition" required />
+        </label>
+        <label class="field">
+          <span>Stance</span>
+          <select name="stance">
+            <option value="proposal">Proposal</option>
+            <option value="support">Support</option>
+            <option value="concern">Concern</option>
+            <option value="neutral" selected>Neutral</option>
+          </select>
+        </label>
+      </div>
       <label class="field">
-        <span>Topic</span>
-        <input name="topic" list="topics-list" placeholder="Energy transition" required />
+        <span>Comment</span>
+        <textarea name="content" rows="4" placeholder="Add a concise, accountable thought." required></textarea>
       </label>
       <label class="field">
-        <span>Stance</span>
-        <select name="stance">
-          <option value="proposal">Proposal</option>
-          <option value="support">Support</option>
-          <option value="concern">Concern</option>
-          <option value="neutral" selected>Neutral</option>
-        </select>
+        <span>Evidence / citations (optional)</span>
+        <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
       </label>
-    </div>
-    <label class="field">
-      <span>Comment</span>
-      <textarea name="content" rows="4" placeholder="Add a concise, accountable thought." required></textarea>
-    </label>
-    <label class="field">
-      <span>Evidence / citations (optional)</span>
-      <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
-    </label>
-    <p class="muted small">One URL per line.</p>
-    <div class="cta-row">
-      <button class="cta" type="submit">Post to discussion</button>
-      <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
-    </div>
-  </form>
+      <p class="muted small">One URL per line.</p>
+      <div class="cta-row">
+        <button class="cta" type="submit">Post to discussion</button>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+      </div>
+    </form>
+  </details>
   <datalist id="topics-list">
     {{topicDatalist}}
   </datalist>
 </section>
 
-<section class="panel">
+<section class="panel" id="discussion-topics">
   <p class="eyebrow">Topics</p>
   <h3>Pick your top categories</h3>
   <p class="muted small">Your list stays local to this provider and helps tune suggested topics.</p>
@@ -65,11 +68,13 @@
       <button class="ghost" type="submit">Save topics</button>
     </div>
   </form>
-  <p class="muted small">Anchors: {{topicAnchors}}</p>
-  <p class="muted small">Pinned: {{topicPinned}}</p>
+  <div class="is-verbose">
+    <p class="muted small">Anchors: {{topicAnchors}}</p>
+    <p class="muted small">Pinned: {{topicPinned}}</p>
+  </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="discussion-feed">
   <p class="eyebrow">Latest contributions</p>
   <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
     <label class="field">

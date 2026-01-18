@@ -7,25 +7,32 @@
   <link rel="stylesheet" href="/public/app.css" />
   <script src="/public/app.js" defer></script>
 </head>
-<body>
-  <header class="hero">
-    <div class="hero__brand">
+<body data-verbosity="{{verbosityMode}}">
+  <header class="topbar">
+    <div class="topbar__brand">
       <div class="orb"></div>
       <div>
         <p class="eyebrow">Representative Party Framework</p>
         <h1>Party Circle</h1>
         <p class="tagline">Verifier-first kernel with QR handoff and ActivityPub hooks.</p>
-        <p class="muted small">{{personHandle}}</p>
+        <p class="muted small is-verbose">{{personHandle}}</p>
       </div>
     </div>
-    <nav class="hero__nav">
-      {{navLinks}}
+    <nav class="topbar__actions">
+      <div class="quick-nav">
+        {{quickLinks}}
+      </div>
     </nav>
   </header>
-  <main data-shell>
-    {{statusStrip}}
-    {{body}}
-  </main>
+  <div class="shell">
+    <aside class="side-nav" data-nav-shell>
+      {{sideNav}}
+    </aside>
+    <main data-shell>
+      {{statusStrip}}
+      {{body}}
+    </main>
+  </div>
   <footer class="footer">
     <span>Vanilla SSR + Party Circle kernel prototype</span>
   </footer>

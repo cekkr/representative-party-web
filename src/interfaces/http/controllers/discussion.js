@@ -114,6 +114,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const postingStatus = permission.allowed ? 'Posting allowed.' : 'Posting blocked.';
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
   const postingReasonLine = renderCalloutRow(postingReason);
+  const composeOpen = url?.searchParams?.get('compose') ? 'open' : '';
 
   const baseEntries = filterVisibleEntries(state.discussions, state, (entry) => {
     if (entry.petitionId) return false;
@@ -159,6 +160,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       topicPreferencesValue: formatTopicList(topicPreferences),
       topicAnchors: formatTopicList(topicConfig.anchors || []),
       topicPinned: formatTopicList(topicConfig.pinned || []) || 'none',
+      composeOpen,
     },
     { wantsPartial, title: 'Deliberation Sandbox', state },
   );

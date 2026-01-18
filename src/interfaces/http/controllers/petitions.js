@@ -63,6 +63,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const voteGateReasonLine = renderCalloutRow(voteGate.message || '');
   const query = url || new URL(req.url, `http://${req.headers.host}`);
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
+  const composeOpen = query.searchParams.get('compose') ? 'open' : '';
   const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
   const petitionLookup = buildPetitionLookup(petitions);
   const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
@@ -91,6 +92,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       quorumDefault: governance.quorumDefault,
       discussionFeed: renderProposalDiscussionFeed(discussionFeedItems),
       stageFilterOptions,
+      composeOpen,
     },
     { wantsPartial, title: 'Proposals & Votes', state },
   );

@@ -1,15 +1,15 @@
 <section class="panel">
   <p class="eyebrow">Verification complete</p>
   <h2>{{actorLabelTitle}} session established</h2>
-  <p>The blinded PID hash is now recorded in the Uniqueness Ledger and ready for federation.</p>
-  <div class="callout">
+  <p>Your session is verified and ready to post.</p>
+  <div class="callout is-verbose">
     <p class="muted">PID hash (truncated)</p>
     <code>{{pidHashShort}}…</code>
   </div>
-  <p class="muted small">ActivityPub actor minted: <code>{{actorId}}</code></p>
-  <p class="muted small">{{ledgerNote}}</p>
+  <p class="muted small is-verbose">ActivityPub actor minted: <code>{{actorId}}</code></p>
+  <p class="muted small is-verbose">{{ledgerNote}}</p>
   <div class="cta-row">
-    <a class="cta" href="/" data-partial>Return home</a>
+    <a class="cta" href="/social/feed" data-partial>Open your wall</a>
     <a class="ghost" href="/discussion" data-partial>Join discussion</a>
   </div>
 </section>

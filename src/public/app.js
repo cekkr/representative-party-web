@@ -2,6 +2,7 @@
   const root = document.querySelector('[data-shell]');
   if (!root) return;
   initInstallWizard(root);
+  syncNavigationState();
 
   document.addEventListener('click', async (event) => {
     const anchor = event.target.closest('a[data-partial]');
@@ -16,6 +17,7 @@
       root.innerHTML = html;
       window.history.pushState({}, '', url);
       initInstallWizard(root);
+      syncNavigationState();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
@@ -79,6 +81,7 @@
       root.innerHTML = html;
       window.history.pushState({}, '', url);
       initInstallWizard(root);
+      syncNavigationState();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
@@ -231,4 +234,56 @@ function initInstallWizard(root) {
 
   update(0);
   syncFromHash();
+}
+
+function syncNavigationState() {
+  const items = Array.from(document.querySelectorAll('[data-nav-section]'));
+  if (!items.length) return;
+  const path = window.location.pathname;
+  let activeKey = '';
+  let bestLength = -1;
+
+  for (const item of items) {
+    const key = item.dataset.navSection || '';
+    const exact = item.dataset.navExact === 'true';
+    const matchPath = item.dataset.navPath || '';
+    const prefix = item.dataset.navPrefix || '';
+    if (exact && matchPath && path === matchPath) {
+      activeKey = key;
+      bestLength = matchPath.length;
+      break;
+    }
+    if (!exact && prefix && path.startsWith(prefix) && prefix.length > bestLength) {
+      activeKey = key;
+      bestLength = prefix.length;
+    }
+  }
+
+  if (activeKey) {
+    document.body.dataset.section = activeKey;
+  } else {
+    delete document.body.dataset.section;
+  }
+
+  items.forEach((item) => {
+    const isActive = item.dataset.navSection === activeKey;
+    item.classList.toggle('is-active', isActive);
+    const link = item.querySelector('[data-nav-link]');
+    if (!link) return;
+    if (isActive) {
+      link.setAttribute('aria-current', 'page');
+    } else {
+      link.removeAttribute('aria-current');
+    }
+  });
+
+  const childBlocks = Array.from(document.querySelectorAll('[data-nav-children]'));
+  childBlocks.forEach((block) => {
+    block.hidden = block.dataset.navChildren !== activeKey;
+  });
+
+  const contextLinks = Array.from(document.querySelectorAll('[data-quick-section]'));
+  contextLinks.forEach((link) => {
+    link.hidden = link.dataset.quickSection !== activeKey;
+  });
 }

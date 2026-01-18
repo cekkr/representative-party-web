@@ -2,12 +2,20 @@ import { getPerson } from '../../../modules/identity/person.js';
 import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
 import { countVisibleEntries } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { sendHtml } from '../../../shared/utils/http.js';
+import { sendHtml, sendRedirect } from '../../../shared/utils/http.js';
+import { renderSocialFeed } from './social.js';
 import { renderPage } from '../views/templates.js';
 import { getActorLabels } from '../views/actorLabel.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
+  if (person && isModuleEnabled(state, 'social')) {
+    if (wantsPartial) {
+      const url = new URL('/social/feed', `http://${req.headers.host}`);
+      return renderSocialFeed({ req, res, state, wantsPartial, url });
+    }
+    return sendRedirect(res, '/social/feed');
+  }
   const policy = getCirclePolicyState(state);
   const effective = getEffectivePolicy(state);
   const actorLabels = getActorLabels(state);

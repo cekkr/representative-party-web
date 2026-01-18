@@ -1,45 +1,71 @@
-<section class="panel">
-  <p class="eyebrow">Social</p>
-  <h2>Small talk & info feed</h2>
-  <p>Typed follows (circle, interest, info, alerts) drive a Twitter-like lane for casual updates, mentions (@handle), tags (#topic), and lightweight reshares. Direct posts act as minimal private messages between verified handles. Photo/video uploads are provider-local and locked by default until viewers request access.</p>
-  <div class="callout">
+<section class="panel" id="social-wall">
+  <p class="eyebrow">Wall</p>
+  <h2>Your wall</h2>
+  <p class="is-verbose">Updates from the {{actorLabelPlural}} you follow, plus public posts relevant to your interests.</p>
+  <div class="callout is-verbose">
     <p class="muted small">Handle: {{personHandle}}</p>
     <p class="muted small">Role: {{roleLabel}}</p>
     <p class="muted small">{{postingStatus}}</p>
     {{postingReasonLine}}
     <p class="muted small">Following: {{followCount}} | Followers: {{followerCount}}</p>
   </div>
-  <form class="stack" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">
-    <label class="field">
-      <span>Message (short)</span>
-      <textarea name="content" rows="3" placeholder="Share a quick thought or update" required data-media-required></textarea>
-    </label>
-    <label class="field">
-      <span>Attach photo or video (locked by default)</span>
-      <input name="media" type="file" accept="image/*,video/*" data-media-toggle />
-      <span class="muted small">Uploads stay with this provider; viewers request access before viewing.</span>
-    </label>
-    <div class="form-grid">
+  <details class="form-toggle is-verbose">
+    <summary>Filter your wall</summary>
+    <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
       <label class="field">
-        <span>Visibility</span>
-        <select name="visibility">
-          <option value="public" selected>Public to your follows</option>
-          <option value="direct">Direct (private) to handle</option>
+        <span>Filter by follow type</span>
+        <select name="type">
+          <option value="" {{followTypeSelectedAll}}>{{followTypeAllLabel}}</option>
+          {{followTypeOptions}}
         </select>
       </label>
-      <label class="field">
-        <span>Direct to (handle, optional unless direct)</span>
-        <input name="targetHandle" placeholder="@handle" />
-      </label>
-    </div>
-    <div class="cta-row">
-      <button class="cta" type="submit">Post</button>
-      <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
-    </div>
-  </form>
+      <div class="cta-row">
+        <button class="ghost" type="submit">Apply filter</button>
+      </div>
+    </form>
+  </details>
+  <div class="wall-feed">
+    {{feedList}}
+  </div>
 </section>
 
-<section class="panel">
+<section class="panel" id="social-compose">
+  <p class="eyebrow">Post</p>
+  <h3>Share an update</h3>
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Write a new post</summary>
+    <form class="stack" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">
+      <label class="field">
+        <span>Message (short)</span>
+        <textarea name="content" rows="3" placeholder="Share a quick thought or update" required data-media-required></textarea>
+      </label>
+      <label class="field">
+        <span>Attach photo or video (locked by default)</span>
+        <input name="media" type="file" accept="image/*,video/*" data-media-toggle />
+        <span class="muted small">Uploads stay with this provider; viewers request access before viewing.</span>
+      </label>
+      <div class="form-grid">
+        <label class="field">
+          <span>Visibility</span>
+          <select name="visibility">
+            <option value="public" selected>Public to your follows</option>
+            <option value="direct">Direct (private) to handle</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Direct to (handle, optional unless direct)</span>
+          <input name="targetHandle" placeholder="@handle" />
+        </label>
+      </div>
+      <div class="cta-row">
+        <button class="cta" type="submit">Post</button>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+      </div>
+    </form>
+  </details>
+</section>
+
+<section class="panel" id="social-follows">
   <p class="eyebrow">Follow graph</p>
   <h3>Follow a handle</h3>
   <form class="stack" method="post" action="/social/follow" data-enhance="social-follow">
@@ -73,25 +99,5 @@
   </datalist>
   <div class="list-stack">
     {{followList}}
-  </div>
-</section>
-
-<section class="panel">
-  <p class="eyebrow">Feed</p>
-  <h3>Posts from the {{actorLabelPlural}} you follow</h3>
-  <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
-    <label class="field">
-      <span>Filter by follow type</span>
-      <select name="type">
-        <option value="" {{followTypeSelectedAll}}>{{followTypeAllLabel}}</option>
-        {{followTypeOptions}}
-      </select>
-    </label>
-    <div class="cta-row">
-      <button class="ghost" type="submit">Apply filter</button>
-    </div>
-  </form>
-  <div class="list-stack">
-    {{feedList}}
   </div>
 </section>

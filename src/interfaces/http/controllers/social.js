@@ -43,6 +43,9 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
+  const composeOpen = url.searchParams.get('compose') ? 'open' : '';
+  const openReplyId = url.searchParams.get('reply') || '';
+  const openReshareId = url.searchParams.get('reshare') || '';
   const followStats = summarizeFollows(state, person?.pidHash);
   const allFollows = followStats.follows;
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows: allFollows });
@@ -64,12 +67,19 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followCount: allFollows.length,
       followerCount: followStats.followerCount,
       followList: renderFollowList(allFollows),
-      feedList: renderSocialPosts(feed, { enableReplies: Boolean(person), followTypeByHash, mediaById }),
+      feedList: renderSocialPosts(feed, {
+        enableReplies: Boolean(person),
+        followTypeByHash,
+        mediaById,
+        openReplyId,
+        openReshareId,
+      }),
       followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: followTypeList }),
       followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false, types: followTypeList }),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
+      composeOpen,
     },
     { wantsPartial, title: 'Social feed', state },
   );
