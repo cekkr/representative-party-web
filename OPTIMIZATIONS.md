@@ -3,7 +3,7 @@
 This file tracks follow-up ideas that are out of scope for the current patch but would further improve performance, reduce redundancy, or tighten UX consistency.
 
 ## Performance
-- Add pagination/cursors for discussion, petitions, and social feeds to avoid full list rendering on large datasets.
+- Add pagination/cursors for discussion, forum, petitions, and social feeds to avoid full list rendering on large datasets.
 - Cache rendered navigation links keyed by module settings to avoid rebuilding nav HTML on every request.
 - Lazy-load heavyweight admin panels (transactions, media review, topic gardener) via partial renders to shrink initial HTML payloads.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.

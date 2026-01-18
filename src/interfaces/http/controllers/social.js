@@ -43,7 +43,9 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
-  const composeOpen = url.searchParams.get('compose') ? 'open' : '';
+  const composeState = url.searchParams.get('compose') ? 'open' : '';
+  const composeToggleLabel = composeState === 'open' ? 'Collapse' : 'Expand';
+  const composeToggleExpanded = composeState === 'open' ? 'true' : 'false';
   const openReplyId = url.searchParams.get('reply') || '';
   const openReshareId = url.searchParams.get('reshare') || '';
   const followStats = summarizeFollows(state, person?.pidHash);
@@ -79,7 +81,9 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
-      composeOpen,
+      composeState,
+      composeToggleLabel,
+      composeToggleExpanded,
     },
     { wantsPartial, title: 'Social feed', state },
   );

@@ -100,14 +100,14 @@ const CONTEXT_ACTIONS = {
 
 const CHILD_SECTIONS = {
   social: [
-    { label: 'Wall', href: '/social/feed#social-wall', partial: true },
     { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },
+    { label: 'Wall', href: '/social/feed#social-wall', partial: true },
     { label: 'Follows', href: '/social/feed#social-follows', partial: true },
   ],
   discussion: [
     { label: 'New post', href: '/discussion?compose=post#discussion-compose', partial: true },
-    { label: 'Topic preferences', href: '/discussion#discussion-topics', partial: true },
     { label: 'Latest contributions', href: '/discussion#discussion-feed', partial: true },
+    { label: 'Topic preferences', href: '/discussion#discussion-topics', partial: true },
   ],
   forum: [
     { label: 'New article', href: '/forum?compose=thread#forum-compose', partial: true },
@@ -115,8 +115,8 @@ const CHILD_SECTIONS = {
   ],
   petitions: [
     { label: 'New proposal', href: '/petitions?compose=proposal#petitions-compose', partial: true },
-    { label: 'Active proposals', href: '/petitions#petitions-active', partial: true },
     { label: 'Active deliberations', href: '/petitions#petitions-discussion', partial: true },
+    { label: 'Active proposals', href: '/petitions#petitions-active', partial: true },
   ],
   admin: [
     { label: 'Circle settings', href: '/admin#circle-settings', partial: true },

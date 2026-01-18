@@ -26,6 +26,31 @@
     }
   });
 
+  document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-compose-toggle]');
+    if (!toggle) return;
+    event.preventDefault();
+    const panel = toggle.closest('[data-compose-state]');
+    if (!panel) return;
+    const current = panel.dataset.composeState || 'collapsed';
+    const isOpen = current === 'open';
+    const next = isOpen ? 'collapsed' : 'open';
+    panel.dataset.composeState = next;
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+    toggle.textContent = isOpen ? 'Expand' : 'Collapse';
+    if (isOpen) {
+      const focused = panel.querySelector(':focus');
+      if (focused && typeof focused.blur === 'function') {
+        focused.blur();
+      }
+      return;
+    }
+    const firstField = panel.querySelector('textarea, input, select');
+    if (firstField && typeof firstField.focus === 'function') {
+      firstField.focus();
+    }
+  });
+
   document.addEventListener('change', (event) => {
     const input = event.target;
     if (!(input instanceof HTMLInputElement)) return;

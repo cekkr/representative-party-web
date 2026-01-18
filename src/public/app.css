@@ -225,6 +225,34 @@ main {
   margin-top: 1rem;
 }
 
+.page-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 1rem;
+  align-items: start;
+}
+
+.page-main {
+  min-width: 0;
+}
+
+.page-aside {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-self: start;
+  position: sticky;
+  top: 1rem;
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.sticky-panel {
+  position: sticky;
+  top: 1rem;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -420,6 +448,20 @@ ul.plain li:last-child {
   position: relative;
 }
 
+.composer__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.composer__toggle {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+}
+
 .sticky-composer {
   position: sticky;
   top: 1rem;
@@ -435,9 +477,13 @@ ul.plain li:last-child {
   transition: max-height 0.2s ease;
 }
 
-.composer-panel:focus-within .composer,
-.composer-panel[data-compose-state="open"] .composer {
+.composer-panel[data-compose-state="open"] .composer,
+.composer-panel:focus-within:not([data-compose-state="collapsed"]) .composer {
   max-height: 720px;
+}
+
+.composer-panel[data-compose-state="collapsed"] .composer__expandable {
+  display: none;
 }
 
 .composer__row {
@@ -480,6 +526,12 @@ ul.plain li:last-child {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.composer__expandable {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
 }
 
@@ -915,9 +967,9 @@ details.form-toggle.form-toggle--inline {
 }
 
 .wall-feed {
-  max-height: 70vh;
-  overflow: auto;
-  padding-right: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .stats .stat__value {
@@ -998,8 +1050,24 @@ code {
     position: static;
   }
 
+  .sticky-panel {
+    position: static;
+  }
+
   .composer {
     max-height: none;
+  }
+
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-aside {
+    order: -1;
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
   }
 
   .composer__chip input {
