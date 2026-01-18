@@ -33,27 +33,50 @@ function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
       const replyOpen = replyOpenId && replyOpenId === thread.id ? 'open' : '';
       const safeThreadId = escapeHtml(thread.id);
       const threadAnchor = `thread-${safeThreadId}`;
-      const replyLink = `<a class="pill ghost" href="/forum?reply=${safeThreadId}#${threadAnchor}" data-partial>Reply</a>`;
+      const replySummary = `Reply (${threadComments.length})`;
       return `
-        <article class="discussion" id="${threadAnchor}">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(topicLabel)}</span>
-            <span class="pill ghost">Article</span>
-            ${renderPreviewPill(thread)}
-            ${renderIssuerPill(thread)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-            ${replyLink}
+        <article class="topic-card" id="${threadAnchor}">
+          <div class="topic-head">
+            <div class="topic-avatar" aria-hidden="true"></div>
+            <div class="topic-info">
+              <div class="topic-breadcrumbs">Forum / ${escapeHtml(topicLabel)}</div>
+              <h3 class="topic-title">${escapeHtml(thread.title || 'Untitled')}</h3>
+              <div class="topic-meta">
+                <span class="pill ghost">Article</span>
+                <span class="pill ghost">Replies: ${threadComments.length}</span>
+                ${renderPreviewPill(thread)}
+                ${renderIssuerPill(thread)}
+                ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+              </div>
+            </div>
           </div>
-          <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
-          <p>${escapeHtml(thread.content)}</p>
-          ${renderAuthorHashLine(thread.authorHash || 'anonymous')}
-          <details class="form-toggle form-toggle--inline" ${replyOpen}>
-            <summary>Reply</summary>
-            <form class="stack" method="post" action="/forum/comment" data-enhance="forum">
+          <div class="topic-body">
+            <p>${escapeHtml(thread.content)}</p>
+          </div>
+          <div class="topic-footer">
+            ${renderAuthorHashLine(thread.authorHash || 'anonymous')}
+          </div>
+          <div class="reply-list">
+            ${renderComments(threadComments)}
+          </div>
+          <details class="reply-composer" ${replyOpen}>
+            <summary>
+              <div class="reply-hint">
+                <div class="reply-hint__meta">
+                  <div class="reply-hint__avatar" aria-hidden="true"></div>
+                  <div>
+                    <div class="reply-hint__title">${replySummary}</div>
+                    <div class="reply-hint__subtitle">Share your view and add evidence when needed.</div>
+                  </div>
+                </div>
+                <span class="reply-hint__cta">Reply</span>
+              </div>
+            </summary>
+            <form class="stack reply-composer__form" method="post" action="/forum/comment" data-enhance="forum">
               <input type="hidden" name="parentId" value="${safeThreadId}" />
               <label class="field">
                 <span>Comment</span>
-                <textarea name="content" rows="2" placeholder="Add your view" required></textarea>
+                <textarea name="content" rows="3" placeholder="Add your view" required></textarea>
               </label>
               <label class="field">
                 <span>Evidence / citations (optional)</span>
@@ -63,9 +86,6 @@ function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
               <button class="ghost" type="submit">Comment</button>
             </form>
           </details>
-          <div class="discussion-list">
-            ${renderComments(threadComments)}
-          </div>
         </article>
       `;
     })
@@ -99,17 +119,20 @@ function renderComments(comments) {
       const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
       const evidenceBlock = renderEvidenceLinks(evidenceLinks);
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill ghost">Comment</span>
-            ${evidencePill}
-            ${renderPreviewPill(comment)}
-            ${renderIssuerPill(comment)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+        <article class="reply-card">
+          <div class="reply-card__avatar" aria-hidden="true"></div>
+          <div class="reply-card__content">
+            <div class="reply-card__meta">
+              <span class="pill ghost">Comment</span>
+              ${evidencePill}
+              ${renderPreviewPill(comment)}
+              ${renderIssuerPill(comment)}
+              ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+            </div>
+            <p class="reply-card__text">${escapeHtml(comment.content)}</p>
+            ${evidenceBlock}
+            ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
           </div>
-          <p>${escapeHtml(comment.content)}</p>
-          ${evidenceBlock}
-          ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
         </article>
       `;
     })

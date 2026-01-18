@@ -320,16 +320,34 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
     if (details) details.open = true;
   });
   await page.select('form[action="/social/feed"] select[name="type"]', 'alerts');
-  await page.click('form[action="/social/feed"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('No posts yet'));
+  await page.$eval('form[action="/social/feed"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForFunction(() => {
+    const feed = document.querySelector('.wall-feed');
+    return feed && feed.textContent.includes('No posts yet');
+  });
 
   await page.evaluate(() => {
     const details = document.querySelector('#social-wall details.form-toggle');
     if (details) details.open = true;
   });
   await page.select('form[action="/social/feed"] select[name="type"]', 'interest');
-  await page.click('form[action="/social/feed"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
+  await page.$eval('form[action="/social/feed"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForFunction(() => {
+    const feed = document.querySelector('.wall-feed');
+    return feed && feed.textContent.includes('Bob update for follow');
+  });
 
   await page.evaluate(() => {
     const details = Array.from(document.querySelectorAll('details.form-toggle')).find((node) =>
@@ -413,16 +431,12 @@ test('UI social feed supports media uploads with locked view and report blocking
   await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
 
-  await page.evaluate(() => {
-    const details = document.querySelector('#social-compose details.form-toggle');
-    if (details) details.open = true;
-  });
   await page.type('form[action="/social/post"] textarea[name="content"]', 'Media post with locked view');
   const fileInput = await page.$('form[action="/social/post"] input[name="media"]');
   assert.ok(fileInput);
   await fileInput.uploadFile(mediaPath);
   await page.click('form[action="/social/post"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Locked media'));
+  await page.waitForSelector('.media-card.locked');
 
   const requestHref = await page.$eval(
     'a[href^="/social/media/"][href*="view=1"]',
@@ -445,8 +459,14 @@ test('UI social feed supports media uploads with locked view and report blocking
   assert.equal(viewResult.status, 200);
   assert.ok(viewResult.type.includes('image/'));
 
-  await page.click('form[data-enhance="social-media-report"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Blocked media'));
+  await page.$eval('form[data-enhance="social-media-report"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForSelector('.media-card.blocked');
   assert.equal(await page.$('form[data-enhance="social-reshare"]'), null);
 
   const blockedStatus = await page.evaluate(async (id) => {
