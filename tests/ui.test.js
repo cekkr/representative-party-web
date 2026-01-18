@@ -110,28 +110,28 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const background = await guestPage.evaluate(() => window.getComputedStyle(document.body).backgroundImage || '');
   assert.ok(background.includes('gradient') || background.includes('radial-gradient'));
 
-  await guestPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await guestPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await guestPage.type('input[name="topic"]', 'Access');
   await guestPage.type('textarea[name="content"]', 'Guest post attempt');
   await expectDialog(
     guestPage,
-    () => guestPage.click('button[type="submit"]'),
+    () => guestPage.click('form[action="/discussion"] button[type="submit"]'),
     /verification|required|blocked/i,
   );
 
   const personPage = await personContext.newPage();
   await configurePage(personPage, server.baseUrl);
   await setSessionCookie(personPage, server.baseUrl, personSession.sessionId);
-  await personPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await personPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="topic"]', 'Energy');
   await personPage.type('textarea[name="content"]', 'Person post');
-  await personPage.click('button[type="submit"]');
+  await personPage.click('form[action="/discussion"] button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('Person post'));
 
-  await personPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await personPage.goto(`${server.baseUrl}/petitions?compose=proposal`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="title"]', 'UI Petition');
   await personPage.type('textarea[name="summary"]', 'Testing petition flow');
-  await personPage.click('button[type="submit"]');
+  await personPage.click('form[action="/petitions"] button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('UI Petition'));
   const moderationForm = await personPage.$('form[action="/petitions/status"]');
   assert.equal(moderationForm, null);
@@ -147,12 +147,12 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const bannedPage = await bannedContext.newPage();
   await configurePage(bannedPage, server.baseUrl);
   await setSessionCookie(bannedPage, server.baseUrl, bannedSession.sessionId);
-  await bannedPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await bannedPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await bannedPage.type('input[name="topic"]', 'Ban');
   await bannedPage.type('textarea[name="content"]', 'Banned post attempt');
   await expectDialog(
     bannedPage,
-    () => bannedPage.click('button[type="submit"]'),
+    () => bannedPage.click('form[action="/discussion"] button[type="submit"]'),
     /banned/i,
   );
 
@@ -163,9 +163,9 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   );
 
   await guestPage.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
-  assert.equal(await guestPage.$('a[data-nav="social"]'), null);
-  assert.equal(await guestPage.$('a[data-nav="petitions"]'), null);
-  assert.equal(await guestPage.$('a[data-nav="groups"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="social"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="petitions"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="groups"]'), null);
 
   await guestPage.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
   assert.ok(await guestPage.$('[data-module-disabled="social"]'));
@@ -315,14 +315,28 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
   await page.waitForFunction(() => document.body.textContent.includes('Follow: interest'));
 
+  await page.evaluate(() => {
+    const details = document.querySelector('#social-wall details.form-toggle');
+    if (details) details.open = true;
+  });
   await page.select('form[action="/social/feed"] select[name="type"]', 'alerts');
   await page.click('form[action="/social/feed"] button[type="submit"]');
   await page.waitForFunction(() => document.body.textContent.includes('No posts yet'));
 
+  await page.evaluate(() => {
+    const details = document.querySelector('#social-wall details.form-toggle');
+    if (details) details.open = true;
+  });
   await page.select('form[action="/social/feed"] select[name="type"]', 'interest');
   await page.click('form[action="/social/feed"] button[type="submit"]');
   await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
 
+  await page.evaluate(() => {
+    const details = Array.from(document.querySelectorAll('details.form-toggle')).find((node) =>
+      node.querySelector('summary')?.textContent?.includes('Reshare'),
+    );
+    if (details) details.open = true;
+  });
   const reshareForm = await page.$('form[data-enhance="social-reshare"]');
   assert.ok(reshareForm);
   const reshareTextarea = await reshareForm.$('textarea[name="content"]');
@@ -399,6 +413,10 @@ test('UI social feed supports media uploads with locked view and report blocking
   await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
 
+  await page.evaluate(() => {
+    const details = document.querySelector('#social-compose details.form-toggle');
+    if (details) details.open = true;
+  });
   await page.type('form[action="/social/post"] textarea[name="content"]', 'Media post with locked view');
   const fileInput = await page.$('form[action="/social/post"] input[name="media"]');
   assert.ok(fileInput);
@@ -707,8 +725,8 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
   await page.waitForFunction(() => document.body.textContent.includes('Module toggles updated'));
 
   await page.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
-  assert.equal(await page.$('a[data-nav="social"]'), null);
-  assert.equal(await page.$('a[data-nav="petitions"]'), null);
+  assert.equal(await page.$('[data-nav-section="social"]'), null);
+  assert.equal(await page.$('[data-nav-section="petitions"]'), null);
 
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
   assert.ok(await page.$('[data-module-disabled="social"]'));
