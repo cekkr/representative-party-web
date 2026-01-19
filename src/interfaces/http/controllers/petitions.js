@@ -72,6 +72,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const html = await renderPage(
     'petitions',
     {
+      person,
       personHandle: resolvePersonHandle(person),
       petitionStatus: petitionGate.allowed ? 'You can draft proposals.' : petitionGate.message || petitionGate.reason,
       voteStatus: voteGate.allowed ? 'You can vote on proposals.' : voteGate.message || voteGate.reason,

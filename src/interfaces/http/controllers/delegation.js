@@ -60,6 +60,7 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'delegation',
     {
+      person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       delegationStatus: permission.allowed ? 'Delegation preferences enabled.' : permission.message || 'Delegation blocked.',

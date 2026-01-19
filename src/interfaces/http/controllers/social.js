@@ -62,6 +62,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const html = await renderPage(
     'social',
     {
+      person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',

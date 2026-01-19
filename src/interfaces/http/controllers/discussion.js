@@ -140,6 +140,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
     'discussion',
     {
       ledgerSize: state.uniquenessLedger.size,
+      person,
       personHandle: resolvePersonHandle(person),
       personStatus: person
         ? `Posting as verified ${actorLabels.actorLabel} bound to a blinded PID hash.`

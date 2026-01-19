@@ -15,6 +15,7 @@ export async function renderGovernance({ req, res, state, wantsPartial }) {
   const html = await renderPage(
     'governance',
     {
+      person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       quorumDefault: escapeHtml(String(governance.quorumDefault)),

@@ -38,6 +38,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
     'groups',
     {
       groups: renderGroupList(groups, person, state),
+      person,
       personHandle: resolvePersonHandle(person),
       personHash: person?.pidHash || '',
       roleLabel: person?.role || 'guest',

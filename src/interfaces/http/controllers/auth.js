@@ -30,6 +30,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         pidHashShort: existing.pidHash?.slice(0, 8) || 'verified',
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
+        person,
         personHandle: existingHandle,
         roleLabel: existingRole,
         isVerified: true,
@@ -73,6 +74,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         policy.enforcement === 'strict'
           ? 'Circle enforcement active: verification required to post or vote.'
           : 'Circle observing mode: verification encouraged for accountability.',
+      person,
       personHandle: person?.handle,
     },
     { wantsPartial, title: 'EUDI Wallet Handshake', state },

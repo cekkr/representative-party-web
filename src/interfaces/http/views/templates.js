@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { DEFAULT_PAGE_TITLE, PATHS } from '../../../config.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { normalizeVerbosityMode } from '../../../shared/utils/parse.js';
 import { getActorLabels } from './actorLabel.js';
 import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
 import { renderNav } from './navigation.js';
@@ -26,9 +27,11 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.quickLinks = layoutData.quickLinks || nav.quickLinks;
     layoutData.sideNav = layoutData.sideNav || nav.sideNav;
   }
-  if (!layoutData.verbosityMode) {
-    layoutData.verbosityMode = 'full';
-  }
+  layoutData.verbosityMode = resolveVerbosityMode({
+    state,
+    person: layoutData.person,
+    explicit: layoutData.verbosityMode,
+  });
   if (!layoutData.themeCss) {
     layoutData.themeCss = String(state?.settings?.composer?.themeCss || '');
   }
@@ -75,6 +78,15 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   layoutData.composerAllowed = isAdmin ? 'true' : '';
   layoutData.composerControls = isAdmin ? buildComposerControls() : '';
   return applyTemplate(layout, layoutData);
+}
+
+export function resolveVerbosityMode({ state, person, explicit } = {}) {
+  const explicitMode = normalizeVerbosityMode(explicit);
+  if (explicitMode) return explicitMode;
+  const personMode = normalizeVerbosityMode(person?.uiVerbosity || person?.ui?.verbosity || person?.verbosityMode);
+  if (personMode) return personMode;
+  const defaultMode = normalizeVerbosityMode(state?.settings?.verbosityMode);
+  return defaultMode || 'full';
 }
 
 async function loadTemplate(name) {

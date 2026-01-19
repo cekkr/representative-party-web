@@ -72,7 +72,7 @@ import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, formatBytes, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { parseBoolean } from '../../../shared/utils/parse.js';
+import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../views/templates.js';
 import { resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPreviewPill } from '../views/shared.js';
@@ -214,6 +214,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const topicGardenerUrl = sanitizeText(body.topicGardenerUrl || prev.topicGardener?.url || '', 240);
   const topicAnchors = parseList(body.topicAnchors, prev.topicGardener?.anchors || DEFAULT_TOPIC_ANCHORS);
   const topicPinned = parseList(body.topicPinned, prev.topicGardener?.pinned || []);
+  const verbosityMode = normalizeVerbosityMode(body.verbosityMode || prev.verbosityMode) || 'full';
   const modules = normalizeModuleSettings(prev.modules || {});
   const dataMode = normalizeDataMode(body.dataMode || prev.data?.mode || DATA_DEFAULTS.mode);
   const dataAdapter = normalizeDataAdapter(body.dataAdapter || prev.data?.adapter || DATA_DEFAULTS.adapter);
@@ -239,6 +240,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     preferredPeer,
     notes: sanitizeText(body.notes || prev.notes || '', 400),
     petitionQuorumAdvance,
+    verbosityMode,
     groupPolicy: {
       electionMode: defaultElectionMode,
       conflictRule: defaultConflictRule,
@@ -1282,6 +1284,7 @@ function buildAdminViewModel(
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
   const petitionQuorumAdvance = normalizeQuorumAdvance(state.settings?.petitionQuorumAdvance || 'discussion');
+  const verbosityMode = normalizeVerbosityMode(state.settings?.verbosityMode) || 'full';
   const topicConfig = state.settings?.topicGardener || {};
   const topicAnchors = (topicConfig.anchors && topicConfig.anchors.length ? topicConfig.anchors : DEFAULT_TOPIC_ANCHORS).join(', ');
   const topicPinned = (topicConfig.pinned || []).join(', ');
@@ -1456,6 +1459,8 @@ function buildAdminViewModel(
     defaultConflictPrompt: defaultConflictRule === 'prompt_user' ? 'selected' : '',
     petitionQuorumAdvanceDiscussion: petitionQuorumAdvance === 'discussion' ? 'selected' : '',
     petitionQuorumAdvanceVote: petitionQuorumAdvance === 'vote' ? 'selected' : '',
+    verbosityModeFull: verbosityMode === 'full' ? 'selected' : '',
+    verbosityModeCompact: verbosityMode === 'compact' ? 'selected' : '',
     extensionsList,
     sessionIdValue: sessionForm.sessionId || '',
     sessionHandleValue: sessionForm.sessionHandle || '',

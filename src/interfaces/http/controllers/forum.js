@@ -150,11 +150,9 @@ async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
   const composeOpen = resolvedUrl.searchParams.get('compose') ? 'open' : '';
   const replyOpenId = resolvedUrl.searchParams.get('reply') || '';
   const forumEntries = filterForumEntries(state);
-  const html = await renderPage(
-    'forum',
-    renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId }),
-    { wantsPartial, title: 'Forum', state },
-  );
+  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId });
+  forumData.person = activePerson;
+  const html = await renderPage('forum', forumData, { wantsPartial, title: 'Forum', state });
   return sendHtml(res, html);
 }
 

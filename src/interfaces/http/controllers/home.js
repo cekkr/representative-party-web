@@ -36,6 +36,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       discussionCount,
       petitionCount,
       groupCount,
+      person,
       personHandle: person?.handle,
       roleLabel: person?.role || 'guest',
       policyFlag: policy.enforcement === 'strict' ? 'Circle enforcement on' : 'Circle policy observing (no hard gate)',

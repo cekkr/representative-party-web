@@ -69,6 +69,46 @@ export function renderProfileSummary(person, actorLabels) {
   `;
 }
 
+export function renderUiPreferencesForm({
+  person,
+  defaultMode = 'full',
+  overrideMode,
+  effectiveMode,
+  flash,
+} = {}) {
+  if (!person) {
+    return `
+      <div class="callout">
+        <p class="muted small">Verify your wallet to set per-session UI preferences.</p>
+      </div>
+    `;
+  }
+  const selection = overrideMode || 'default';
+  const defaultLabel = defaultMode === 'compact' ? 'Compact' : 'Full';
+  const effectiveLabel = effectiveMode === 'compact' ? 'Compact' : 'Full';
+  const flashNote = flash
+    ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>`
+    : '';
+  return `
+    ${flashNote}
+    <form class="stack" method="post" action="/profile" data-enhance="profile">
+      <input type="hidden" name="intent" value="ui-preferences" />
+      <label class="field">
+        <span>UI verbosity</span>
+        <select name="uiVerbosity">
+          <option value="default" ${selection === 'default' ? 'selected' : ''}>Use Circle default (${defaultLabel})</option>
+          <option value="full" ${selection === 'full' ? 'selected' : ''}>Full (show guidance + telemetry cues)</option>
+          <option value="compact" ${selection === 'compact' ? 'selected' : ''}>Compact (hide verbose cues)</option>
+        </select>
+      </label>
+      <div class="cta-row">
+        <button class="ghost" type="submit">Save UI preference</button>
+      </div>
+    </form>
+    <p class="muted small">Current view: ${escapeHtml(effectiveLabel)}.</p>
+  `;
+}
+
 export function buildProfileValues(providerFields = [], entry) {
   const values = {};
   const provider = entry?.provider || {};

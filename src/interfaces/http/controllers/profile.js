@@ -9,7 +9,7 @@ import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { parseBoolean } from '../../../shared/utils/parse.js';
+import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
 import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
 import { renderPage } from '../views/templates.js';
 import {
@@ -17,7 +17,10 @@ import {
   normalizeProfilePayload,
   renderProfileForm,
   renderProfileSummary,
+  renderUiPreferencesForm,
 } from '../views/profileView.js';
+import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
+import { persistSessions } from '../../../infra/persistence/storage.js';
 
 export async function renderProfile({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -28,6 +31,35 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
   const person = getPerson(req, state);
   if (!person?.sessionId) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to update profile.' });
+  }
+  const body = await readRequestBody(req);
+  const intent = body.intent || 'profile';
+  if (intent === 'ui-preferences') {
+    const currentSession = state.sessions.get(person.sessionId);
+    if (!currentSession) {
+      return sendJson(res, 404, { error: 'session_not_found', message: 'Session not found.' });
+    }
+    const normalized = normalizeVerbosityMode(body.uiVerbosity);
+    const next = { ...currentSession };
+    let flash = '';
+    if (normalized) {
+      next.uiVerbosity = normalized;
+      flash = `UI verbosity set to ${normalized}.`;
+    } else {
+      delete next.uiVerbosity;
+      flash = 'UI verbosity reset to Circle default.';
+    }
+    state.sessions.set(person.sessionId, next);
+    invalidateSessionIndex(state);
+    await persistSessions(state);
+    return renderProfilePage({
+      req,
+      res,
+      state,
+      wantsPartial,
+      person: { ...person, ...next },
+      uiFlash: flash,
+    });
   }
   const providerFields = normalizeProviderFields(state.profileStructures || []);
   if (!providerFields.length) {
@@ -40,7 +72,6 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       errors: ['No provider-local fields are configured yet.'],
     });
   }
-  const body = await readRequestBody(req);
   const rawPayload = normalizeProfilePayload(providerFields, body);
   const { attributes, errors } = parseAttributePayloadWithValidation(rawPayload, providerFields);
   const missingRequired = listMissingRequired(providerFields, attributes);
@@ -82,7 +113,19 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
   });
 }
 
-async function renderProfilePage({ req, res, state, wantsPartial, person, errors = [], values, flash, entry, consentChecked }) {
+async function renderProfilePage({
+  req,
+  res,
+  state,
+  wantsPartial,
+  person,
+  errors = [],
+  values,
+  flash,
+  uiFlash,
+  entry,
+  consentChecked,
+}) {
   const actorLabels = getActorLabels(state);
   const providerFields = normalizeProviderFields(state.profileStructures || []);
   const profileEntry = entry || (person ? findProfileAttributes(state, person.sessionId) : null);
@@ -113,17 +156,29 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
     updatedAt,
   });
   const profileSummary = renderProfileSummary(person, actorLabels);
+  const defaultVerbosity = normalizeVerbosityMode(state.settings?.verbosityMode) || 'full';
+  const overrideVerbosity = normalizeVerbosityMode(person?.uiVerbosity);
+  const effectiveVerbosity = overrideVerbosity || defaultVerbosity;
+  const uiPreferencesForm = renderUiPreferencesForm({
+    person,
+    defaultMode: defaultVerbosity,
+    overrideMode: overrideVerbosity,
+    effectiveMode: effectiveVerbosity,
+    flash: uiFlash,
+  });
   const profileFlash = flash
     ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>`
     : '';
   const html = await renderPage(
     'profile',
     {
+      person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
       profileForm,
       profileSummary,
       profileFlash,
+      uiPreferencesForm,
       profileSchemaNote,
       profileSchemaWarning,
     },
