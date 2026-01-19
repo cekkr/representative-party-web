@@ -2,7 +2,10 @@
   const root = document.querySelector('[data-shell]');
   if (!root) return;
   initInstallWizard(root);
+  syncPageMeta();
   syncNavigationState();
+  applyPageLayout();
+  initVerbosityToggle();
   initComposerTool();
 
   document.addEventListener('click', async (event) => {
@@ -18,7 +21,10 @@
       root.innerHTML = html;
       window.history.pushState({}, '', url);
       initInstallWizard(root);
+      syncPageMeta();
       syncNavigationState();
+      applyPageLayout();
+      initVerbosityToggle();
       initComposerTool();
       scrollToHash(url);
       triggerDeepLink();
@@ -108,7 +114,10 @@
       root.innerHTML = html;
       window.history.pushState({}, '', url);
       initInstallWizard(root);
+      syncPageMeta();
       syncNavigationState();
+      applyPageLayout();
+      initVerbosityToggle();
       initComposerTool();
       scrollToHash(url);
       triggerDeepLink();
@@ -207,12 +216,16 @@ function createComposerTool(tool) {
   const sideLists = tool.querySelector('[data-composer-side-lists]');
   const mainList = tool.querySelector('[data-composer-list="main"]');
   const asideList = tool.querySelector('[data-composer-list="aside"]');
+  const asideBlock = tool.querySelector('[data-composer-aside-block]');
+  const pageVerbositySelect = tool.querySelector('[data-composer-page-verbosity]');
+  const pageVerbosityLabel = tool.querySelector('[data-composer-page-label]');
   const styleInputs = Array.from(tool.querySelectorAll('[data-composer-style]'));
 
   let state = readComposerSettings();
   let hasDirty = false;
   let selected = null;
   let dragInfo = null;
+  const getPageKey = () => document.body?.dataset?.pageKey || 'default';
 
   const setStatus = (message, isError = false) => {
     if (!statusLine) return;
@@ -367,17 +380,31 @@ function createComposerTool(tool) {
     });
   });
 
+  pageVerbositySelect?.addEventListener('change', () => {
+    const pageKey = getPageKey();
+    const value = pageVerbositySelect.value || '';
+    state.pageVerbosity = state.pageVerbosity || {};
+    if (value) {
+      state.pageVerbosity[pageKey] = value;
+    } else {
+      delete state.pageVerbosity[pageKey];
+    }
+    if (document.body) {
+      document.body.dataset.verbosityPagePreset = value;
+      if (!document.body.dataset.verbosityOverride) {
+        document.body.dataset.verbosity = value || document.body.dataset.verbosityDefault || 'full';
+      }
+    }
+    updateVerbosityToggleUI();
+    noteDirty();
+  });
+
   const listOrderKeys = (listEl) =>
     Array.from(listEl?.querySelectorAll('[data-composer-item]') || []).map((item) => item.dataset.composerItem);
 
-  const mergeOrders = (listKeys, existing) => {
-    const seen = new Set(listKeys);
-    const extras = (existing || []).filter((key) => key && !seen.has(key));
-    return [...listKeys, ...extras];
-  };
-
-  const bindSortableList = (listEl, onReorder) => {
+  const bindSortableList = (listEl, onReorder, { allowCross = false } = {}) => {
     if (!listEl) return;
+    listEl.dataset.composerCross = allowCross ? 'true' : 'false';
     if (listEl.dataset.composerBound === 'true') return;
     listEl.dataset.composerBound = 'true';
     listEl.addEventListener('dragstart', (event) => {
@@ -389,23 +416,30 @@ function createComposerTool(tool) {
       event.dataTransfer?.setDragImage(item, 10, 10);
     });
     listEl.addEventListener('dragover', (event) => {
-      if (!dragInfo || dragInfo.listEl !== listEl) return;
+      if (!dragInfo) return;
+      if (listEl.dataset.composerCross !== 'true' && dragInfo.listEl !== listEl) return;
       event.preventDefault();
       const target = event.target.closest('[data-composer-item]');
-      if (!target || target === dragInfo.item) return;
+      if (!target) {
+        listEl.appendChild(dragInfo.item);
+        return;
+      }
+      if (target === dragInfo.item) return;
       const rect = target.getBoundingClientRect();
       const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
       listEl.insertBefore(dragInfo.item, shouldInsertAfter ? target.nextSibling : target);
     });
     listEl.addEventListener('drop', (event) => {
-      if (!dragInfo || dragInfo.listEl !== listEl) return;
+      if (!dragInfo) return;
+      if (listEl.dataset.composerCross !== 'true' && dragInfo.listEl !== listEl) return;
       event.preventDefault();
       dragInfo.item.classList.remove('is-dragging');
       dragInfo = null;
       onReorder();
     });
     listEl.addEventListener('dragend', () => {
-      if (!dragInfo || dragInfo.listEl !== listEl) return;
+      if (!dragInfo) return;
+      if (listEl.dataset.composerCross !== 'true' && dragInfo.listEl !== listEl) return;
       dragInfo.item.classList.remove('is-dragging');
       dragInfo = null;
       onReorder();
@@ -501,40 +535,103 @@ function createComposerTool(tool) {
     });
   };
 
-  const buildPanelLists = () => {
-    const mainColumn = document.querySelector('.page-main');
-    const asideColumn = document.querySelector('.page-aside');
-    const mapPanels = (column, listEl, prefix) => {
-      if (!column || !listEl) return;
-      const panels = Array.from(column.querySelectorAll('.panel'));
-      const items = panels.map((panel, index) => {
-        const key = panel.dataset.composerSection || panel.id || `${prefix}-${index + 1}`;
-        panel.dataset.composerSection = key;
-        const title =
-          panel.querySelector('h2')?.textContent?.trim() ||
-          panel.querySelector('h3')?.textContent?.trim() ||
-          panel.querySelector('.eyebrow')?.textContent?.trim() ||
-          key;
-        return { key, label: title };
-      });
-      buildList(listEl, items);
-      bindSortableList(listEl, () => {
-        reorderPanels(column, listOrderKeys(listEl));
-        noteDirty();
-      });
+  const resolvePanelTitle = (panel, fallback) =>
+    panel.querySelector('h2')?.textContent?.trim() ||
+    panel.querySelector('h3')?.textContent?.trim() ||
+    panel.querySelector('.eyebrow')?.textContent?.trim() ||
+    fallback;
+
+  const getPageLayoutState = (pageKey) => {
+    const current = state.pageLayouts?.[pageKey] || {};
+    return {
+      main: Array.isArray(current.main) ? current.main.slice() : [],
+      aside: Array.isArray(current.aside) ? current.aside.slice() : [],
+      hidden: Array.isArray(current.hidden) ? current.hidden.slice() : [],
     };
-    mapPanels(mainColumn, mainList, 'main');
-    mapPanels(asideColumn, asideList, 'aside');
   };
 
-  const reorderPanels = (column, order) => {
-    if (!column) return;
-    const panels = Array.from(column.querySelectorAll('.panel')).filter((panel) => panel.dataset.composerSection);
-    const byKey = new Map(panels.map((panel) => [panel.dataset.composerSection, panel]));
-    order.forEach((key) => {
-      const panel = byKey.get(key);
-      if (panel) column.appendChild(panel);
+  const updatePanelLayoutFromLists = () => {
+    const pageKey = getPageKey();
+    const next = getPageLayoutState(pageKey);
+    next.main = listOrderKeys(mainList);
+    next.aside = listOrderKeys(asideList);
+    state.pageLayouts = state.pageLayouts || {};
+    state.pageLayouts[pageKey] = next;
+    applyPageLayoutFromSettings(state);
+    noteDirty();
+  };
+
+  const togglePanelHidden = (key, listItem, button) => {
+    const pageKey = getPageKey();
+    const next = getPageLayoutState(pageKey);
+    const hidden = new Set(next.hidden || []);
+    const wasHidden = hidden.has(key);
+    if (wasHidden) {
+      hidden.delete(key);
+    } else {
+      hidden.add(key);
+    }
+    next.hidden = Array.from(hidden);
+    state.pageLayouts = state.pageLayouts || {};
+    state.pageLayouts[pageKey] = next;
+    applyPageLayoutFromSettings(state);
+    if (listItem) {
+      listItem.classList.toggle('is-hidden', !wasHidden);
+    }
+    if (button) {
+      button.textContent = wasHidden ? 'Hide' : 'Show';
+    }
+    noteDirty();
+  };
+
+  const buildPanelList = (listEl, panels, hiddenSet) => {
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    panels.forEach((panel, index) => {
+      const key = panel.dataset.composerSection || panel.id || `panel-${index + 1}`;
+      panel.dataset.composerSection = key;
+      const li = document.createElement('li');
+      li.className = 'composer-tool__item';
+      if (hiddenSet.has(key)) {
+        li.classList.add('is-hidden');
+      }
+      li.dataset.composerItem = key;
+      li.draggable = true;
+      const label = resolvePanelTitle(panel, key);
+      li.innerHTML = `<span class="composer-tool__drag" aria-hidden="true"></span><span>${label}</span>`;
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'ghost composer-tool__toggle';
+      toggle.textContent = hiddenSet.has(key) ? 'Show' : 'Hide';
+      toggle.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        togglePanelHidden(key, li, toggle);
+      });
+      li.appendChild(toggle);
+      listEl.appendChild(li);
     });
+  };
+
+  const buildPanelLists = () => {
+    applyPageLayoutFromSettings(state);
+    const { mainColumn, asideColumn, mainPanels, asidePanels } = getPanelColumns();
+    if (asideBlock) {
+      asideBlock.hidden = !asideColumn;
+    }
+    const pageKey = getPageKey();
+    const layout = getPageLayoutState(pageKey);
+    const hiddenSet = new Set(layout.hidden || []);
+    buildPanelList(mainList, mainPanels, hiddenSet);
+    if (asideColumn) {
+      buildPanelList(asideList, asidePanels, hiddenSet);
+    } else if (asideList) {
+      asideList.innerHTML = '';
+    }
+    bindSortableList(mainList, updatePanelLayoutFromLists, { allowCross: Boolean(asideColumn) });
+    if (asideColumn) {
+      bindSortableList(asideList, updatePanelLayoutFromLists, { allowCross: true });
+    }
   };
 
   const saveComposer = async () => {
@@ -546,6 +643,8 @@ function createComposerTool(tool) {
     payload.set('composerAsideWidth', state.pageAsideWidth ? String(state.pageAsideWidth) : '');
     payload.set('composerTextOverrides', JSON.stringify(state.textOverrides || {}));
     payload.set('composerStyleOverrides', JSON.stringify(state.styleOverrides || {}));
+    payload.set('composerPageVerbosity', JSON.stringify(state.pageVerbosity || {}));
+    payload.set('composerPageLayouts', JSON.stringify(state.pageLayouts || {}));
     try {
       const response = await fetch('/admin', {
         method: 'POST',
@@ -571,6 +670,8 @@ function createComposerTool(tool) {
     quickActionsOrder: Array.isArray(state.quickActionsOrder) ? state.quickActionsOrder : [],
     sideNavOrder: Array.isArray(state.sideNavOrder) ? state.sideNavOrder : [],
     pageAsideWidth: Number.isFinite(state.pageAsideWidth) ? state.pageAsideWidth : null,
+    pageVerbosity: state.pageVerbosity && typeof state.pageVerbosity === 'object' ? state.pageVerbosity : {},
+    pageLayouts: state.pageLayouts && typeof state.pageLayouts === 'object' ? state.pageLayouts : {},
     textOverrides: state.textOverrides && typeof state.textOverrides === 'object' ? state.textOverrides : {},
     styleOverrides: state.styleOverrides && typeof state.styleOverrides === 'object' ? state.styleOverrides : {},
   });
@@ -582,6 +683,14 @@ function createComposerTool(tool) {
     state = readSettingsWithDefaults();
     buildNavLists();
     buildPanelLists();
+    if (pageVerbositySelect) {
+      const pageKey = getPageKey();
+      const preset = state.pageVerbosity?.[pageKey] || '';
+      pageVerbositySelect.value = preset;
+      if (pageVerbosityLabel) {
+        pageVerbosityLabel.textContent = `Verbosity preset for ${pageKey}`;
+      }
+    }
   };
 
   return { refresh };
@@ -595,6 +704,8 @@ function readComposerSettings() {
       quickActionsOrder: [],
       sideNavOrder: [],
       pageAsideWidth: null,
+      pageVerbosity: {},
+      pageLayouts: {},
       textOverrides: {},
       styleOverrides: {},
     };
@@ -605,6 +716,143 @@ function readComposerSettings() {
   } catch (_error) {
     return {};
   }
+}
+
+function mergeOrders(listKeys = [], existing = []) {
+  const trimmed = (listKeys || []).filter(Boolean);
+  const seen = new Set(trimmed);
+  const extras = (existing || []).filter((key) => key && !seen.has(key));
+  return [...trimmed, ...extras];
+}
+
+function syncPageMeta() {
+  const meta = document.querySelector('[data-page-meta]');
+  if (!meta || !document.body) return;
+  const body = document.body;
+  if (meta.dataset.pageKey !== undefined) body.dataset.pageKey = meta.dataset.pageKey;
+  if (meta.dataset.verbosity !== undefined) body.dataset.verbosity = meta.dataset.verbosity;
+  if (meta.dataset.verbosityDefault !== undefined) body.dataset.verbosityDefault = meta.dataset.verbosityDefault;
+  if (meta.dataset.verbosityOverride !== undefined) body.dataset.verbosityOverride = meta.dataset.verbosityOverride;
+  if (meta.dataset.verbosityPagePreset !== undefined) body.dataset.verbosityPagePreset = meta.dataset.verbosityPagePreset;
+  if (meta.dataset.verbosityCanSave !== undefined) body.dataset.verbosityCanSave = meta.dataset.verbosityCanSave;
+  if (meta.dataset.composerSettings !== undefined) body.dataset.composerSettings = meta.dataset.composerSettings;
+  if (meta.dataset.composerAllowed !== undefined) body.dataset.composerAllowed = meta.dataset.composerAllowed;
+  meta.remove();
+}
+
+function updateVerbosityToggleUI() {
+  const button = document.querySelector('[data-verbosity-toggle]');
+  if (!button || !document.body) return;
+  const body = document.body;
+  const baseMode = body.dataset.verbosityPagePreset || body.dataset.verbosityDefault || 'full';
+  const override = body.dataset.verbosityOverride || '';
+  const effective = override || baseMode || 'full';
+  const label = effective === 'compact' ? 'Compact' : 'Full';
+  const source = override ? 'Session override' : body.dataset.verbosityPagePreset ? 'Page preset' : 'Circle default';
+  button.textContent = `Verbosity: ${label}`;
+  button.title = `Verbosity: ${source}`;
+}
+
+function initVerbosityToggle() {
+  const button = document.querySelector('[data-verbosity-toggle]');
+  if (!button || !document.body) return;
+  updateVerbosityToggleUI();
+  if (button.dataset.verbosityBound === 'true') return;
+  button.dataset.verbosityBound = 'true';
+  button.addEventListener('click', async () => {
+    const body = document.body;
+    const baseMode = body.dataset.verbosityPagePreset || body.dataset.verbosityDefault || 'full';
+    const override = body.dataset.verbosityOverride || '';
+    const effective = override || baseMode || 'full';
+    const nextMode = effective === 'compact' ? 'full' : 'compact';
+    const nextOverride = nextMode === baseMode ? '' : nextMode;
+    body.dataset.verbosityOverride = nextOverride;
+    body.dataset.verbosity = nextOverride || baseMode || 'full';
+    updateVerbosityToggleUI();
+    if (body.dataset.verbosityCanSave === 'true') {
+      try {
+        const payload = new URLSearchParams();
+        payload.set('intent', 'ui-preferences');
+        payload.set('uiVerbosity', nextOverride);
+        const response = await fetch('/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'partial' },
+          body: payload,
+        });
+        if (!response.ok) throw new Error('Save failed');
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  });
+}
+
+function applyPageLayout() {
+  applyPageLayoutFromSettings(readComposerSettings());
+}
+
+function applyPageLayoutFromSettings(settings = {}) {
+  const body = document.body;
+  if (!body) return;
+  const pageKey = body.dataset.pageKey || '';
+  if (!pageKey) return;
+  const layouts = settings.pageLayouts;
+  if (!layouts || typeof layouts !== 'object') return;
+  const layout = layouts[pageKey];
+  if (!layout || typeof layout !== 'object') return;
+  const { mainColumn, asideColumn, mainPanels, asidePanels, allPanels } = getPanelColumns();
+  if (!mainColumn) return;
+  const panelMap = new Map(allPanels.map((panel) => [panel.dataset.composerSection, panel]));
+  const layoutMain = Array.isArray(layout.main) ? layout.main.filter(Boolean) : [];
+  const layoutAside = Array.isArray(layout.aside) ? layout.aside.filter(Boolean) : [];
+  const mainSet = new Set(layoutMain);
+  const asideOrderBase = layoutAside.filter((key) => key && !mainSet.has(key));
+  const asideSet = new Set(asideOrderBase);
+  const currentMainOrder = mainPanels
+    .map((panel) => panel.dataset.composerSection)
+    .filter((key) => key && !asideSet.has(key));
+  const currentAsideOrder = asidePanels
+    .map((panel) => panel.dataset.composerSection)
+    .filter((key) => key && !mainSet.has(key));
+  const mainOrder = mergeOrders(layoutMain, currentMainOrder);
+  const asideOrder = mergeOrders(asideOrderBase, currentAsideOrder);
+  const applyOrder = (column, order) => {
+    if (!column) return;
+    order.forEach((key) => {
+      const panel = panelMap.get(key);
+      if (panel) column.appendChild(panel);
+    });
+  };
+  applyOrder(mainColumn, mainOrder);
+  if (asideColumn) {
+    applyOrder(asideColumn, asideOrder);
+  }
+  const hiddenSet = new Set(Array.isArray(layout.hidden) ? layout.hidden : []);
+  allPanels.forEach((panel) => {
+    const key = panel.dataset.composerSection;
+    panel.hidden = hiddenSet.has(key);
+  });
+}
+
+function getPanelColumns() {
+  const root = document.querySelector('[data-shell]') || document.querySelector('main');
+  if (!root) {
+    return { root: null, mainColumn: null, asideColumn: null, mainPanels: [], asidePanels: [], allPanels: [] };
+  }
+  const mainColumn = root.querySelector('.page-main') || root;
+  const asideColumn = root.querySelector('.page-aside');
+  const allPanels = Array.from(root.querySelectorAll('.panel'));
+  allPanels.forEach((panel, index) => {
+    if (panel.dataset.composerSection) return;
+    const key = panel.id || `panel-${index + 1}`;
+    panel.dataset.composerSection = key;
+  });
+  const mainPanels =
+    mainColumn === root
+      ? allPanels.filter((panel) => !panel.closest('.page-aside'))
+      : Array.from(mainColumn.querySelectorAll('.panel'));
+  const asidePanels = asideColumn ? Array.from(asideColumn.querySelectorAll('.panel')) : [];
+  return { root, mainColumn, asideColumn, mainPanels, asidePanels, allPanels };
 }
 
 function initInstallWizard(root) {

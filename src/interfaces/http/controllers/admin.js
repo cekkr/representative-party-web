@@ -409,6 +409,83 @@ function parseComposerStyleOverrides(raw, fallback = {}) {
   return { value: cleaned, errors };
 }
 
+function parseComposerPageVerbosity(raw, fallback = {}) {
+  if (raw === undefined || raw === null) {
+    return { value: fallback || {}, errors: [] };
+  }
+  if (raw === '') {
+    return { value: {}, errors: [] };
+  }
+  const errors = [];
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch (_error) {
+    return { value: fallback || {}, errors: ['Page verbosity must be valid JSON.'] };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { value: fallback || {}, errors: ['Page verbosity must be a JSON object.'] };
+  }
+  const entries = Object.entries(parsed).slice(0, 120);
+  const cleaned = {};
+  for (const [key, value] of entries) {
+    const safeKey = sanitizeText(key, 80);
+    if (!safeKey) continue;
+    const mode = normalizeVerbosityMode(value);
+    if (!mode) continue;
+    cleaned[safeKey] = mode;
+  }
+  if (Object.keys(parsed).length > entries.length) {
+    errors.push('Page verbosity trimmed to 120 entries.');
+  }
+  return { value: cleaned, errors };
+}
+
+function parseComposerPageLayouts(raw, fallback = {}) {
+  if (raw === undefined || raw === null) {
+    return { value: fallback || {}, errors: [] };
+  }
+  if (raw === '') {
+    return { value: {}, errors: [] };
+  }
+  const errors = [];
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch (_error) {
+    return { value: fallback || {}, errors: ['Page layouts must be valid JSON.'] };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { value: fallback || {}, errors: ['Page layouts must be a JSON object.'] };
+  }
+  const entries = Object.entries(parsed).slice(0, 80);
+  const cleaned = {};
+  for (const [key, value] of entries) {
+    const safeKey = sanitizeText(key, 80);
+    if (!safeKey) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const hasLayout =
+      Object.prototype.hasOwnProperty.call(value, 'main') ||
+      Object.prototype.hasOwnProperty.call(value, 'aside') ||
+      Object.prototype.hasOwnProperty.call(value, 'hidden');
+    if (!hasLayout) continue;
+    const main = sanitizeLayoutList(value.main, 80);
+    const aside = sanitizeLayoutList(value.aside, 80);
+    const hidden = sanitizeLayoutList(value.hidden, 80);
+    cleaned[safeKey] = { main, aside, hidden };
+  }
+  if (Object.keys(parsed).length > entries.length) {
+    errors.push('Page layouts trimmed to 80 entries.');
+  }
+  return { value: cleaned, errors };
+}
+
+function sanitizeLayoutList(value, maxEntries = 80) {
+  if (!Array.isArray(value)) return [];
+  const cleaned = value.map((entry) => sanitizeText(entry, 80)).filter(Boolean);
+  return dedupe(cleaned).slice(0, maxEntries);
+}
+
 function parseMultilineList(value, { maxLength = 120, fallback = [] } = {}) {
   if (Array.isArray(value)) {
     const cleaned = value.map((entry) => sanitizeText(entry, maxLength)).filter(Boolean);
@@ -1113,6 +1190,8 @@ async function updateComposerSettings(state, body) {
   const sideNavOrder = parseListAllowEmpty(body.composerSideNavOrder, prev.sideNavOrder || []);
   const textOverridesResult = parseComposerTextOverrides(body.composerTextOverrides, prev.textOverrides || {});
   const styleOverridesResult = parseComposerStyleOverrides(body.composerStyleOverrides, prev.styleOverrides || {});
+  const pageVerbosityResult = parseComposerPageVerbosity(body.composerPageVerbosity, prev.pageVerbosity || {});
+  const pageLayoutsResult = parseComposerPageLayouts(body.composerPageLayouts, prev.pageLayouts || {});
   const asideWidthInput = sanitizeText(body.composerAsideWidth || '', 12);
   const asideWidthResult = normalizeNumericInput(asideWidthInput, {
     fallback: null,
@@ -1120,7 +1199,13 @@ async function updateComposerSettings(state, body) {
     max: 600,
     label: 'Composer panel width',
   });
-  const errors = [...asideWidthResult.errors, ...textOverridesResult.errors, ...styleOverridesResult.errors];
+  const errors = [
+    ...asideWidthResult.errors,
+    ...textOverridesResult.errors,
+    ...styleOverridesResult.errors,
+    ...pageVerbosityResult.errors,
+    ...pageLayoutsResult.errors,
+  ];
   const pageAsideWidth = Number.isFinite(asideWidthResult.value) ? asideWidthResult.value : null;
 
   if (errors.length) {
@@ -1139,6 +1224,8 @@ async function updateComposerSettings(state, body) {
     quickActionsOrder,
     sideNavOrder,
     pageAsideWidth,
+    pageVerbosity: pageVerbosityResult.value || {},
+    pageLayouts: pageLayoutsResult.value || {},
     textOverrides: textOverridesResult.value || {},
     styleOverrides: styleOverridesResult.value || {},
   };
@@ -1148,7 +1235,7 @@ async function updateComposerSettings(state, body) {
   };
   recordAdminAudit(state, {
     action: 'composer.update',
-    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'} text=${Object.keys(next.textOverrides || {}).length} style=${Object.keys(next.styleOverrides || {}).length}`,
+    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'} pages=${Object.keys(next.pageLayouts || {}).length} presets=${Object.keys(next.pageVerbosity || {}).length} text=${Object.keys(next.textOverrides || {}).length} style=${Object.keys(next.styleOverrides || {}).length}`,
   });
   await persistSettings(state);
   return {

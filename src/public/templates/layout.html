@@ -10,6 +10,11 @@
 </head>
 <body
   data-verbosity="{{verbosityMode}}"
+  data-page-key="{{pageKey}}"
+  data-verbosity-default="{{verbosityDefault}}"
+  data-verbosity-override="{{verbosityOverride}}"
+  data-verbosity-page-preset="{{verbosityPagePreset}}"
+  data-verbosity-can-save="{{verbosityCanSave}}"
   data-composer-settings="{{composerSettingsAttr}}"
   data-composer-allowed="{{composerAllowed}}"
   data-composer-mode="off"
@@ -38,6 +43,9 @@
       </div>
     </div>
     <nav class="topbar__actions">
+      <button class="ghost verbosity-toggle" type="button" data-verbosity-toggle title="Verbosity: {{verbosityToggleSource}}">
+        Verbosity: {{verbosityToggleLabel}}
+      </button>
       <div class="quick-nav">
         {{quickLinks}}
       </div>

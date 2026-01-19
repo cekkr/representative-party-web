@@ -16,9 +16,33 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   const actorLabels = getActorLabels(state);
   const body = applyTemplate(bodyTemplate, { ...actorLabels, ...data });
   const statusStrip = data.statusStrip !== undefined ? data.statusStrip : renderStatusStrip(deriveStatusMeta(state));
-  if (wantsPartial) return `${statusStrip}${body}`;
+  const pageKey = data.pageKey || templateName;
+  const composerSettings = state?.settings?.composer || {};
+  const composerTextOverrides =
+    composerSettings.textOverrides && typeof composerSettings.textOverrides === 'object' ? composerSettings.textOverrides : {};
+  const composerStyleOverrides =
+    composerSettings.styleOverrides && typeof composerSettings.styleOverrides === 'object' ? composerSettings.styleOverrides : {};
+  const composerPayload = {
+    themeCss: String(composerSettings.themeCss || ''),
+    quickActionsOrder: Array.isArray(composerSettings.quickActionsOrder) ? composerSettings.quickActionsOrder : [],
+    sideNavOrder: Array.isArray(composerSettings.sideNavOrder) ? composerSettings.sideNavOrder : [],
+    pageAsideWidth: Number.isFinite(composerSettings.pageAsideWidth) ? composerSettings.pageAsideWidth : null,
+    pageVerbosity: composerSettings.pageVerbosity || {},
+    pageLayouts: composerSettings.pageLayouts || {},
+    textOverrides: composerTextOverrides,
+    styleOverrides: composerStyleOverrides,
+  };
+  const composerSettingsAttr = escapeHtml(JSON.stringify(composerPayload));
+  const roleLabel = data.roleLabel || data.person?.role || '';
+  const isAdmin = String(roleLabel || '').toLowerCase() === 'admin';
+  const verbosityMeta = resolveVerbosityMeta({ state, person: data.person, explicit: data.verbosityMode, pageKey });
+  if (wantsPartial) {
+    const pageMeta = renderPageMeta({ pageKey, composerSettingsAttr, composerAllowed: isAdmin ? 'true' : '', ...verbosityMeta });
+    return `${pageMeta}${statusStrip}${body}`;
+  }
   const layout = await loadTemplate('layout');
   const layoutData = { ...actorLabels, ...data, body, title, statusStrip };
+  layoutData.pageKey = pageKey;
   if (!layoutData.personHandle) {
     layoutData.personHandle = 'Guest session';
   }
@@ -27,11 +51,13 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.quickLinks = layoutData.quickLinks || nav.quickLinks;
     layoutData.sideNav = layoutData.sideNav || nav.sideNav;
   }
-  layoutData.verbosityMode = resolveVerbosityMode({
-    state,
-    person: layoutData.person,
-    explicit: layoutData.verbosityMode,
-  });
+  layoutData.verbosityMode = verbosityMeta.verbosityMode;
+  layoutData.verbosityDefault = verbosityMeta.verbosityDefault;
+  layoutData.verbosityOverride = verbosityMeta.verbosityOverride;
+  layoutData.verbosityPagePreset = verbosityMeta.verbosityPagePreset;
+  layoutData.verbosityToggleLabel = verbosityMeta.verbosityToggleLabel;
+  layoutData.verbosityToggleSource = verbosityMeta.verbosityToggleSource;
+  layoutData.verbosityCanSave = verbosityMeta.verbosityCanSave;
   if (!layoutData.themeCss) {
     layoutData.themeCss = String(state?.settings?.composer?.themeCss || '');
   }
@@ -39,11 +65,6 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     const asideWidth = state?.settings?.composer?.pageAsideWidth;
     layoutData.themeVars = asideWidth ? `--page-aside-width: ${asideWidth}px;` : '';
   }
-  const composerSettings = state?.settings?.composer || {};
-  const composerTextOverrides =
-    composerSettings.textOverrides && typeof composerSettings.textOverrides === 'object' ? composerSettings.textOverrides : {};
-  const composerStyleOverrides =
-    composerSettings.styleOverrides && typeof composerSettings.styleOverrides === 'object' ? composerSettings.styleOverrides : {};
   const brandDefaults = {
     eyebrow: 'Representative Party Framework',
     title: 'Party Circle',
@@ -63,28 +84,20 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   layoutData.brandTaglineStyle = resolveComposerStyle(composerStyleOverrides, 'layout.brandTagline');
   layoutData.footerNoteStyle = resolveComposerStyle(composerStyleOverrides, 'layout.footerNote');
   if (!layoutData.composerSettingsAttr) {
-    const payload = {
-      themeCss: String(composerSettings.themeCss || ''),
-      quickActionsOrder: Array.isArray(composerSettings.quickActionsOrder) ? composerSettings.quickActionsOrder : [],
-      sideNavOrder: Array.isArray(composerSettings.sideNavOrder) ? composerSettings.sideNavOrder : [],
-      pageAsideWidth: Number.isFinite(composerSettings.pageAsideWidth) ? composerSettings.pageAsideWidth : null,
-      textOverrides: composerTextOverrides,
-      styleOverrides: composerStyleOverrides,
-    };
-    layoutData.composerSettingsAttr = escapeHtml(JSON.stringify(payload));
+    layoutData.composerSettingsAttr = composerSettingsAttr;
   }
-  const roleLabel = layoutData.roleLabel || layoutData.person?.role || '';
-  const isAdmin = String(roleLabel || '').toLowerCase() === 'admin';
   layoutData.composerAllowed = isAdmin ? 'true' : '';
   layoutData.composerControls = isAdmin ? buildComposerControls() : '';
   return applyTemplate(layout, layoutData);
 }
 
-export function resolveVerbosityMode({ state, person, explicit } = {}) {
+export function resolveVerbosityMode({ state, person, explicit, pageKey } = {}) {
   const explicitMode = normalizeVerbosityMode(explicit);
   if (explicitMode) return explicitMode;
   const personMode = normalizeVerbosityMode(person?.uiVerbosity || person?.ui?.verbosity || person?.verbosityMode);
   if (personMode) return personMode;
+  const pagePreset = normalizeVerbosityMode(state?.settings?.composer?.pageVerbosity?.[pageKey]);
+  if (pagePreset) return pagePreset;
   const defaultMode = normalizeVerbosityMode(state?.settings?.verbosityMode);
   return defaultMode || 'full';
 }
@@ -104,6 +117,39 @@ function applyTemplate(template, data) {
     const value = data[key];
     return value === undefined || value === null ? '' : String(value);
   });
+}
+
+function resolveVerbosityMeta({ state, person, explicit, pageKey } = {}) {
+  const verbosityDefault = normalizeVerbosityMode(state?.settings?.verbosityMode) || 'full';
+  const verbosityOverride = normalizeVerbosityMode(person?.uiVerbosity || person?.ui?.verbosity || person?.verbosityMode);
+  const verbosityPagePreset = normalizeVerbosityMode(state?.settings?.composer?.pageVerbosity?.[pageKey]);
+  const verbosityMode = resolveVerbosityMode({ state, person, explicit, pageKey });
+  return {
+    verbosityMode,
+    verbosityDefault,
+    verbosityOverride: verbosityOverride || '',
+    verbosityPagePreset: verbosityPagePreset || '',
+    verbosityToggleLabel: verbosityMode === 'compact' ? 'Compact' : 'Full',
+    verbosityToggleSource: verbosityOverride ? 'Session override' : verbosityPagePreset ? 'Page preset' : 'Circle default',
+    verbosityCanSave: person?.sessionId ? 'true' : '',
+  };
+}
+
+function renderPageMeta(meta = {}) {
+  const attrs = [
+    'data-page-meta',
+    meta.pageKey ? `data-page-key="${escapeHtml(meta.pageKey)}"` : '',
+    `data-verbosity="${escapeHtml(meta.verbosityMode || '')}"`,
+    `data-verbosity-default="${escapeHtml(meta.verbosityDefault || '')}"`,
+    `data-verbosity-override="${escapeHtml(meta.verbosityOverride || '')}"`,
+    `data-verbosity-page-preset="${escapeHtml(meta.verbosityPagePreset || '')}"`,
+    `data-verbosity-can-save="${escapeHtml(meta.verbosityCanSave || '')}"`,
+    meta.composerSettingsAttr ? `data-composer-settings="${meta.composerSettingsAttr}"` : '',
+    meta.composerAllowed ? `data-composer-allowed="${escapeHtml(meta.composerAllowed)}"` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `<div ${attrs} hidden></div>`;
 }
 
 function buildComposerControls() {
@@ -167,11 +213,23 @@ function buildComposerControls() {
               <p class="muted small">Main column</p>
               <ol class="composer-tool__list" data-composer-list="main"></ol>
             </div>
-            <div class="composer-tool__list-block">
+            <div class="composer-tool__list-block" data-composer-aside-block>
               <p class="muted small">Side column</p>
               <ol class="composer-tool__list" data-composer-list="aside"></ol>
             </div>
           </div>
+        </section>
+        <section class="composer-tool__section">
+          <p class="eyebrow">Page defaults</p>
+          <p class="muted small" data-composer-page-label>Current page preset</p>
+          <label class="field">
+            <span>Verbosity preset</span>
+            <select data-composer-page-verbosity>
+              <option value="">Inherit Circle default</option>
+              <option value="full">Full</option>
+              <option value="compact">Compact</option>
+            </select>
+          </label>
         </section>
         <div class="composer-tool__footer">
           <button class="cta" type="button" data-composer-save>Save composer changes</button>

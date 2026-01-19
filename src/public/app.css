@@ -104,6 +104,13 @@ header.topbar {
   color: var(--accent);
 }
 
+.verbosity-toggle {
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  letter-spacing: 0.01em;
+}
+
 .shell {
   display: grid;
   grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
@@ -314,6 +321,16 @@ body[data-composer-mode="on"] .composer-tool__panel {
   background: rgba(4, 6, 15, 0.45);
   cursor: grab;
   font-size: 0.85rem;
+}
+
+.composer-tool__item.is-hidden {
+  opacity: 0.55;
+}
+
+.composer-tool__toggle {
+  margin-left: auto;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.7rem;
 }
 
 .composer-tool__item.is-dragging {
