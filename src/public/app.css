@@ -860,6 +860,12 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
   gap: 0.35rem;
 }
 
+.field.checkbox {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
 .field input,
 .field select,
 .field textarea {
@@ -869,6 +875,14 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
   border-radius: 0.65rem;
   padding: 0.65rem 0.75rem;
   font-size: 1rem;
+}
+
+.field.checkbox input[type="checkbox"] {
+  width: 1.05rem;
+  height: 1.05rem;
+  padding: 0;
+  margin-top: 0.15rem;
+  background: transparent;
 }
 
 .field textarea {

@@ -5,7 +5,7 @@ import { loadExtensions } from '../modules/extensions/registry.js';
 import { startGossipScheduler } from '../modules/federation/gossip.js';
 import { loadOutboundTransports } from '../modules/messaging/transports.js';
 import { startTopicGardenerScheduler } from '../modules/topics/gardenerSync.js';
-import { initState } from '../infra/persistence/storage.js';
+import { initState, persistSettings } from '../infra/persistence/storage.js';
 import { sendJson } from '../shared/utils/http.js';
 import { cleanupTempUploads } from '../shared/utils/request.js';
 import { routeRequest } from './router.js';
@@ -13,13 +13,14 @@ import { routeRequest } from './router.js';
 export async function startServer() {
   const state = await initState();
   const extensionList = state.settings?.extensions;
+  state.uploadCleanup = state.settings?.uploadCleanup || state.uploadCleanup || {};
   state.extensions = await loadExtensions({ list: extensionList });
   // wire outbound transports (email/SMS/webhook); defaults log-only if not configured
   state.outbound = await loadOutboundTransports();
   const uploadRetentionMs = MEDIA.uploadRetentionHours * 60 * 60 * 1000;
-  const recordUploadCleanup = ({ result, error, skippedReason } = {}) => {
+  const recordUploadCleanup = async ({ result, error, skippedReason } = {}) => {
     const now = new Date().toISOString();
-    const prev = state.uploadCleanup || {};
+    const prev = state.uploadCleanup || state.settings?.uploadCleanup || {};
     const next = { ...prev, lastRunAt: now };
     if (skippedReason) {
       next.lastSkippedAt = now;
@@ -36,18 +37,27 @@ export async function startServer() {
       next.lastError = error?.message || String(error);
     }
     state.uploadCleanup = next;
+    if (!state.settings) state.settings = {};
+    state.settings.uploadCleanup = next;
+    if (state.store?.saveSettings) {
+      try {
+        await persistSettings(state);
+      } catch (persistError) {
+        console.warn('[uploads] failed to persist cleanup stats', persistError);
+      }
+    }
   };
   const cleanupUploads = async () => {
     if (!Number.isFinite(uploadRetentionMs) || uploadRetentionMs <= 0) {
-      recordUploadCleanup({ skippedReason: 'retention_disabled' });
+      await recordUploadCleanup({ skippedReason: 'retention_disabled' });
       return null;
     }
     try {
       const result = await cleanupTempUploads({ maxAgeMs: uploadRetentionMs });
-      recordUploadCleanup({ result });
+      await recordUploadCleanup({ result });
       return result;
     } catch (error) {
-      recordUploadCleanup({ error });
+      await recordUploadCleanup({ error });
       throw error;
     }
   };

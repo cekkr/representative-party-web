@@ -5,7 +5,7 @@
 
 Go-ahead pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
-Continue with other roadmap implementations (and improvements/fixes/optimizations where needed, look also [ROADMAP.md](ROADMAP.md) and [OPTIMIZATIONS.md](OPTIMIZATIONS.md) ) in source code in various contexts (UX, features, data management and P2P protocol etc...). Then run unit tests and remember to update markdowns
+Continue with other roadmap implementations (and improvements/fixes/optimizations where needed, look also [ROADMAP.md](ROADMAP.md) and [OPTIMIZATIONS.md](OPTIMIZATIONS.md) ) in source code in various contexts (UX, features, data management and P2P protocol etc...). Then implement better unit tests and run them. remember to update markdowns
 
 Check-back pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 

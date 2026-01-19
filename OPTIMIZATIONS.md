@@ -47,7 +47,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
-- Persist upload cleanup stats (last run counts + errors) in settings/metrics so `/health` survives restarts and dashboards can trend them.
 
 ## Storage & IO
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
@@ -78,6 +77,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added periodic cleanup for stale temp uploads in long-running servers.
 - Added multipart field-name and header size caps to reduce oversized multipart metadata.
 - Added multipart filename length caps to block oversized upload metadata.
+- Persisted upload cleanup stats in settings so `/health` survives restarts and dashboards can trend them.
 - Centralized preview-pill rendering in shared view helpers for consistent UX copy.
 - Reused a shared `formatBytes()` helper for admin and social media rendering.
 - Combined petition comment argument/last-activity scans into a single summary pass.
