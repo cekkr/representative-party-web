@@ -325,6 +325,88 @@ function formatCsvList(list = []) {
   return (list || []).join(', ');
 }
 
+function sanitizeCssValue(raw, maxLength = 64) {
+  const cleaned = sanitizeText(raw || '', maxLength);
+  if (!cleaned) return '';
+  if (!/^[#()%,.\s0-9a-zA-Z-]+$/.test(cleaned)) return '';
+  return cleaned;
+}
+
+function parseComposerTextOverrides(raw, fallback = {}) {
+  if (raw === undefined || raw === null) {
+    return { value: fallback || {}, errors: [] };
+  }
+  if (raw === '') {
+    return { value: {}, errors: [] };
+  }
+  const errors = [];
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch (_error) {
+    return { value: fallback || {}, errors: ['Text overrides must be valid JSON.'] };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { value: fallback || {}, errors: ['Text overrides must be a JSON object.'] };
+  }
+  const entries = Object.entries(parsed).slice(0, 120);
+  const cleaned = {};
+  for (const [key, value] of entries) {
+    const safeKey = sanitizeText(key, 80);
+    if (!safeKey) continue;
+    if (typeof value !== 'string') continue;
+    const safeValue = sanitizeText(value, 220);
+    if (!safeValue) continue;
+    cleaned[safeKey] = safeValue;
+  }
+  if (Object.keys(parsed).length > entries.length) {
+    errors.push('Text overrides trimmed to 120 entries.');
+  }
+  return { value: cleaned, errors };
+}
+
+function parseComposerStyleOverrides(raw, fallback = {}) {
+  if (raw === undefined || raw === null) {
+    return { value: fallback || {}, errors: [] };
+  }
+  if (raw === '') {
+    return { value: {}, errors: [] };
+  }
+  const errors = [];
+  let parsed;
+  try {
+    parsed = JSON.parse(String(raw));
+  } catch (_error) {
+    return { value: fallback || {}, errors: ['Style overrides must be valid JSON.'] };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { value: fallback || {}, errors: ['Style overrides must be a JSON object.'] };
+  }
+  const entries = Object.entries(parsed).slice(0, 120);
+  const cleaned = {};
+  for (const [key, value] of entries) {
+    const safeKey = sanitizeText(key, 80);
+    if (!safeKey) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const next = {};
+    const color = sanitizeCssValue(value.color);
+    const background = sanitizeCssValue(value.background);
+    const fontSize = sanitizeCssValue(value.fontSize);
+    const padding = sanitizeCssValue(value.padding);
+    if (color) next.color = color;
+    if (background) next.background = background;
+    if (fontSize) next.fontSize = fontSize;
+    if (padding) next.padding = padding;
+    if (Object.keys(next).length) {
+      cleaned[safeKey] = next;
+    }
+  }
+  if (Object.keys(parsed).length > entries.length) {
+    errors.push('Style overrides trimmed to 120 entries.');
+  }
+  return { value: cleaned, errors };
+}
+
 function parseMultilineList(value, { maxLength = 120, fallback = [] } = {}) {
   if (Array.isArray(value)) {
     const cleaned = value.map((entry) => sanitizeText(entry, maxLength)).filter(Boolean);
@@ -1027,6 +1109,8 @@ async function updateComposerSettings(state, body) {
   const limitedCss = themeCss.length > 8000 ? themeCss.slice(0, 8000) : themeCss;
   const quickActionsOrder = parseListAllowEmpty(body.composerQuickActionsOrder, prev.quickActionsOrder || []);
   const sideNavOrder = parseListAllowEmpty(body.composerSideNavOrder, prev.sideNavOrder || []);
+  const textOverridesResult = parseComposerTextOverrides(body.composerTextOverrides, prev.textOverrides || {});
+  const styleOverridesResult = parseComposerStyleOverrides(body.composerStyleOverrides, prev.styleOverrides || {});
   const asideWidthInput = sanitizeText(body.composerAsideWidth || '', 12);
   const asideWidthResult = normalizeNumericInput(asideWidthInput, {
     fallback: null,
@@ -1034,7 +1118,7 @@ async function updateComposerSettings(state, body) {
     max: 600,
     label: 'Composer panel width',
   });
-  const errors = [...asideWidthResult.errors];
+  const errors = [...asideWidthResult.errors, ...textOverridesResult.errors, ...styleOverridesResult.errors];
   const pageAsideWidth = Number.isFinite(asideWidthResult.value) ? asideWidthResult.value : null;
 
   if (errors.length) {
@@ -1053,6 +1137,8 @@ async function updateComposerSettings(state, body) {
     quickActionsOrder,
     sideNavOrder,
     pageAsideWidth,
+    textOverrides: textOverridesResult.value || {},
+    styleOverrides: styleOverridesResult.value || {},
   };
   state.settings = {
     ...(state.settings || {}),
@@ -1060,7 +1146,7 @@ async function updateComposerSettings(state, body) {
   };
   recordAdminAudit(state, {
     action: 'composer.update',
-    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'}`,
+    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'} text=${Object.keys(next.textOverrides || {}).length} style=${Object.keys(next.styleOverrides || {}).length}`,
   });
   await persistSettings(state);
   return {

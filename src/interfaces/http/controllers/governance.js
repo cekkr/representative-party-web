@@ -16,6 +16,7 @@ export async function renderGovernance({ req, res, state, wantsPartial }) {
     'governance',
     {
       personHandle: resolvePersonHandle(person),
+      roleLabel: person?.role || 'guest',
       quorumDefault: escapeHtml(String(governance.quorumDefault)),
       discussionWindowDays: escapeHtml(String(governance.discussionWindowDays)),
       voteWindowDays: escapeHtml(String(governance.voteWindowDays)),

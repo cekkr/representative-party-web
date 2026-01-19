@@ -40,6 +40,7 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
       groups: renderGroupList(groups, person, state),
       personHandle: resolvePersonHandle(person),
       personHash: person?.pidHash || '',
+      roleLabel: person?.role || 'guest',
       circlePolicyNote: 'Party Circle policy governs quorum/votes; groups manage internal delegate preferences and hierarchies.',
     },
     { wantsPartial, title: 'Groups', state },

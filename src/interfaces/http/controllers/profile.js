@@ -120,6 +120,7 @@ async function renderProfilePage({ req, res, state, wantsPartial, person, errors
     'profile',
     {
       personHandle: resolvePersonHandle(person),
+      roleLabel: person?.role || 'guest',
       profileForm,
       profileSummary,
       profileFlash,

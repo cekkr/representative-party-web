@@ -20,6 +20,7 @@ export async function renderNotifications({ req, res, state, wantsPartial }) {
     {
       notifications: renderNotificationList(notifications),
       personHandle: resolvePersonHandle(person),
+      roleLabel: person?.role || 'guest',
       preferencesPanel: preferencePanel,
     },
     { wantsPartial, title: 'Notifications', state },

@@ -1,5 +1,7 @@
 import { resolveModuleSettings } from '../../../modules/circle/modules.js';
 import { getPrivilegesForPerson } from '../../../modules/identity/privileges.js';
+import { escapeHtml } from '../../../shared/utils/text.js';
+import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', partial: true, match: { path: '/', exact: true } },
@@ -54,10 +56,10 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { label: 'Start', keys: ['home', 'auth', 'profile', 'notifications'] },
-  { label: 'Conversation', keys: ['social', 'discussion', 'forum'] },
-  { label: 'Governance', keys: ['petitions', 'delegation', 'groups', 'governance'] },
-  { label: 'Operations', keys: ['admin', 'health'] },
+  { key: 'start', label: 'Start', keys: ['home', 'auth', 'profile', 'notifications'] },
+  { key: 'conversation', label: 'Conversation', keys: ['social', 'discussion', 'forum'] },
+  { key: 'governance', label: 'Governance', keys: ['petitions', 'delegation', 'groups', 'governance'] },
+  { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
 ];
 
 const QUICK_ACTIONS = [
@@ -148,6 +150,8 @@ export function renderNav(state, context = {}) {
   const navContext = resolveNavContext(state, context);
   navContext.quickOrder = composerSettings.quickActionsOrder;
   navContext.sideOrder = composerSettings.sideNavOrder;
+  navContext.textOverrides = composerSettings.textOverrides;
+  navContext.styleOverrides = composerSettings.styleOverrides;
   const sideNav = renderSideNav(modules, navContext);
   const quickLinks = renderQuickLinks(modules, navContext);
   return { sideNav, quickLinks };
@@ -167,9 +171,19 @@ function renderNavGroup(group, byKey, modules, navContext) {
   const orderedItems = applyOrder(items, navContext.sideOrder);
   if (!orderedItems.length) return '';
   const links = orderedItems.map((item) => renderSideItem(item, modules, navContext)).join('\n');
+  const groupKey = `nav.group.${group.key || group.label}`;
+  const groupLabel = resolveComposerTextEscaped(navContext.textOverrides, groupKey, group.label);
+  const groupStyle = resolveComposerStyle(navContext.styleOverrides, groupKey);
+  const groupAttrs = [
+    `data-composer-key="${escapeHtml(groupKey)}"`,
+    `data-composer-default="${escapeHtml(group.label)}"`,
+    groupStyle ? `style="${escapeHtml(groupStyle)}"` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
   return `
     <div class="side-nav__group">
-      <p class="eyebrow">${group.label}</p>
+      <p class="eyebrow" ${groupAttrs}>${groupLabel}</p>
       ${links}
     </div>
   `;
@@ -180,9 +194,9 @@ function renderSideItem(item, modules, navContext) {
   const matchAttrs = buildMatchAttributes(item);
   return `
     <div class="side-nav__item" data-nav-section="${item.key}" ${matchAttrs}>
-      ${renderLink(item, { className: 'side-nav__link', extraAttrs: ['data-nav-link'] })}
+      ${renderLink(item, { className: 'side-nav__link', extraAttrs: ['data-nav-link'], navContext })}
       <div class="side-nav__children" data-nav-children="${item.key}" hidden>
-        ${childSections.map((child) => renderLink(child, { className: 'side-nav__child' })).join('\n')}
+        ${childSections.map((child) => renderLink(child, { className: 'side-nav__child', navContext })).join('\n')}
       </div>
     </div>
   `;
@@ -196,26 +210,38 @@ function renderQuickLinks(modules, navContext) {
       items.filter((item) => isItemAllowed(item, modules, navContext)).map((item) => ({ ...item, section })),
     );
   const orderedContext = applyOrder(contextLinks, navContext.quickOrder);
-  const globalHtml = orderedGlobal.map((item) => renderLink(item, { className: 'quick-link' })).join('\n');
+  const globalHtml = orderedGlobal.map((item) => renderLink(item, { className: 'quick-link', navContext })).join('\n');
   const orderedContextHtml = orderedContext
     .map((item) =>
       renderLink(item, {
         className: 'quick-link quick-link--context',
         extraAttrs: [`data-quick-section="${item.section}"`, 'hidden'],
+        navContext,
       }),
     )
     .join('\n');
   return [globalHtml, orderedContextHtml].filter(Boolean).join('\n');
 }
 
-function renderLink(item, { className, extraAttrs = [] } = {}) {
+function renderLink(item, { className, extraAttrs = [], navContext } = {}) {
   const attributes = [];
+  const labelKey = item.key ? `nav.item.${item.key}` : '';
+  const label = resolveComposerTextEscaped(navContext?.textOverrides, labelKey, item.label);
+  const style = labelKey ? resolveComposerStyle(navContext?.styleOverrides, labelKey) : '';
   if (item.partial) attributes.push('data-partial');
   if (item.target) attributes.push(`target="${item.target}"`);
   if (item.rel) attributes.push(`rel="${item.rel}"`);
   if (item.module) attributes.push(`data-module="${item.module}"`);
   if (className) attributes.push(`class="${className}"`);
-  return `<a href="${item.href}" ${attributes.concat(extraAttrs).join(' ')}>${item.label}</a>`;
+  if (item.key) {
+    attributes.push(`data-nav-key="${escapeHtml(item.key)}"`);
+    attributes.push(`data-composer-key="${escapeHtml(labelKey)}"`);
+    attributes.push(`data-composer-default="${escapeHtml(item.label)}"`);
+  }
+  if (style) {
+    attributes.push(`style="${escapeHtml(style)}"`);
+  }
+  return `<a href="${item.href}" ${attributes.concat(extraAttrs).join(' ')}>${label}</a>`;
 }
 
 function buildMatchAttributes(item) {
@@ -262,6 +288,8 @@ function resolveComposerSettings(state) {
   return {
     quickActionsOrder: Array.isArray(composer.quickActionsOrder) ? composer.quickActionsOrder : [],
     sideNavOrder: Array.isArray(composer.sideNavOrder) ? composer.sideNavOrder : [],
+    textOverrides: composer.textOverrides && typeof composer.textOverrides === 'object' ? composer.textOverrides : {},
+    styleOverrides: composer.styleOverrides && typeof composer.styleOverrides === 'object' ? composer.styleOverrides : {},
   };
 }
 
