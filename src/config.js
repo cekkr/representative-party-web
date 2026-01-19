@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -61,7 +61,10 @@ export const PATHS = {
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
-  UPLOADS_ROOT: join(ROOT_DIR, 'data', 'uploads'),
+  UPLOADS_ROOT: resolvePathEnv(
+    process.env.SOCIAL_MEDIA_UPLOADS_ROOT || process.env.SOCIAL_MEDIA_UPLOAD_ROOT || process.env.UPLOADS_ROOT,
+    join(ROOT_DIR, 'data', 'uploads'),
+  ),
   MEDIA_ROOT: join(ROOT_DIR, 'data', 'media'),
   EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
   DATA_SQLITE: join(ROOT_DIR, 'data', 'state.sqlite'),
@@ -177,6 +180,13 @@ export function normalizeDataAdapter(value) {
     key_value: 'kv',
   };
   return aliases[normalized] || normalized;
+}
+
+function resolvePathEnv(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const trimmed = String(value).trim();
+  if (!trimmed) return fallback;
+  return isAbsolute(trimmed) ? trimmed : resolve(ROOT_DIR, trimmed);
 }
 
 function parseBooleanEnv(value, fallback = false) {

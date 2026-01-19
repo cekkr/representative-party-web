@@ -1,4 +1,4 @@
-<section class="panel">
+<section class="panel" data-composer-section="delegation-overview">
   <p class="eyebrow">Delegation</p>
   <h2>Manual delegation preferences</h2>
   <p class="muted small is-verbose">Handle: {{personHandle}} · Role: {{roleLabel}}</p>
@@ -9,14 +9,14 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" data-composer-section="delegation-recommendations">
   <p class="eyebrow">Group recommendations</p>
   <h3>Suggested delegates</h3>
   <p class="muted small">Election winners are tagged so you can see why a suggestion was picked.</p>
   {{delegationSuggestions}}
 </section>
 
-<section class="panel">
+<section class="panel" data-composer-section="delegation-set">
   <p class="eyebrow">Set preference</p>
   <h3>Pick a delegate by topic</h3>
   <form class="stack" method="post" action="/delegation" data-enhance="delegation">
@@ -54,7 +54,7 @@
   </div>
 </section>
 
-<section class="panel">
+<section class="panel" data-composer-section="delegation-current">
   <p class="eyebrow">Current preferences</p>
   {{delegationList}}
 </section>

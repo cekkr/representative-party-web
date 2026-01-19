@@ -4,14 +4,13 @@ import { mkdtemp, mkdir, readFile, rm, utimes, writeFile } from 'node:fs/promise
 import os from 'node:os';
 import path from 'node:path';
 
-import { PATHS } from '../src/config.js';
 import { fetchJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 
 test('upload cleanup persists last run stats in settings', { timeout: 60000 }, async (t) => {
   const tempDir = await mkdtemp(path.join(os.tmpdir(), 'rpw-upload-clean-'));
   const kvFile = path.join(tempDir, 'state.json');
-  const uploadsDir = PATHS.UPLOADS_ROOT;
+  const uploadsDir = path.join(tempDir, 'uploads');
   const uploadFile = path.join(uploadsDir, `cleanup-${Date.now()}.upload`);
 
   await mkdir(uploadsDir, { recursive: true });
@@ -25,6 +24,7 @@ test('upload cleanup persists last run stats in settings', { timeout: 60000 }, a
     dataMode: 'centralized',
     kvFile,
     extraEnv: {
+      SOCIAL_MEDIA_UPLOADS_ROOT: uploadsDir,
       SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS: '1',
       SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES: '0',
     },
