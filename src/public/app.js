@@ -1,135 +1,3 @@
-(() => {
-  const root = document.querySelector('[data-shell]');
-  if (!root) return;
-  initInstallWizard(root);
-  syncPageMeta();
-  syncNavigationState();
-  applyPageLayout();
-  initVerbosityToggle();
-  initComposerTool();
-
-  document.addEventListener('click', async (event) => {
-    const anchor = event.target.closest('a[data-partial]');
-    if (!anchor) return;
-    const url = anchor.href;
-    if (!url.startsWith(window.location.origin)) return;
-    event.preventDefault();
-    try {
-      const response = await fetch(url, { headers: { 'X-Requested-With': 'partial' } });
-      if (!response.ok) throw new Error('Navigation failed');
-      const html = await response.text();
-      root.innerHTML = html;
-      window.history.pushState({}, '', url);
-      initInstallWizard(root);
-      syncPageMeta();
-      syncNavigationState();
-      applyPageLayout();
-      initVerbosityToggle();
-      initComposerTool();
-      scrollToHash(url);
-      triggerDeepLink();
-    } catch (error) {
-      console.error(error);
-      window.location.href = url;
-    }
-  });
-
-  document.addEventListener('click', (event) => {
-    const toggle = event.target.closest('[data-compose-toggle]');
-    if (!toggle) return;
-    event.preventDefault();
-    const panel = toggle.closest('[data-compose-state]');
-    if (!panel) return;
-    const current = panel.dataset.composeState || 'collapsed';
-    const isOpen = current === 'open';
-    const next = isOpen ? 'collapsed' : 'open';
-    panel.dataset.composeState = next;
-    toggle.setAttribute('aria-expanded', String(!isOpen));
-    toggle.textContent = isOpen ? 'Expand' : 'Collapse';
-    if (isOpen) {
-      const focused = panel.querySelector(':focus');
-      if (focused && typeof focused.blur === 'function') {
-        focused.blur();
-      }
-      return;
-    }
-    const firstField = panel.querySelector('textarea, input, select');
-    if (firstField && typeof firstField.focus === 'function') {
-      firstField.focus();
-    }
-  });
-
-  document.addEventListener('change', (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    if (input.type !== 'file' || !input.hasAttribute('data-media-toggle')) return;
-    const form = input.closest('form');
-    const textarea = form?.querySelector('textarea[data-media-required]');
-    if (!textarea) return;
-    textarea.required = !(input.files && input.files.length > 0);
-  });
-
-  document.addEventListener('submit', async (event) => {
-    const form = event.target.closest('form[data-enhance]');
-    if (!form) return;
-    event.preventDefault();
-    if (form.dataset.enhance === 'extensions') {
-      await submitExtensionsForm(form);
-      return;
-    }
-    if (form.dataset.enhance === 'delegation-conflict') {
-      await submitDelegationChoice(form);
-      return;
-    }
-    try {
-      const formData = new FormData(form);
-      const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
-      const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
-      const method = (form.method || 'POST').toUpperCase();
-      const headers = { 'X-Requested-With': 'partial' };
-      let url = form.action;
-      const options = { method, headers };
-      if (method === 'GET') {
-        const params = new URLSearchParams(formData);
-        const target = new URL(form.action, window.location.origin);
-        target.search = params.toString();
-        url = target.toString();
-      } else {
-        options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
-      }
-      const response = await fetch(url, options);
-      if (!response.ok) {
-        if (response.status === 401 || response.status === 403 || response.status === 429) {
-          try {
-            const payload = await response.json();
-            alert(payload.message || payload.error || 'Not allowed for this role.');
-          } catch (_error) {
-            alert('Action blocked.');
-          }
-          return;
-        }
-        throw new Error('Submit failed');
-      }
-      const html = await response.text();
-      root.innerHTML = html;
-      window.history.pushState({}, '', url);
-      initInstallWizard(root);
-      syncPageMeta();
-      syncNavigationState();
-      applyPageLayout();
-      initVerbosityToggle();
-      initComposerTool();
-      scrollToHash(url);
-      triggerDeepLink();
-    } catch (error) {
-      console.error(error);
-      form.submit();
-    }
-  });
-
-  window.addEventListener('popstate', () => window.location.reload());
-})();
-
 function triggerDeepLink() {
   const target = document.querySelector('[data-deep-link]');
   if (!target) return;
@@ -1933,3 +1801,135 @@ function syncNavigationState() {
     link.hidden = link.dataset.quickSection !== activeKey;
   });
 }
+
+(() => {
+  const root = document.querySelector('[data-shell]');
+  if (!root) return;
+  initInstallWizard(root);
+  syncPageMeta();
+  syncNavigationState();
+  applyPageLayout();
+  initVerbosityToggle();
+  initComposerTool();
+
+  document.addEventListener('click', async (event) => {
+    const anchor = event.target.closest('a[data-partial]');
+    if (!anchor) return;
+    const url = anchor.href;
+    if (!url.startsWith(window.location.origin)) return;
+    event.preventDefault();
+    try {
+      const response = await fetch(url, { headers: { 'X-Requested-With': 'partial' } });
+      if (!response.ok) throw new Error('Navigation failed');
+      const html = await response.text();
+      root.innerHTML = html;
+      window.history.pushState({}, '', url);
+      initInstallWizard(root);
+      syncPageMeta();
+      syncNavigationState();
+      applyPageLayout();
+      initVerbosityToggle();
+      initComposerTool();
+      scrollToHash(url);
+      triggerDeepLink();
+    } catch (error) {
+      console.error(error);
+      window.location.href = url;
+    }
+  });
+
+  document.addEventListener('click', (event) => {
+    const toggle = event.target.closest('[data-compose-toggle]');
+    if (!toggle) return;
+    event.preventDefault();
+    const panel = toggle.closest('[data-compose-state]');
+    if (!panel) return;
+    const current = panel.dataset.composeState || 'collapsed';
+    const isOpen = current === 'open';
+    const next = isOpen ? 'collapsed' : 'open';
+    panel.dataset.composeState = next;
+    toggle.setAttribute('aria-expanded', String(!isOpen));
+    toggle.textContent = isOpen ? 'Expand' : 'Collapse';
+    if (isOpen) {
+      const focused = panel.querySelector(':focus');
+      if (focused && typeof focused.blur === 'function') {
+        focused.blur();
+      }
+      return;
+    }
+    const firstField = panel.querySelector('textarea, input, select');
+    if (firstField && typeof firstField.focus === 'function') {
+      firstField.focus();
+    }
+  });
+
+  document.addEventListener('change', (event) => {
+    const input = event.target;
+    if (!(input instanceof HTMLInputElement)) return;
+    if (input.type !== 'file' || !input.hasAttribute('data-media-toggle')) return;
+    const form = input.closest('form');
+    const textarea = form?.querySelector('textarea[data-media-required]');
+    if (!textarea) return;
+    textarea.required = !(input.files && input.files.length > 0);
+  });
+
+  document.addEventListener('submit', async (event) => {
+    const form = event.target.closest('form[data-enhance]');
+    if (!form) return;
+    event.preventDefault();
+    if (form.dataset.enhance === 'extensions') {
+      await submitExtensionsForm(form);
+      return;
+    }
+    if (form.dataset.enhance === 'delegation-conflict') {
+      await submitDelegationChoice(form);
+      return;
+    }
+    try {
+      const formData = new FormData(form);
+      const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
+      const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
+      const method = (form.method || 'POST').toUpperCase();
+      const headers = { 'X-Requested-With': 'partial' };
+      let url = form.action;
+      const options = { method, headers };
+      if (method === 'GET') {
+        const params = new URLSearchParams(formData);
+        const target = new URL(form.action, window.location.origin);
+        target.search = params.toString();
+        url = target.toString();
+      } else {
+        options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
+      }
+      const response = await fetch(url, options);
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403 || response.status === 429) {
+          try {
+            const payload = await response.json();
+            alert(payload.message || payload.error || 'Not allowed for this role.');
+          } catch (_error) {
+            alert('Action blocked.');
+          }
+          return;
+        }
+        throw new Error('Submit failed');
+      }
+      const html = await response.text();
+      root.innerHTML = html;
+      window.history.pushState({}, '', url);
+      initInstallWizard(root);
+      syncPageMeta();
+      syncNavigationState();
+      applyPageLayout();
+      initVerbosityToggle();
+      initComposerTool();
+      scrollToHash(url);
+      triggerDeepLink();
+    } catch (error) {
+      console.error(error);
+      form.submit();
+    }
+  });
+
+  window.addEventListener('popstate', () => window.location.reload());
+})();
