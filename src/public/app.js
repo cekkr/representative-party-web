@@ -191,13 +191,24 @@ async function submitDelegationChoice(form) {
 }
 
 let composerToolState = null;
+let composerToolRoot = null;
 
 function initComposerTool() {
   const tool = document.querySelector('[data-composer-tool]');
-  const allowed = document.body?.dataset?.composerAllowed === 'true';
-  if (!tool || !allowed) return;
-  if (!composerToolState) {
+  if (!tool) return;
+  const allowed =
+    document.body?.dataset?.composerAllowed === 'true' || tool.dataset?.composerAllowed === 'true';
+  if (!allowed) {
+    tool.hidden = true;
+    if (document.body) {
+      document.body.dataset.composerMode = 'off';
+    }
+    return;
+  }
+  tool.hidden = false;
+  if (!composerToolState || composerToolRoot !== tool) {
     composerToolState = createComposerTool(tool);
+    composerToolRoot = tool;
   }
   composerToolState.refresh();
 }
