@@ -1,12 +1,12 @@
-import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { getPerson } from '../../../modules/identity/person.js';
-import { buildDelegateProfile } from '../../../modules/delegation/delegateProfiles.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
-import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderPage } from '../views/templates.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
-import { renderModuleDisabled } from '../views/moduleGate.js';
+import { isModuleEnabled } from '../../../../modules/circle/modules.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { buildDelegateProfile } from '../../../../modules/delegation/delegateProfiles.js';
+import { sendHtml, sendJson } from '../../../../shared/utils/http.js';
+import { escapeHtml, sanitizeText } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { renderPage } from '../../views/templates.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
+import { renderModuleDisabled } from '../../views/moduleGate.js';
 
 export async function renderDelegateProfile({ req, res, state, wantsPartial, params }) {
   if (!isModuleEnabled(state, 'delegation')) {

@@ -1,23 +1,23 @@
 import { randomUUID } from 'node:crypto';
 
-import { getPerson } from '../../../modules/identity/person.js';
-import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
-import { getTopicConfig } from '../../../modules/topics/topicGardenerClient.js';
-import { formatTopicList, getTopicPreferences, normalizeTopicKey, storeTopicPreferences } from '../../../modules/topics/preferences.js';
-import { ensureTopicPath } from '../../../modules/topics/registry.js';
-import { logTransaction } from '../../../modules/transactions/registry.js';
-import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
-import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
-import { recordRateLimit } from '../../../modules/ops/metrics.js';
-import { renderDiscussionList } from '../views/discussionView.js';
-import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
-import { renderPage } from '../views/templates.js';
-import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../views/topicHelpers.js';
-import { renderCalloutRow } from '../views/shared.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { evaluateAction, getCirclePolicyState } from '../../../../modules/circle/policy.js';
+import { getTopicConfig } from '../../../../modules/topics/topicGardenerClient.js';
+import { formatTopicList, getTopicPreferences, normalizeTopicKey, storeTopicPreferences } from '../../../../modules/topics/preferences.js';
+import { ensureTopicPath } from '../../../../modules/topics/registry.js';
+import { logTransaction } from '../../../../modules/transactions/registry.js';
+import { persistDiscussions, persistProfileAttributes } from '../../../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../../../modules/federation/replication.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { parseEvidenceLinks, sanitizeText } from '../../../../shared/utils/text.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../../modules/identity/rateLimit.js';
+import { recordRateLimit } from '../../../../modules/ops/metrics.js';
+import { renderDiscussionList } from '../../views/discussionView.js';
+import { getActorLabels, resolvePersonHandle } from '../../views/actorLabel.js';
+import { renderPage } from '../../views/templates.js';
+import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../../views/topicHelpers.js';
+import { renderCalloutRow } from '../../views/shared.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);

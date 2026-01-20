@@ -1,11 +1,11 @@
-import { getPerson } from '../../../modules/identity/person.js';
-import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { countVisibleEntries } from '../../../modules/federation/replication.js';
-import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { sendHtml, sendRedirect } from '../../../shared/utils/http.js';
-import { renderSocialFeed } from './social.js';
-import { renderPage } from '../views/templates.js';
-import { getActorLabels } from '../views/actorLabel.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { buildPolicyGates, getCirclePolicyState, getEffectivePolicy } from '../../../../modules/circle/policy.js';
+import { countVisibleEntries } from '../../../../modules/federation/replication.js';
+import { isModuleEnabled } from '../../../../modules/circle/modules.js';
+import { sendHtml, sendRedirect } from '../../../../shared/utils/http.js';
+import { renderSocialFeed } from '../social/social.js';
+import { renderPage } from '../../views/templates.js';
+import { getActorLabels } from '../../views/actorLabel.js';
 
 export async function renderHome({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);

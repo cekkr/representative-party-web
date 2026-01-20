@@ -1,14 +1,14 @@
-import { DATA_DEFAULTS, MEDIA, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../config.js';
-import { computeLedgerHash } from '../../../modules/circle/federation.js';
+import { DATA_DEFAULTS, MEDIA, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../../../config.js';
+import { computeLedgerHash } from '../../../../modules/circle/federation.js';
 import {
   applySigningKeysToEnv,
   fingerprintPublicKey,
   generateSigningKeyPair,
   resolveSigningKeys,
-} from '../../../modules/circle/signingKeys.js';
-import { DEFAULT_TOPIC_ANCHORS } from '../../../modules/topics/topicGardenerClient.js';
-import { syncTopicGardenerOperations } from '../../../modules/topics/gardenerSync.js';
-import { getGovernanceSettings, normalizeGovernanceSettings } from '../../../modules/governance/constitution.js';
+} from '../../../../modules/circle/signingKeys.js';
+import { DEFAULT_TOPIC_ANCHORS } from '../../../../modules/topics/topicGardenerClient.js';
+import { syncTopicGardenerOperations } from '../../../../modules/topics/gardenerSync.js';
+import { getGovernanceSettings, normalizeGovernanceSettings } from '../../../../modules/governance/constitution.js';
 import {
   appendTopicHistory,
   applyTopicMerge,
@@ -20,7 +20,7 @@ import {
   labelFromKey,
   normalizeTopicKey,
   normalizeTopicLabel,
-} from '../../../modules/topics/registry.js';
+} from '../../../../modules/topics/registry.js';
 import {
   persistPeers,
   persistProfileAttributes,
@@ -29,37 +29,37 @@ import {
   persistSessions,
   persistSettings,
   persistSocialMedia,
-} from '../../../infra/persistence/storage.js';
+} from '../../../../infra/persistence/storage.js';
 import {
   evaluateAction,
   getCirclePolicyState,
   getEffectivePolicy,
   resolveDefaultActorRole,
-} from '../../../modules/circle/policy.js';
+} from '../../../../modules/circle/policy.js';
 import {
   getProviderBlindSettings,
   normalizeProviderBlindSettings,
   validateProviderBlindSettings,
-} from '../../../modules/circle/ringRegistry.js';
-import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../modules/circle/modules.js';
-import { listAvailableExtensions } from '../../../modules/extensions/registry.js';
-import { pullGossipNow, pushGossipNow } from '../../../modules/federation/gossip.js';
-import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
-import { normalizePeerUrl } from '../../../modules/federation/peers.js';
-import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../../modules/federation/quarantine.js';
+} from '../../../../modules/circle/ringRegistry.js';
+import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../../../modules/circle/modules.js';
+import { listAvailableExtensions } from '../../../../modules/extensions/registry.js';
+import { pullGossipNow, pushGossipNow } from '../../../../modules/federation/gossip.js';
+import { listPeerCapabilities } from '../../../../modules/federation/capabilities.js';
+import { normalizePeerUrl } from '../../../../modules/federation/peers.js';
+import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../../../modules/federation/quarantine.js';
 import {
   describeProfile,
   filterVisibleEntries,
   getReplicationProfile,
   isGossipEnabled,
-} from '../../../modules/federation/replication.js';
-import { getPerson } from '../../../modules/identity/person.js';
-import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../modules/identity/rateLimit.js';
-import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
-import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
-import { getMetricsSnapshot, getOpsMetricsConfig } from '../../../modules/ops/metrics.js';
-import { listTransactions, logTransaction } from '../../../modules/transactions/registry.js';
-import { findMedia, updateMediaStatus } from '../../../modules/social/media.js';
+} from '../../../../modules/federation/replication.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../../../modules/identity/rateLimit.js';
+import { invalidateSessionIndex } from '../../../../modules/identity/sessions.js';
+import { summarizeOutboundDeliveries } from '../../../../modules/messaging/outbound.js';
+import { getMetricsSnapshot, getOpsMetricsConfig } from '../../../../modules/ops/metrics.js';
+import { listTransactions, logTransaction } from '../../../../modules/transactions/registry.js';
+import { findMedia, updateMediaStatus } from '../../../../modules/social/media.js';
 import {
   describeCanonicalProfile,
   formatProviderFieldsForTextarea,
@@ -67,15 +67,15 @@ import {
   parseAttributePayloadWithValidation,
   parseProviderFieldInput,
   upsertProviderAttributes,
-} from '../../../modules/structure/structureManager.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml, formatBytes, sanitizeText } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
-import { renderPage } from '../views/templates.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
-import { renderPreviewPill } from '../views/shared.js';
+} from '../../../../modules/structure/structureManager.js';
+import { sendHtml, sendJson } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { escapeHtml, formatBytes, sanitizeText } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { normalizeVerbosityMode, parseBoolean } from '../../../../shared/utils/parse.js';
+import { renderPage } from '../../views/templates.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
+import { renderPreviewPill } from '../../views/shared.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 

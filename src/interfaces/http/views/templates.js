@@ -10,6 +10,26 @@ import { renderNav } from './navigation.js';
 import { deriveStatusMeta, renderStatusStrip } from './status.js';
 
 const templateCache = new Map();
+const HTTP_MODULES_ROOT = join(PATHS.ROOT, 'interfaces', 'http', 'modules');
+const TEMPLATE_MODULES = {
+  layout: 'core',
+  error: 'core',
+  'module-disabled': 'core',
+  home: 'home',
+  'auth-eudi': 'auth',
+  'verification-complete': 'auth',
+  discussion: 'discussion',
+  forum: 'forum',
+  governance: 'governance',
+  petitions: 'petitions',
+  groups: 'groups',
+  delegation: 'delegation',
+  'delegate-profile': 'delegates',
+  notifications: 'notifications',
+  profile: 'profile',
+  social: 'social',
+  admin: 'admin',
+};
 
 export async function renderPage(templateName, data = {}, { wantsPartial = false, title = DEFAULT_PAGE_TITLE, state } = {}) {
   const bodyTemplate = await loadTemplate(templateName);
@@ -106,7 +126,10 @@ async function loadTemplate(name) {
   if (templateCache.has(name)) {
     return templateCache.get(name);
   }
-  const filePath = join(PATHS.TEMPLATE_ROOT, `${name}.html`);
+  const moduleName = TEMPLATE_MODULES[name];
+  const filePath = moduleName
+    ? join(HTTP_MODULES_ROOT, moduleName, 'templates', `${name}.html`)
+    : join(PATHS.TEMPLATE_ROOT, `${name}.html`);
   const content = await readFile(filePath, 'utf-8');
   templateCache.set(name, content);
   return content;

@@ -1,19 +1,19 @@
-import { getPerson } from '../../../modules/identity/person.js';
-import { evaluateAction } from '../../../modules/circle/policy.js';
-import { chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../../modules/delegation/delegation.js';
-import { recommendDelegationForPerson } from '../../../modules/groups/groups.js';
-import { getTopicConfig } from '../../../modules/topics/topicGardenerClient.js';
-import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../../modules/topics/preferences.js';
-import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderPage } from '../views/templates.js';
-import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
-import { buildTopicOptions, renderTopicDatalist } from '../views/topicHelpers.js';
-import { renderIssuerPill, renderPreviewPill } from '../views/shared.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { evaluateAction } from '../../../../modules/circle/policy.js';
+import { chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../../../modules/delegation/delegation.js';
+import { recommendDelegationForPerson } from '../../../../modules/groups/groups.js';
+import { getTopicConfig } from '../../../../modules/topics/topicGardenerClient.js';
+import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../../../modules/topics/preferences.js';
+import { isModuleEnabled } from '../../../../modules/circle/modules.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { escapeHtml, sanitizeText } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { renderPage } from '../../views/templates.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../../views/moduleGate.js';
+import { buildTopicOptions, renderTopicDatalist } from '../../views/topicHelpers.js';
+import { renderIssuerPill, renderPreviewPill } from '../../views/shared.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
 
 export async function resolveConflict({ req, res, state }) {
   if (!isModuleEnabled(state, 'delegation')) {

@@ -51,7 +51,7 @@ This file captures the essential implementation directives. Keep it in sync with
 - **State/persistence**: `src/infra/persistence/storage.js` (interface), adapter drivers under `src/infra/persistence/adapters/` (json/memory/sql/kv/mysql/mongodb), replication/validation helpers in `src/modules/federation/replication.js`, migrations in `src/infra/persistence/migrations.js`, and the store entry in `src/infra/persistence/store.js` (social follows + micro-posts + media metadata persist through the same adapters; media binaries stay provider-local).
 - **Helper services**: AI/ML workers live in `src/infra/workers/` (Python projects, e.g., topic gardener). Node code should call them via `src/modules/topics/topicGardenerClient.js` to avoid conflicting provider outputs and duplicated computation across classification providers.
 - **Shared utilities**: `src/shared/utils/` (http helpers, request parsing, text sanitization/escaping).
-- **Assets**: `src/public/` (templates, CSS, JS). Static served from `/public/*`.
+- **Assets**: static CSS/JS in `src/public/`; SSR templates live under `src/interfaces/http/modules/*/templates/` with layout in `src/interfaces/http/modules/core/templates/`. Static served from `/public/*`.
 
 ## UX contract (Phase 1)
 - SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.

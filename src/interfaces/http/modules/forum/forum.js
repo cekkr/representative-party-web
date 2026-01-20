@@ -1,19 +1,19 @@
 import { randomUUID } from 'node:crypto';
 
-import { getPerson } from '../../../modules/identity/person.js';
-import { classifyTopic } from '../../../modules/topics/classification.js';
-import { ensureTopicPath } from '../../../modules/topics/registry.js';
-import { evaluateAction, getCirclePolicyState } from '../../../modules/circle/policy.js';
-import { logTransaction } from '../../../modules/transactions/registry.js';
-import { persistDiscussions } from '../../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../../modules/federation/replication.js';
-import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
-import { renderForum } from '../views/forumView.js';
-import { renderPage } from '../views/templates.js';
-import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
-import { recordRateLimit } from '../../../modules/ops/metrics.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { classifyTopic } from '../../../../modules/topics/classification.js';
+import { ensureTopicPath } from '../../../../modules/topics/registry.js';
+import { evaluateAction, getCirclePolicyState } from '../../../../modules/circle/policy.js';
+import { logTransaction } from '../../../../modules/transactions/registry.js';
+import { persistDiscussions } from '../../../../infra/persistence/storage.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../../../modules/federation/replication.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { parseEvidenceLinks, sanitizeText } from '../../../../shared/utils/text.js';
+import { renderForum } from '../../views/forumView.js';
+import { renderPage } from '../../views/templates.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../../modules/identity/rateLimit.js';
+import { recordRateLimit } from '../../../../modules/ops/metrics.js';
 
 export async function renderForumRoute({ req, res, state, wantsPartial, url }) {
   return renderForumPage({ req, res, state, wantsPartial, url });

@@ -59,6 +59,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Theme-level verbosity controls are live: admin default + per-session overrides in `/profile`, plus a top‑bar toggle and per‑page presets via Composer.
 - Composer mode now supports per-page layout ordering (including main/aside swaps), panel hiding, and per-page verbosity presets.
+- HTTP templates now live under `src/interfaces/http/modules/*/templates/` with per-module controllers in `src/interfaces/http/modules/<module>/` for clearer ownership.
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
@@ -71,7 +72,6 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
 - Admin Composer: extend the layout builder with component-level property editing and richer template/module compatibility beyond panels + nav (DOM tree/layers sidebar, movable/collapsible floating inspector, component palette, and persistent DOM mutation storage for reorder/wrap/insert/delete operations).
-- Template organization: relocate module templates under their owning `src/modules/<module>/` folders (with per-module view helpers/controllers) and split large templates into composable sub-templates per module surface.
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.

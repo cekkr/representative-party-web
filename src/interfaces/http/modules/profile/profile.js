@@ -1,26 +1,26 @@
-import { getPerson } from '../../../modules/identity/person.js';
-import { persistProfileAttributes } from '../../../infra/persistence/storage.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { persistProfileAttributes } from '../../../../infra/persistence/storage.js';
 import {
   normalizeProviderFields,
   parseAttributePayloadWithValidation,
   upsertProviderAttributes,
-} from '../../../modules/structure/structureManager.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
-import { getActorLabels, resolvePersonHandle } from '../views/actorLabel.js';
-import { renderPage } from '../views/templates.js';
+} from '../../../../modules/structure/structureManager.js';
+import { sendHtml, sendJson } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { escapeHtml } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { normalizeVerbosityMode, parseBoolean } from '../../../../shared/utils/parse.js';
+import { getActorLabels, resolvePersonHandle } from '../../views/actorLabel.js';
+import { renderPage } from '../../views/templates.js';
 import {
   buildProfileValues,
   normalizeProfilePayload,
   renderProfileForm,
   renderProfileSummary,
   renderUiPreferencesForm,
-} from '../views/profileView.js';
-import { invalidateSessionIndex } from '../../../modules/identity/sessions.js';
-import { persistSessions } from '../../../infra/persistence/storage.js';
+} from '../../views/profileView.js';
+import { invalidateSessionIndex } from '../../../../modules/identity/sessions.js';
+import { persistSessions } from '../../../../infra/persistence/storage.js';
 
 export async function renderProfile({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);

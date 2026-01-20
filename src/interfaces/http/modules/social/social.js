@@ -3,11 +3,11 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { getPerson } from '../../../modules/identity/person.js';
-import { evaluateAction } from '../../../modules/circle/policy.js';
-import { isModuleEnabled } from '../../../modules/circle/modules.js';
-import { MEDIA, PATHS } from '../../../config.js';
-import { persistSocialFollows, persistSocialPosts, persistSocialMedia } from '../../../infra/persistence/storage.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { evaluateAction } from '../../../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../../../modules/circle/modules.js';
+import { MEDIA, PATHS } from '../../../../config.js';
+import { persistSocialFollows, persistSocialPosts, persistSocialMedia } from '../../../../infra/persistence/storage.js';
 import {
   DEFAULT_FOLLOW_TYPES,
   ensureFollowEdge,
@@ -15,27 +15,27 @@ import {
   normalizeFollowType,
   removeFollowEdge,
   summarizeFollows,
-} from '../../../modules/social/followGraph.js';
-import { buildFeed, createPost, findPost, invalidatePostIndex } from '../../../modules/social/posts.js';
+} from '../../../../modules/social/followGraph.js';
+import { buildFeed, createPost, findPost, invalidatePostIndex } from '../../../../modules/social/posts.js';
 import {
   createMedia,
   findMedia,
   hasBlockedMedia,
   recordMediaViewRequest,
   reportMedia,
-} from '../../../modules/social/media.js';
-import { notifyMediaViewRequest, notifySocialParticipants } from '../../../modules/social/notifications.js';
-import { logTransaction } from '../../../modules/transactions/registry.js';
-import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
-import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
-import { renderPage } from '../views/templates.js';
-import { renderFollowList, renderSocialPosts } from '../views/socialView.js';
-import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
-import { consumeRateLimit, resolveRateLimitActor } from '../../../modules/identity/rateLimit.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
-import { recordRateLimit } from '../../../modules/ops/metrics.js';
-import { renderCalloutRow } from '../views/shared.js';
+} from '../../../../modules/social/media.js';
+import { notifyMediaViewRequest, notifySocialParticipants } from '../../../../modules/social/notifications.js';
+import { logTransaction } from '../../../../modules/transactions/registry.js';
+import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../../shared/utils/http.js';
+import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../../shared/utils/request.js';
+import { sanitizeText } from '../../../../shared/utils/text.js';
+import { renderPage } from '../../views/templates.js';
+import { renderFollowList, renderSocialPosts } from '../../views/socialView.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../../views/moduleGate.js';
+import { consumeRateLimit, resolveRateLimitActor } from '../../../../modules/identity/rateLimit.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
+import { recordRateLimit } from '../../../../modules/ops/metrics.js';
+import { renderCalloutRow } from '../../views/shared.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {

@@ -329,7 +329,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - `src/index.js`, `src/app/server.js`, `src/app/router.js`
 
 ### Interfaces (HTTP)
-- Controllers: `src/interfaces/http/controllers/`
+- Controllers: `src/interfaces/http/modules/<module>/<module>.js` for UI modules, plus non-UI endpoints in `src/interfaces/http/controllers/`
 - View helpers: `src/interfaces/http/views/`
 
 ### Domain modules
@@ -342,7 +342,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - Shared utilities: `src/shared/utils/`
 
 ### Views / assets
-- SSR templates: `src/public/templates/`
+- SSR templates: `src/interfaces/http/modules/*/templates/` (core layout under `src/interfaces/http/modules/core/templates/`)
 - Styles/JS: `src/public/app.css`, `src/public/app.js`
 
 ### Extensions
@@ -357,7 +357,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 
 ## Capabilities by module (endpoints + internals)
 
-- **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/controllers/auth.js`. Pending sessions can be resumed with `?session={id}`.
+- **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/interfaces/http/modules/auth/auth.js`. Pending sessions can be resumed with `?session={id}`.
 - **Uniqueness Ledger + circle sync:** ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes + capability hints, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
 - **Policy gates:** role-aware checks (person/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
@@ -373,12 +373,12 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 
 ## UI & templating (extension‑aware)
 
-- SSR‑first shell lives in `src/public/templates/` with `layout.html` wrapping page templates; status strip surfaces Circle enforcement + validation/preview state so users see why content is gated. Styles/JS in `src/public/app.css` and `src/public/app.js`.
+- SSR‑first shell lives in `src/interfaces/http/modules/*/templates/` with `src/interfaces/http/modules/core/templates/layout.html` wrapping page templates; status strip surfaces Circle enforcement + validation/preview state so users see why content is gated. Styles/JS in `src/public/app.css` and `src/public/app.js`.
 - Navigation and panels stay modular: keep links visible only for enabled modules (discussion/forum/social/petitions/delegation/groups) to avoid dead ends; module toggles live in `/admin` and extension toggles (`/extensions` or `CIRCLE_EXTENSIONS`) drive policy badges and gate messages.
 - Verbosity controls: admin sets the default UI verbosity (full vs compact), verified users can override per session under `/profile` or from the top‑bar toggle, and admins can set per‑page presets via the Composer tool.
 - Composer mode: admin-only floating tool for inline text/style edits, nav ordering, per-page layout (drag panels between columns, hide panels), and per-page verbosity presets.
 - Preview/provenance cues are consistent across modules (pills for `Preview` and `from {issuer}`); when `DATA_PREVIEW=false`, the server hides previews, otherwise label them. Social feed shows follow‑type filters + inline replies; discussion/forum reuse the same pill language.
-- Templating personalization: duplicate templates under `src/public/templates/` to theme per deployment (colors/fonts can be tweaked in `app.css`); keep SSR placeholders (`{{...}}`) intact for router partial responses. Avoid SPA‑only components to preserve partial‑render navigation.
+- Templating personalization: duplicate templates under `src/interfaces/http/modules/*/templates/` to theme per deployment (colors/fonts can be tweaked in `app.css`); keep SSR placeholders (`{{...}}`) intact for router partial responses. Avoid SPA‑only components to preserve partial‑render navigation.
 - Extension UI hooks: use light‑touch badges or info strips to signal tightened policies (extension‑driven gate changes) instead of new flows; policy messages come from `circle/policy` so custom extensions display automatically. Notifications and social mentions reuse the same renderer to keep UX coherent across modules.
 
 ---
@@ -456,7 +456,7 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 ```
 
 - The app is SSR‑first with a vanilla router interceptor: set `X-Requested-With: partial` to fetch partial HTML for app‑like navigation.
-- Static assets/templates live in `src/public`; keep new templates under `src/public/templates`.
+- Static assets live in `src/public`; keep new templates under `src/interfaces/http/modules/<module>/templates/`.
 
 ---
 

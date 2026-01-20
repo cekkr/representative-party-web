@@ -1,6 +1,6 @@
-import { getPerson } from '../../../modules/identity/person.js';
-import { evaluateAction } from '../../../modules/circle/policy.js';
-import { isModuleEnabled } from '../../../modules/circle/modules.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { evaluateAction } from '../../../../modules/circle/policy.js';
+import { isModuleEnabled } from '../../../../modules/circle/modules.js';
 import {
   createGroup,
   findGroupById,
@@ -10,19 +10,19 @@ import {
   leaveGroup,
   listGroups,
   setGroupDelegate,
-} from '../../../modules/groups/groups.js';
-import { createNotification } from '../../../modules/messaging/notifications.js';
-import { getGroupPolicy, setGroupPolicy } from '../../../modules/groups/groupPolicy.js';
-import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../../modules/groups/groupElections.js';
-import { logTransaction } from '../../../modules/transactions/registry.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderPage } from '../views/templates.js';
-import { renderModuleDisabled, sendModuleDisabledJson } from '../views/moduleGate.js';
-import { renderIssuerPill, renderPreviewPill } from '../views/shared.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
+} from '../../../../modules/groups/groups.js';
+import { createNotification } from '../../../../modules/messaging/notifications.js';
+import { getGroupPolicy, setGroupPolicy } from '../../../../modules/groups/groupPolicy.js';
+import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../../../modules/groups/groupElections.js';
+import { logTransaction } from '../../../../modules/transactions/registry.js';
+import { sendHtml, sendJson } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { escapeHtml, sanitizeText } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { renderPage } from '../../views/templates.js';
+import { renderModuleDisabled, sendModuleDisabledJson } from '../../views/moduleGate.js';
+import { renderIssuerPill, renderPreviewPill } from '../../views/shared.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {

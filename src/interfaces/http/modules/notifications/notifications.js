@@ -1,15 +1,15 @@
-import { getPerson } from '../../../modules/identity/person.js';
-import { listNotificationsForPerson, markAllRead } from '../../../modules/messaging/notifications.js';
-import { resolveNotificationPreferences } from '../../../modules/messaging/outbound.js';
-import { persistProfileAttributes } from '../../../infra/persistence/storage.js';
-import { upsertProviderAttributes } from '../../../modules/structure/structureManager.js';
-import { escapeHtml } from '../../../shared/utils/text.js';
-import { formatTimestamp } from '../../../shared/utils/time.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
-import { readRequestBody } from '../../../shared/utils/request.js';
-import { parseBoolean } from '../../../shared/utils/parse.js';
-import { renderPage } from '../views/templates.js';
-import { resolvePersonHandle } from '../views/actorLabel.js';
+import { getPerson } from '../../../../modules/identity/person.js';
+import { listNotificationsForPerson, markAllRead } from '../../../../modules/messaging/notifications.js';
+import { resolveNotificationPreferences } from '../../../../modules/messaging/outbound.js';
+import { persistProfileAttributes } from '../../../../infra/persistence/storage.js';
+import { upsertProviderAttributes } from '../../../../modules/structure/structureManager.js';
+import { escapeHtml } from '../../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../../shared/utils/time.js';
+import { sendHtml, sendJson } from '../../../../shared/utils/http.js';
+import { readRequestBody } from '../../../../shared/utils/request.js';
+import { parseBoolean } from '../../../../shared/utils/parse.js';
+import { renderPage } from '../../views/templates.js';
+import { resolvePersonHandle } from '../../views/actorLabel.js';
 
 export async function renderNotifications({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
