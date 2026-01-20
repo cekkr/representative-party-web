@@ -192,6 +192,7 @@ async function submitDelegationChoice(form) {
 
 let composerToolState = null;
 let composerToolRoot = null;
+let composerOverlay = null;
 
 function initComposerTool() {
   const tool = document.querySelector('[data-composer-tool]');
@@ -202,6 +203,9 @@ function initComposerTool() {
     tool.hidden = true;
     if (document.body) {
       document.body.dataset.composerMode = 'off';
+    }
+    if (composerOverlay) {
+      composerOverlay.style.display = 'none';
     }
     return;
   }
@@ -231,11 +235,17 @@ function createComposerTool(tool) {
   const pageVerbositySelect = tool.querySelector('[data-composer-page-verbosity]');
   const pageVerbosityLabel = tool.querySelector('[data-composer-page-label]');
   const styleInputs = Array.from(tool.querySelectorAll('[data-composer-style]'));
+  const overlay = ensureComposerOverlay();
+  const overlayLabel = overlay?.querySelector('[data-composer-overlay-label]');
+  const overlayClear = overlay?.querySelector('[data-composer-overlay-clear]');
+  const overlayExit = overlay?.querySelector('[data-composer-overlay-exit]');
 
   let state = readComposerSettings();
   let hasDirty = false;
   let selected = null;
   let dragInfo = null;
+  let overlayFrame = null;
+  let overlayBound = false;
   const getPageKey = () => document.body?.dataset?.pageKey || 'default';
 
   const setStatus = (message, isError = false) => {
@@ -245,10 +255,101 @@ function createComposerTool(tool) {
   };
 
   const isActive = () => body.dataset.composerMode === 'on';
+
+  const updateToggleLabel = (active) => {
+    if (!toggle) return;
+    toggle.textContent = active ? 'Exit Composer' : 'Enter Composer';
+  };
+
+  const getEditableText = (el) => {
+    if (!el) return '';
+    if (el.matches('input, textarea')) {
+      return (el.value || el.placeholder || '').trim();
+    }
+    return (el.textContent || '').trim();
+  };
+
+  const setEditableText = (el, value) => {
+    if (!el) return;
+    if (el.matches('input, textarea')) {
+      el.value = value;
+      return;
+    }
+    el.textContent = value;
+  };
+
+  const describeSelection = (entry) => {
+    if (!entry?.el) return 'No selection';
+    const tag = entry.el.tagName ? entry.el.tagName.toLowerCase() : 'element';
+    const text = getEditableText(entry.el).replace(/\s+/g, ' ');
+    const clipped = text ? `${text.slice(0, 36)}${text.length > 36 ? '...' : ''}` : '';
+    const key = entry.key || tag;
+    return clipped ? `${key} (${tag}) "${clipped}"` : `${key} (${tag})`;
+  };
+
+  const updateOverlay = () => {
+    if (!overlay) return;
+    if (!isActive() || !selected?.el) {
+      overlay.style.display = 'none';
+      return;
+    }
+    const rect = selected.el.getBoundingClientRect();
+    const inView =
+      rect.width > 0 &&
+      rect.height > 0 &&
+      rect.bottom > 0 &&
+      rect.right > 0 &&
+      rect.top < window.innerHeight &&
+      rect.left < window.innerWidth;
+    if (!inView) {
+      overlay.style.display = 'none';
+      return;
+    }
+    overlay.style.display = 'block';
+    overlay.style.left = `${rect.left}px`;
+    overlay.style.top = `${rect.top}px`;
+    overlay.style.width = `${rect.width}px`;
+    overlay.style.height = `${rect.height}px`;
+    if (overlayLabel) {
+      overlayLabel.textContent = describeSelection(selected);
+    }
+  };
+
+  const scheduleOverlayUpdate = () => {
+    if (!overlay || !selected || !isActive()) return;
+    if (overlayFrame) return;
+    overlayFrame = window.requestAnimationFrame(() => {
+      overlayFrame = null;
+      updateOverlay();
+    });
+  };
+
+  const bindOverlayEvents = () => {
+    if (overlayBound) return;
+    overlayBound = true;
+    window.addEventListener('resize', scheduleOverlayUpdate);
+    window.addEventListener('scroll', scheduleOverlayUpdate, true);
+  };
+
+  const unbindOverlayEvents = () => {
+    if (!overlayBound) return;
+    overlayBound = false;
+    window.removeEventListener('resize', scheduleOverlayUpdate);
+    window.removeEventListener('scroll', scheduleOverlayUpdate, true);
+  };
+
   const setMode = (active) => {
     body.dataset.composerMode = active ? 'on' : 'off';
     if (toggle) toggle.setAttribute('aria-expanded', String(active));
-    if (!active) clearSelection();
+    updateToggleLabel(active);
+    if (!active) {
+      clearSelection();
+      unbindOverlayEvents();
+    } else {
+      setStatus('Composer mode active.');
+      bindOverlayEvents();
+      scheduleOverlayUpdate();
+    }
   };
 
   const clearSelection = () => {
@@ -261,6 +362,7 @@ function createComposerTool(tool) {
     styleInputs.forEach((input) => {
       input.value = '';
     });
+    if (overlay) overlay.style.display = 'none';
   };
 
   const applyStyleOverrides = (el, overrides) => {
@@ -278,19 +380,53 @@ function createComposerTool(tool) {
       selected.el.classList.remove('is-composer-selected');
       selected.el.removeAttribute('contenteditable');
     }
-    const defaultText = el.dataset.composerDefault || el.textContent.trim();
+    const defaultText = el.dataset.composerDefault || getEditableText(el);
     selected = { el, key, defaultText };
     el.classList.add('is-composer-selected');
-    el.setAttribute('contenteditable', 'true');
-    if (textInput) textInput.value = el.textContent.trim();
-    if (selectionNote) selectionNote.textContent = `Editing ${key}`;
+    if (textInput) textInput.value = getEditableText(el);
+    if (selectionNote) selectionNote.textContent = `Selected ${key}. Double click to edit.`;
     const styleOverrides = state.styleOverrides?.[key] || {};
     applyStyleOverrides(el, styleOverrides);
     styleInputs.forEach((input) => {
       const prop = input.dataset.composerStyle;
       input.value = styleOverrides[prop] || '';
     });
+    updateOverlay();
+  };
+
+  const startInlineEditing = (el) => {
+    const key = el?.dataset?.composerKey || '';
+    if (!key) return;
+    if (el.matches('input, textarea, select')) {
+      selectElement(el);
+      el.focus({ preventScroll: true });
+      return;
+    }
+    selectElement(el);
+    if (el.getAttribute('contenteditable') === 'true') return;
+    el.setAttribute('contenteditable', 'true');
     el.focus({ preventScroll: true });
+    const selection = window.getSelection();
+    if (selection) {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
+    const onKey = (event) => {
+      if (event.key === 'Enter' || event.key === 'Escape') {
+        event.preventDefault();
+        el.blur();
+      }
+    };
+    const stop = () => {
+      el.removeAttribute('contenteditable');
+      el.removeEventListener('keydown', onKey);
+      scheduleOverlayUpdate();
+    };
+    el.addEventListener('blur', stop, { once: true });
+    el.addEventListener('keydown', onKey);
   };
 
   const noteDirty = () => {
@@ -300,7 +436,27 @@ function createComposerTool(tool) {
 
   const updateSelectionText = (value) => {
     if (!selected) return;
-    selected.el.textContent = value;
+    setEditableText(selected.el, value);
+    updateOverlay();
+  };
+
+  const clearSelectedOverrides = ({ clearStyles = false } = {}) => {
+    if (!selected) return;
+    if (state.textOverrides) {
+      delete state.textOverrides[selected.key];
+    }
+    if (clearStyles && state.styleOverrides) {
+      delete state.styleOverrides[selected.key];
+      applyStyleOverrides(selected.el, {});
+      styleInputs.forEach((input) => {
+        input.value = '';
+      });
+    }
+    const fallback = selected.defaultText || '';
+    if (textInput) textInput.value = fallback;
+    updateSelectionText(fallback);
+    noteDirty();
+    scheduleOverlayUpdate();
   };
 
   toggle?.addEventListener('click', () => {
@@ -309,16 +465,48 @@ function createComposerTool(tool) {
 
   closeButton?.addEventListener('click', () => setMode(false));
 
+  overlayClear?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    clearSelectedOverrides({ clearStyles: true });
+  });
+
+  overlayExit?.addEventListener('click', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setMode(false);
+  });
+
   document.addEventListener(
     'click',
     (event) => {
       if (!isActive()) return;
       if (tool.contains(event.target)) return;
+      if (overlay && overlay.contains(event.target)) return;
+      if (event.target.closest('[contenteditable="true"]')) return;
+      const target = event.target.closest('[data-composer-key]');
+      event.preventDefault();
+      event.stopPropagation();
+      if (!target) {
+        clearSelection();
+        return;
+      }
+      selectElement(target);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    'dblclick',
+    (event) => {
+      if (!isActive()) return;
+      if (tool.contains(event.target)) return;
+      if (overlay && overlay.contains(event.target)) return;
       const target = event.target.closest('[data-composer-key]');
       if (!target) return;
       event.preventDefault();
       event.stopPropagation();
-      selectElement(target);
+      startInlineEditing(target);
     },
     true,
   );
@@ -326,6 +514,14 @@ function createComposerTool(tool) {
   document.addEventListener('keydown', (event) => {
     if (!isActive()) return;
     if (event.key === 'Escape') {
+      if (selected?.el?.getAttribute('contenteditable') === 'true') {
+        selected.el.blur();
+        return;
+      }
+      if (selected) {
+        clearSelection();
+        return;
+      }
       setMode(false);
     }
   });
@@ -333,10 +529,12 @@ function createComposerTool(tool) {
   document.addEventListener('input', (event) => {
     if (!isActive() || !selected) return;
     if (event.target !== selected.el) return;
-    if (textInput) textInput.value = selected.el.textContent.trim();
+    const value = getEditableText(selected.el);
+    if (textInput) textInput.value = value;
     state.textOverrides = state.textOverrides || {};
-    state.textOverrides[selected.key] = selected.el.textContent.trim();
+    state.textOverrides[selected.key] = value.trim();
     noteDirty();
+    updateOverlay();
   });
 
   textInput?.addEventListener('input', () => {
@@ -345,6 +543,7 @@ function createComposerTool(tool) {
     state.textOverrides = state.textOverrides || {};
     state.textOverrides[selected.key] = textInput.value.trim();
     noteDirty();
+    scheduleOverlayUpdate();
   });
 
   applyButton?.addEventListener('click', () => {
@@ -361,17 +560,11 @@ function createComposerTool(tool) {
     state.textOverrides[selected.key] = next;
     updateSelectionText(next);
     noteDirty();
+    scheduleOverlayUpdate();
   });
 
   clearButton?.addEventListener('click', () => {
-    if (!selected) return;
-    if (state.textOverrides) {
-      delete state.textOverrides[selected.key];
-    }
-    const fallback = selected.defaultText || '';
-    if (textInput) textInput.value = fallback;
-    updateSelectionText(fallback);
-    noteDirty();
+    clearSelectedOverrides();
   });
 
   styleInputs.forEach((input) => {
@@ -388,6 +581,7 @@ function createComposerTool(tool) {
       }
       applyStyleOverrides(selected.el, state.styleOverrides[selected.key]);
       noteDirty();
+      scheduleOverlayUpdate();
     });
   });
 
@@ -704,7 +898,41 @@ function createComposerTool(tool) {
     }
   };
 
+  updateToggleLabel(isActive());
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', String(isActive()));
+  }
+  if (isActive()) {
+    bindOverlayEvents();
+    scheduleOverlayUpdate();
+  } else if (overlay) {
+    overlay.style.display = 'none';
+  }
+
   return { refresh };
+}
+
+function ensureComposerOverlay() {
+  if (composerOverlay && document.body?.contains(composerOverlay)) {
+    return composerOverlay;
+  }
+  if (!document.body) return null;
+  const overlay = document.createElement('div');
+  overlay.className = 'composer-overlay';
+  overlay.dataset.composerOverlay = 'true';
+  overlay.style.display = 'none';
+  overlay.innerHTML = `
+    <div class="composer-overlay__bar">
+      <span class="composer-overlay__label" data-composer-overlay-label>Selection</span>
+      <div class="composer-overlay__tools">
+        <button class="ghost composer-overlay__action" type="button" data-composer-overlay-clear>Clear</button>
+        <button class="ghost composer-overlay__action" type="button" data-composer-overlay-exit>Exit</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  composerOverlay = overlay;
+  return composerOverlay;
 }
 
 function readComposerSettings() {

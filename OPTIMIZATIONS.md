@@ -21,6 +21,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
+- Use ResizeObserver/IntersectionObserver to update composer overlay bounds only when selection or layout changes, avoiding continuous scroll listeners.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.

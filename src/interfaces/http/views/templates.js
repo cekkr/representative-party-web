@@ -155,7 +155,7 @@ function renderPageMeta(meta = {}) {
 function buildComposerControls() {
   return `
     <div class="composer-tool" data-composer-tool data-composer-allowed="true">
-      <button class="composer-tool__fab" type="button" data-composer-toggle aria-expanded="false">Composer</button>
+      <button class="composer-tool__fab" type="button" data-composer-toggle aria-expanded="false">Enter Composer</button>
       <aside class="composer-tool__panel" data-composer-panel aria-label="Composer tools">
         <div class="composer-tool__header">
           <div>
