@@ -67,11 +67,22 @@ const COMPOSER_STYLE_PROPS = [
   'color',
   'background',
   'fontSize',
+  'fontWeight',
+  'fontStyle',
+  'textAlign',
+  'textDecoration',
+  'lineHeight',
+  'letterSpacing',
   'borderRadius',
   'padding',
   'margin',
   'border',
   'boxShadow',
+  'gap',
+  'gridTemplateColumns',
+  'gridAutoFlow',
+  'alignItems',
+  'justifyContent',
   'display',
   'position',
   'zIndex',
@@ -85,6 +96,20 @@ function readComposerTextValue(node) {
     return (node.value || node.placeholder || '').trim();
   }
   return (node.textContent || '').trim();
+}
+
+function normalizeOverrideMap(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  return value;
+}
+
+function buildOverrideBundle(raw = {}) {
+  const bucket = normalizeOverrideMap(raw);
+  return {
+    textOverrides: normalizeOverrideMap(bucket.textOverrides),
+    styleOverrides: normalizeOverrideMap(bucket.styleOverrides),
+    domOrders: normalizeOverrideMap(bucket.domOrders),
+  };
 }
 
 function hydrateComposerTextTargets(container, baseKey) {
@@ -160,6 +185,23 @@ function hydrateComposerTargets() {
   });
   document.querySelectorAll('.side-nav__item').forEach((item) => {
     item.dataset.composerNavItem = 'true';
+  });
+  const grids = Array.from(document.querySelectorAll('.grid:not(.form-grid)'));
+  grids.forEach((grid, index) => {
+    if (!grid.dataset.composerKey) {
+      const parentKey = grid.closest('[data-composer-key]')?.dataset.composerKey;
+      grid.dataset.composerKey = parentKey ? `${parentKey}.grid.${index + 1}` : `grid.${index + 1}`;
+    }
+    grid.dataset.composerRole = grid.dataset.composerRole || 'grid';
+    grid.dataset.composerGrid = 'true';
+    Array.from(grid.children || []).forEach((child, childIndex) => {
+      if (!child.dataset.composerKey) {
+        child.dataset.composerKey = `${grid.dataset.composerKey}.item.${childIndex + 1}`;
+      }
+      child.dataset.composerRole = child.dataset.composerRole || 'grid-item';
+      child.dataset.composerDraggable = 'true';
+      hydrateComposerTextTargets(child, child.dataset.composerKey);
+    });
   });
 }
 
@@ -273,6 +315,9 @@ function createComposerTool(tool) {
   const rawApplyButton = tool.querySelector('[data-composer-raw-apply]');
   const rawSyncButton = tool.querySelector('[data-composer-raw-sync]');
   const styleClearButton = tool.querySelector('[data-composer-style-clear]');
+  const toolbarToggles = Array.from(tool.querySelectorAll('[data-composer-toggle-style]'));
+  const toolbarSetters = Array.from(tool.querySelectorAll('[data-composer-style-set]'));
+  const gridControls = tool.querySelector('[data-composer-grid-controls]');
   const moveUpButton = tool.querySelector('[data-composer-move-up]');
   const moveDownButton = tool.querySelector('[data-composer-move-down]');
   const treeRoot = tool.querySelector('[data-composer-tree]');
@@ -297,6 +342,7 @@ function createComposerTool(tool) {
   let activeDrag = null;
   let dragBound = false;
   let panelDrag = null;
+  let dropTarget = null;
   const getPageKey = () => document.body?.dataset?.pageKey || 'default';
 
   const toolUiStorageKey = 'composer-tool-ui';
@@ -374,6 +420,38 @@ function createComposerTool(tool) {
 
   const isActive = () => body.dataset.composerMode === 'on';
 
+  const isGlobalComposerKey = (key) => {
+    if (!key) return false;
+    return key.startsWith('layout.') || key.startsWith('nav.');
+  };
+
+  const resolveOverrideScope = (key) => (isGlobalComposerKey(key) ? 'global' : 'page');
+
+  const getOverrideBucket = (scope, type) => {
+    if (scope === 'global') {
+      if (type === 'text') return state.globalTextOverrides;
+      if (type === 'style') return state.globalStyleOverrides;
+      if (type === 'dom') return state.globalDomOrders;
+    }
+    if (type === 'text') return state.pageTextOverrides;
+    if (type === 'style') return state.pageStyleOverrides;
+    if (type === 'dom') return state.pageDomOrders;
+    return null;
+  };
+
+  const isGridOrFlexParent = (el) => {
+    const parent = el?.parentElement;
+    if (!parent) return false;
+    const display = window.getComputedStyle(parent).display;
+    return display === 'grid' || display === 'flex';
+  };
+
+  const canFreeMove = (el) => {
+    if (!el) return false;
+    if (el.dataset.composerFree === 'true') return true;
+    return !isGridOrFlexParent(el);
+  };
+
   const updateToggleLabel = (active) => {
     if (!toggle) return;
     toggle.textContent = active ? 'Exit Composer' : 'Enter Composer';
@@ -450,6 +528,7 @@ function createComposerTool(tool) {
     overlay.style.top = `${rect.top}px`;
     overlay.style.width = `${rect.width}px`;
     overlay.style.height = `${rect.height}px`;
+    overlay.dataset.composerMove = canFreeMove(selected.el) ? 'enabled' : 'disabled';
     if (overlayLabel) {
       overlayLabel.textContent = describeSelection(selected);
     }
@@ -518,6 +597,7 @@ function createComposerTool(tool) {
     setInspectorDisabled(true);
     updateSelectionNotes();
     syncListSelection();
+    syncToolbarState();
     if (overlay) overlay.style.display = 'none';
   };
 
@@ -547,6 +627,7 @@ function createComposerTool(tool) {
       if (!prop) return;
       input.value = getStyleValue(prop);
     });
+    syncToolbarState();
   };
 
   const styleToRawDeclarations = (el) => {
@@ -565,39 +646,81 @@ function createComposerTool(tool) {
     rawCssInput.value = styleToRawDeclarations(selected.el);
   };
 
+  const syncToolbarState = () => {
+    const hasSelection = Boolean(selected?.el);
+    toolbarToggles.forEach((button) => {
+      const prop = normalizeStyleProp(button.dataset.composerToggleStyle || '');
+      const value = button.dataset.composerValue || '';
+      if (!prop || !hasSelection) {
+        button.classList.remove('is-active');
+        button.disabled = !hasSelection;
+        return;
+      }
+      const current = getStyleValue(prop);
+      button.classList.toggle('is-active', current === value);
+      button.disabled = false;
+    });
+    toolbarSetters.forEach((button) => {
+      const prop = normalizeStyleProp(button.dataset.composerStyleSet || '');
+      const value = button.dataset.composerValue || '';
+      if (!prop || !hasSelection) {
+        button.classList.remove('is-active');
+        button.disabled = !hasSelection;
+        return;
+      }
+      const current = getStyleValue(prop);
+      button.classList.toggle('is-active', current === value);
+      button.disabled = false;
+    });
+    if (gridControls) {
+      if (!hasSelection) {
+        gridControls.hidden = true;
+      } else {
+        const display = window.getComputedStyle(selected.el).display;
+        gridControls.hidden = !(display === 'grid' || display === 'flex' || selected.el.dataset.composerGrid === 'true');
+      }
+    }
+  };
+
   const setStyleOverride = (prop, value) => {
     if (!selected?.el || !selected?.key) return;
     const normalized = normalizeStyleProp(prop);
     if (!normalized) return;
     const trimmed = String(value || '').trim();
-    state.styleOverrides = state.styleOverrides || {};
-    const bucket = state.styleOverrides[selected.key] || {};
+    const scope = resolveOverrideScope(selected.key);
+    const styleBucket = getOverrideBucket(scope, 'style');
+    if (!styleBucket) return;
+    const bucket = styleBucket[selected.key] || {};
     if (!trimmed) {
       delete bucket[normalized];
     } else {
       bucket[normalized] = trimmed;
     }
     if (Object.keys(bucket).length) {
-      state.styleOverrides[selected.key] = bucket;
+      styleBucket[selected.key] = bucket;
     } else {
-      delete state.styleOverrides[selected.key];
+      delete styleBucket[selected.key];
     }
+    syncEffectiveOverrides();
     applyStyleOverrides(selected.el, state.styleOverrides[selected.key] || {});
   };
 
   const commitStyleOverridesFromElement = () => {
     if (!selected?.el || !selected?.key) return;
-    state.styleOverrides = state.styleOverrides || {};
+    const scope = resolveOverrideScope(selected.key);
+    const styleBucket = getOverrideBucket(scope, 'style');
+    if (!styleBucket) return;
     const next = {};
     COMPOSER_STYLE_PROPS.forEach((prop) => {
       const value = selected.el.style[prop];
       if (value) next[prop] = value;
     });
     if (Object.keys(next).length) {
-      state.styleOverrides[selected.key] = next;
+      styleBucket[selected.key] = next;
     } else {
-      delete state.styleOverrides[selected.key];
+      delete styleBucket[selected.key];
     }
+    syncEffectiveOverrides();
     syncStyleInputs();
     syncRawCss();
   };
@@ -740,6 +863,7 @@ function createComposerTool(tool) {
     setInspectorDisabled(false);
     updateSelectionNotes();
     syncListSelection();
+    syncToolbarState();
     updateOverlay();
   };
 
@@ -824,7 +948,8 @@ function createComposerTool(tool) {
     writeToolUi({ ...ui, left: clamped.left, top: clamped.top });
   };
 
-  const makeAbsoluteIfNeeded = (el) => {
+  const makeAbsoluteIfNeeded = (el, { allowAbsolute = true } = {}) => {
+    if (!allowAbsolute) return;
     if (!el) return;
     const parent = el.offsetParent || el.parentElement;
     if (!parent) return;
@@ -833,10 +958,14 @@ function createComposerTool(tool) {
       parent.style.position = 'relative';
       const parentKey = parent.dataset.composerKey || '';
       if (parentKey) {
-        state.styleOverrides = state.styleOverrides || {};
-        const bucket = state.styleOverrides[parentKey] || {};
-        bucket.position = 'relative';
-        state.styleOverrides[parentKey] = bucket;
+        const scope = resolveOverrideScope(parentKey);
+        const styleBucket = getOverrideBucket(scope, 'style');
+        if (styleBucket) {
+          const bucket = styleBucket[parentKey] || {};
+          bucket.position = 'relative';
+          styleBucket[parentKey] = bucket;
+          syncEffectiveOverrides();
+        }
         noteDirty();
       }
     }
@@ -866,6 +995,7 @@ function createComposerTool(tool) {
     if (!resizing || !selected?.el || !moveStart || !resizeHandle) return;
     const dx = event.clientX - moveStart.x;
     const dy = event.clientY - moveStart.y;
+    const allowAbsolute = canFreeMove(selected.el);
     let nextWidth = moveStart.width;
     let nextHeight = moveStart.height;
     if (resizeHandle.includes('e')) nextWidth = moveStart.width + dx;
@@ -874,14 +1004,14 @@ function createComposerTool(tool) {
     if (resizeHandle.includes('n')) nextHeight = moveStart.height - dy;
     nextWidth = Math.max(40, nextWidth);
     nextHeight = Math.max(40, nextHeight);
-    if (resizeHandle.includes('w') || resizeHandle.includes('n')) {
-      makeAbsoluteIfNeeded(selected.el);
+    if (allowAbsolute && (resizeHandle.includes('w') || resizeHandle.includes('n'))) {
+      makeAbsoluteIfNeeded(selected.el, { allowAbsolute });
     }
-    if (resizeHandle.includes('w')) {
+    if (allowAbsolute && resizeHandle.includes('w')) {
       const nextLeft = moveStart.left + (moveStart.width - nextWidth);
       selected.el.style.left = `${nextLeft}px`;
     }
-    if (resizeHandle.includes('n')) {
+    if (allowAbsolute && resizeHandle.includes('n')) {
       const nextTop = moveStart.top + (moveStart.height - nextHeight);
       selected.el.style.top = `${nextTop}px`;
     }
@@ -973,8 +1103,12 @@ function createComposerTool(tool) {
       .map((child) => child.dataset?.composerKey || '')
       .filter(Boolean);
     if (!childKeys.length) return;
-    state.domOrders = state.domOrders || {};
-    state.domOrders[parentKey] = mergeOrders(childKeys, state.domOrders[parentKey]);
+    const scope = resolveOverrideScope(parentKey);
+    const domBucket = getOverrideBucket(scope, 'dom');
+    if (domBucket) {
+      domBucket[parentKey] = mergeOrders(childKeys, domBucket[parentKey]);
+      syncEffectiveOverrides();
+    }
     buildHierarchyTree();
     noteDirty();
   };
@@ -1001,16 +1135,38 @@ function createComposerTool(tool) {
     }
   };
 
-  const showDropLine = (rect, y) => {
+  const markDropTarget = (target) => {
+    if (dropTarget && dropTarget !== target) {
+      dropTarget.classList.remove('is-composer-drop-target');
+    }
+    dropTarget = target;
+    if (dropTarget) {
+      dropTarget.classList.add('is-composer-drop-target');
+    }
+  };
+
+  const showDropLine = (rect, axis, before) => {
     if (!dropLine || !rect) return;
     dropLine.style.display = 'block';
-    dropLine.style.left = `${rect.left}px`;
+    if (axis === 'x') {
+      dropLine.style.width = '3px';
+      dropLine.style.height = `${rect.height}px`;
+      dropLine.style.left = `${before ? rect.left - 2 : rect.right - 2}px`;
+      dropLine.style.top = `${rect.top}px`;
+      return;
+    }
+    dropLine.style.height = '3px';
     dropLine.style.width = `${rect.width}px`;
-    dropLine.style.top = `${y}px`;
+    dropLine.style.left = `${rect.left}px`;
+    dropLine.style.top = `${before ? rect.top - 2 : rect.bottom - 2}px`;
   };
 
   const hideDropLine = () => {
     if (dropLine) dropLine.style.display = 'none';
+    if (dropTarget) {
+      dropTarget.classList.remove('is-composer-drop-target');
+      dropTarget = null;
+    }
   };
 
   const findPanelInsertTarget = (zone, clientY) => {
@@ -1039,6 +1195,36 @@ function createComposerTool(tool) {
     return null;
   };
 
+  const resolveDragAxis = (zone) => {
+    if (!zone) return 'y';
+    const style = window.getComputedStyle(zone);
+    if (style.display === 'flex') {
+      return style.flexDirection.startsWith('row') ? 'x' : 'y';
+    }
+    if (style.display === 'grid') {
+      const items = Array.from(zone.children || []).filter((child) => child.dataset?.composerKey);
+      if (items.length > 1) {
+        const first = items[0].getBoundingClientRect();
+        for (let i = 1; i < items.length; i += 1) {
+          const rect = items[i].getBoundingClientRect();
+          if (Math.abs(rect.top - first.top) < 8) {
+            return 'x';
+          }
+        }
+      }
+    }
+    return 'y';
+  };
+
+  const findGridInsertTarget = (zone, target, event) => {
+    if (!zone || !target || target === activeDrag?.el) return null;
+    const rect = target.getBoundingClientRect();
+    const axis = resolveDragAxis(zone);
+    const midpoint = axis === 'x' ? rect.left + rect.width / 2 : rect.top + rect.height / 2;
+    const before = axis === 'x' ? event.clientX < midpoint : event.clientY < midpoint;
+    return { target, rect, axis, before };
+  };
+
   const bindDragHandlers = () => {
     if (dragBound) return;
     dragBound = true;
@@ -1058,26 +1244,60 @@ function createComposerTool(tool) {
         activeDrag = { type: 'nav', el: navItem, zone, before: null, zoneType: zone?.dataset?.composerNavZone || '' };
         navItem.classList.add('is-composer-dragging');
         event.dataTransfer.effectAllowed = 'move';
+        return;
+      }
+      const component = event.target.closest('[data-composer-draggable="true"]');
+      if (component && !component.classList.contains('panel') && !component.dataset.composerNavItem) {
+        const zone = component.closest('[data-composer-grid="true"]');
+        if (!zone) return;
+        activeDrag = { type: 'grid', el: component, zone, before: null };
+        component.classList.add('is-composer-dragging');
+        event.dataTransfer.effectAllowed = 'move';
       }
     });
 
     document.addEventListener('dragover', (event) => {
       if (!isActive() || !activeDrag) return;
-      const zoneSelector = activeDrag.type === 'panel' ? '[data-composer-droppable="true"]' : '[data-composer-nav-zone]';
+      const zoneSelector =
+        activeDrag.type === 'panel'
+          ? '[data-composer-droppable="true"]'
+          : activeDrag.type === 'nav'
+            ? '[data-composer-nav-zone]'
+            : '[data-composer-grid="true"]';
       const zone = event.target.closest(zoneSelector);
       if (!zone) return;
       if (activeDrag.type === 'nav' && zone.dataset.composerNavZone !== activeDrag.zoneType) return;
+      if (activeDrag.type === 'grid' && zone !== activeDrag.zone) return;
       event.preventDefault();
+      if (activeDrag.type === 'grid') {
+        const target = event.target.closest('[data-composer-draggable="true"]');
+        const info = findGridInsertTarget(zone, target, event);
+        activeDrag.zone = zone;
+        if (info) {
+          activeDrag.before = info.before ? info.target : info.target.nextElementSibling;
+          showDropLine(info.rect, info.axis, info.before);
+          markDropTarget(info.target);
+        } else {
+          const rect = zone.getBoundingClientRect();
+          const axis = resolveDragAxis(zone);
+          showDropLine(rect, axis, false);
+          markDropTarget(null);
+          activeDrag.before = null;
+        }
+        return;
+      }
       const before =
         activeDrag.type === 'panel' ? findPanelInsertTarget(zone, event.clientY) : findNavInsertTarget(zone, event.clientY);
       activeDrag.zone = zone;
       activeDrag.before = before;
       if (before) {
         const rect = before.getBoundingClientRect();
-        showDropLine(rect, rect.top - 2);
+        showDropLine(rect, 'y', true);
+        markDropTarget(before);
       } else {
         const rect = zone.getBoundingClientRect();
-        showDropLine(rect, rect.bottom - 2);
+        showDropLine(rect, 'y', false);
+        markDropTarget(null);
       }
     });
 
@@ -1099,6 +1319,8 @@ function createComposerTool(tool) {
         updateLayoutFromDom();
       } else if (type === 'nav') {
         updateNavOrdersFromDom();
+      } else if (type === 'grid') {
+        updateDomOrderFromElement(el);
       }
       updateOverlay();
       activeDrag = null;
@@ -1114,11 +1336,16 @@ function createComposerTool(tool) {
 
   const clearSelectedOverrides = ({ clearStyles = false } = {}) => {
     if (!selected) return;
-    if (selected.textEditable && state.textOverrides) {
-      delete state.textOverrides[selected.key];
+    const scope = resolveOverrideScope(selected.key);
+    if (selected.textEditable) {
+      const textBucket = getOverrideBucket(scope, 'text');
+      if (textBucket) delete textBucket[selected.key];
+      syncEffectiveOverrides();
     }
-    if (clearStyles && state.styleOverrides) {
-      delete state.styleOverrides[selected.key];
+    if (clearStyles) {
+      const styleBucket = getOverrideBucket(scope, 'style');
+      if (styleBucket) delete styleBucket[selected.key];
+      syncEffectiveOverrides();
       applyStyleOverrides(selected.el, {});
       syncStyleInputs();
       syncRawCss();
@@ -1169,11 +1396,15 @@ function createComposerTool(tool) {
 
   overlayBar?.addEventListener('mousedown', (event) => {
     if (!isActive() || !selected?.el) return;
+    if (!canFreeMove(selected.el)) {
+      setStatus('Use drag-and-drop to reorder grid or flex items.', true);
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     moving = true;
     moveStart = pointerInfo(event);
-    makeAbsoluteIfNeeded(selected.el);
+    makeAbsoluteIfNeeded(selected.el, { allowAbsolute: canFreeMove(selected.el) });
     window.addEventListener('mousemove', onMoveDrag);
     window.addEventListener('mouseup', stopMoveResize, { once: true });
   });
@@ -1199,7 +1430,8 @@ function createComposerTool(tool) {
       if (overlay && overlay.contains(event.target)) return;
       if (event.target.closest('[contenteditable="true"]')) return;
       const target = event.altKey
-        ? event.target.closest('[data-composer-role="panel"], [data-composer-role="container"]') || resolveComposerTarget(event.target)
+        ? event.target.closest('[data-composer-role="panel"], [data-composer-role="container"], [data-composer-role="grid"]') ||
+          resolveComposerTarget(event.target)
         : resolveComposerTarget(event.target);
       event.preventDefault();
       event.stopPropagation();
@@ -1252,8 +1484,12 @@ function createComposerTool(tool) {
     if (event.target !== selected.el) return;
     const value = getEditableText(selected.el);
     if (textInput) textInput.value = value;
-    state.textOverrides = state.textOverrides || {};
-    state.textOverrides[selected.key] = value.trim();
+    const scope = resolveOverrideScope(selected.key);
+    const textBucket = getOverrideBucket(scope, 'text');
+    if (textBucket) {
+      textBucket[selected.key] = value.trim();
+      syncEffectiveOverrides();
+    }
     noteDirty();
     updateOverlay();
   });
@@ -1261,8 +1497,12 @@ function createComposerTool(tool) {
   textInput?.addEventListener('input', () => {
     if (!selected || !selected.textEditable) return;
     updateSelectionText(textInput.value);
-    state.textOverrides = state.textOverrides || {};
-    state.textOverrides[selected.key] = textInput.value.trim();
+    const scope = resolveOverrideScope(selected.key);
+    const textBucket = getOverrideBucket(scope, 'text');
+    if (textBucket) {
+      textBucket[selected.key] = textInput.value.trim();
+      syncEffectiveOverrides();
+    }
     noteDirty();
     scheduleOverlayUpdate();
   });
@@ -1277,8 +1517,12 @@ function createComposerTool(tool) {
       setStatus('Text cannot be empty.', true);
       return;
     }
-    state.textOverrides = state.textOverrides || {};
-    state.textOverrides[selected.key] = next;
+    const scope = resolveOverrideScope(selected.key);
+    const textBucket = getOverrideBucket(scope, 'text');
+    if (textBucket) {
+      textBucket[selected.key] = next;
+      syncEffectiveOverrides();
+    }
     updateSelectionText(next);
     noteDirty();
     scheduleOverlayUpdate();
@@ -1300,10 +1544,49 @@ function createComposerTool(tool) {
       setStyleOverride(prop, input.value);
       noteDirty();
       syncRawCss();
+      syncToolbarState();
       scheduleOverlayUpdate();
     };
     input.addEventListener('input', onChange);
     input.addEventListener('change', onChange);
+  });
+
+  toolbarToggles.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!selected) {
+        setStatus('Select an element to format.', true);
+        return;
+      }
+      const prop = normalizeStyleProp(button.dataset.composerToggleStyle || '');
+      if (!prop) return;
+      const value = button.dataset.composerValue || '';
+      const current = getStyleValue(prop);
+      const next = current === value ? '' : value;
+      setStyleOverride(prop, next);
+      noteDirty();
+      syncStyleInputs();
+      syncRawCss();
+      syncToolbarState();
+      scheduleOverlayUpdate();
+    });
+  });
+
+  toolbarSetters.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (!selected) {
+        setStatus('Select an element to format.', true);
+        return;
+      }
+      const prop = normalizeStyleProp(button.dataset.composerStyleSet || '');
+      if (!prop) return;
+      const value = button.dataset.composerValue || '';
+      setStyleOverride(prop, value);
+      noteDirty();
+      syncStyleInputs();
+      syncRawCss();
+      syncToolbarState();
+      scheduleOverlayUpdate();
+    });
   });
 
   rawApplyButton?.addEventListener('click', () => {
@@ -1607,15 +1890,25 @@ function createComposerTool(tool) {
   };
 
   const saveComposer = async () => {
+    syncEffectiveOverrides();
     const payload = new URLSearchParams();
     payload.set('intent', 'composer');
     payload.set('composerQuickActionsOrder', (state.quickActionsOrder || []).join(', '));
     payload.set('composerSideNavOrder', (state.sideNavOrder || []).join(', '));
     payload.set('composerThemeCss', state.themeCss || '');
     payload.set('composerAsideWidth', state.pageAsideWidth ? String(state.pageAsideWidth) : '');
-    payload.set('composerTextOverrides', JSON.stringify(state.textOverrides || {}));
-    payload.set('composerStyleOverrides', JSON.stringify(state.styleOverrides || {}));
-    payload.set('composerDomOrders', JSON.stringify(state.domOrders || {}));
+    payload.set('composerTextOverrides', JSON.stringify(state.globalTextOverrides || {}));
+    payload.set('composerStyleOverrides', JSON.stringify(state.globalStyleOverrides || {}));
+    payload.set('composerDomOrders', JSON.stringify(state.globalDomOrders || {}));
+    payload.set('composerPageKey', getPageKey());
+    payload.set(
+      'composerPageOverrides',
+      JSON.stringify({
+        textOverrides: state.pageTextOverrides || {},
+        styleOverrides: state.pageStyleOverrides || {},
+        domOrders: state.pageDomOrders || {},
+      }),
+    );
     payload.set('composerPageVerbosity', JSON.stringify(state.pageVerbosity || {}));
     payload.set('composerPageLayouts', JSON.stringify(state.pageLayouts || {}));
     try {
@@ -1638,23 +1931,58 @@ function createComposerTool(tool) {
 
   saveButton?.addEventListener('click', saveComposer);
 
-  const readSettingsWithDefaults = () => ({
-    themeCss: state.themeCss || '',
-    quickActionsOrder: Array.isArray(state.quickActionsOrder) ? state.quickActionsOrder : [],
-    sideNavOrder: Array.isArray(state.sideNavOrder) ? state.sideNavOrder : [],
-    pageAsideWidth: Number.isFinite(state.pageAsideWidth) ? state.pageAsideWidth : null,
-    pageVerbosity: state.pageVerbosity && typeof state.pageVerbosity === 'object' ? state.pageVerbosity : {},
-    pageLayouts: state.pageLayouts && typeof state.pageLayouts === 'object' ? state.pageLayouts : {},
-    textOverrides: state.textOverrides && typeof state.textOverrides === 'object' ? state.textOverrides : {},
-    styleOverrides: state.styleOverrides && typeof state.styleOverrides === 'object' ? state.styleOverrides : {},
-    domOrders: state.domOrders && typeof state.domOrders === 'object' ? state.domOrders : {},
-  });
+  const readSettingsWithDefaults = () => {
+    const globalOverrides = buildOverrideBundle(state.globalOverrides || {});
+    const pageOverrides = buildOverrideBundle(state.pageOverrides || {});
+    return {
+      themeCss: state.themeCss || '',
+      quickActionsOrder: Array.isArray(state.quickActionsOrder) ? state.quickActionsOrder : [],
+      sideNavOrder: Array.isArray(state.sideNavOrder) ? state.sideNavOrder : [],
+      pageAsideWidth: Number.isFinite(state.pageAsideWidth) ? state.pageAsideWidth : null,
+      pageVerbosity: state.pageVerbosity && typeof state.pageVerbosity === 'object' ? state.pageVerbosity : {},
+      pageLayouts: state.pageLayouts && typeof state.pageLayouts === 'object' ? state.pageLayouts : {},
+      globalOverrides,
+      pageOverrides,
+      globalTextOverrides: normalizeOverrideMap(globalOverrides.textOverrides),
+      globalStyleOverrides: normalizeOverrideMap(globalOverrides.styleOverrides),
+      globalDomOrders: normalizeOverrideMap(globalOverrides.domOrders),
+      pageTextOverrides: normalizeOverrideMap(pageOverrides.textOverrides),
+      pageStyleOverrides: normalizeOverrideMap(pageOverrides.styleOverrides),
+      pageDomOrders: normalizeOverrideMap(pageOverrides.domOrders),
+      textOverrides: normalizeOverrideMap(state.textOverrides),
+      styleOverrides: normalizeOverrideMap(state.styleOverrides),
+      domOrders: normalizeOverrideMap(state.domOrders),
+    };
+  };
+
+  const syncEffectiveOverrides = () => {
+    state.globalTextOverrides = normalizeOverrideMap(state.globalTextOverrides);
+    state.globalStyleOverrides = normalizeOverrideMap(state.globalStyleOverrides);
+    state.globalDomOrders = normalizeOverrideMap(state.globalDomOrders);
+    state.pageTextOverrides = normalizeOverrideMap(state.pageTextOverrides);
+    state.pageStyleOverrides = normalizeOverrideMap(state.pageStyleOverrides);
+    state.pageDomOrders = normalizeOverrideMap(state.pageDomOrders);
+    state.textOverrides = { ...state.globalTextOverrides, ...state.pageTextOverrides };
+    state.styleOverrides = { ...state.globalStyleOverrides, ...state.pageStyleOverrides };
+    state.domOrders = { ...state.globalDomOrders, ...state.pageDomOrders };
+    state.globalOverrides = buildOverrideBundle({
+      textOverrides: state.globalTextOverrides,
+      styleOverrides: state.globalStyleOverrides,
+      domOrders: state.globalDomOrders,
+    });
+    state.pageOverrides = buildOverrideBundle({
+      textOverrides: state.pageTextOverrides,
+      styleOverrides: state.pageStyleOverrides,
+      domOrders: state.pageDomOrders,
+    });
+  };
 
   const refresh = () => {
     if (!hasDirty) {
       state = { ...state, ...readComposerSettings() };
     }
     state = readSettingsWithDefaults();
+    syncEffectiveOverrides();
     hydrateComposerTargets();
     applyComposerDomOrdersToPage(state);
     applyComposerStyleOverridesToPage(state);
@@ -1677,6 +2005,7 @@ function createComposerTool(tool) {
       if (textInput) textInput.disabled = true;
     }
     syncListSelection();
+    syncToolbarState();
   };
 
   updateToggleLabel(isActive());
@@ -1745,11 +2074,26 @@ function readComposerSettings() {
       textOverrides: {},
       styleOverrides: {},
       domOrders: {},
+      globalOverrides: { textOverrides: {}, styleOverrides: {}, domOrders: {} },
+      pageOverrides: { textOverrides: {}, styleOverrides: {}, domOrders: {} },
     };
   }
   try {
     const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? parsed : {};
+    if (!parsed || typeof parsed !== 'object') return {};
+    const globalOverrides = buildOverrideBundle(parsed.globalOverrides || parsed);
+    const pageOverrides = buildOverrideBundle(parsed.pageOverrides || {});
+    const textOverrides = { ...globalOverrides.textOverrides, ...pageOverrides.textOverrides };
+    const styleOverrides = { ...globalOverrides.styleOverrides, ...pageOverrides.styleOverrides };
+    const domOrders = { ...globalOverrides.domOrders, ...pageOverrides.domOrders };
+    return {
+      ...parsed,
+      globalOverrides,
+      pageOverrides,
+      textOverrides,
+      styleOverrides,
+      domOrders,
+    };
   } catch (_error) {
     return {};
   }

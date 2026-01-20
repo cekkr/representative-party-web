@@ -337,6 +337,23 @@ body[data-composer-mode="on"] .composer-tool__panel {
   gap: 0.5rem;
 }
 
+.composer-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+}
+
+.composer-toolbar__button.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(126, 242, 208, 0.2);
+  background: rgba(126, 242, 208, 0.12);
+}
+
+.composer-toolbar--grid .form-grid {
+  margin-top: 0.4rem;
+}
+
 .composer-tool__item {
   display: flex;
   align-items: center;
@@ -485,6 +502,15 @@ body[data-composer-mode="on"] .composer-tool__panel {
   pointer-events: auto;
 }
 
+.composer-overlay[data-composer-move="disabled"] .composer-overlay__handle {
+  display: none;
+}
+
+.composer-overlay[data-composer-move="disabled"] .composer-overlay__bar {
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
 .composer-overlay__handle--nw {
   top: -6px;
   left: -6px;
@@ -517,6 +543,11 @@ body[data-composer-mode="on"] .composer-tool__panel {
   z-index: 140;
   box-shadow: 0 8px 20px rgba(126, 242, 208, 0.35);
   pointer-events: none;
+}
+
+.is-composer-drop-target {
+  outline: 2px dashed rgba(126, 242, 208, 0.6);
+  outline-offset: 4px;
 }
 
 .is-composer-dragging {

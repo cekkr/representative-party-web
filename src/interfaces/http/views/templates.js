@@ -38,10 +38,23 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   const statusStrip = data.statusStrip !== undefined ? data.statusStrip : renderStatusStrip(deriveStatusMeta(state));
   const pageKey = data.pageKey || templateName;
   const composerSettings = state?.settings?.composer || {};
-  const composerTextOverrides =
+  const pages = composerSettings.pages && typeof composerSettings.pages === 'object' ? composerSettings.pages : {};
+  const pageOverrides = pages[pageKey] && typeof pages[pageKey] === 'object' ? pages[pageKey] : {};
+  const globalTextOverrides =
     composerSettings.textOverrides && typeof composerSettings.textOverrides === 'object' ? composerSettings.textOverrides : {};
-  const composerStyleOverrides =
+  const globalStyleOverrides =
     composerSettings.styleOverrides && typeof composerSettings.styleOverrides === 'object' ? composerSettings.styleOverrides : {};
+  const globalDomOrders =
+    composerSettings.domOrders && typeof composerSettings.domOrders === 'object' ? composerSettings.domOrders : {};
+  const pageTextOverrides =
+    pageOverrides.textOverrides && typeof pageOverrides.textOverrides === 'object' ? pageOverrides.textOverrides : {};
+  const pageStyleOverrides =
+    pageOverrides.styleOverrides && typeof pageOverrides.styleOverrides === 'object' ? pageOverrides.styleOverrides : {};
+  const pageDomOrders =
+    pageOverrides.domOrders && typeof pageOverrides.domOrders === 'object' ? pageOverrides.domOrders : {};
+  const composerTextOverrides = { ...globalTextOverrides, ...pageTextOverrides };
+  const composerStyleOverrides = { ...globalStyleOverrides, ...pageStyleOverrides };
+  const composerDomOrders = { ...globalDomOrders, ...pageDomOrders };
   const composerPayload = {
     themeCss: String(composerSettings.themeCss || ''),
     quickActionsOrder: Array.isArray(composerSettings.quickActionsOrder) ? composerSettings.quickActionsOrder : [],
@@ -51,7 +64,17 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     pageLayouts: composerSettings.pageLayouts || {},
     textOverrides: composerTextOverrides,
     styleOverrides: composerStyleOverrides,
-    domOrders: composerSettings.domOrders || {},
+    domOrders: composerDomOrders,
+    globalOverrides: {
+      textOverrides: globalTextOverrides,
+      styleOverrides: globalStyleOverrides,
+      domOrders: globalDomOrders,
+    },
+    pageOverrides: {
+      textOverrides: pageTextOverrides,
+      styleOverrides: pageStyleOverrides,
+      domOrders: pageDomOrders,
+    },
   };
   const composerSettingsAttr = escapeHtml(JSON.stringify(composerPayload));
   const roleLabel = data.roleLabel || data.person?.role || '';
@@ -273,6 +296,53 @@ function buildComposerControls() {
           <div class="cta-row">
             <button class="ghost" type="button" data-composer-apply>Apply text</button>
             <button class="ghost" type="button" data-composer-clear>Clear override</button>
+          </div>
+        </section>
+        <section class="composer-tool__section">
+          <p class="eyebrow">Toolbar</p>
+          <div class="composer-toolbar">
+            <button class="ghost composer-toolbar__button" type="button" data-composer-toggle-style="fontWeight" data-composer-value="700">Bold</button>
+            <button class="ghost composer-toolbar__button" type="button" data-composer-toggle-style="fontStyle" data-composer-value="italic">Italic</button>
+            <button class="ghost composer-toolbar__button" type="button" data-composer-toggle-style="textDecoration" data-composer-value="underline">Underline</button>
+          </div>
+          <div class="composer-toolbar">
+            <button class="ghost composer-toolbar__button" type="button" data-composer-style-set="textAlign" data-composer-value="left">Align left</button>
+            <button class="ghost composer-toolbar__button" type="button" data-composer-style-set="textAlign" data-composer-value="center">Center</button>
+            <button class="ghost composer-toolbar__button" type="button" data-composer-style-set="textAlign" data-composer-value="right">Align right</button>
+          </div>
+          <div class="composer-toolbar composer-toolbar--grid" data-composer-grid-controls hidden>
+            <div class="form-grid">
+              <label class="field">
+                <span>Grid columns</span>
+                <input type="text" data-composer-style="gridTemplateColumns" placeholder="repeat(3, minmax(0, 1fr))" />
+              </label>
+              <label class="field">
+                <span>Gap</span>
+                <input type="text" data-composer-style="gap" placeholder="1rem" />
+              </label>
+              <label class="field">
+                <span>Align items</span>
+                <select data-composer-style="alignItems">
+                  <option value="">(no change)</option>
+                  <option>start</option>
+                  <option>center</option>
+                  <option>end</option>
+                  <option>stretch</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Justify content</span>
+                <select data-composer-style="justifyContent">
+                  <option value="">(no change)</option>
+                  <option>start</option>
+                  <option>center</option>
+                  <option>end</option>
+                  <option>space-between</option>
+                  <option>space-around</option>
+                  <option>space-evenly</option>
+                </select>
+              </label>
+            </div>
           </div>
         </section>
         <section class="composer-tool__section">

@@ -342,11 +342,13 @@ function parseComposerTextOverrides(raw, fallback = {}) {
     return { value: {}, errors: [] };
   }
   const errors = [];
-  let parsed;
-  try {
-    parsed = JSON.parse(String(raw));
-  } catch (_error) {
-    return { value: fallback || {}, errors: ['Text overrides must be valid JSON.'] };
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(String(raw));
+    } catch (_error) {
+      return { value: fallback || {}, errors: ['Text overrides must be valid JSON.'] };
+    }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { value: fallback || {}, errors: ['Text overrides must be a JSON object.'] };
@@ -375,11 +377,13 @@ function parseComposerStyleOverrides(raw, fallback = {}) {
     return { value: {}, errors: [] };
   }
   const errors = [];
-  let parsed;
-  try {
-    parsed = JSON.parse(String(raw));
-  } catch (_error) {
-    return { value: fallback || {}, errors: ['Style overrides must be valid JSON.'] };
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(String(raw));
+    } catch (_error) {
+      return { value: fallback || {}, errors: ['Style overrides must be valid JSON.'] };
+    }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { value: fallback || {}, errors: ['Style overrides must be a JSON object.'] };
@@ -397,10 +401,21 @@ function parseComposerStyleOverrides(raw, fallback = {}) {
     const background = sanitizeCssValue(value.background);
     const fontSize = sanitizeCssValue(value.fontSize);
     const borderRadius = sanitizeCssValue(value.borderRadius);
+    const fontWeight = sanitizeCssValue(value.fontWeight);
+    const fontStyle = sanitizeCssValue(value.fontStyle);
+    const textAlign = sanitizeCssValue(value.textAlign);
+    const textDecoration = sanitizeCssValue(value.textDecoration);
+    const lineHeight = sanitizeCssValue(value.lineHeight);
+    const letterSpacing = sanitizeCssValue(value.letterSpacing);
     const padding = sanitizeCssValue(value.padding);
     const margin = sanitizeCssValue(value.margin);
     const border = sanitizeCssValue(value.border);
     const boxShadow = sanitizeCssValue(value.boxShadow);
+    const gap = sanitizeCssValue(value.gap);
+    const gridTemplateColumns = sanitizeCssValue(value.gridTemplateColumns);
+    const gridAutoFlow = sanitizeCssValue(value.gridAutoFlow);
+    const alignItems = sanitizeCssValue(value.alignItems);
+    const justifyContent = sanitizeCssValue(value.justifyContent);
     const display = sanitizeCssValue(value.display);
     const position = sanitizeCssValue(value.position);
     const zIndex = sanitizeCssValue(value.zIndex);
@@ -412,10 +427,21 @@ function parseComposerStyleOverrides(raw, fallback = {}) {
     if (background) next.background = background;
     if (fontSize) next.fontSize = fontSize;
     if (borderRadius) next.borderRadius = borderRadius;
+    if (fontWeight) next.fontWeight = fontWeight;
+    if (fontStyle) next.fontStyle = fontStyle;
+    if (textAlign) next.textAlign = textAlign;
+    if (textDecoration) next.textDecoration = textDecoration;
+    if (lineHeight) next.lineHeight = lineHeight;
+    if (letterSpacing) next.letterSpacing = letterSpacing;
     if (padding) next.padding = padding;
     if (margin) next.margin = margin;
     if (border) next.border = border;
     if (boxShadow) next.boxShadow = boxShadow;
+    if (gap) next.gap = gap;
+    if (gridTemplateColumns) next.gridTemplateColumns = gridTemplateColumns;
+    if (gridAutoFlow) next.gridAutoFlow = gridAutoFlow;
+    if (alignItems) next.alignItems = alignItems;
+    if (justifyContent) next.justifyContent = justifyContent;
     if (display) next.display = display;
     if (position) next.position = position;
     if (zIndex) next.zIndex = zIndex;
@@ -510,11 +536,13 @@ function parseComposerDomOrders(raw, fallback = {}) {
     return { value: {}, errors: [] };
   }
   const errors = [];
-  let parsed;
-  try {
-    parsed = JSON.parse(String(raw));
-  } catch (_error) {
-    return { value: fallback || {}, errors: ['DOM order overrides must be valid JSON.'] };
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(String(raw));
+    } catch (_error) {
+      return { value: fallback || {}, errors: ['DOM order overrides must be valid JSON.'] };
+    }
   }
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     return { value: fallback || {}, errors: ['DOM order overrides must be a JSON object.'] };
@@ -533,6 +561,37 @@ function parseComposerDomOrders(raw, fallback = {}) {
     errors.push('DOM order overrides trimmed to 120 entries.');
   }
   return { value: cleaned, errors };
+}
+
+function parseComposerPageOverrides(raw, fallback = {}) {
+  if (raw === undefined || raw === null) {
+    return { value: fallback || {}, errors: [] };
+  }
+  if (raw === '') {
+    return { value: {}, errors: [] };
+  }
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(String(raw));
+    } catch (_error) {
+      return { value: fallback || {}, errors: ['Page overrides must be valid JSON.'] };
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return { value: fallback || {}, errors: ['Page overrides must be a JSON object.'] };
+  }
+  const textResult = parseComposerTextOverrides(parsed.textOverrides, fallback.textOverrides || {});
+  const styleResult = parseComposerStyleOverrides(parsed.styleOverrides, fallback.styleOverrides || {});
+  const domResult = parseComposerDomOrders(parsed.domOrders, fallback.domOrders || {});
+  return {
+    value: {
+      textOverrides: textResult.value || {},
+      styleOverrides: styleResult.value || {},
+      domOrders: domResult.value || {},
+    },
+    errors: [...textResult.errors, ...styleResult.errors, ...domResult.errors],
+  };
 }
 
 function sanitizeLayoutList(value, maxEntries = 80) {
@@ -1243,9 +1302,11 @@ async function updateComposerSettings(state, body) {
   const limitedCss = themeCss.length > 8000 ? themeCss.slice(0, 8000) : themeCss;
   const quickActionsOrder = parseListAllowEmpty(body.composerQuickActionsOrder, prev.quickActionsOrder || []);
   const sideNavOrder = parseListAllowEmpty(body.composerSideNavOrder, prev.sideNavOrder || []);
+  const pageKey = sanitizeText(body.composerPageKey || '', 80);
   const textOverridesResult = parseComposerTextOverrides(body.composerTextOverrides, prev.textOverrides || {});
   const styleOverridesResult = parseComposerStyleOverrides(body.composerStyleOverrides, prev.styleOverrides || {});
   const domOrdersResult = parseComposerDomOrders(body.composerDomOrders, prev.domOrders || {});
+  const pageOverridesResult = parseComposerPageOverrides(body.composerPageOverrides, (prev.pages || {})[pageKey] || {});
   const pageVerbosityResult = parseComposerPageVerbosity(body.composerPageVerbosity, prev.pageVerbosity || {});
   const pageLayoutsResult = parseComposerPageLayouts(body.composerPageLayouts, prev.pageLayouts || {});
   const asideWidthInput = sanitizeText(body.composerAsideWidth || '', 12);
@@ -1260,10 +1321,24 @@ async function updateComposerSettings(state, body) {
     ...textOverridesResult.errors,
     ...styleOverridesResult.errors,
     ...domOrdersResult.errors,
+    ...pageOverridesResult.errors,
     ...pageVerbosityResult.errors,
     ...pageLayoutsResult.errors,
   ];
   const pageAsideWidth = Number.isFinite(asideWidthResult.value) ? asideWidthResult.value : null;
+  const pages = { ...(prev.pages || {}) };
+  if (pageKey) {
+    const pageOverrides = pageOverridesResult.value || {};
+    const hasOverrides =
+      Object.keys(pageOverrides.textOverrides || {}).length ||
+      Object.keys(pageOverrides.styleOverrides || {}).length ||
+      Object.keys(pageOverrides.domOrders || {}).length;
+    if (hasOverrides) {
+      pages[pageKey] = pageOverrides;
+    } else {
+      delete pages[pageKey];
+    }
+  }
 
   if (errors.length) {
     return {
@@ -1286,6 +1361,7 @@ async function updateComposerSettings(state, body) {
     textOverrides: textOverridesResult.value || {},
     styleOverrides: styleOverridesResult.value || {},
     domOrders: domOrdersResult.value || {},
+    pages,
   };
   state.settings = {
     ...(state.settings || {}),
@@ -1293,7 +1369,7 @@ async function updateComposerSettings(state, body) {
   };
   recordAdminAudit(state, {
     action: 'composer.update',
-    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'} pages=${Object.keys(next.pageLayouts || {}).length} domOrders=${Object.keys(next.domOrders || {}).length} presets=${Object.keys(next.pageVerbosity || {}).length} text=${Object.keys(next.textOverrides || {}).length} style=${Object.keys(next.styleOverrides || {}).length}`,
+    summary: `quickActions=${quickActionsOrder.length} sideNav=${sideNavOrder.length} asideWidth=${pageAsideWidth || 'default'} pages=${Object.keys(next.pageLayouts || {}).length} templates=${Object.keys(next.pages || {}).length} domOrders=${Object.keys(next.domOrders || {}).length} presets=${Object.keys(next.pageVerbosity || {}).length} text=${Object.keys(next.textOverrides || {}).length} style=${Object.keys(next.styleOverrides || {}).length}`,
   });
   await persistSettings(state);
   return {

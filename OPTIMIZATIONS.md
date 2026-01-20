@@ -24,6 +24,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Use ResizeObserver/IntersectionObserver to update composer overlay bounds only when selection or layout changes, avoiding continuous scroll listeners.
 - Cache composer target queries (panels/nav zones) and refresh only on navigation or mutation events to avoid full DOM scans on every refresh/drag.
 - Rebuild composer hierarchy trees via a MutationObserver + debounce rather than regenerating the full tree on every refresh or reorder.
+- Cache grid drag candidate rects per drag session (or throttle dragover to rAF) to reduce layout thrash during composer reorder.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.
