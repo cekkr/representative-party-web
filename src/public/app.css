@@ -337,6 +337,12 @@ body[data-composer-mode="on"] .composer-tool__panel {
   opacity: 0.55;
 }
 
+.composer-tool__item.is-selected {
+  border-style: solid;
+  border-color: rgba(126, 242, 208, 0.6);
+  background: rgba(126, 242, 208, 0.12);
+}
+
 .composer-tool__toggle {
   margin-left: auto;
   padding: 0.25rem 0.6rem;
@@ -385,6 +391,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
   background: rgba(15, 22, 39, 0.95);
   border: 1px solid rgba(126, 242, 208, 0.5);
   pointer-events: auto;
+  cursor: grab;
 }
 
 .composer-overlay__label {
@@ -402,6 +409,54 @@ body[data-composer-mode="on"] .composer-tool__panel {
   padding: 0.2rem 0.55rem;
   font-size: 0.7rem;
   border-radius: 0.6rem;
+}
+
+.composer-overlay__handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  background: var(--accent);
+  border: 1px solid rgba(12, 19, 32, 0.9);
+  pointer-events: auto;
+}
+
+.composer-overlay__handle--nw {
+  top: -6px;
+  left: -6px;
+  cursor: nwse-resize;
+}
+
+.composer-overlay__handle--ne {
+  top: -6px;
+  right: -6px;
+  cursor: nesw-resize;
+}
+
+.composer-overlay__handle--sw {
+  bottom: -6px;
+  left: -6px;
+  cursor: nesw-resize;
+}
+
+.composer-overlay__handle--se {
+  bottom: -6px;
+  right: -6px;
+  cursor: nwse-resize;
+}
+
+.composer-drop-line {
+  position: fixed;
+  height: 3px;
+  background: var(--accent);
+  border-radius: 999px;
+  z-index: 140;
+  box-shadow: 0 8px 20px rgba(126, 242, 208, 0.35);
+  pointer-events: none;
+}
+
+.is-composer-dragging {
+  opacity: 0.6;
 }
 
 .panel {

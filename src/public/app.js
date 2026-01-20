@@ -193,12 +193,151 @@ async function submitDelegationChoice(form) {
 let composerToolState = null;
 let composerToolRoot = null;
 let composerOverlay = null;
+const COMPOSER_STYLE_PROPS = [
+  'width',
+  'height',
+  'color',
+  'background',
+  'fontSize',
+  'borderRadius',
+  'padding',
+  'margin',
+  'border',
+  'boxShadow',
+  'display',
+  'position',
+  'zIndex',
+  'left',
+  'top',
+];
+
+function readComposerTextValue(node) {
+  if (!node) return '';
+  if (node.matches && node.matches('input, textarea')) {
+    return (node.value || node.placeholder || '').trim();
+  }
+  return (node.textContent || '').trim();
+}
+
+function hydrateComposerTextTargets(container, baseKey) {
+  if (!container || !baseKey) return;
+  const children = Array.from(container.children || []);
+  const eyebrows = children.filter((child) => child.classList && child.classList.contains('eyebrow'));
+  const headings = children.filter((child) => child.matches && child.matches('h1, h2, h3, h4'));
+  const assignGroup = (nodes, suffix) => {
+    nodes.forEach((node, index) => {
+      if (!node.dataset.composerKey) {
+        const key = nodes.length > 1 ? `${baseKey}.${suffix}.${index + 1}` : `${baseKey}.${suffix}`;
+        node.dataset.composerKey = key;
+      }
+      if (node.dataset.composerDefault === undefined) {
+        const text = readComposerTextValue(node);
+        if (text) node.dataset.composerDefault = text;
+      }
+    });
+  };
+  assignGroup(eyebrows, 'eyebrow');
+  assignGroup(headings, 'heading');
+}
+
+function applyComposerOverridesToNode(node, overrides = {}) {
+  if (!node) return;
+  COMPOSER_STYLE_PROPS.forEach((prop) => {
+    node.style[prop] = overrides?.[prop] || '';
+  });
+}
+
+function hydrateComposerTargets() {
+  const { root, mainColumn, asideColumn, allPanels } = getPanelColumns();
+  const targets = [
+    { selector: 'header.topbar', key: 'layout.topbar', role: 'container' },
+    { selector: '.topbar__brand', key: 'layout.topbarBrand', role: 'container' },
+    { selector: '.topbar__actions', key: 'layout.topbarActions', role: 'container' },
+    { selector: '.quick-nav', key: 'layout.quickNav', role: 'container' },
+    { selector: '.shell', key: 'layout.shell', role: 'container' },
+    { selector: '.side-nav', key: 'layout.sideNav', role: 'container' },
+    { selector: 'main[data-shell]', key: 'layout.main', role: 'container' },
+    { selector: '.page-main', key: 'layout.pageMain', role: 'container' },
+    { selector: '.page-aside', key: 'layout.pageAside', role: 'container' },
+    { selector: '.footer', key: 'layout.footer', role: 'container' },
+  ];
+  targets.forEach(({ selector, key, role }) => {
+    const node = document.querySelector(selector);
+    if (!node) return;
+    if (!node.dataset.composerKey) node.dataset.composerKey = key;
+    if (role && !node.dataset.composerRole) node.dataset.composerRole = role;
+  });
+  allPanels.forEach((panel) => {
+    if (!panel.dataset.composerSection) return;
+    if (!panel.dataset.composerKey) {
+      panel.dataset.composerKey = `panel.${panel.dataset.composerSection}`;
+    }
+    panel.dataset.composerRole = panel.dataset.composerRole || 'panel';
+    panel.dataset.composerDraggable = 'true';
+    hydrateComposerTextTargets(panel, `panel.${panel.dataset.composerSection}`);
+  });
+  const dropZones = [mainColumn || root, asideColumn].filter(Boolean);
+  dropZones.forEach((zone) => {
+    zone.dataset.composerDroppable = 'true';
+  });
+  const quickNav = document.querySelector('.quick-nav');
+  if (quickNav) {
+    quickNav.dataset.composerNavZone = 'quick';
+  }
+  document.querySelectorAll('.side-nav__group').forEach((group) => {
+    group.dataset.composerNavZone = 'side';
+  });
+  document.querySelectorAll('.quick-nav .quick-link').forEach((link) => {
+    link.dataset.composerNavItem = 'true';
+  });
+  document.querySelectorAll('.side-nav__item').forEach((item) => {
+    item.dataset.composerNavItem = 'true';
+  });
+}
+
+function applyComposerStyleOverridesToPage(settings = readComposerSettings()) {
+  if (!document.body) return;
+  hydrateComposerTargets();
+  const overrides = settings?.styleOverrides || {};
+  document.querySelectorAll('[data-composer-key]').forEach((node) => {
+    const key = node.dataset.composerKey || '';
+    if (!key) return;
+    applyComposerOverridesToNode(node, overrides[key] || {});
+  });
+}
+
+function escapeComposerSelector(value) {
+  if (typeof CSS !== 'undefined' && CSS.escape) return CSS.escape(String(value));
+  return String(value).replace(/"/g, '\\"');
+}
+
+function applyComposerTextOverridesToPage(settings = readComposerSettings()) {
+  if (!document.body) return;
+  hydrateComposerTargets();
+  const overrides = settings?.textOverrides || {};
+  Object.entries(overrides).forEach(([key, value]) => {
+    if (typeof value !== 'string') return;
+    const selector = `[data-composer-key="${escapeComposerSelector(key)}"]`;
+    document.querySelectorAll(selector).forEach((node) => {
+      if (node.matches('input, textarea')) {
+        node.value = value;
+        return;
+      }
+      if (node.dataset.composerText !== 'true' && node.dataset.composerDefault === undefined) {
+        return;
+      }
+      node.textContent = value;
+    });
+  });
+}
 
 function initComposerTool() {
   const tool = document.querySelector('[data-composer-tool]');
+  applyComposerStyleOverridesToPage();
+  applyComposerTextOverridesToPage();
   if (!tool) return;
-  const allowed =
-    document.body?.dataset?.composerAllowed === 'true' || tool.dataset?.composerAllowed === 'true';
+  const bodyAllowed = document.body?.dataset?.composerAllowed;
+  const allowed = bodyAllowed !== undefined ? bodyAllowed === 'true' : tool.dataset?.composerAllowed === 'true';
   if (!allowed) {
     tool.hidden = true;
     if (document.body) {
@@ -207,6 +346,7 @@ function initComposerTool() {
     if (composerOverlay) {
       composerOverlay.style.display = 'none';
     }
+    applyComposerStyleOverridesToPage();
     return;
   }
   tool.hidden = false;
@@ -235,10 +375,20 @@ function createComposerTool(tool) {
   const pageVerbositySelect = tool.querySelector('[data-composer-page-verbosity]');
   const pageVerbosityLabel = tool.querySelector('[data-composer-page-label]');
   const styleInputs = Array.from(tool.querySelectorAll('[data-composer-style]'));
+  const inspectorNote = tool.querySelector('[data-composer-inspector-note]');
+  const rawCssInput = tool.querySelector('[data-composer-raw]');
+  const rawApplyButton = tool.querySelector('[data-composer-raw-apply]');
+  const rawSyncButton = tool.querySelector('[data-composer-raw-sync]');
+  const styleClearButton = tool.querySelector('[data-composer-style-clear]');
+  const moveUpButton = tool.querySelector('[data-composer-move-up]');
+  const moveDownButton = tool.querySelector('[data-composer-move-down]');
   const overlay = ensureComposerOverlay();
+  const overlayBar = overlay?.querySelector('[data-composer-overlay-bar]');
+  const overlayHandles = Array.from(overlay?.querySelectorAll('[data-composer-handle]') || []);
   const overlayLabel = overlay?.querySelector('[data-composer-overlay-label]');
   const overlayClear = overlay?.querySelector('[data-composer-overlay-clear]');
   const overlayExit = overlay?.querySelector('[data-composer-overlay-exit]');
+  const dropLine = ensureComposerDropLine();
 
   let state = readComposerSettings();
   let hasDirty = false;
@@ -246,6 +396,12 @@ function createComposerTool(tool) {
   let dragInfo = null;
   let overlayFrame = null;
   let overlayBound = false;
+  let moving = false;
+  let resizing = false;
+  let resizeHandle = null;
+  let moveStart = null;
+  let activeDrag = null;
+  let dragBound = false;
   const getPageKey = () => document.body?.dataset?.pageKey || 'default';
 
   const setStatus = (message, isError = false) => {
@@ -262,11 +418,7 @@ function createComposerTool(tool) {
   };
 
   const getEditableText = (el) => {
-    if (!el) return '';
-    if (el.matches('input, textarea')) {
-      return (el.value || el.placeholder || '').trim();
-    }
-    return (el.textContent || '').trim();
+    return readComposerTextValue(el);
   };
 
   const setEditableText = (el, value) => {
@@ -276,6 +428,32 @@ function createComposerTool(tool) {
       return;
     }
     el.textContent = value;
+  };
+
+  const isTextEditableElement = (el) => {
+    if (!el) return false;
+    if (el.matches('input, textarea')) return true;
+    if (el.dataset.composerText === 'true') return true;
+    return el.dataset.composerDefault !== undefined;
+  };
+
+  const getComposerRole = (el) => {
+    if (!el) return '';
+    if (el.dataset.composerRole) return el.dataset.composerRole;
+    if (el.dataset.composerSection) return 'panel';
+    return '';
+  };
+
+  const setInspectorDisabled = (disabled) => {
+    styleInputs.forEach((input) => {
+      input.disabled = disabled;
+    });
+    if (rawCssInput) rawCssInput.disabled = disabled;
+    if (rawApplyButton) rawApplyButton.disabled = disabled;
+    if (rawSyncButton) rawSyncButton.disabled = disabled;
+    if (styleClearButton) styleClearButton.disabled = disabled;
+    if (moveUpButton) moveUpButton.disabled = disabled;
+    if (moveDownButton) moveDownButton.disabled = disabled;
   };
 
   const describeSelection = (entry) => {
@@ -343,10 +521,19 @@ function createComposerTool(tool) {
     if (toggle) toggle.setAttribute('aria-expanded', String(active));
     updateToggleLabel(active);
     if (!active) {
+      if (moving || resizing) {
+        stopMoveResize();
+      }
       clearSelection();
       unbindOverlayEvents();
+      setDraggableState(false);
+      hideDropLine();
     } else {
       setStatus('Composer mode active.');
+      hydrateComposerTargets();
+      applyComposerStyleOverridesToPage(state);
+      applyComposerTextOverridesToPage(state);
+      setDraggableState(true);
       bindOverlayEvents();
       scheduleOverlayUpdate();
     }
@@ -357,20 +544,151 @@ function createComposerTool(tool) {
     selected.el.classList.remove('is-composer-selected');
     selected.el.removeAttribute('contenteditable');
     selected = null;
-    if (textInput) textInput.value = '';
+    if (textInput) {
+      textInput.value = '';
+      textInput.disabled = true;
+    }
     if (selectionNote) selectionNote.textContent = 'Select a label or heading to edit.';
     styleInputs.forEach((input) => {
       input.value = '';
     });
+    if (rawCssInput) rawCssInput.value = '';
+    setInspectorDisabled(true);
+    updateSelectionNotes();
+    syncListSelection();
     if (overlay) overlay.style.display = 'none';
   };
 
   const applyStyleOverrides = (el, overrides) => {
-    if (!el) return;
-    el.style.color = overrides?.color || '';
-    el.style.background = overrides?.background || '';
-    el.style.fontSize = overrides?.fontSize || '';
-    el.style.padding = overrides?.padding || '';
+    applyComposerOverridesToNode(el, overrides);
+  };
+
+  const normalizeStyleProp = (prop) => {
+    if (!prop) return '';
+    if (COMPOSER_STYLE_PROPS.includes(prop)) return prop;
+    const camel = prop.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+    return COMPOSER_STYLE_PROPS.includes(camel) ? camel : '';
+  };
+
+  const toCssProp = (prop) => prop.replace(/[A-Z]/g, (match) => `-${match.toLowerCase()}`);
+
+  const getStyleValue = (prop) => {
+    if (!selected?.el) return '';
+    const overrides = state.styleOverrides?.[selected.key];
+    if (overrides && overrides[prop] !== undefined) return overrides[prop];
+    return selected.el.style[prop] || '';
+  };
+
+  const syncStyleInputs = () => {
+    styleInputs.forEach((input) => {
+      const prop = normalizeStyleProp(input.dataset.composerStyle || '');
+      if (!prop) return;
+      input.value = getStyleValue(prop);
+    });
+  };
+
+  const styleToRawDeclarations = (el) => {
+    if (!el) return '';
+    const lines = [];
+    COMPOSER_STYLE_PROPS.forEach((prop) => {
+      const value = el.style[prop];
+      if (!value) return;
+      lines.push(`${toCssProp(prop)}: ${value};`);
+    });
+    return lines.join('\n');
+  };
+
+  const syncRawCss = () => {
+    if (!rawCssInput || !selected?.el) return;
+    rawCssInput.value = styleToRawDeclarations(selected.el);
+  };
+
+  const setStyleOverride = (prop, value) => {
+    if (!selected?.el || !selected?.key) return;
+    const normalized = normalizeStyleProp(prop);
+    if (!normalized) return;
+    const trimmed = String(value || '').trim();
+    state.styleOverrides = state.styleOverrides || {};
+    const bucket = state.styleOverrides[selected.key] || {};
+    if (!trimmed) {
+      delete bucket[normalized];
+    } else {
+      bucket[normalized] = trimmed;
+    }
+    if (Object.keys(bucket).length) {
+      state.styleOverrides[selected.key] = bucket;
+    } else {
+      delete state.styleOverrides[selected.key];
+    }
+    applyStyleOverrides(selected.el, state.styleOverrides[selected.key] || {});
+  };
+
+  const commitStyleOverridesFromElement = () => {
+    if (!selected?.el || !selected?.key) return;
+    state.styleOverrides = state.styleOverrides || {};
+    const next = {};
+    COMPOSER_STYLE_PROPS.forEach((prop) => {
+      const value = selected.el.style[prop];
+      if (value) next[prop] = value;
+    });
+    if (Object.keys(next).length) {
+      state.styleOverrides[selected.key] = next;
+    } else {
+      delete state.styleOverrides[selected.key];
+    }
+    syncStyleInputs();
+    syncRawCss();
+  };
+
+  const updateSelectionNotes = () => {
+    if (selectionNote) {
+      selectionNote.textContent = selected?.textEditable
+        ? `Editing ${selected.key}`
+        : selected
+          ? `Selected ${selected.key}. Style-only selection.`
+          : 'Select a label or heading to edit.';
+    }
+    if (inspectorNote) {
+      inspectorNote.textContent = selected ? `Selected ${selected.key}` : 'Select a panel or label to edit.';
+    }
+  };
+
+  const syncListSelection = () => {
+    const selectedKey = selected?.key || '';
+    const panelKey = selectedKey.startsWith('panel.') ? selectedKey.slice('panel.'.length) : '';
+    const navKey = selectedKey.startsWith('nav.item.') ? selectedKey.slice('nav.item.'.length) : '';
+    const markList = (listEl, matchKey) => {
+      Array.from(listEl?.querySelectorAll('[data-composer-item]') || []).forEach((item) => {
+        const isMatch = matchKey && item.dataset.composerItem === matchKey;
+        item.classList.toggle('is-selected', isMatch);
+      });
+    };
+    markList(mainList, panelKey);
+    markList(asideList, panelKey);
+    markList(quickList, navKey);
+    if (sideLists) {
+      sideLists.querySelectorAll('.composer-tool__list').forEach((listEl) => markList(listEl, navKey));
+    }
+  };
+
+  const setDraggableState = (active) => {
+    document.querySelectorAll('[data-composer-draggable="true"]').forEach((node) => {
+      const isForm = node.matches('input, textarea, select, button');
+      node.draggable = active && !isForm;
+    });
+    document.querySelectorAll('[data-composer-nav-item="true"]').forEach((node) => {
+      node.draggable = active;
+    });
+  };
+
+  const resolveComposerTarget = (target) => {
+    if (!target) return null;
+    const keyTarget = target.closest('[data-composer-key]');
+    if (keyTarget && !['panel', 'container'].includes(keyTarget.dataset.composerRole || '')) {
+      return keyTarget;
+    }
+    const panelTarget = target.closest('[data-composer-role="panel"], [data-composer-role="container"]');
+    return panelTarget || keyTarget;
   };
 
   const selectElement = (el) => {
@@ -381,16 +699,21 @@ function createComposerTool(tool) {
       selected.el.removeAttribute('contenteditable');
     }
     const defaultText = el.dataset.composerDefault || getEditableText(el);
-    selected = { el, key, defaultText };
+    const textEditable = isTextEditableElement(el);
+    const role = getComposerRole(el);
+    selected = { el, key, defaultText, textEditable, role };
     el.classList.add('is-composer-selected');
-    if (textInput) textInput.value = getEditableText(el);
-    if (selectionNote) selectionNote.textContent = `Selected ${key}. Double click to edit.`;
+    if (textInput) {
+      textInput.value = textEditable ? getEditableText(el) : '';
+      textInput.disabled = !textEditable;
+    }
     const styleOverrides = state.styleOverrides?.[key] || {};
     applyStyleOverrides(el, styleOverrides);
-    styleInputs.forEach((input) => {
-      const prop = input.dataset.composerStyle;
-      input.value = styleOverrides[prop] || '';
-    });
+    syncStyleInputs();
+    syncRawCss();
+    setInspectorDisabled(false);
+    updateSelectionNotes();
+    syncListSelection();
     updateOverlay();
   };
 
@@ -403,6 +726,7 @@ function createComposerTool(tool) {
       return;
     }
     selectElement(el);
+    if (!isTextEditableElement(el)) return;
     if (el.getAttribute('contenteditable') === 'true') return;
     el.setAttribute('contenteditable', 'true');
     el.focus({ preventScroll: true });
@@ -435,26 +759,305 @@ function createComposerTool(tool) {
   };
 
   const updateSelectionText = (value) => {
-    if (!selected) return;
+    if (!selected || !selected.textEditable) return;
     setEditableText(selected.el, value);
     updateOverlay();
   };
 
+  const pointerInfo = (event) => {
+    const rect = selected?.el?.getBoundingClientRect();
+    return {
+      x: event.clientX,
+      y: event.clientY,
+      left: parseFloat(selected?.el?.style?.left || '0'),
+      top: parseFloat(selected?.el?.style?.top || '0'),
+      width: rect?.width || 0,
+      height: rect?.height || 0,
+    };
+  };
+
+  const makeAbsoluteIfNeeded = (el) => {
+    if (!el) return;
+    const parent = el.offsetParent || el.parentElement;
+    if (!parent) return;
+    const parentStyle = window.getComputedStyle(parent);
+    if (parentStyle.position === 'static') {
+      parent.style.position = 'relative';
+      const parentKey = parent.dataset.composerKey || '';
+      if (parentKey) {
+        state.styleOverrides = state.styleOverrides || {};
+        const bucket = state.styleOverrides[parentKey] || {};
+        bucket.position = 'relative';
+        state.styleOverrides[parentKey] = bucket;
+        noteDirty();
+      }
+    }
+    const rect = el.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    const currentPos = window.getComputedStyle(el).position;
+    if (currentPos !== 'absolute' && currentPos !== 'fixed') {
+      el.style.position = 'absolute';
+      el.style.left = `${rect.left - parentRect.left + parent.scrollLeft}px`;
+      el.style.top = `${rect.top - parentRect.top + parent.scrollTop}px`;
+      el.style.width = `${rect.width}px`;
+    }
+  };
+
+  const onMoveDrag = (event) => {
+    if (!moving || !selected?.el || !moveStart) return;
+    const dx = event.clientX - moveStart.x;
+    const dy = event.clientY - moveStart.y;
+    const nextLeft = moveStart.left + dx;
+    const nextTop = moveStart.top + dy;
+    selected.el.style.left = `${nextLeft}px`;
+    selected.el.style.top = `${nextTop}px`;
+    updateOverlay();
+  };
+
+  const onResizeDrag = (event) => {
+    if (!resizing || !selected?.el || !moveStart || !resizeHandle) return;
+    const dx = event.clientX - moveStart.x;
+    const dy = event.clientY - moveStart.y;
+    let nextWidth = moveStart.width;
+    let nextHeight = moveStart.height;
+    if (resizeHandle.includes('e')) nextWidth = moveStart.width + dx;
+    if (resizeHandle.includes('s')) nextHeight = moveStart.height + dy;
+    if (resizeHandle.includes('w')) nextWidth = moveStart.width - dx;
+    if (resizeHandle.includes('n')) nextHeight = moveStart.height - dy;
+    nextWidth = Math.max(40, nextWidth);
+    nextHeight = Math.max(40, nextHeight);
+    if (resizeHandle.includes('w') || resizeHandle.includes('n')) {
+      makeAbsoluteIfNeeded(selected.el);
+    }
+    if (resizeHandle.includes('w')) {
+      const nextLeft = moveStart.left + (moveStart.width - nextWidth);
+      selected.el.style.left = `${nextLeft}px`;
+    }
+    if (resizeHandle.includes('n')) {
+      const nextTop = moveStart.top + (moveStart.height - nextHeight);
+      selected.el.style.top = `${nextTop}px`;
+    }
+    selected.el.style.width = `${nextWidth}px`;
+    selected.el.style.height = `${nextHeight}px`;
+    updateOverlay();
+  };
+
+  const stopMoveResize = () => {
+    moving = false;
+    resizing = false;
+    resizeHandle = null;
+    moveStart = null;
+    window.removeEventListener('mousemove', onMoveDrag);
+    window.removeEventListener('mousemove', onResizeDrag);
+    commitStyleOverridesFromElement();
+    noteDirty();
+    updateOverlay();
+  };
+
+  const applyRawCss = (text) => {
+    if (!selected) return;
+    const lines = String(text || '').split('\n');
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      const match = trimmed.match(/^([a-zA-Z-]+)\s*:\s*(.+?);?$/);
+      if (!match) return;
+      const prop = normalizeStyleProp(match[1]);
+      if (!prop) return;
+      setStyleOverride(prop, match[2].trim());
+    });
+    noteDirty();
+    syncStyleInputs();
+    syncRawCss();
+  };
+
+  const updateLayoutFromDom = () => {
+    const pageKey = getPageKey();
+    const { mainColumn, asideColumn } = getPanelColumns();
+    if (!mainColumn) return;
+    const next = getPageLayoutState(pageKey);
+    next.main = Array.from(mainColumn.querySelectorAll('.panel'))
+      .map((panel) => panel.dataset.composerSection)
+      .filter(Boolean);
+    if (asideColumn) {
+      next.aside = Array.from(asideColumn.querySelectorAll('.panel'))
+        .map((panel) => panel.dataset.composerSection)
+        .filter(Boolean);
+    } else {
+      next.aside = [];
+    }
+    state.pageLayouts = state.pageLayouts || {};
+    state.pageLayouts[pageKey] = next;
+    applyPageLayoutFromSettings(state);
+    noteDirty();
+  };
+
+  const updateNavOrdersFromDom = () => {
+    const quick = document.querySelector('.quick-nav');
+    if (quick) {
+      const quickOrder = Array.from(quick.querySelectorAll('.quick-link:not(.quick-link--context)'))
+        .map((link) => link.dataset.navKey)
+        .filter(Boolean);
+      state.quickActionsOrder = mergeOrders(quickOrder, state.quickActionsOrder);
+    }
+    const groups = Array.from(document.querySelectorAll('.side-nav__group'));
+    if (groups.length) {
+      const sideOrder = groups
+        .flatMap((group) => Array.from(group.querySelectorAll('.side-nav__item')))
+        .map((item) => item.dataset.navSection)
+        .filter(Boolean);
+      state.sideNavOrder = mergeOrders(sideOrder, state.sideNavOrder);
+    }
+    noteDirty();
+  };
+
+  const moveSibling = (direction) => {
+    if (!selected?.el) return;
+    const el = selected.el;
+    const parent = el.parentElement;
+    if (!parent) return;
+    if (direction < 0) {
+      const prev = el.previousElementSibling;
+      if (prev) parent.insertBefore(el, prev);
+    } else {
+      const next = el.nextElementSibling;
+      if (next) parent.insertBefore(next, el);
+    }
+    updateOverlay();
+    if (el.classList.contains('panel')) {
+      updateLayoutFromDom();
+    } else if (el.closest('.quick-nav') || el.closest('.side-nav__group')) {
+      updateNavOrdersFromDom();
+    }
+  };
+
+  const showDropLine = (rect, y) => {
+    if (!dropLine || !rect) return;
+    dropLine.style.display = 'block';
+    dropLine.style.left = `${rect.left}px`;
+    dropLine.style.width = `${rect.width}px`;
+    dropLine.style.top = `${y}px`;
+  };
+
+  const hideDropLine = () => {
+    if (dropLine) dropLine.style.display = 'none';
+  };
+
+  const findPanelInsertTarget = (zone, clientY) => {
+    const panels = Array.from(zone.querySelectorAll('.panel'));
+    for (const panel of panels) {
+      const rect = panel.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) {
+        return panel;
+      }
+    }
+    return null;
+  };
+
+  const findNavInsertTarget = (zone, clientY) => {
+    const items = Array.from(
+      zone.dataset.composerNavZone === 'quick'
+        ? zone.querySelectorAll('.quick-link:not(.quick-link--context)')
+        : zone.querySelectorAll('.side-nav__item'),
+    );
+    for (const item of items) {
+      const rect = item.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) {
+        return item;
+      }
+    }
+    return null;
+  };
+
+  const bindDragHandlers = () => {
+    if (dragBound) return;
+    dragBound = true;
+
+    document.addEventListener('dragstart', (event) => {
+      if (!isActive()) return;
+      const panel = event.target.closest('[data-composer-draggable="true"]');
+      if (panel && panel.classList.contains('panel')) {
+        activeDrag = { type: 'panel', el: panel, zone: null, before: null };
+        panel.classList.add('is-composer-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+        return;
+      }
+      const navItem = event.target.closest('[data-composer-nav-item="true"]');
+      if (navItem) {
+        const zone = navItem.closest('[data-composer-nav-zone]');
+        activeDrag = { type: 'nav', el: navItem, zone, before: null, zoneType: zone?.dataset?.composerNavZone || '' };
+        navItem.classList.add('is-composer-dragging');
+        event.dataTransfer.effectAllowed = 'move';
+      }
+    });
+
+    document.addEventListener('dragover', (event) => {
+      if (!isActive() || !activeDrag) return;
+      const zoneSelector = activeDrag.type === 'panel' ? '[data-composer-droppable="true"]' : '[data-composer-nav-zone]';
+      const zone = event.target.closest(zoneSelector);
+      if (!zone) return;
+      if (activeDrag.type === 'nav' && zone.dataset.composerNavZone !== activeDrag.zoneType) return;
+      event.preventDefault();
+      const before =
+        activeDrag.type === 'panel' ? findPanelInsertTarget(zone, event.clientY) : findNavInsertTarget(zone, event.clientY);
+      activeDrag.zone = zone;
+      activeDrag.before = before;
+      if (before) {
+        const rect = before.getBoundingClientRect();
+        showDropLine(rect, rect.top - 2);
+      } else {
+        const rect = zone.getBoundingClientRect();
+        showDropLine(rect, rect.bottom - 2);
+      }
+    });
+
+    document.addEventListener('drop', (event) => {
+      if (!isActive() || !activeDrag) return;
+      const { el, zone, before, type } = activeDrag;
+      hideDropLine();
+      if (!zone || !el) {
+        activeDrag = null;
+        return;
+      }
+      event.preventDefault();
+      if (before) {
+        zone.insertBefore(el, before);
+      } else {
+        zone.appendChild(el);
+      }
+      if (type === 'panel') {
+        updateLayoutFromDom();
+      } else if (type === 'nav') {
+        updateNavOrdersFromDom();
+      }
+      updateOverlay();
+      activeDrag = null;
+    });
+
+    document.addEventListener('dragend', () => {
+      if (!activeDrag) return;
+      activeDrag.el?.classList?.remove('is-composer-dragging');
+      activeDrag = null;
+      hideDropLine();
+    });
+  };
+
   const clearSelectedOverrides = ({ clearStyles = false } = {}) => {
     if (!selected) return;
-    if (state.textOverrides) {
+    if (selected.textEditable && state.textOverrides) {
       delete state.textOverrides[selected.key];
     }
     if (clearStyles && state.styleOverrides) {
       delete state.styleOverrides[selected.key];
       applyStyleOverrides(selected.el, {});
-      styleInputs.forEach((input) => {
-        input.value = '';
-      });
+      syncStyleInputs();
+      syncRawCss();
     }
-    const fallback = selected.defaultText || '';
-    if (textInput) textInput.value = fallback;
-    updateSelectionText(fallback);
+    if (selected.textEditable) {
+      const fallback = selected.defaultText || '';
+      if (textInput) textInput.value = fallback;
+      updateSelectionText(fallback);
+    }
     noteDirty();
     scheduleOverlayUpdate();
   };
@@ -477,6 +1080,30 @@ function createComposerTool(tool) {
     setMode(false);
   });
 
+  overlayBar?.addEventListener('mousedown', (event) => {
+    if (!isActive() || !selected?.el) return;
+    event.preventDefault();
+    event.stopPropagation();
+    moving = true;
+    moveStart = pointerInfo(event);
+    makeAbsoluteIfNeeded(selected.el);
+    window.addEventListener('mousemove', onMoveDrag);
+    window.addEventListener('mouseup', stopMoveResize, { once: true });
+  });
+
+  overlayHandles.forEach((handle) => {
+    handle.addEventListener('mousedown', (event) => {
+      if (!isActive() || !selected?.el) return;
+      event.preventDefault();
+      event.stopPropagation();
+      resizing = true;
+      resizeHandle = handle.dataset.composerHandle || '';
+      moveStart = pointerInfo(event);
+      window.addEventListener('mousemove', onResizeDrag);
+      window.addEventListener('mouseup', stopMoveResize, { once: true });
+    });
+  });
+
   document.addEventListener(
     'click',
     (event) => {
@@ -484,7 +1111,9 @@ function createComposerTool(tool) {
       if (tool.contains(event.target)) return;
       if (overlay && overlay.contains(event.target)) return;
       if (event.target.closest('[contenteditable="true"]')) return;
-      const target = event.target.closest('[data-composer-key]');
+      const target = event.altKey
+        ? event.target.closest('[data-composer-role="panel"], [data-composer-role="container"]') || resolveComposerTarget(event.target)
+        : resolveComposerTarget(event.target);
       event.preventDefault();
       event.stopPropagation();
       if (!target) {
@@ -502,7 +1131,7 @@ function createComposerTool(tool) {
       if (!isActive()) return;
       if (tool.contains(event.target)) return;
       if (overlay && overlay.contains(event.target)) return;
-      const target = event.target.closest('[data-composer-key]');
+      const target = resolveComposerTarget(event.target);
       if (!target) return;
       event.preventDefault();
       event.stopPropagation();
@@ -514,6 +1143,10 @@ function createComposerTool(tool) {
   document.addEventListener('keydown', (event) => {
     if (!isActive()) return;
     if (event.key === 'Escape') {
+      if (moving || resizing) {
+        stopMoveResize();
+        return;
+      }
       if (selected?.el?.getAttribute('contenteditable') === 'true') {
         selected.el.blur();
         return;
@@ -528,6 +1161,7 @@ function createComposerTool(tool) {
 
   document.addEventListener('input', (event) => {
     if (!isActive() || !selected) return;
+    if (!selected.textEditable) return;
     if (event.target !== selected.el) return;
     const value = getEditableText(selected.el);
     if (textInput) textInput.value = value;
@@ -538,7 +1172,7 @@ function createComposerTool(tool) {
   });
 
   textInput?.addEventListener('input', () => {
-    if (!selected) return;
+    if (!selected || !selected.textEditable) return;
     updateSelectionText(textInput.value);
     state.textOverrides = state.textOverrides || {};
     state.textOverrides[selected.key] = textInput.value.trim();
@@ -547,7 +1181,7 @@ function createComposerTool(tool) {
   });
 
   applyButton?.addEventListener('click', () => {
-    if (!selected) {
+    if (!selected || !selected.textEditable) {
       setStatus('Select something to edit first.', true);
       return;
     }
@@ -564,26 +1198,55 @@ function createComposerTool(tool) {
   });
 
   clearButton?.addEventListener('click', () => {
+    if (!selected || !selected.textEditable) {
+      setStatus('Select a text label to clear.', true);
+      return;
+    }
     clearSelectedOverrides();
   });
 
   styleInputs.forEach((input) => {
-    input.addEventListener('input', () => {
+    const onChange = () => {
       if (!selected) return;
-      const prop = input.dataset.composerStyle;
+      const prop = normalizeStyleProp(input.dataset.composerStyle || '');
       if (!prop) return;
-      state.styleOverrides = state.styleOverrides || {};
-      state.styleOverrides[selected.key] = state.styleOverrides[selected.key] || {};
-      if (!input.value.trim()) {
-        delete state.styleOverrides[selected.key][prop];
-      } else {
-        state.styleOverrides[selected.key][prop] = input.value.trim();
-      }
-      applyStyleOverrides(selected.el, state.styleOverrides[selected.key]);
+      setStyleOverride(prop, input.value);
       noteDirty();
+      syncRawCss();
       scheduleOverlayUpdate();
-    });
+    };
+    input.addEventListener('input', onChange);
+    input.addEventListener('change', onChange);
   });
+
+  rawApplyButton?.addEventListener('click', () => {
+    if (!selected) {
+      setStatus('Select an element to apply CSS.', true);
+      return;
+    }
+    applyRawCss(rawCssInput?.value || '');
+    scheduleOverlayUpdate();
+  });
+
+  rawSyncButton?.addEventListener('click', () => {
+    if (!selected) {
+      setStatus('Select an element to sync.', true);
+      return;
+    }
+    syncStyleInputs();
+    syncRawCss();
+  });
+
+  styleClearButton?.addEventListener('click', () => {
+    if (!selected) {
+      setStatus('Select an element to clear styles.', true);
+      return;
+    }
+    clearSelectedOverrides({ clearStyles: true });
+  });
+
+  moveUpButton?.addEventListener('click', () => moveSibling(-1));
+  moveDownButton?.addEventListener('click', () => moveSibling(1));
 
   pageVerbositySelect?.addEventListener('change', () => {
     const pageKey = getPageKey();
@@ -660,6 +1323,13 @@ function createComposerTool(tool) {
       li.dataset.composerItem = item.key;
       li.draggable = true;
       li.innerHTML = `<span class="composer-tool__drag" aria-hidden="true"></span><span>${item.label}</span>`;
+      li.addEventListener('click', (event) => {
+        if (dragInfo) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const navTarget = document.querySelector(`[data-nav-key="${item.key}"]`);
+        if (navTarget) selectElement(navTarget);
+      });
       listEl.appendChild(li);
     });
   };
@@ -795,6 +1465,9 @@ function createComposerTool(tool) {
     panels.forEach((panel, index) => {
       const key = panel.dataset.composerSection || panel.id || `panel-${index + 1}`;
       panel.dataset.composerSection = key;
+      if (!panel.dataset.composerKey) {
+        panel.dataset.composerKey = `panel.${key}`;
+      }
       const li = document.createElement('li');
       li.className = 'composer-tool__item';
       if (hiddenSet.has(key)) {
@@ -812,6 +1485,12 @@ function createComposerTool(tool) {
         event.preventDefault();
         event.stopPropagation();
         togglePanelHidden(key, li, toggle);
+      });
+      li.addEventListener('click', (event) => {
+        if (dragInfo) return;
+        event.preventDefault();
+        event.stopPropagation();
+        selectElement(panel);
       });
       li.appendChild(toggle);
       listEl.appendChild(li);
@@ -886,6 +1565,11 @@ function createComposerTool(tool) {
       state = { ...state, ...readComposerSettings() };
     }
     state = readSettingsWithDefaults();
+    hydrateComposerTargets();
+    applyComposerStyleOverridesToPage(state);
+    applyComposerTextOverridesToPage(state);
+    setDraggableState(isActive());
+    bindDragHandlers();
     buildNavLists();
     buildPanelLists();
     if (pageVerbositySelect) {
@@ -896,6 +1580,11 @@ function createComposerTool(tool) {
         pageVerbosityLabel.textContent = `Verbosity preset for ${pageKey}`;
       }
     }
+    if (!selected) {
+      setInspectorDisabled(true);
+      if (textInput) textInput.disabled = true;
+    }
+    syncListSelection();
   };
 
   updateToggleLabel(isActive());
@@ -922,17 +1611,33 @@ function ensureComposerOverlay() {
   overlay.dataset.composerOverlay = 'true';
   overlay.style.display = 'none';
   overlay.innerHTML = `
-    <div class="composer-overlay__bar">
+    <div class="composer-overlay__bar" data-composer-overlay-bar>
       <span class="composer-overlay__label" data-composer-overlay-label>Selection</span>
       <div class="composer-overlay__tools">
         <button class="ghost composer-overlay__action" type="button" data-composer-overlay-clear>Clear</button>
         <button class="ghost composer-overlay__action" type="button" data-composer-overlay-exit>Exit</button>
       </div>
     </div>
+    <div class="composer-overlay__handle composer-overlay__handle--nw" data-composer-handle="nw"></div>
+    <div class="composer-overlay__handle composer-overlay__handle--ne" data-composer-handle="ne"></div>
+    <div class="composer-overlay__handle composer-overlay__handle--sw" data-composer-handle="sw"></div>
+    <div class="composer-overlay__handle composer-overlay__handle--se" data-composer-handle="se"></div>
   `;
   document.body.appendChild(overlay);
   composerOverlay = overlay;
   return composerOverlay;
+}
+
+function ensureComposerDropLine() {
+  const existing = document.querySelector('[data-composer-drop-line]');
+  if (existing) return existing;
+  if (!document.body) return null;
+  const line = document.createElement('div');
+  line.className = 'composer-drop-line';
+  line.dataset.composerDropLine = 'true';
+  line.style.display = 'none';
+  document.body.appendChild(line);
+  return line;
 }
 
 function readComposerSettings() {

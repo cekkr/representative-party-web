@@ -327,7 +327,7 @@ function formatCsvList(list = []) {
   return (list || []).join(', ');
 }
 
-function sanitizeCssValue(raw, maxLength = 64) {
+function sanitizeCssValue(raw, maxLength = 180) {
   const cleaned = sanitizeText(raw || '', maxLength);
   if (!cleaned) return '';
   if (!/^[#()%,.\s0-9a-zA-Z-]+$/.test(cleaned)) return '';
@@ -391,14 +391,36 @@ function parseComposerStyleOverrides(raw, fallback = {}) {
     if (!safeKey) continue;
     if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
     const next = {};
+    const width = sanitizeCssValue(value.width);
+    const height = sanitizeCssValue(value.height);
     const color = sanitizeCssValue(value.color);
     const background = sanitizeCssValue(value.background);
     const fontSize = sanitizeCssValue(value.fontSize);
+    const borderRadius = sanitizeCssValue(value.borderRadius);
     const padding = sanitizeCssValue(value.padding);
+    const margin = sanitizeCssValue(value.margin);
+    const border = sanitizeCssValue(value.border);
+    const boxShadow = sanitizeCssValue(value.boxShadow);
+    const display = sanitizeCssValue(value.display);
+    const position = sanitizeCssValue(value.position);
+    const zIndex = sanitizeCssValue(value.zIndex);
+    const left = sanitizeCssValue(value.left);
+    const top = sanitizeCssValue(value.top);
+    if (width) next.width = width;
+    if (height) next.height = height;
     if (color) next.color = color;
     if (background) next.background = background;
     if (fontSize) next.fontSize = fontSize;
+    if (borderRadius) next.borderRadius = borderRadius;
     if (padding) next.padding = padding;
+    if (margin) next.margin = margin;
+    if (border) next.border = border;
+    if (boxShadow) next.boxShadow = boxShadow;
+    if (display) next.display = display;
+    if (position) next.position = position;
+    if (zIndex) next.zIndex = zIndex;
+    if (left) next.left = left;
+    if (top) next.top = top;
     if (Object.keys(next).length) {
       cleaned[safeKey] = next;
     }

@@ -176,8 +176,17 @@ function buildComposerControls() {
           </div>
         </section>
         <section class="composer-tool__section">
-          <p class="eyebrow">Style</p>
+          <p class="eyebrow">Inspector</p>
+          <p class="muted small" data-composer-inspector-note>Select a panel or label to edit.</p>
           <div class="form-grid">
+            <label class="field">
+              <span>Width</span>
+              <input type="text" data-composer-style="width" placeholder="320px / 40% / auto" />
+            </label>
+            <label class="field">
+              <span>Height</span>
+              <input type="text" data-composer-style="height" placeholder="180px / auto" />
+            </label>
             <label class="field">
               <span>Text color</span>
               <input type="text" data-composer-style="color" placeholder="#e8f1ff" />
@@ -191,9 +200,71 @@ function buildComposerControls() {
               <input type="text" data-composer-style="fontSize" placeholder="1.1rem" />
             </label>
             <label class="field">
+              <span>Border radius</span>
+              <input type="text" data-composer-style="borderRadius" placeholder="12px" />
+            </label>
+            <label class="field">
               <span>Padding</span>
               <input type="text" data-composer-style="padding" placeholder="0.25rem 0.6rem" />
             </label>
+            <label class="field">
+              <span>Margin</span>
+              <input type="text" data-composer-style="margin" placeholder="0.75rem 0" />
+            </label>
+            <label class="field">
+              <span>Border</span>
+              <input type="text" data-composer-style="border" placeholder="1px solid rgba(154, 177, 211, 0.3)" />
+            </label>
+            <label class="field">
+              <span>Box shadow</span>
+              <input type="text" data-composer-style="boxShadow" placeholder="0 12px 30px rgba(0,0,0,0.3)" />
+            </label>
+            <label class="field">
+              <span>Display</span>
+              <select data-composer-style="display">
+                <option value="">(no change)</option>
+                <option>block</option>
+                <option>inline-block</option>
+                <option>flex</option>
+                <option>grid</option>
+                <option>none</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Position</span>
+              <select data-composer-style="position">
+                <option value="">(no change)</option>
+                <option>static</option>
+                <option>relative</option>
+                <option>absolute</option>
+                <option>fixed</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Z-index</span>
+              <input type="text" data-composer-style="zIndex" placeholder="10" />
+            </label>
+            <label class="field">
+              <span>Left</span>
+              <input type="text" data-composer-style="left" placeholder="20px" />
+            </label>
+            <label class="field">
+              <span>Top</span>
+              <input type="text" data-composer-style="top" placeholder="10px" />
+            </label>
+          </div>
+          <label class="field">
+            <span>Raw CSS declarations</span>
+            <textarea data-composer-raw spellcheck="false" placeholder="background: rgba(255,255,255,0.08);&#10;border: 1px solid rgba(255,255,255,0.2);"></textarea>
+          </label>
+          <div class="cta-row">
+            <button class="ghost" type="button" data-composer-raw-apply>Apply CSS</button>
+            <button class="ghost" type="button" data-composer-raw-sync>Sync from selection</button>
+            <button class="ghost" type="button" data-composer-style-clear>Clear styles</button>
+          </div>
+          <div class="cta-row">
+            <button class="ghost" type="button" data-composer-move-up>Move up</button>
+            <button class="ghost" type="button" data-composer-move-down>Move down</button>
           </div>
         </section>
         <section class="composer-tool__section">
