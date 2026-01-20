@@ -1,10 +1,10 @@
 import { URL } from 'node:url';
 
-import { renderAdmin, updateAdmin, exportAuditLog } from '../interfaces/http/modules/admin/admin.js';
+import { renderAdmin, updateAdmin, exportAuditLog } from '../modules/admin/http/admin.js';
 import { serveActor, serveOutbox, serveOutboxCollection, serveObject, inbox } from '../interfaces/http/controllers/activitypub.js';
-import { completeAuth, startAuth } from '../interfaces/http/modules/auth/auth.js';
+import { completeAuth, startAuth } from '../modules/auth/http/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../interfaces/http/controllers/circle.js';
-import { renderDiscussion, postDiscussion } from '../interfaces/http/modules/discussion/discussion.js';
+import { renderDiscussion, postDiscussion } from '../modules/discussion/http/discussion.js';
 import {
   renderPetitions,
   submitPetition,
@@ -13,18 +13,18 @@ import {
   updatePetitionStatus,
   signPetitionRoute,
   postPetitionComment,
-} from '../interfaces/http/modules/petitions/petitions.js';
-import { renderForumRoute, postThread, postComment } from '../interfaces/http/modules/forum/forum.js';
-import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../interfaces/http/modules/groups/groups.js';
-import { renderGovernance } from '../interfaces/http/modules/governance/governance.js';
+} from '../modules/petitions/http/petitions.js';
+import { renderForumRoute, postThread, postComment } from '../modules/forum/http/forum.js';
+import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../modules/groups/http/groups.js';
+import { renderGovernance } from '../modules/governance/http/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
-import { renderHome } from '../interfaces/http/modules/home/home.js';
+import { renderHome } from '../modules/home/http/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
 import { getExtensions, toggleExtension } from '../interfaces/http/controllers/extensions.js';
-import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../interfaces/http/modules/notifications/notifications.js';
-import { renderProfile, updateProfileAttributes } from '../interfaces/http/modules/profile/profile.js';
-import { renderDelegation, resolveConflict, updateDelegation } from '../interfaces/http/modules/delegation/delegation.js';
-import { renderDelegateProfile } from '../interfaces/http/modules/delegates/delegates.js';
+import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../modules/notifications/http/notifications.js';
+import { renderProfile, updateProfileAttributes } from '../modules/profile/http/profile.js';
+import { renderDelegation, resolveConflict, updateDelegation } from '../modules/delegation/http/delegation.js';
+import { renderDelegateProfile } from '../modules/delegates/http/delegates.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
   renderSocialFeed,
@@ -34,7 +34,7 @@ import {
   listRelationships,
   serveSocialMedia,
   reportSocialMedia,
-} from '../interfaces/http/modules/social/social.js';
+} from '../modules/social/http/social.js';
 import { renderTransactions, exportTransactions, exportTransactionsLedger, gossipTransactions } from '../interfaces/http/controllers/transactions.js';
 import { sendNotFound } from '../shared/utils/http.js';
 

@@ -46,12 +46,12 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## Code map (Phase 1 kernel)
 - **Entry & server**: `src/index.js` (bootstrap), `src/app/server.js` (HTTP), `src/app/router.js` (table-driven routes).
-- **Interfaces (HTTP)**: `src/interfaces/http/controllers/` (`home`, `health`, `auth`, `discussion`, `forum`, `petitions`, `notifications`, `groups`, `delegation`, `circle`, `extensions`, `activitypub`, `static`, `admin`, `votes`, `social` for follows/feed/posts); view helpers in `src/interfaces/http/views/`.
+- **Interfaces (HTTP)**: module controllers under `src/modules/<module>/http/`, non-UI endpoints in `src/interfaces/http/controllers/`, and view helpers in `src/interfaces/http/views/`.
 - **Domain modules**: `src/modules/identity/*` (auth scaffold + blinded hash, person session lookup, privileges), `src/modules/circle/*` (policy gates, ledger envelope signing/verification), `src/modules/messaging/notifications.js`, `src/modules/topics/*` (classification hook + topic gardener client), `src/modules/petitions/signatures.js`, `src/modules/votes/voteEnvelope.js`, `src/modules/delegation/delegation.js`, `src/modules/groups/*` (delegation cachets, per-group rules, elections), `src/modules/social/*` (follow graph + micro-posts + mentions/tags/reshares), `src/modules/federation/{activitypub.js,gossip.js,ingest.js,peers.js,quarantine.js}`, `src/modules/extensions/registry.js` + `sample-policy-tighten.js`.
 - **State/persistence**: `src/infra/persistence/storage.js` (interface), adapter drivers under `src/infra/persistence/adapters/` (json/memory/sql/kv/mysql/mongodb), replication/validation helpers in `src/modules/federation/replication.js`, migrations in `src/infra/persistence/migrations.js`, and the store entry in `src/infra/persistence/store.js` (social follows + micro-posts + media metadata persist through the same adapters; media binaries stay provider-local).
 - **Helper services**: AI/ML workers live in `src/infra/workers/` (Python projects, e.g., topic gardener). Node code should call them via `src/modules/topics/topicGardenerClient.js` to avoid conflicting provider outputs and duplicated computation across classification providers.
 - **Shared utilities**: `src/shared/utils/` (http helpers, request parsing, text sanitization/escaping).
-- **Assets**: static CSS/JS in `src/public/`; SSR templates live under `src/interfaces/http/modules/*/templates/` with layout in `src/interfaces/http/modules/core/templates/`. Static served from `/public/*`.
+- **Assets**: static CSS/JS in `src/public/`; SSR templates live under `src/modules/<module>/templates/` with layout in `src/modules/core/templates/layout.html` and sub-components under `src/modules/<module>/templates/partials/` (included via `{{> name}}`). Static served from `/public/*`.
 
 ## UX contract (Phase 1)
 - SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.

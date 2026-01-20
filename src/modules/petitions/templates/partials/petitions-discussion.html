@@ -1,0 +1,18 @@
+<section class="panel" id="petitions-discussion">
+  <p class="eyebrow">Active deliberations</p>
+  <h3>Proposal discussion feed</h3>
+  <form class="form-grid" method="get" action="/petitions" data-enhance="petitions-filter">
+    <label class="field">
+      <span>Filter by stage</span>
+      <select name="stage">
+        {{stageFilterOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
+  <div class="list-stack">
+    {{discussionFeed}}
+  </div>
+</section>

@@ -1,0 +1,36 @@
+<section class="panel" id="social-follows">
+  <p class="eyebrow">Follow graph</p>
+  <h3>Follow a handle</h3>
+  <form class="stack" method="post" action="/social/follow" data-enhance="social-follow">
+    <div class="form-grid">
+      <label class="field">
+        <span>Handle</span>
+        <input name="handle" placeholder="{{actorLabel}}-1234" required />
+      </label>
+      <label class="field">
+        <span>Follow type</span>
+        <input name="type" list="follow-types" placeholder="circle / interest / info / alerts" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Follow</button>
+    </div>
+  </form>
+  <form class="stack" method="post" action="/social/unfollow" data-enhance="social-unfollow">
+    <div class="form-grid">
+      <label class="field">
+        <span>Handle to unfollow</span>
+        <input name="handle" placeholder="{{actorLabel}}-1234" required />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Unfollow</button>
+    </div>
+  </form>
+  <datalist id="follow-types">
+    {{followTypeDatalistOptions}}
+  </datalist>
+  <div class="list-stack">
+    {{followList}}
+  </div>
+</section>

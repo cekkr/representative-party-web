@@ -1,0 +1,16 @@
+<section class="panel" id="social-controls">
+  <p class="eyebrow">Wall controls</p>
+  <h3>Filter your wall</h3>
+  <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
+    <label class="field">
+      <span>Filter by follow type</span>
+      <select name="type">
+        <option value="" {{followTypeSelectedAll}}>{{followTypeAllLabel}}</option>
+        {{followTypeOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
+</section>

@@ -10,7 +10,7 @@ import { renderNav } from './navigation.js';
 import { deriveStatusMeta, renderStatusStrip } from './status.js';
 
 const templateCache = new Map();
-const HTTP_MODULES_ROOT = join(PATHS.ROOT, 'interfaces', 'http', 'modules');
+const MODULES_ROOT = join(PATHS.ROOT, 'modules');
 const TEMPLATE_MODULES = {
   layout: 'core',
   error: 'core',
@@ -51,6 +51,7 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     pageLayouts: composerSettings.pageLayouts || {},
     textOverrides: composerTextOverrides,
     styleOverrides: composerStyleOverrides,
+    domOrders: composerSettings.domOrders || {},
   };
   const composerSettingsAttr = escapeHtml(JSON.stringify(composerPayload));
   const roleLabel = data.roleLabel || data.person?.role || '';
@@ -123,16 +124,89 @@ export function resolveVerbosityMode({ state, person, explicit, pageKey } = {}) 
 }
 
 async function loadTemplate(name) {
-  if (templateCache.has(name)) {
-    return templateCache.get(name);
-  }
+  const { moduleName, filePath } = resolveTemplatePath(name);
+  return loadTemplateFile(filePath, { moduleName });
+}
+
+function resolveTemplatePath(name) {
   const moduleName = TEMPLATE_MODULES[name];
   const filePath = moduleName
-    ? join(HTTP_MODULES_ROOT, moduleName, 'templates', `${name}.html`)
+    ? join(MODULES_ROOT, moduleName, 'templates', `${name}.html`)
     : join(PATHS.TEMPLATE_ROOT, `${name}.html`);
-  const content = await readFile(filePath, 'utf-8');
-  templateCache.set(name, content);
+  return { moduleName, filePath };
+}
+
+async function loadTemplateFile(filePath, { moduleName = '', stack = new Set() } = {}) {
+  if (templateCache.has(filePath)) {
+    return templateCache.get(filePath);
+  }
+  if (stack.has(filePath)) {
+    return '';
+  }
+  stack.add(filePath);
+  let content = await readFile(filePath, 'utf-8');
+  content = await resolvePartials(content, { moduleName, stack });
+  stack.delete(filePath);
+  templateCache.set(filePath, content);
   return content;
+}
+
+async function resolvePartials(template, { moduleName, stack }) {
+  const matches = Array.from(template.matchAll(/{{>\s*([^}]+)\s*}}/g));
+  if (!matches.length) return template;
+  let output = template;
+  for (const match of matches) {
+    const token = normalizePartialToken(match[1]);
+    if (!token) {
+      output = output.replace(match[0], '');
+      continue;
+    }
+    const partial = await loadPartial(token, { moduleName, stack });
+    output = output.replace(match[0], partial);
+  }
+  return output;
+}
+
+function normalizePartialToken(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return '';
+  if (!/^[a-zA-Z0-9_./:-]+$/.test(trimmed)) return '';
+  if (trimmed.includes('..')) return '';
+  return trimmed;
+}
+
+async function loadPartial(token, { moduleName, stack }) {
+  const { moduleName: targetModule, candidates } = resolvePartialCandidates(token, moduleName);
+  for (const candidate of candidates) {
+    try {
+      return await loadTemplateFile(candidate, { moduleName: targetModule, stack });
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  return '';
+}
+
+function resolvePartialCandidates(token, moduleName) {
+  let targetModule = moduleName;
+  let partialName = token;
+  if (token.includes(':')) {
+    const parts = token.split(':');
+    targetModule = parts[0] || moduleName;
+    partialName = parts.slice(1).join(':') || '';
+  }
+  const baseDir = targetModule ? join(MODULES_ROOT, targetModule, 'templates') : PATHS.TEMPLATE_ROOT;
+  if (!partialName) {
+    return { moduleName: targetModule, candidates: [] };
+  }
+  const candidates = [];
+  if (partialName.includes('/')) {
+    candidates.push(join(baseDir, `${partialName}.html`));
+  } else {
+    candidates.push(join(baseDir, 'partials', `${partialName}.html`));
+    candidates.push(join(baseDir, `${partialName}.html`));
+  }
+  return { moduleName: targetModule, candidates };
 }
 
 function applyTemplate(template, data) {

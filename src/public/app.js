@@ -199,8 +199,31 @@ function applyComposerTextOverridesToPage(settings = readComposerSettings()) {
   });
 }
 
+function applyComposerDomOrdersToPage(settings = readComposerSettings()) {
+  if (!document.body) return;
+  hydrateComposerTargets();
+  const domOrders = settings?.domOrders;
+  if (!domOrders || typeof domOrders !== 'object') return;
+  Object.entries(domOrders).forEach(([parentKey, order]) => {
+    if (!Array.isArray(order) || !order.length) return;
+    const selector = `[data-composer-key="${escapeComposerSelector(parentKey)}"]`;
+    const parent = document.querySelector(selector);
+    if (!parent) return;
+    const children = Array.from(parent.children || []).filter((child) => child.dataset?.composerKey);
+    if (!children.length) return;
+    const byKey = new Map(children.map((child) => [child.dataset.composerKey, child]));
+    const currentOrder = children.map((child) => child.dataset.composerKey).filter(Boolean);
+    const merged = mergeOrders(order, currentOrder);
+    merged.forEach((key) => {
+      const child = byKey.get(key);
+      if (child) parent.appendChild(child);
+    });
+  });
+}
+
 function initComposerTool() {
   const tool = document.querySelector('[data-composer-tool]');
+  applyComposerDomOrdersToPage();
   applyComposerStyleOverridesToPage();
   applyComposerTextOverridesToPage();
   if (!tool) return;
@@ -938,6 +961,24 @@ function createComposerTool(tool) {
     noteDirty();
   };
 
+  const updateDomOrderFromElement = (el) => {
+    if (!el) return;
+    if (el.classList?.contains('panel') || el.dataset?.composerRole === 'panel') return;
+    if (el.closest('.quick-nav') || el.closest('.side-nav')) return;
+    const parent = el.parentElement;
+    if (!parent) return;
+    const parentKey = parent.dataset?.composerKey || '';
+    if (!parentKey) return;
+    const childKeys = Array.from(parent.children || [])
+      .map((child) => child.dataset?.composerKey || '')
+      .filter(Boolean);
+    if (!childKeys.length) return;
+    state.domOrders = state.domOrders || {};
+    state.domOrders[parentKey] = mergeOrders(childKeys, state.domOrders[parentKey]);
+    buildHierarchyTree();
+    noteDirty();
+  };
+
   const moveSibling = (direction) => {
     if (!selected?.el) return;
     const el = selected.el;
@@ -955,6 +996,8 @@ function createComposerTool(tool) {
       updateLayoutFromDom();
     } else if (el.closest('.quick-nav') || el.closest('.side-nav__group')) {
       updateNavOrdersFromDom();
+    } else {
+      updateDomOrderFromElement(el);
     }
   };
 
@@ -1572,6 +1615,7 @@ function createComposerTool(tool) {
     payload.set('composerAsideWidth', state.pageAsideWidth ? String(state.pageAsideWidth) : '');
     payload.set('composerTextOverrides', JSON.stringify(state.textOverrides || {}));
     payload.set('composerStyleOverrides', JSON.stringify(state.styleOverrides || {}));
+    payload.set('composerDomOrders', JSON.stringify(state.domOrders || {}));
     payload.set('composerPageVerbosity', JSON.stringify(state.pageVerbosity || {}));
     payload.set('composerPageLayouts', JSON.stringify(state.pageLayouts || {}));
     try {
@@ -1603,6 +1647,7 @@ function createComposerTool(tool) {
     pageLayouts: state.pageLayouts && typeof state.pageLayouts === 'object' ? state.pageLayouts : {},
     textOverrides: state.textOverrides && typeof state.textOverrides === 'object' ? state.textOverrides : {},
     styleOverrides: state.styleOverrides && typeof state.styleOverrides === 'object' ? state.styleOverrides : {},
+    domOrders: state.domOrders && typeof state.domOrders === 'object' ? state.domOrders : {},
   });
 
   const refresh = () => {
@@ -1611,6 +1656,7 @@ function createComposerTool(tool) {
     }
     state = readSettingsWithDefaults();
     hydrateComposerTargets();
+    applyComposerDomOrdersToPage(state);
     applyComposerStyleOverridesToPage(state);
     applyComposerTextOverridesToPage(state);
     setDraggableState(isActive());
@@ -1698,6 +1744,7 @@ function readComposerSettings() {
       pageLayouts: {},
       textOverrides: {},
       styleOverrides: {},
+      domOrders: {},
     };
   }
   try {
@@ -1778,7 +1825,9 @@ function initVerbosityToggle() {
 }
 
 function applyPageLayout() {
-  applyPageLayoutFromSettings(readComposerSettings());
+  const settings = readComposerSettings();
+  applyPageLayoutFromSettings(settings);
+  applyComposerDomOrdersToPage(settings);
 }
 
 function applyPageLayoutFromSettings(settings = {}) {
