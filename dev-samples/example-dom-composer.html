@@ -1,0 +1,1973 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mini “GrapesJS-like” DOM Composer (Single-File)</title>
+  <style>
+    :root{
+      --bg:#0b0d12;
+      --panel:#101521;
+      --panel2:#0f1420;
+      --stroke:rgba(255,255,255,.10);
+      --stroke2:rgba(255,255,255,.16);
+      --text:rgba(255,255,255,.88);
+      --muted:rgba(255,255,255,.62);
+      --accent:#7c5cff;
+      --danger:#ff4d6d;
+      --ok:#35d07f;
+      --shadow: 0 16px 60px rgba(0,0,0,.45);
+      --radius:14px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{ box-sizing:border-box; }
+    html,body{ height:100%; }
+    body{
+      margin:0;
+      background:radial-gradient(1200px 700px at 20% -10%, rgba(124,92,255,.20), transparent 60%),
+                 radial-gradient(900px 500px at 120% 10%, rgba(53,208,127,.14), transparent 55%),
+                 var(--bg);
+      color:var(--text);
+      font-family:var(--sans);
+      overflow:hidden;
+    }
+
+    /* App shell */
+    .app{
+      height:100%;
+      display:grid;
+      grid-template-columns: 310px 1fr 360px;
+      gap:12px;
+      padding:12px;
+    }
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.05), transparent 18%), var(--panel);
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+    }
+    .panel-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      padding:10px 12px;
+      border-bottom:1px solid var(--stroke);
+      background:rgba(255,255,255,.03);
+      gap:10px;
+    }
+    .panel-title{
+      font-weight:650;
+      letter-spacing:.2px;
+      font-size:13px;
+      color:rgba(255,255,255,.84);
+      display:flex;
+      align-items:center;
+      gap:8px;
+      white-space:nowrap;
+    }
+    .panel-body{
+      padding:12px;
+      overflow:auto;
+      min-height:0;
+    }
+
+    /* Buttons / inputs */
+    .btn{
+      appearance:none;
+      border:1px solid var(--stroke2);
+      background:rgba(255,255,255,.05);
+      color:var(--text);
+      padding:7px 10px;
+      border-radius:10px;
+      font-size:12px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      user-select:none;
+      transition: transform .08s ease, background .12s ease, border-color .12s ease;
+    }
+    .btn:hover{ background:rgba(255,255,255,.08); }
+    .btn:active{ transform: translateY(1px); }
+    .btn.primary{
+      background:rgba(124,92,255,.18);
+      border-color:rgba(124,92,255,.45);
+    }
+    .btn.danger{
+      background:rgba(255,77,109,.14);
+      border-color:rgba(255,77,109,.40);
+    }
+    .btn.ok{
+      background:rgba(53,208,127,.14);
+      border-color:rgba(53,208,127,.40);
+    }
+    .pill{
+      font-size:11px;
+      padding:2px 8px;
+      border:1px solid var(--stroke2);
+      border-radius:999px;
+      color:var(--muted);
+      background:rgba(255,255,255,.04);
+      white-space:nowrap;
+    }
+    .row{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    .sep{ height:1px; background:var(--stroke); margin:10px 0; }
+
+    .hint{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.35;
+    }
+    .kbd{
+      font-family:var(--mono);
+      font-size:11px;
+      border:1px solid var(--stroke2);
+      padding:1px 6px;
+      border-radius:8px;
+      background:rgba(0,0,0,.22);
+      color:rgba(255,255,255,.82);
+    }
+
+    input, select, textarea{
+      width:100%;
+      border:1px solid var(--stroke2);
+      background:rgba(0,0,0,.18);
+      color:var(--text);
+      border-radius:10px;
+      padding:8px 10px;
+      font-size:12px;
+      outline:none;
+    }
+    textarea{ min-height:92px; resize:vertical; font-family:var(--mono); }
+    label{
+      display:block;
+      font-size:11px;
+      color:var(--muted);
+      margin:8px 0 6px;
+    }
+    .grid2{ display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+    .grid3{ display:grid; grid-template-columns: 1fr 1fr 1fr; gap:8px; }
+    .small{ font-size:11px; color:var(--muted); }
+    .mono{ font-family:var(--mono); }
+
+    /* Center canvas */
+    .center{
+      display:flex;
+      flex-direction:column;
+      min-height:0;
+      gap:12px;
+    }
+    .topbar{
+      background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      padding:10px 12px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .topbar .left, .topbar .right{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .brand{
+      display:flex; align-items:center; gap:10px;
+      padding-right:8px; margin-right:6px;
+      border-right:1px solid var(--stroke);
+    }
+    .logo{
+      width:28px; height:28px; border-radius:10px;
+      background: radial-gradient(12px 12px at 35% 35%, rgba(255,255,255,.35), transparent 60%),
+                  linear-gradient(135deg, rgba(124,92,255,.85), rgba(53,208,127,.75));
+      border:1px solid rgba(255,255,255,.20);
+      box-shadow: 0 10px 28px rgba(124,92,255,.22);
+    }
+    .title{
+      font-weight:750;
+      letter-spacing:.2px;
+      font-size:13px;
+      line-height:1.1;
+    }
+    .subtitle{ font-size:11px; color:var(--muted); }
+
+    .stage{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), transparent 16%), var(--panel2);
+      border:1px solid var(--stroke);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:auto;
+      min-height:0;
+      position:relative;
+    }
+    .stage-inner{
+      padding:18px;
+      min-width:900px; /* so it feels like a “page” */
+    }
+
+    /* “Social page” styles (the content you will edit) */
+    .social-page{
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      overflow:hidden;
+      box-shadow: 0 14px 50px rgba(0,0,0,.28);
+    }
+    .social-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 14px;
+      background:rgba(0,0,0,.20);
+      border-bottom:1px solid rgba(255,255,255,.10);
+    }
+    .social-header .left{
+      display:flex; align-items:center; gap:12px;
+    }
+    .social-header .appmark{
+      width:34px; height:34px; border-radius:12px;
+      background: radial-gradient(12px 12px at 35% 35%, rgba(255,255,255,.35), transparent 60%),
+                  linear-gradient(135deg, rgba(124,92,255,.85), rgba(255,77,109,.72));
+      border:1px solid rgba(255,255,255,.18);
+    }
+    .social-header .name{
+      font-weight:750;
+      font-size:14px;
+      letter-spacing:.2px;
+    }
+    .social-header .search{
+      width:320px;
+      max-width:40vw;
+    }
+    .social-header .right{
+      display:flex; align-items:center; gap:10px;
+    }
+    .chip{
+      font-size:12px;
+      padding:6px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.12);
+      color:rgba(255,255,255,.86);
+      white-space:nowrap;
+    }
+
+    /* Top menu (special: supports add/remove/reorder/rename in edit mode) */
+    .top-menu{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      list-style:none;
+      margin:0;
+      padding:0;
+    }
+    .top-menu li{
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+      cursor:pointer;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .top-menu li:hover{ background:rgba(255,255,255,.09); }
+
+    .social-body{
+      display:grid;
+      grid-template-columns: 230px 1fr 280px;
+      gap:14px;
+      padding:14px;
+    }
+    .card{
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:12px;
+    }
+    .side-nav ul{
+      list-style:none;
+      padding:0;
+      margin:0;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .side-nav li{
+      padding:10px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+      cursor:pointer;
+      user-select:none;
+    }
+    .side-nav li:hover{ background:rgba(255,255,255,.07); }
+
+    .feed{ display:flex; flex-direction:column; gap:12px; }
+    .post{
+      background:rgba(0,0,0,.22);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:16px;
+      padding:12px;
+    }
+    .post-head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .avatar{
+      width:34px; height:34px; border-radius:12px;
+      background:linear-gradient(135deg, rgba(53,208,127,.70), rgba(124,92,255,.70));
+      border:1px solid rgba(255,255,255,.15);
+      flex:0 0 auto;
+    }
+    .who{
+      display:flex; flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+    .who .u{ font-weight:700; font-size:13px; }
+    .who .t{ font-size:11px; color:rgba(255,255,255,.60); }
+    .post-text{ font-size:13px; line-height:1.45; color:rgba(255,255,255,.86); }
+    .post-media{
+      margin-top:10px;
+      border-radius:14px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.10);
+      background:
+        radial-gradient(400px 200px at 10% 10%, rgba(124,92,255,.20), transparent 50%),
+        radial-gradient(300px 160px at 100% 0%, rgba(53,208,127,.14), transparent 50%),
+        rgba(255,255,255,.03);
+      height:160px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      color:rgba(255,255,255,.55);
+      font-family:var(--mono);
+      font-size:12px;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      margin-top:10px;
+      flex-wrap:wrap;
+    }
+    .action{
+      padding:7px 10px;
+      border-radius:12px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.05);
+      cursor:pointer;
+      user-select:none;
+      font-size:12px;
+    }
+    .action:hover{ background:rgba(255,255,255,.08); }
+
+    /* Palette */
+    .palette{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:8px;
+    }
+    .tile{
+      border:1px dashed rgba(255,255,255,.22);
+      background:rgba(255,255,255,.04);
+      border-radius:12px;
+      padding:10px;
+      cursor:grab;
+      user-select:none;
+      font-size:12px;
+      line-height:1.2;
+    }
+    .tile:active{ cursor:grabbing; }
+    .tile .k{ font-family:var(--mono); font-size:11px; color:rgba(255,255,255,.70); }
+    .tile .d{ font-size:11px; color:rgba(255,255,255,.55); margin-top:4px; }
+
+    /* Hierarchy tree */
+    .tree{
+      font-family:var(--mono);
+      font-size:11px;
+      line-height:1.25;
+    }
+    .tree ul{ list-style:none; padding-left:16px; margin:6px 0; }
+    .tree li{ margin:2px 0; }
+    .node{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      padding:3px 6px;
+      border-radius:10px;
+      cursor:pointer;
+      border:1px solid transparent;
+      color:rgba(255,255,255,.80);
+      background:transparent;
+      max-width:100%;
+    }
+    .node:hover{
+      background:rgba(255,255,255,.06);
+      border-color:rgba(255,255,255,.10);
+    }
+    .node.selected{
+      background:rgba(124,92,255,.14);
+      border-color:rgba(124,92,255,.35);
+      color:rgba(255,255,255,.92);
+    }
+    .node .tag{ color:rgba(255,255,255,.58); }
+    .node .meta{ color:rgba(255,255,255,.45); }
+    .node .txt{
+      color:rgba(255,255,255,.50);
+      max-width:220px;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+
+    /* Edit mode visual hints */
+    body.edit-mode .stage{ outline:1px solid rgba(124,92,255,.26); }
+    body.edit-mode [data-editable]:hover{
+      outline:1px dashed rgba(124,92,255,.55);
+      outline-offset:2px;
+    }
+    body.edit-mode [data-droppable]:hover{
+      box-shadow: inset 0 0 0 2px rgba(53,208,127,.35);
+    }
+
+    /* Selection overlay */
+    .overlay{
+      position:fixed;
+      z-index:9999;
+      pointer-events:none;
+      border:2px solid rgba(124,92,255,.95);
+      border-radius:10px;
+      box-shadow: 0 10px 30px rgba(124,92,255,.22);
+      display:none;
+    }
+    .overlay .bar{
+      position:absolute;
+      left:-2px;
+      right:-2px;
+      top:-28px;
+      height:26px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:8px;
+      padding:0 8px;
+      border-radius:10px 10px 12px 12px;
+      background:rgba(15,20,32,.92);
+      border:1px solid rgba(124,92,255,.45);
+      pointer-events:auto;
+    }
+    .overlay .bar .label{
+      font-family:var(--mono);
+      font-size:11px;
+      color:rgba(255,255,255,.85);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+      max-width:480px;
+    }
+    .overlay .bar .tools{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      flex:0 0 auto;
+    }
+    .mini{
+      pointer-events:auto;
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.06);
+      border-radius:9px;
+      padding:4px 8px;
+      font-size:11px;
+      color:rgba(255,255,255,.86);
+      cursor:pointer;
+      user-select:none;
+    }
+    .mini:hover{ background:rgba(255,255,255,.09); }
+    .mini.danger{
+      border-color:rgba(255,77,109,.35);
+      background:rgba(255,77,109,.12);
+    }
+    .handle{
+      position:absolute;
+      width:10px; height:10px;
+      background:rgba(124,92,255,.95);
+      border:1px solid rgba(255,255,255,.35);
+      border-radius:3px;
+      pointer-events:auto;
+    }
+    .h-nw{ left:-5px; top:-5px; cursor:nwse-resize; }
+    .h-ne{ right:-5px; top:-5px; cursor:nesw-resize; }
+    .h-sw{ left:-5px; bottom:-5px; cursor:nesw-resize; }
+    .h-se{ right:-5px; bottom:-5px; cursor:nwse-resize; }
+
+    /* Floating inspector menu (contextual) */
+    .floating-inspector{
+      position:fixed;
+      z-index:10000;
+      width:320px;
+      display:none;
+      pointer-events:auto;
+      background:rgba(15,20,32,.96);
+      border:1px solid rgba(255,255,255,.14);
+      border-radius:14px;
+      box-shadow: 0 18px 70px rgba(0,0,0,.55);
+      overflow:hidden;
+      backdrop-filter: blur(6px);
+    }
+    .floating-inspector .head{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 10px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+    }
+    .floating-inspector .head .t{
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      min-width:0;
+    }
+    .floating-inspector .head .t .a{
+      font-family:var(--mono);
+      font-size:11px;
+      color:rgba(255,255,255,.88);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .floating-inspector .head .t .b{
+      font-size:11px;
+      color:rgba(255,255,255,.60);
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .floating-inspector .body{
+      padding:10px;
+      max-height:55vh;
+      overflow:auto;
+    }
+    .floating-inspector .close{
+      border:1px solid rgba(255,255,255,.16);
+      background:rgba(255,255,255,.05);
+      color:rgba(255,255,255,.85);
+      border-radius:10px;
+      padding:6px 8px;
+      cursor:pointer;
+      font-size:11px;
+    }
+
+    /* Drop indicator line */
+    .drop-line{
+      position:absolute;
+      height:3px;
+      background:rgba(53,208,127,.90);
+      border-radius:999px;
+      box-shadow: 0 10px 22px rgba(53,208,127,.18);
+      z-index:5000;
+      pointer-events:none;
+      display:none;
+    }
+
+    /* Modal */
+    .modal-backdrop{
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:20000;
+      padding:18px;
+    }
+    .modal{
+      width:min(980px, 95vw);
+      max-height:86vh;
+      overflow:hidden;
+      border-radius:16px;
+      border:1px solid rgba(255,255,255,.14);
+      background:rgba(15,20,32,.96);
+      box-shadow: 0 20px 90px rgba(0,0,0,.65);
+      display:flex;
+      flex-direction:column;
+    }
+    .modal .mhead{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:10px 12px;
+      border-bottom:1px solid rgba(255,255,255,.10);
+      background:rgba(255,255,255,.04);
+    }
+    .modal .mhead .mtitle{
+      font-weight:750; font-size:12px; color:rgba(255,255,255,.88);
+    }
+    .modal .mbody{ padding:12px; overflow:auto; min-height:0; }
+    pre{
+      margin:0;
+      padding:12px;
+      border-radius:14px;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(0,0,0,.20);
+      color:rgba(255,255,255,.86);
+      font-family:var(--mono);
+      font-size:11px;
+      line-height:1.45;
+      overflow:auto;
+      white-space:pre;
+    }
+
+    /* Make contenteditable look safe */
+    [contenteditable="true"]{
+      outline:2px solid rgba(53,208,127,.75) !important;
+      outline-offset:2px;
+      border-radius:10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- LEFT: palette + hierarchy -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🧩 Blocks & Tree <span class="pill" id="modePill">view</span></div>
+        <button class="btn" id="rebuildBtn" title="Rebuild hierarchy tree">Rebuild</button>
+      </div>
+
+      <div class="panel-body">
+        <div class="hint">
+          Drag blocks into the page in <b>Edit mode</b>.
+          Select elements by click. Double click text (or menu items) to edit inline.<br><br>
+          <span class="kbd">Del</span> remove · <span class="kbd">Ctrl</span>+drag overlay bar to duplicate ·
+          <span class="kbd">Esc</span> clear selection
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="panel-title" style="margin-bottom:8px;">Palette</div>
+        <div class="palette" id="palette">
+          <div class="tile" draggable="true" data-template="text">
+            <div class="k">Text</div><div class="d">Simple text block</div>
+          </div>
+          <div class="tile" draggable="true" data-template="button">
+            <div class="k">Button</div><div class="d">Clickable pill</div>
+          </div>
+          <div class="tile" draggable="true" data-template="card">
+            <div class="k">Card</div><div class="d">Container w/ padding</div>
+          </div>
+          <div class="tile" draggable="true" data-template="image">
+            <div class="k">Media</div><div class="d">Image placeholder</div>
+          </div>
+          <div class="tile" draggable="true" data-template="post">
+            <div class="k">Post</div><div class="d">Social post component</div>
+          </div>
+          <div class="tile" draggable="true" data-template="menuItem">
+            <div class="k">Menu item</div><div class="d">Top menu &lt;li&gt;</div>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="panel-title" style="margin-bottom:8px;">Hierarchy</div>
+        <div class="tree" id="tree"></div>
+      </div>
+    </section>
+
+    <!-- CENTER: stage -->
+    <section class="center">
+      <div class="topbar">
+        <div class="left">
+          <div class="brand">
+            <div class="logo"></div>
+            <div>
+              <div class="title">Mini DOM Composer</div>
+              <div class="subtitle">Single-file “GrapesJS-like” demo</div>
+            </div>
+          </div>
+
+          <button class="btn primary" id="toggleEdit">Enter Edit mode</button>
+          <button class="btn" id="exportBtn">Export HTML</button>
+          <button class="btn danger" id="resetBtn" title="Restore original demo content">Reset demo</button>
+        </div>
+
+        <div class="right">
+          <span class="pill" id="selectionPill">no selection</span>
+        </div>
+      </div>
+
+      <div class="stage" id="stage">
+        <div class="stage-inner">
+          <!-- CANVAS (this is what you edit) -->
+          <div id="canvas" class="social-page" data-canvas-root data-droppable data-editable>
+            <header class="social-header" data-editable data-droppable>
+              <div class="left" data-editable data-droppable>
+                <div class="appmark" data-editable></div>
+                <div class="name" data-editable>Vineyard</div>
+                <input class="search" data-editable placeholder="Search posts, people, tags…" />
+              </div>
+
+              <!-- TOP MENU: you can add/remove/reorder/rename items -->
+              <nav data-editable data-droppable>
+                <ul class="top-menu" data-menu data-droppable data-editable>
+                  <li data-menu-item data-editable>Home</li>
+                  <li data-menu-item data-editable>Explore</li>
+                  <li data-menu-item data-editable>Messages</li>
+                  <li data-menu-item data-editable>Profile</li>
+                </ul>
+              </nav>
+
+              <div class="right" data-editable data-droppable>
+                <div class="chip" data-editable>🔔 3</div>
+                <div class="chip" data-editable>🟣 Upgrade</div>
+              </div>
+            </header>
+
+            <main class="social-body" data-editable data-droppable>
+              <aside class="card side-nav" data-editable data-droppable>
+                <div style="font-weight:750;margin-bottom:10px;" data-editable>Shortcuts</div>
+                <ul data-editable data-droppable>
+                  <li data-editable>🧵 Threads</li>
+                  <li data-editable>📌 Bookmarks</li>
+                  <li data-editable>🧠 Learn</li>
+                  <li data-editable>⚙️ Settings</li>
+                </ul>
+              </aside>
+
+              <section class="feed" data-editable data-droppable>
+                <article class="post" data-editable data-droppable>
+                  <div class="post-head" data-editable data-droppable>
+                    <div style="display:flex;align-items:center;gap:10px;min-width:0;" data-editable data-droppable>
+                      <div class="avatar" data-editable></div>
+                      <div class="who" data-editable data-droppable>
+                        <div class="u" data-editable>@ink.geckos</div>
+                        <div class="t" data-editable>now · Turin</div>
+                      </div>
+                    </div>
+                    <div class="chip" data-editable>✨ pinned</div>
+                  </div>
+                  <div class="post-text" data-editable>
+                    A minimal “page builder” inside one HTML file. Toggle edit mode, select, move, resize,
+                    and tweak CSS like an inspector.
+                  </div>
+                  <div class="post-media" data-editable>MEDIA PLACEHOLDER</div>
+                  <div class="actions" data-editable data-droppable>
+                    <div class="action" data-editable>👍 Like</div>
+                    <div class="action" data-editable>💬 Reply</div>
+                    <div class="action" data-editable>↗ Share</div>
+                  </div>
+                </article>
+
+                <article class="post" data-editable data-droppable>
+                  <div class="post-head" data-editable data-droppable>
+                    <div style="display:flex;align-items:center;gap:10px;min-width:0;" data-editable data-droppable>
+                      <div class="avatar" data-editable style="background:linear-gradient(135deg, rgba(255,77,109,.72), rgba(124,92,255,.70));"></div>
+                      <div class="who" data-editable data-droppable>
+                        <div class="u" data-editable>@someone</div>
+                        <div class="t" data-editable>5m · Milan</div>
+                      </div>
+                    </div>
+                    <div class="chip" data-editable>#ui</div>
+                  </div>
+                  <div class="post-text" data-editable>
+                    Tip: double click menu items to rename. Use inspector buttons to add/remove/reorder.
+                  </div>
+                  <div class="actions" data-editable data-droppable>
+                    <div class="action" data-editable>👍 Like</div>
+                    <div class="action" data-editable>💬 Reply</div>
+                    <div class="action" data-editable>↗ Share</div>
+                  </div>
+                </article>
+              </section>
+
+              <aside class="card" data-editable data-droppable>
+                <div style="font-weight:750;margin-bottom:10px;" data-editable>Trends</div>
+                <div class="small" data-editable>#swiftui · #metal · #css · #dom</div>
+                <div class="sep"></div>
+                <div style="font-weight:750;margin-bottom:10px;" data-editable>Who to follow</div>
+                <div class="small" data-editable>@renderkid · @nodewizard · @shaderchef</div>
+              </aside>
+            </main>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT: inspector (docked) -->
+    <section class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🛠 Inspector (docked)</div>
+        <button class="btn" id="clearStylesBtn" title="Clear inline styles on selected">Clear styles</button>
+      </div>
+      <div class="panel-body">
+        <div class="hint">
+          This panel mirrors the floating inspector. When you select an element, you can:
+          set quick CSS, paste raw CSS declarations, reorder siblings, and manage menu items.
+        </div>
+
+        <div class="sep"></div>
+
+        <div id="dockedInspector">
+          <div class="small">Select an element in edit mode.</div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Selection overlay -->
+  <div class="overlay" id="overlay">
+    <div class="bar">
+      <div class="label" id="overlayLabel"></div>
+      <div class="tools">
+        <div class="mini" id="miniDuplicate" title="Duplicate (Ctrl+drag also works)">Duplicate</div>
+        <div class="mini danger" id="miniDelete" title="Delete (Del)">Delete</div>
+      </div>
+    </div>
+    <div class="handle h-nw" data-handle="nw"></div>
+    <div class="handle h-ne" data-handle="ne"></div>
+    <div class="handle h-sw" data-handle="sw"></div>
+    <div class="handle h-se" data-handle="se"></div>
+  </div>
+
+  <!-- Floating inspector (context menu near selection) -->
+  <div class="floating-inspector" id="floatingInspector">
+    <div class="head">
+      <div class="t">
+        <div class="a" id="fiTitle">—</div>
+        <div class="b" id="fiSub">—</div>
+      </div>
+      <button class="close" id="fiClose">Close</button>
+    </div>
+    <div class="body" id="fiBody"></div>
+  </div>
+
+  <!-- Drop indicator -->
+  <div class="drop-line" id="dropLine"></div>
+
+  <!-- Export modal -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <div class="mhead">
+        <div class="mtitle">Exported HTML (canvas innerHTML)</div>
+        <div class="row">
+          <button class="btn" id="copyExport">Copy</button>
+          <button class="btn danger" id="closeModal">Close</button>
+        </div>
+      </div>
+      <div class="mbody">
+        <pre id="exportPre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /**********************************************************************
+     * Mini “GrapesJS-like” single-file builder:
+     * - Toggle edit mode
+     * - Select elements
+     * - Move (overlay bar drag -> sets position:absolute in offset parent)
+     * - Resize (corner handles -> width/height inline)
+     * - Drag&drop palette blocks into droppable containers
+     * - Drag&drop existing elements to move inside other droppable containers
+     * - Hierarchy tree with selection sync
+     * - Floating inspector near selection + docked inspector (same UI)
+     * - Special menu demo: add/remove/reorder/rename top menu items
+     **********************************************************************/
+
+    const body = document.body;
+    const stage = document.getElementById('stage');
+    const canvas = document.getElementById('canvas');
+    const treeEl = document.getElementById('tree');
+
+    const toggleEditBtn = document.getElementById('toggleEdit');
+    const modePill = document.getElementById('modePill');
+    const selectionPill = document.getElementById('selectionPill');
+
+    const overlay = document.getElementById('overlay');
+    const overlayLabel = document.getElementById('overlayLabel');
+    const dropLine = document.getElementById('dropLine');
+
+    const floatingInspector = document.getElementById('floatingInspector');
+    const fiTitle = document.getElementById('fiTitle');
+    const fiSub = document.getElementById('fiSub');
+    const fiBody = document.getElementById('fiBody');
+    const fiClose = document.getElementById('fiClose');
+
+    const dockedInspector = document.getElementById('dockedInspector');
+    const clearStylesBtn = document.getElementById('clearStylesBtn');
+
+    const exportBtn = document.getElementById('exportBtn');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const exportPre = document.getElementById('exportPre');
+    const closeModal = document.getElementById('closeModal');
+    const copyExport = document.getElementById('copyExport');
+
+    const resetBtn = document.getElementById('resetBtn');
+    const rebuildBtn = document.getElementById('rebuildBtn');
+    const miniDelete = document.getElementById('miniDelete');
+    const miniDuplicate = document.getElementById('miniDuplicate');
+
+    const palette = document.getElementById('palette');
+
+    const initialCanvasHTML = canvas.innerHTML;
+
+    let editMode = false;
+    let selectedEl = null;
+
+    // Used for drag/drop moving
+    let dragSourceEid = null;
+    let dragFromPalette = null;
+
+    // Overlay interactions
+    let moving = false;
+    let resizing = false;
+    let resizeHandle = null;
+    let start = null;
+
+    // Tree rebuild throttling
+    let treeDirty = false;
+
+    // Assign stable ids to elements (for drag/drop + tree selection)
+    function ensureEids() {
+      let i = 1;
+      canvas.querySelectorAll('[data-editable]').forEach(el => {
+        if (!el.dataset.eid) el.dataset.eid = 'e' + (i++);
+      });
+    }
+
+    function isEditable(el) {
+      return el && el.nodeType === 1 && el.hasAttribute('data-editable') && canvas.contains(el);
+    }
+
+    function isDroppable(el) {
+      return el && el.nodeType === 1 && el.hasAttribute('data-droppable') && canvas.contains(el);
+    }
+
+    function cssPathHint(el){
+      const parts = [];
+      let cur = el;
+      while (cur && cur !== canvas && cur.nodeType === 1){
+        let s = cur.tagName.toLowerCase();
+        if (cur.id) s += '#' + cur.id;
+        if (cur.classList && cur.classList.length) s += '.' + [...cur.classList].slice(0,2).join('.');
+        parts.push(s);
+        cur = cur.parentElement;
+      }
+      return parts.reverse().join(' > ');
+    }
+
+    function labelForEl(el){
+      const tag = el.tagName.toLowerCase();
+      const id = el.id ? '#' + el.id : '';
+      const cls = el.classList && el.classList.length ? '.' + [...el.classList].slice(0,2).join('.') : '';
+      const txt = (el.matches('input,textarea') ? (el.placeholder || el.value || '') : (el.textContent || '')).trim().replace(/\s+/g,' ');
+      const shortTxt = txt ? (' — "' + txt.slice(0, 26) + (txt.length > 26 ? '…' : '') + '"') : '';
+      return `<${tag}${id}${cls}>${shortTxt}`;
+    }
+
+    // Selection
+    function select(el){
+      if (!editMode) return;
+      if (!isEditable(el)) return;
+
+      // Avoid selecting the overlay itself
+      selectedEl = el;
+
+      selectionPill.textContent = labelForEl(el).replace(/<|>/g,'');
+      overlayLabel.textContent = labelForEl(el).replace(/<|>/g,'');
+
+      updateOverlay();
+      overlay.style.display = 'block';
+      showInspectors();
+
+      // highlight tree node
+      rebuildTreeSoon();
+    }
+
+    function clearSelection(){
+      selectedEl = null;
+      overlay.style.display = 'none';
+      floatingInspector.style.display = 'none';
+      selectionPill.textContent = 'no selection';
+      dockedInspector.innerHTML = '<div class="small">Select an element in edit mode.</div>';
+      rebuildTreeSoon();
+    }
+
+    // Overlay placement
+    function updateOverlay(){
+      if (!selectedEl) return;
+      const r = selectedEl.getBoundingClientRect();
+
+      // If element is not visible, hide overlay
+      const inView = r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < window.innerHeight && r.left < window.innerWidth;
+      overlay.style.display = inView ? 'block' : 'none';
+      if (!inView) return;
+
+      overlay.style.left = r.left + 'px';
+      overlay.style.top = r.top + 'px';
+      overlay.style.width = r.width + 'px';
+      overlay.style.height = r.height + 'px';
+
+      positionFloatingInspector();
+    }
+
+    function positionFloatingInspector(){
+      if (!selectedEl) return;
+      if (floatingInspector.style.display === 'none') return;
+
+      const r = selectedEl.getBoundingClientRect();
+      const pad = 10;
+
+      // prefer top-right of selection
+      let x = r.right + pad;
+      let y = r.top - 2;
+
+      const w = 320;
+      const h = floatingInspector.offsetHeight || 260;
+
+      // clamp into viewport
+      if (x + w > window.innerWidth - pad) x = Math.max(pad, r.left - w - pad);
+      if (y + h > window.innerHeight - pad) y = Math.max(pad, window.innerHeight - h - pad);
+      if (y < pad) y = pad;
+
+      floatingInspector.style.left = x + 'px';
+      floatingInspector.style.top = y + 'px';
+    }
+
+    // Toggle edit mode
+    function setEditMode(on){
+      editMode = on;
+      body.classList.toggle('edit-mode', editMode);
+      toggleEditBtn.textContent = editMode ? 'Exit Edit mode' : 'Enter Edit mode';
+      modePill.textContent = editMode ? 'edit' : 'view';
+
+      // In edit mode, make all editable elements draggable (for moving via HTML5 DnD)
+      canvas.querySelectorAll('[data-editable]').forEach(el => {
+        // Avoid making inputs draggable (annoying), but still selectable/resizable
+        const isForm = el.matches('input,textarea,select,button');
+        el.draggable = editMode && !isForm;
+      });
+
+      if (!editMode) clearSelection();
+    }
+
+    toggleEditBtn.addEventListener('click', () => setEditMode(!editMode));
+
+    // Click to select
+    canvas.addEventListener('click', (e) => {
+      if (!editMode) return;
+      // stop selecting if user clicked in editable input while editing
+      if (e.target && e.target.getAttribute && e.target.getAttribute('contenteditable') === 'true') return;
+
+      const el = e.target.closest('[data-editable]');
+      if (el) {
+        e.preventDefault();
+        e.stopPropagation();
+        select(el);
+      }
+    });
+
+    // Double click -> inline text editing (including menu items)
+    canvas.addEventListener('dblclick', (e) => {
+      if (!editMode) return;
+      const el = e.target.closest('[data-editable]');
+      if (!el) return;
+
+      // inputs already editable
+      if (el.matches('input,textarea')) return;
+
+      // Try to choose a “text-like” node: menu item, post text, chip, etc.
+      // If user dblclicks a container, we still allow editing its text (demo convenience).
+      el.setAttribute('contenteditable', 'true');
+      el.focus();
+
+      // Place caret at end (simple)
+      const sel = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      range.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      const stop = () => {
+        el.removeAttribute('contenteditable');
+        el.removeEventListener('blur', stop);
+        el.removeEventListener('keydown', onKey);
+        rebuildTreeSoon();
+        updateOverlay();
+      };
+
+      const onKey = (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); el.blur(); }
+        if (ev.key === 'Escape') { ev.preventDefault(); el.blur(); }
+      };
+
+      el.addEventListener('blur', stop);
+      el.addEventListener('keydown', onKey);
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (!editMode) return;
+      if (e.key === 'Escape') { clearSelection(); return; }
+      if (!selectedEl) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Don’t delete if currently editing text
+        if (document.activeElement && document.activeElement.getAttribute && document.activeElement.getAttribute('contenteditable') === 'true') return;
+        if (document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
+
+        e.preventDefault();
+        deleteSelected();
+      }
+    });
+
+    function deleteSelected(){
+      if (!selectedEl) return;
+      // Prevent removing the canvas root
+      if (selectedEl === canvas) return;
+
+      const next = selectedEl.nextElementSibling || selectedEl.parentElement;
+      selectedEl.remove();
+      clearSelection();
+      if (next && isEditable(next)) select(next);
+      rebuildTreeSoon();
+    }
+
+    function duplicateSelected(){
+      if (!selectedEl) return;
+      const clone = selectedEl.cloneNode(true);
+      clone.dataset.eid = ''; // will be re-assigned
+      selectedEl.insertAdjacentElement('afterend', clone);
+      ensureEids();
+      select(clone);
+      rebuildTreeSoon();
+    }
+
+    miniDelete.addEventListener('click', (e) => { e.stopPropagation(); deleteSelected(); });
+    miniDuplicate.addEventListener('click', (e) => { e.stopPropagation(); duplicateSelected(); });
+
+    // Move + resize using overlay
+    overlay.querySelector('.bar').addEventListener('mousedown', (e) => {
+      if (!editMode || !selectedEl) return;
+
+      // Ctrl+drag duplicates, like a tiny “power user” shortcut
+      if (e.ctrlKey || e.metaKey) {
+        duplicateSelected();
+        // selection now is the clone -> continue move
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      moving = true;
+      start = pointerInfo(e);
+
+      // When moving, we convert the element to absolute positioning inside its offsetParent
+      makeAbsoluteIfNeeded(selectedEl);
+
+      window.addEventListener('mousemove', onMoveMove);
+      window.addEventListener('mouseup', stopMoveResize, { once:true });
+    });
+
+    overlay.querySelectorAll('.handle').forEach(h => {
+      h.addEventListener('mousedown', (e) => {
+        if (!editMode || !selectedEl) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        resizing = true;
+        resizeHandle = h.dataset.handle;
+        start = pointerInfo(e);
+
+        // For resizing, inline width/height are easiest
+        const r = selectedEl.getBoundingClientRect();
+        start.w = r.width;
+        start.h = r.height;
+
+        window.addEventListener('mousemove', onMoveResize);
+        window.addEventListener('mouseup', stopMoveResize, { once:true });
+      });
+    });
+
+    function pointerInfo(e){
+      const r = selectedEl.getBoundingClientRect();
+      return {
+        x: e.clientX,
+        y: e.clientY,
+        left: parseFloat(selectedEl.style.left || '0'),
+        top: parseFloat(selectedEl.style.top || '0'),
+        rect: r
+      };
+    }
+
+    function makeAbsoluteIfNeeded(el){
+      // Choose offset parent
+      const parent = el.offsetParent || el.parentElement;
+      if (!parent) return;
+
+      // Ensure parent is positioned
+      const ps = getComputedStyle(parent).position;
+      if (ps === 'static') parent.style.position = 'relative';
+
+      const rEl = el.getBoundingClientRect();
+      const rPar = parent.getBoundingClientRect();
+
+      // If already absolute/fixed, keep coordinates
+      const pos = getComputedStyle(el).position;
+      if (pos !== 'absolute' && pos !== 'fixed') {
+        el.style.position = 'absolute';
+        el.style.left = (rEl.left - rPar.left + parent.scrollLeft) + 'px';
+        el.style.top = (rEl.top - rPar.top + parent.scrollTop) + 'px';
+        // Keep width to avoid collapsing
+        el.style.width = rEl.width + 'px';
+      }
+    }
+
+    function onMoveMove(e){
+      if (!moving || !selectedEl) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+
+      const curLeft = parseFloat(selectedEl.style.left || '0');
+      const curTop  = parseFloat(selectedEl.style.top || '0');
+
+      selectedEl.style.left = (curLeft + dx) + 'px';
+      selectedEl.style.top  = (curTop + dy) + 'px';
+
+      // Update start to allow smooth incremental dragging
+      start.x = e.clientX;
+      start.y = e.clientY;
+
+      updateOverlay();
+      rebuildTreeSoon();
+    }
+
+    function onMoveResize(e){
+      if (!resizing || !selectedEl) return;
+      const dx = e.clientX - start.x;
+      const dy = e.clientY - start.y;
+
+      // For corners: tweak width/height
+      let w = start.w, h = start.h;
+      if (resizeHandle === 'se') { w += dx; h += dy; }
+      if (resizeHandle === 'sw') { w -= dx; h += dy; }
+      if (resizeHandle === 'ne') { w += dx; h -= dy; }
+      if (resizeHandle === 'nw') { w -= dx; h -= dy; }
+
+      w = Math.max(20, w);
+      h = Math.max(20, h);
+
+      selectedEl.style.width = w + 'px';
+      selectedEl.style.height = h + 'px';
+
+      // If resizing from west/north, adjust left/top to “anchor” opposite corner
+      if (resizeHandle === 'sw' || resizeHandle === 'nw') {
+        makeAbsoluteIfNeeded(selectedEl);
+        const curLeft = parseFloat(selectedEl.style.left || '0');
+        selectedEl.style.left = (curLeft + (start.w - w)) + 'px';
+      }
+      if (resizeHandle === 'ne' || resizeHandle === 'nw') {
+        makeAbsoluteIfNeeded(selectedEl);
+        const curTop = parseFloat(selectedEl.style.top || '0');
+        selectedEl.style.top = (curTop + (start.h - h)) + 'px';
+      }
+
+      updateOverlay();
+    }
+
+    function stopMoveResize(){
+      moving = false;
+      resizing = false;
+      resizeHandle = null;
+      start = null;
+      window.removeEventListener('mousemove', onMoveMove);
+      window.removeEventListener('mousemove', onMoveResize);
+      updateOverlay();
+      rebuildTreeSoon();
+    }
+
+    // Keep overlay aligned on scroll/resize
+    window.addEventListener('resize', updateOverlay);
+    stage.addEventListener('scroll', updateOverlay, { passive:true });
+
+    // Palette drag start
+    palette.addEventListener('dragstart', (e) => {
+      const tile = e.target.closest('.tile');
+      if (!tile) return;
+      if (!editMode) { e.preventDefault(); return; }
+
+      dragFromPalette = tile.dataset.template;
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', 'palette:' + dragFromPalette);
+    });
+
+    // Existing element drag start
+    canvas.addEventListener('dragstart', (e) => {
+      if (!editMode) return;
+      const el = e.target.closest('[data-editable]');
+      if (!el || el === canvas) return;
+
+      dragSourceEid = el.dataset.eid;
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', 'move:' + dragSourceEid);
+    });
+
+    canvas.addEventListener('dragend', () => {
+      dragSourceEid = null;
+      dragFromPalette = null;
+      dropLine.style.display = 'none';
+    });
+
+    // Drag over droppable areas
+    canvas.addEventListener('dragover', (e) => {
+      if (!editMode) return;
+      e.preventDefault();
+
+      const over = e.target.closest('[data-droppable]');
+      if (!over) return;
+
+      // Show drop indicator (simple: a line at top of target)
+      const r = over.getBoundingClientRect();
+      dropLine.style.display = 'block';
+      dropLine.style.left = r.left + 'px';
+      dropLine.style.top = (r.top - 2) + 'px';
+      dropLine.style.width = r.width + 'px';
+    });
+
+    canvas.addEventListener('dragleave', (e) => {
+      if (!editMode) return;
+      // Hide when leaving canvas
+      if (e.target === canvas) dropLine.style.display = 'none';
+    });
+
+    canvas.addEventListener('drop', (e) => {
+      if (!editMode) return;
+      e.preventDefault();
+      dropLine.style.display = 'none';
+
+      let target = e.target.closest('[data-droppable]');
+      if (!target) return;
+
+      // If dropping onto something not ideal (like a text node container), prefer its closest droppable parent
+      if (!isDroppable(target)) target = target.closest('[data-droppable]');
+
+      const raw = e.dataTransfer.getData('text/plain') || '';
+      if (raw.startsWith('palette:')) {
+        const type = raw.split(':')[1];
+        const node = createFromTemplate(type);
+        if (!node) return;
+        target.appendChild(node);
+        ensureEids();
+        select(node);
+        rebuildTreeSoon();
+        return;
+      }
+      if (raw.startsWith('move:')) {
+        const eid = raw.split(':')[1];
+        const el = canvas.querySelector('[data-eid="'+eid+'"]');
+        if (!el || el === canvas) return;
+
+        // Prevent dropping into itself
+        if (el.contains(target)) return;
+
+        target.appendChild(el);
+        select(el);
+        rebuildTreeSoon();
+        return;
+      }
+    });
+
+    // Templates for new elements
+    function createFromTemplate(type){
+      const wrapEditable = (el) => { el.setAttribute('data-editable',''); return el; };
+
+      if (type === 'text'){
+        const el = document.createElement('div');
+        el.textContent = 'New text (double click to edit)';
+        el.style.padding = '8px 10px';
+        el.style.borderRadius = '12px';
+        el.style.border = '1px solid rgba(255,255,255,.10)';
+        el.style.background = 'rgba(255,255,255,.04)';
+        return wrapEditable(el);
+      }
+      if (type === 'button'){
+        const el = document.createElement('div');
+        el.textContent = 'Action';
+        el.className = 'action';
+        // already styled by .action, but still editable
+        return wrapEditable(el);
+      }
+      if (type === 'card'){
+        const el = document.createElement('div');
+        el.className = 'card';
+        el.setAttribute('data-droppable','');
+        el.innerHTML = '<div data-editable style="font-weight:750;margin-bottom:8px;">Card title</div><div data-editable class="small">Drop stuff here</div>';
+        wrapEditable(el);
+        // Mark children editable as well
+        el.querySelectorAll('[data-editable]').forEach(x => x.setAttribute('data-editable',''));
+        return el;
+      }
+      if (type === 'image'){
+        const el = document.createElement('div');
+        el.className = 'post-media';
+        el.textContent = 'MEDIA PLACEHOLDER';
+        return wrapEditable(el);
+      }
+      if (type === 'post'){
+        const el = document.createElement('article');
+        el.className = 'post';
+        el.setAttribute('data-droppable','');
+        el.setAttribute('data-editable','');
+        el.innerHTML = `
+          <div class="post-head" data-editable data-droppable>
+            <div style="display:flex;align-items:center;gap:10px;min-width:0;" data-editable data-droppable>
+              <div class="avatar" data-editable></div>
+              <div class="who" data-editable data-droppable>
+                <div class="u" data-editable>@newuser</div>
+                <div class="t" data-editable>just now · somewhere</div>
+              </div>
+            </div>
+            <div class="chip" data-editable>#new</div>
+          </div>
+          <div class="post-text" data-editable>Write something… (double click)</div>
+          <div class="actions" data-editable data-droppable>
+            <div class="action" data-editable>👍 Like</div>
+            <div class="action" data-editable>💬 Reply</div>
+            <div class="action" data-editable>↗ Share</div>
+          </div>
+        `;
+        // ensure attributes properly set
+        el.querySelectorAll('[data-editable]').forEach(x => x.setAttribute('data-editable',''));
+        el.querySelectorAll('[data-droppable]').forEach(x => x.setAttribute('data-droppable',''));
+        return el;
+      }
+      if (type === 'menuItem'){
+        // If there's a menu, add to first menu list, otherwise create a generic list item
+        const li = document.createElement('li');
+        li.textContent = 'NewItem';
+        li.setAttribute('data-menu-item','');
+        li.setAttribute('data-editable','');
+        return li;
+      }
+      return null;
+    }
+
+    // Tree building
+    function rebuildTreeSoon(){
+      if (treeDirty) return;
+      treeDirty = true;
+      requestAnimationFrame(() => {
+        treeDirty = false;
+        rebuildTree();
+      });
+    }
+
+    function rebuildTree(){
+      ensureEids();
+      const root = canvas;
+
+      function nodeLabel(el){
+        const tag = el.tagName.toLowerCase();
+        const id = el.id ? '#' + el.id : '';
+        const cls = el.classList && el.classList.length ? '.' + [...el.classList].slice(0,2).join('.') : '';
+        const txt = (el.matches('input,textarea') ? (el.placeholder || el.value || '') : (el.textContent || '')).trim().replace(/\s+/g,' ');
+        const shortTxt = txt ? txt.slice(0, 24) + (txt.length > 24 ? '…' : '') : '';
+        return { tag, id, cls, shortTxt };
+      }
+
+      function build(el){
+        const { tag, id, cls, shortTxt } = nodeLabel(el);
+        const eid = el.dataset.eid || '';
+
+        const isSel = selectedEl && selectedEl === el;
+        let html = `<li>
+          <span class="node ${isSel ? 'selected':''}" data-eid="${eid}">
+            <span class="tag">&lt;${tag}${id}${cls}&gt;</span>
+            <span class="txt">${shortTxt ? shortTxt.replace(/[<>]/g,'') : ''}</span>
+            <span class="meta">${eid ? ('['+eid+']') : ''}</span>
+          </span>`;
+
+        const kids = [...el.children].filter(c => c.hasAttribute && c.hasAttribute('data-editable'));
+        if (kids.length){
+          html += `<ul>${kids.map(build).join('')}</ul>`;
+        }
+        html += `</li>`;
+        return html;
+      }
+
+      treeEl.innerHTML = `<ul>${build(root)}</ul>`;
+
+      // node click selects corresponding element
+      treeEl.querySelectorAll('.node').forEach(n => {
+        n.addEventListener('click', () => {
+          if (!editMode) return;
+          const eid = n.dataset.eid;
+          const el = canvas.querySelector('[data-eid="'+eid+'"]');
+          if (el) {
+            select(el);
+            // reveal in stage
+            el.scrollIntoView({ behavior:'smooth', block:'center', inline:'nearest' });
+          }
+        });
+      });
+    }
+
+    rebuildBtn.addEventListener('click', rebuildTree);
+
+    // MutationObserver to keep tree fresh
+    const mo = new MutationObserver(() => rebuildTreeSoon());
+    mo.observe(canvas, { childList:true, subtree:true, attributes:true, characterData:true });
+
+    // Inspectors (floating + docked share same content)
+    function showInspectors(){
+      if (!selectedEl) return;
+
+      // Floating inspector
+      floatingInspector.style.display = 'block';
+      fiTitle.textContent = selectedEl.tagName.toLowerCase();
+      fiSub.textContent = cssPathHint(selectedEl);
+      renderInspectorUI(fiBody);
+
+      // Docked inspector
+      renderInspectorUI(dockedInspector);
+
+      positionFloatingInspector();
+    }
+
+    fiClose.addEventListener('click', () => floatingInspector.style.display = 'none');
+
+    function renderInspectorUI(container){
+      if (!selectedEl){
+        container.innerHTML = '<div class="small">No selection.</div>';
+        return;
+      }
+
+      const isMenuItem = selectedEl.hasAttribute('data-menu-item');
+      const menu = selectedEl.closest('[data-menu]');
+      const isInsideMenu = !!menu;
+
+      const inline = selectedEl.getAttribute('style') || '';
+      const eid = selectedEl.dataset.eid || '';
+      const tag = selectedEl.tagName.toLowerCase();
+
+      container.innerHTML = `
+        <div class="small">Selected: <span class="mono">${escapeHTML(labelForEl(selectedEl))}</span></div>
+        <div class="small">EID: <span class="mono">${escapeHTML(eid)}</span></div>
+
+        <div class="sep"></div>
+
+        <div class="grid2">
+          <div>
+            <label>width</label>
+            <input data-css="width" placeholder="e.g. 320px / 40% / auto" />
+          </div>
+          <div>
+            <label>height</label>
+            <input data-css="height" placeholder="e.g. 180px / auto" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>color</label>
+            <input data-css="color" placeholder="e.g. #fff / rgba(...)" />
+          </div>
+          <div>
+            <label>background</label>
+            <input data-css="background" placeholder="e.g. rgba(...) / linear-gradient(...)" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>font-size</label>
+            <input data-css="fontSize" placeholder="e.g. 14px" />
+          </div>
+          <div>
+            <label>border-radius</label>
+            <input data-css="borderRadius" placeholder="e.g. 12px" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>padding</label>
+            <input data-css="padding" placeholder="e.g. 10px 12px" />
+          </div>
+          <div>
+            <label>margin</label>
+            <input data-css="margin" placeholder="e.g. 8px 0" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>border</label>
+            <input data-css="border" placeholder="e.g. 1px solid #333" />
+          </div>
+          <div>
+            <label>box-shadow</label>
+            <input data-css="boxShadow" placeholder="e.g. 0 10px 20px rgba(...)" />
+          </div>
+        </div>
+
+        <div class="grid3">
+          <div>
+            <label>display</label>
+            <select data-css="display">
+              <option value="">(no change)</option>
+              <option>block</option>
+              <option>inline-block</option>
+              <option>flex</option>
+              <option>grid</option>
+              <option>none</option>
+            </select>
+          </div>
+          <div>
+            <label>position</label>
+            <select data-css="position">
+              <option value="">(no change)</option>
+              <option>static</option>
+              <option>relative</option>
+              <option>absolute</option>
+              <option>fixed</option>
+            </select>
+          </div>
+          <div>
+            <label>z-index</label>
+            <input data-css="zIndex" placeholder="e.g. 10" />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label>left</label>
+            <input data-css="left" placeholder="e.g. 20px" />
+          </div>
+          <div>
+            <label>top</label>
+            <input data-css="top" placeholder="e.g. 10px" />
+          </div>
+        </div>
+
+        <label>Raw CSS declarations</label>
+        <textarea id="rawCss" spellcheck="false" placeholder="One per line:\nbackground: rgba(255,255,255,.06);\nborder: 1px solid rgba(255,255,255,.2);\n..."></textarea>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn ok" id="applyRaw">Apply</button>
+          <button class="btn" id="syncFields">Sync from element</button>
+          <button class="btn danger" id="removeEl">Remove</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="panel-title" style="margin-bottom:6px;">Order & hierarchy</div>
+        <div class="row">
+          <button class="btn" id="moveUp">Move up</button>
+          <button class="btn" id="moveDown">Move down</button>
+          <button class="btn" id="wrapCard">Wrap in card</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <div class="panel-title" style="margin-bottom:6px;">Menu tools (demo)</div>
+        <div class="hint">
+          Works when selection is a menu item (or inside the top menu).
+          Double click a menu item to rename.
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <button class="btn" id="menuAdd">Add item</button>
+          <button class="btn danger" id="menuRemove">Remove item</button>
+          <button class="btn" id="menuLeft">Move left</button>
+          <button class="btn" id="menuRight">Move right</button>
+        </div>
+
+        <div class="sep"></div>
+        <div class="small">Inline style:</div>
+        <pre style="margin-top:6px;">${escapeHTML(inline || '(none)')}</pre>
+      `;
+
+      // Wire inspector controls
+      syncInputsFromElement(container);
+
+      container.querySelectorAll('[data-css]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          applyQuickCss(container);
+          updateOverlay();
+        });
+        inp.addEventListener('change', () => {
+          applyQuickCss(container);
+          updateOverlay();
+        });
+      });
+
+      const rawCss = container.querySelector('#rawCss');
+      rawCss.value = styleToRawDeclarations(selectedEl);
+
+      container.querySelector('#applyRaw').addEventListener('click', () => {
+        applyRawCss(rawCss.value);
+        syncInputsFromElement(container);
+        updateOverlay();
+        rebuildTreeSoon();
+      });
+
+      container.querySelector('#syncFields').addEventListener('click', () => {
+        syncInputsFromElement(container);
+        rawCss.value = styleToRawDeclarations(selectedEl);
+      });
+
+      container.querySelector('#removeEl').addEventListener('click', () => deleteSelected());
+
+      container.querySelector('#moveUp').addEventListener('click', () => moveSibling(-1));
+      container.querySelector('#moveDown').addEventListener('click', () => moveSibling(1));
+
+      container.querySelector('#wrapCard').addEventListener('click', () => {
+        if (!selectedEl || selectedEl === canvas) return;
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.setAttribute('data-editable','');
+        card.setAttribute('data-droppable','');
+        selectedEl.parentElement.insertBefore(card, selectedEl);
+        card.appendChild(selectedEl);
+        ensureEids();
+        select(card);
+        rebuildTreeSoon();
+      });
+
+      // Menu demo tools
+      const menuAdd = container.querySelector('#menuAdd');
+      const menuRemove = container.querySelector('#menuRemove');
+      const menuLeft = container.querySelector('#menuLeft');
+      const menuRight = container.querySelector('#menuRight');
+
+      function resolveMenuContext(){
+        const m = selectedEl.closest('[data-menu]');
+        const item = selectedEl.hasAttribute('data-menu-item') ? selectedEl : selectedEl.closest('[data-menu-item]');
+        return { m, item };
+      }
+
+      function setMenuButtonsEnabled(){
+        const { m, item } = resolveMenuContext();
+        const on = !!m;
+        [menuAdd, menuRemove, menuLeft, menuRight].forEach(b => b.disabled = !on);
+        menuRemove.disabled = !(m && item);
+        menuLeft.disabled = !(m && item && item.previousElementSibling);
+        menuRight.disabled = !(m && item && item.nextElementSibling);
+      }
+      setMenuButtonsEnabled();
+
+      menuAdd.addEventListener('click', () => {
+        const { m, item } = resolveMenuContext();
+        if (!m) return;
+
+        const li = document.createElement('li');
+        li.textContent = 'New';
+        li.setAttribute('data-menu-item','');
+        li.setAttribute('data-editable','');
+
+        if (item) item.insertAdjacentElement('afterend', li);
+        else m.appendChild(li);
+
+        ensureEids();
+        select(li);
+        rebuildTreeSoon();
+      });
+
+      menuRemove.addEventListener('click', () => {
+        const { item } = resolveMenuContext();
+        if (!item) return;
+        if (item.parentElement && item.parentElement.children.length <= 1) return; // keep at least 1
+        item.remove();
+        clearSelection();
+        rebuildTreeSoon();
+      });
+
+      menuLeft.addEventListener('click', () => {
+        const { item } = resolveMenuContext();
+        if (!item || !item.previousElementSibling) return;
+        item.parentElement.insertBefore(item, item.previousElementSibling);
+        ensureEids();
+        select(item);
+        rebuildTreeSoon();
+      });
+
+      menuRight.addEventListener('click', () => {
+        const { item } = resolveMenuContext();
+        if (!item || !item.nextElementSibling) return;
+        item.parentElement.insertBefore(item.nextElementSibling, item);
+        ensureEids();
+        select(item);
+        rebuildTreeSoon();
+      });
+    }
+
+    function syncInputsFromElement(container){
+      const s = selectedEl.style;
+
+      // Map camelCase to CSS style property on element.style
+      const map = {
+        width:'width', height:'height',
+        color:'color', background:'background',
+        fontSize:'fontSize', borderRadius:'borderRadius',
+        padding:'padding', margin:'margin',
+        border:'border', boxShadow:'boxShadow',
+        display:'display', position:'position',
+        zIndex:'zIndex', left:'left', top:'top'
+      };
+
+      container.querySelectorAll('[data-css]').forEach(inp => {
+        const k = inp.dataset.css;
+        const prop = map[k] || k;
+        const val = s[prop] || '';
+        if (inp.tagName === 'SELECT') {
+          inp.value = val || '';
+        } else {
+          inp.value = val;
+        }
+      });
+    }
+
+    function applyQuickCss(container){
+      if (!selectedEl) return;
+
+      const map = {
+        width:'width', height:'height',
+        color:'color', background:'background',
+        fontSize:'fontSize', borderRadius:'borderRadius',
+        padding:'padding', margin:'margin',
+        border:'border', boxShadow:'boxShadow',
+        display:'display', position:'position',
+        zIndex:'zIndex', left:'left', top:'top'
+      };
+
+      container.querySelectorAll('[data-css]').forEach(inp => {
+        const k = inp.dataset.css;
+        const prop = map[k] || k;
+        const val = inp.value.trim();
+
+        if (val === '') {
+          // If blank, do NOT forcibly remove (some users want to keep)
+          // but if user explicitly clears, we remove inline property:
+          selectedEl.style[prop] = '';
+        } else {
+          selectedEl.style[prop] = val;
+        }
+      });
+
+      // Update raw textarea if present
+      const raw = container.querySelector('#rawCss');
+      if (raw) raw.value = styleToRawDeclarations(selectedEl);
+
+      rebuildTreeSoon();
+    }
+
+    function applyRawCss(text){
+      if (!selectedEl) return;
+      // Parse lines: "prop: value;"
+      text.split('\n').forEach(line => {
+        const s = line.trim();
+        if (!s) return;
+        const m = s.match(/^([a-zA-Z\-]+)\s*:\s*(.+?);?$/);
+        if (!m) return;
+        selectedEl.style.setProperty(m[1], m[2]);
+      });
+    }
+
+    function styleToRawDeclarations(el){
+      // Only inline style, formatted
+      const s = el.getAttribute('style') || '';
+      if (!s.trim()) return '';
+      return s
+        .split(';')
+        .map(x => x.trim())
+        .filter(Boolean)
+        .map(x => x + ';')
+        .join('\n');
+    }
+
+    function moveSibling(dir){
+      if (!selectedEl || selectedEl === canvas) return;
+      const parent = selectedEl.parentElement;
+      if (!parent) return;
+
+      if (dir < 0) {
+        const prev = selectedEl.previousElementSibling;
+        if (prev) parent.insertBefore(selectedEl, prev);
+      } else {
+        const next = selectedEl.nextElementSibling;
+        if (next) parent.insertBefore(next, selectedEl);
+      }
+      ensureEids();
+      select(selectedEl);
+      rebuildTreeSoon();
+    }
+
+    clearStylesBtn.addEventListener('click', () => {
+      if (!selectedEl) return;
+      selectedEl.removeAttribute('style');
+      showInspectors();
+      updateOverlay();
+      rebuildTreeSoon();
+    });
+
+    // Export
+    exportBtn.addEventListener('click', () => {
+      exportPre.textContent = canvas.innerHTML.trim();
+      modalBackdrop.style.display = 'flex';
+    });
+    closeModal.addEventListener('click', () => modalBackdrop.style.display = 'none');
+    modalBackdrop.addEventListener('click', (e) => {
+      if (e.target === modalBackdrop) modalBackdrop.style.display = 'none';
+    });
+    copyExport.addEventListener('click', async () => {
+      try{
+        await navigator.clipboard.writeText(exportPre.textContent);
+        copyExport.textContent = 'Copied!';
+        setTimeout(() => copyExport.textContent = 'Copy', 900);
+      }catch{
+        copyExport.textContent = 'Copy failed';
+        setTimeout(() => copyExport.textContent = 'Copy', 900);
+      }
+    });
+
+    // Reset demo
+    resetBtn.addEventListener('click', () => {
+      canvas.innerHTML = initialCanvasHTML;
+      ensureEids();
+      clearSelection();
+      setEditMode(false);
+      rebuildTreeSoon();
+    });
+
+    // Rebuild tree initially
+    ensureEids();
+    rebuildTree();
+
+    // Also rebuild on scroll changes affecting overlay
+    const ro = new ResizeObserver(() => updateOverlay());
+    ro.observe(canvas);
+
+    // Keep selection overlay updated in animations/scrolling
+    setInterval(() => {
+      if (selectedEl && editMode) updateOverlay();
+    }, 120);
+
+    // Helpers
+    function escapeHTML(s){
+      return String(s)
+        .replaceAll('&','&amp;')
+        .replaceAll('<','&lt;')
+        .replaceAll('>','&gt;');
+    }
+  </script>
+</body>
+</html>
