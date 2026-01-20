@@ -295,12 +295,13 @@ function createComposerTool(tool) {
   const toggle = tool.querySelector('[data-composer-toggle]');
   const collapseButton = tool.querySelector('[data-composer-collapse]');
   const closeButton = tool.querySelector('[data-composer-close]');
-  const dragHandle = tool.querySelector('[data-composer-drag]');
+  const dragHandles = Array.from(tool.querySelectorAll('[data-composer-drag]'));
   const selectionNote = tool.querySelector('[data-composer-selection]');
   const textInput = tool.querySelector('[data-composer-text-input]');
   const applyButton = tool.querySelector('[data-composer-apply]');
   const clearButton = tool.querySelector('[data-composer-clear]');
-  const saveButton = tool.querySelector('[data-composer-save]');
+  const saveButtons = Array.from(tool.querySelectorAll('[data-composer-save]'));
+  const cancelButtons = Array.from(tool.querySelectorAll('[data-composer-cancel]'));
   const statusLine = tool.querySelector('[data-composer-status]');
   const quickList = tool.querySelector('[data-composer-list="quick"]');
   const sideLists = tool.querySelector('[data-composer-side-lists]');
@@ -578,6 +579,7 @@ function createComposerTool(tool) {
       bindOverlayEvents();
       scheduleOverlayUpdate();
     }
+    updateActionButtons();
   };
 
   const clearSelection = () => {
@@ -599,6 +601,47 @@ function createComposerTool(tool) {
     syncListSelection();
     syncToolbarState();
     if (overlay) overlay.style.display = 'none';
+  };
+
+  const resetComposerTextToDefault = (settings) => {
+    const overrides = settings?.textOverrides || {};
+    document.querySelectorAll('[data-composer-key]').forEach((node) => {
+      const key = node.dataset.composerKey || '';
+      if (!key) return;
+      if (overrides[key] !== undefined) return;
+      if (node.dataset.composerDefault === undefined) return;
+      if (node.matches('input, textarea')) {
+        node.value = node.dataset.composerDefault;
+        return;
+      }
+      if (node.dataset.composerText !== 'true' && node.dataset.composerDefault === undefined) {
+        return;
+      }
+      node.textContent = node.dataset.composerDefault;
+    });
+  };
+
+  const discardChanges = () => {
+    if (!hasDirty) {
+      setStatus('No changes to discard.');
+      return;
+    }
+    hasDirty = false;
+    clearSelection();
+    state = { ...state, ...readComposerSettings() };
+    state = readSettingsWithDefaults();
+    syncEffectiveOverrides();
+    hydrateComposerTargets();
+    resetComposerTextToDefault(state);
+    applyComposerDomOrdersToPage(state);
+    applyComposerStyleOverridesToPage(state);
+    applyComposerTextOverridesToPage(state);
+    buildNavLists();
+    buildPanelLists();
+    buildHierarchyTree();
+    syncToolbarState();
+    updateActionButtons();
+    setStatus('Composer changes discarded.');
   };
 
   const applyStyleOverrides = (el, overrides) => {
@@ -848,6 +891,9 @@ function createComposerTool(tool) {
       selected.el.removeAttribute('contenteditable');
     }
     const defaultText = el.dataset.composerDefault || getEditableText(el);
+    if (el.dataset.composerDefault === undefined) {
+      el.dataset.composerDefault = defaultText;
+    }
     const textEditable = isTextEditableElement(el);
     const role = getComposerRole(el);
     selected = { el, key, defaultText, textEditable, role };
@@ -894,18 +940,29 @@ function createComposerTool(tool) {
         el.blur();
       }
     };
-    const stop = () => {
-      el.removeAttribute('contenteditable');
-      el.removeEventListener('keydown', onKey);
-      scheduleOverlayUpdate();
-    };
-    el.addEventListener('blur', stop, { once: true });
-    el.addEventListener('keydown', onKey);
+  const stop = () => {
+    el.removeAttribute('contenteditable');
+    el.removeEventListener('keydown', onKey);
+    scheduleOverlayUpdate();
+  };
+  el.addEventListener('blur', stop, { once: true });
+  el.addEventListener('keydown', onKey);
+  };
+
+  const updateActionButtons = () => {
+    const enabled = hasDirty;
+    saveButtons.forEach((button) => {
+      button.disabled = !enabled;
+    });
+    cancelButtons.forEach((button) => {
+      button.disabled = !enabled;
+    });
   };
 
   const noteDirty = () => {
     hasDirty = true;
     setStatus('Changes staged. Save to persist.');
+    updateActionButtons();
   };
 
   const updateSelectionText = (value) => {
@@ -1370,16 +1427,18 @@ function createComposerTool(tool) {
 
   closeButton?.addEventListener('click', () => setMode(false));
 
-  dragHandle?.addEventListener('mousedown', (event) => {
-    if (event.button !== 0) return;
-    if (event.target.closest('button, input, select, textarea')) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = tool.getBoundingClientRect();
-    panelDrag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
-    tool.classList.add('is-composer-panel-dragging');
-    window.addEventListener('mousemove', onPanelDragMove);
-    window.addEventListener('mouseup', stopPanelDrag, { once: true });
+  dragHandles.forEach((handle) => {
+    handle.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
+      if (event.target.closest('button, input, select, textarea')) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const rect = tool.getBoundingClientRect();
+      panelDrag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+      tool.classList.add('is-composer-panel-dragging');
+      window.addEventListener('mousemove', onPanelDragMove);
+      window.addEventListener('mouseup', stopPanelDrag, { once: true });
+    });
   });
 
   overlayClear?.addEventListener('click', (event) => {
@@ -1923,13 +1982,19 @@ function createComposerTool(tool) {
       hasDirty = false;
       body.dataset.composerSettings = JSON.stringify(state);
       setStatus('Composer settings saved.');
+      updateActionButtons();
     } catch (error) {
       console.error(error);
       setStatus('Failed to save composer settings.', true);
     }
   };
 
-  saveButton?.addEventListener('click', saveComposer);
+  saveButtons.forEach((button) => {
+    button.addEventListener('click', saveComposer);
+  });
+  cancelButtons.forEach((button) => {
+    button.addEventListener('click', discardChanges);
+  });
 
   const readSettingsWithDefaults = () => {
     const globalOverrides = buildOverrideBundle(state.globalOverrides || {});
@@ -2006,6 +2071,7 @@ function createComposerTool(tool) {
     }
     syncListSelection();
     syncToolbarState();
+    updateActionButtons();
   };
 
   updateToggleLabel(isActive());

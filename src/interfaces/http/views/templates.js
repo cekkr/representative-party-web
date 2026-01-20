@@ -275,7 +275,13 @@ function renderPageMeta(meta = {}) {
 function buildComposerControls() {
   return `
     <div class="composer-tool" data-composer-tool data-composer-allowed="true">
-      <button class="composer-tool__fab" type="button" data-composer-toggle aria-expanded="false">Enter Composer</button>
+      <div class="composer-tool__bar" data-composer-drag>
+        <button class="composer-tool__fab" type="button" data-composer-toggle aria-expanded="false">Enter Composer</button>
+        <div class="composer-tool__bar-actions">
+          <button class="ghost composer-tool__bar-button" type="button" data-composer-save>Save</button>
+          <button class="ghost composer-tool__bar-button" type="button" data-composer-cancel>Cancel</button>
+        </div>
+      </div>
       <aside class="composer-tool__panel" data-composer-panel aria-label="Composer tools">
         <div class="composer-tool__header" data-composer-drag>
           <div>
@@ -477,7 +483,6 @@ function buildComposerControls() {
           </label>
         </section>
         <div class="composer-tool__footer">
-          <button class="cta" type="button" data-composer-save>Save composer changes</button>
           <p class="muted small" data-composer-status>Changes apply locally until saved.</p>
         </div>
       </aside>

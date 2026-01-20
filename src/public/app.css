@@ -253,6 +253,44 @@ main {
   gap: 0.75rem;
 }
 
+.composer-tool__bar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(8, 12, 22, 0.92);
+  box-shadow: 0 10px 24px rgba(11, 92, 255, 0.25);
+  cursor: grab;
+}
+
+.composer-tool.is-composer-panel-dragging .composer-tool__bar {
+  cursor: grabbing;
+}
+
+.composer-tool__bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.composer-tool__bar-button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+}
+
+.composer-tool__bar-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.composer-tool__bar .composer-tool__fab {
+  box-shadow: none;
+  padding: 0.5rem 0.9rem;
+}
+
 .composer-tool__fab {
   border: none;
   padding: 0.65rem 1.1rem;
