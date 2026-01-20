@@ -70,7 +70,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
-- Admin Composer: extend the layout builder with component-level property editing and richer template/module compatibility beyond panels + nav.
+- Admin Composer: extend the layout builder with component-level property editing and richer template/module compatibility beyond panels + nav (DOM tree/layers sidebar, movable/collapsible floating inspector, component palette, and persistent DOM mutation storage for reorder/wrap/insert/delete operations).
+- Template organization: relocate module templates under their owning `src/modules/<module>/` folders (with per-module view helpers/controllers) and split large templates into composable sub-templates per module surface.
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.

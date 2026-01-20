@@ -157,12 +157,15 @@ function buildComposerControls() {
     <div class="composer-tool" data-composer-tool data-composer-allowed="true">
       <button class="composer-tool__fab" type="button" data-composer-toggle aria-expanded="false">Enter Composer</button>
       <aside class="composer-tool__panel" data-composer-panel aria-label="Composer tools">
-        <div class="composer-tool__header">
+        <div class="composer-tool__header" data-composer-drag>
           <div>
             <p class="eyebrow">Composer</p>
             <h3>Inline editor</h3>
           </div>
-          <button class="ghost composer-tool__close" type="button" data-composer-close aria-label="Close composer">Close</button>
+          <div class="composer-tool__header-actions">
+            <button class="ghost composer-tool__collapse" type="button" data-composer-collapse aria-expanded="true">Collapse</button>
+            <button class="ghost composer-tool__close" type="button" data-composer-close aria-label="Close composer">Close</button>
+          </div>
         </div>
         <section class="composer-tool__section">
           <p class="muted small" data-composer-selection>Select a label or heading to edit.</p>
@@ -276,6 +279,10 @@ function buildComposerControls() {
             </div>
             <div class="composer-tool__list-block" data-composer-side-lists></div>
           </div>
+        </section>
+        <section class="composer-tool__section">
+          <p class="eyebrow">Hierarchy</p>
+          <div class="composer-tree" data-composer-tree></div>
         </section>
         <section class="composer-tool__section">
           <p class="eyebrow">Layout</p>

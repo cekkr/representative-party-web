@@ -228,7 +228,9 @@ function initComposerTool() {
 function createComposerTool(tool) {
   const body = document.body;
   const toggle = tool.querySelector('[data-composer-toggle]');
+  const collapseButton = tool.querySelector('[data-composer-collapse]');
   const closeButton = tool.querySelector('[data-composer-close]');
+  const dragHandle = tool.querySelector('[data-composer-drag]');
   const selectionNote = tool.querySelector('[data-composer-selection]');
   const textInput = tool.querySelector('[data-composer-text-input]');
   const applyButton = tool.querySelector('[data-composer-apply]');
@@ -250,6 +252,7 @@ function createComposerTool(tool) {
   const styleClearButton = tool.querySelector('[data-composer-style-clear]');
   const moveUpButton = tool.querySelector('[data-composer-move-up]');
   const moveDownButton = tool.querySelector('[data-composer-move-down]');
+  const treeRoot = tool.querySelector('[data-composer-tree]');
   const overlay = ensureComposerOverlay();
   const overlayBar = overlay?.querySelector('[data-composer-overlay-bar]');
   const overlayHandles = Array.from(overlay?.querySelectorAll('[data-composer-handle]') || []);
@@ -270,13 +273,81 @@ function createComposerTool(tool) {
   let moveStart = null;
   let activeDrag = null;
   let dragBound = false;
+  let panelDrag = null;
   const getPageKey = () => document.body?.dataset?.pageKey || 'default';
 
+  const toolUiStorageKey = 'composer-tool-ui';
+
+  const readToolUi = () => {
+    try {
+      const raw = window.localStorage?.getItem(toolUiStorageKey);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch (_error) {
+      return {};
+    }
+  };
+
+  const writeToolUi = (next) => {
+    try {
+      window.localStorage?.setItem(toolUiStorageKey, JSON.stringify(next));
+    } catch (_error) {
+      // Ignore persistence errors for private mode/etc.
+    }
+  };
+
+  const applyToolUi = (ui) => {
+    if (!tool) return;
+    if (ui && typeof ui === 'object') {
+      if (Number.isFinite(ui.left) && Number.isFinite(ui.top)) {
+        tool.style.left = `${ui.left}px`;
+        tool.style.top = `${ui.top}px`;
+        tool.style.right = 'auto';
+        tool.style.bottom = 'auto';
+      }
+      if (ui.collapsed) {
+        tool.dataset.composerCollapsed = 'true';
+      } else {
+        tool.dataset.composerCollapsed = 'false';
+      }
+      if (collapseButton) {
+        const isCollapsed = tool.dataset.composerCollapsed === 'true';
+        collapseButton.textContent = isCollapsed ? 'Expand' : 'Collapse';
+        collapseButton.setAttribute('aria-expanded', String(!isCollapsed));
+      }
+    }
+  };
+
+  const clampToolPosition = () => {
+    const rect = tool.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+    const nextLeft = Math.min(Math.max(8, rect.left), maxLeft);
+    const nextTop = Math.min(Math.max(8, rect.top), maxTop);
+    tool.style.left = `${nextLeft}px`;
+    tool.style.top = `${nextTop}px`;
+    tool.style.right = 'auto';
+    tool.style.bottom = 'auto';
+    return { left: nextLeft, top: nextTop };
+  };
+
+  const setCollapsed = (collapsed) => {
+    tool.dataset.composerCollapsed = collapsed ? 'true' : 'false';
+    if (collapseButton) {
+      collapseButton.textContent = collapsed ? 'Expand' : 'Collapse';
+      collapseButton.setAttribute('aria-expanded', String(!collapsed));
+    }
+    const ui = readToolUi();
+    writeToolUi({ ...ui, collapsed });
+  };
   const setStatus = (message, isError = false) => {
     if (!statusLine) return;
     statusLine.textContent = message;
     statusLine.style.color = isError ? '#ff9a9a' : '';
   };
+
+  applyToolUi(readToolUi());
 
   const isActive = () => body.dataset.composerMode === 'on';
 
@@ -537,6 +608,70 @@ function createComposerTool(tool) {
     if (sideLists) {
       sideLists.querySelectorAll('.composer-tool__list').forEach((listEl) => markList(listEl, navKey));
     }
+    if (treeRoot) {
+      treeRoot.querySelectorAll('[data-composer-tree-key]').forEach((button) => {
+        const isMatch = selectedKey && button.dataset.composerTreeKey === selectedKey;
+        button.classList.toggle('is-selected', isMatch);
+      });
+    }
+  };
+
+  const composerTreeNodes = (rootEl) => {
+    const nodes = [];
+    Array.from(rootEl.children || []).forEach((child) => {
+      if (child.closest('[data-composer-tool], [data-composer-overlay], [data-composer-drop-line]')) return;
+      const childNodes = composerTreeNodes(child);
+      if (child.dataset?.composerKey) {
+        nodes.push({ el: child, key: child.dataset.composerKey, children: childNodes });
+        return;
+      }
+      if (childNodes.length) {
+        nodes.push(...childNodes);
+      }
+    });
+    return nodes;
+  };
+
+  const composerTreeLabel = (el) => {
+    const key = el.dataset?.composerKey || 'element';
+    const tag = el.tagName ? el.tagName.toLowerCase() : 'node';
+    const text = readComposerTextValue(el).replace(/\s+/g, ' ');
+    const snippet = text ? `${text.slice(0, 28)}${text.length > 28 ? '...' : ''}` : '';
+    return snippet ? `${key} (${tag}) ${snippet}` : `${key} (${tag})`;
+  };
+
+  const buildHierarchyTree = () => {
+    if (!treeRoot) return;
+    treeRoot.innerHTML = '';
+    const nodes = composerTreeNodes(document.body);
+    const list = document.createElement('ul');
+    list.className = 'composer-tree__list';
+    const renderNode = (node) => {
+      const li = document.createElement('li');
+      li.className = 'composer-tree__item';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'composer-tree__button';
+      button.dataset.composerTreeKey = node.key;
+      button.textContent = composerTreeLabel(node.el);
+      button.title = node.key;
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectElement(node.el);
+      });
+      li.appendChild(button);
+      if (node.children && node.children.length) {
+        const childList = document.createElement('ul');
+        childList.className = 'composer-tree__list';
+        node.children.forEach((child) => childList.appendChild(renderNode(child)));
+        li.appendChild(childList);
+      }
+      return li;
+    };
+    nodes.forEach((node) => list.appendChild(renderNode(node)));
+    treeRoot.appendChild(list);
+    syncListSelection();
   };
 
   const setDraggableState = (active) => {
@@ -642,6 +777,28 @@ function createComposerTool(tool) {
       width: rect?.width || 0,
       height: rect?.height || 0,
     };
+  };
+
+  const onPanelDragMove = (event) => {
+    if (!panelDrag) return;
+    const dx = event.clientX - panelDrag.x;
+    const dy = event.clientY - panelDrag.y;
+    const nextLeft = panelDrag.left + dx;
+    const nextTop = panelDrag.top + dy;
+    tool.style.left = `${nextLeft}px`;
+    tool.style.top = `${nextTop}px`;
+    tool.style.right = 'auto';
+    tool.style.bottom = 'auto';
+  };
+
+  const stopPanelDrag = () => {
+    if (!panelDrag) return;
+    panelDrag = null;
+    tool.classList.remove('is-composer-panel-dragging');
+    window.removeEventListener('mousemove', onPanelDragMove);
+    const clamped = clampToolPosition();
+    const ui = readToolUi();
+    writeToolUi({ ...ui, left: clamped.left, top: clamped.top });
   };
 
   const makeAbsoluteIfNeeded = (el) => {
@@ -757,6 +914,7 @@ function createComposerTool(tool) {
     state.pageLayouts = state.pageLayouts || {};
     state.pageLayouts[pageKey] = next;
     applyPageLayoutFromSettings(state);
+    buildHierarchyTree();
     noteDirty();
   };
 
@@ -776,6 +934,7 @@ function createComposerTool(tool) {
         .filter(Boolean);
       state.sideNavOrder = mergeOrders(sideOrder, state.sideNavOrder);
     }
+    buildHierarchyTree();
     noteDirty();
   };
 
@@ -934,7 +1093,24 @@ function createComposerTool(tool) {
     setMode(!isActive());
   });
 
+  collapseButton?.addEventListener('click', () => {
+    const collapsed = tool.dataset.composerCollapsed === 'true';
+    setCollapsed(!collapsed);
+  });
+
   closeButton?.addEventListener('click', () => setMode(false));
+
+  dragHandle?.addEventListener('mousedown', (event) => {
+    if (event.button !== 0) return;
+    if (event.target.closest('button, input, select, textarea')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const rect = tool.getBoundingClientRect();
+    panelDrag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top };
+    tool.classList.add('is-composer-panel-dragging');
+    window.addEventListener('mousemove', onPanelDragMove);
+    window.addEventListener('mouseup', stopPanelDrag, { once: true });
+  });
 
   overlayClear?.addEventListener('click', (event) => {
     event.preventDefault();
@@ -1301,6 +1477,7 @@ function createComposerTool(tool) {
     state.pageLayouts = state.pageLayouts || {};
     state.pageLayouts[pageKey] = next;
     applyPageLayoutFromSettings(state);
+    buildHierarchyTree();
     noteDirty();
   };
 
@@ -1440,6 +1617,7 @@ function createComposerTool(tool) {
     bindDragHandlers();
     buildNavLists();
     buildPanelLists();
+    buildHierarchyTree();
     if (pageVerbositySelect) {
       const pageKey = getPageKey();
       const preset = state.pageVerbosity?.[pageKey] || '';

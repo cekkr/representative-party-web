@@ -292,6 +292,22 @@ body[data-composer-mode="on"] .composer-tool__panel {
   justify-content: space-between;
   gap: 0.75rem;
   margin-bottom: 0.85rem;
+  cursor: grab;
+}
+
+.composer-tool.is-composer-panel-dragging .composer-tool__header {
+  cursor: grabbing;
+}
+
+.composer-tool__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.composer-tool[data-composer-collapsed="true"] .composer-tool__section,
+.composer-tool[data-composer-collapsed="true"] .composer-tool__footer {
+  display: none;
 }
 
 .composer-tool__section + .composer-tool__section {
@@ -338,6 +354,54 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 .composer-tool__item.is-selected {
+  border-style: solid;
+  border-color: rgba(126, 242, 208, 0.6);
+  background: rgba(126, 242, 208, 0.12);
+}
+
+.composer-tree {
+  max-height: 240px;
+  overflow: auto;
+  padding: 0.35rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(154, 177, 211, 0.2);
+  background: rgba(4, 6, 15, 0.35);
+}
+
+.composer-tree__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.composer-tree__list .composer-tree__list {
+  margin-left: 0.75rem;
+  padding-left: 0.6rem;
+  border-left: 1px dashed rgba(154, 177, 211, 0.25);
+}
+
+.composer-tree__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.composer-tree__button {
+  width: 100%;
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.6rem;
+  border: 1px dashed rgba(154, 177, 211, 0.35);
+  background: rgba(4, 6, 15, 0.4);
+  color: var(--text);
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.composer-tree__button.is-selected {
   border-style: solid;
   border-color: rgba(126, 242, 208, 0.6);
   background: rgba(126, 242, 208, 0.12);
