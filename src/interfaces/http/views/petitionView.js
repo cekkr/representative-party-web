@@ -34,7 +34,7 @@ export function renderPetitionList(
   const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
   const state = options.state;
   if (!petitions.length) {
-    return renderEmptyState('No proposals yet. Draft one when you need a decision.');
+    return renderPetitionOnboarding();
   }
 
   const voteBuckets = buildVoteBuckets(votes);
@@ -145,6 +145,24 @@ export function renderPetitionList(
       `;
     })
     .join('\n');
+}
+
+function renderPetitionOnboarding() {
+  return `
+    <div class="onboarding-card">
+      <p class="eyebrow">Getting started</p>
+      <h3>Draft a proposal</h3>
+      <ul class="plain small">
+        <li>Summarize the decision you need.</li>
+        <li>Add structured outline details if helpful.</li>
+        <li>Attach evidence links to support review.</li>
+      </ul>
+      <div class="onboarding-actions">
+        <a class="cta" href="#petitions-compose">Draft proposal</a>
+        <a class="ghost" href="#petitions-discussion">Review deliberations</a>
+      </div>
+    </div>
+  `;
 }
 
 

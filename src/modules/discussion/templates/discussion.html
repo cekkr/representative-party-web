@@ -17,6 +17,13 @@
     <p class="muted small">{{hashOnlyMessage}}</p>
     <p class="muted small">Use discussions to frame options; proposals and votes handle formal decisions.</p>
   </div>
+  <div class="next-action">
+    <p class="eyebrow">Next action</p>
+    <div class="next-action__row">
+      <a class="ghost" href="#discussion-compose">Start a post</a>
+      <a class="ghost" href="#discussion-topics">Set top topics</a>
+    </div>
+  </div>
   <details class="form-toggle" {{composeOpen}}>
     <summary>Start a discussion post</summary>
     <form class="stack" method="post" action="/discussion" data-enhance="discussion">

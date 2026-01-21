@@ -7,7 +7,7 @@ export function renderSocialPosts(
   { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId } = {},
 ) {
   if (!posts || posts.length === 0) {
-    return renderEmptyState('No posts yet. Follow a handle or share an update.');
+    return renderSocialOnboarding();
   }
 
   return posts
@@ -61,6 +61,24 @@ export function renderSocialPosts(
       `;
     })
     .join('\n');
+}
+
+function renderSocialOnboarding() {
+  return `
+    <div class="onboarding-card">
+      <p class="eyebrow">Getting started</p>
+      <h3>Build your wall</h3>
+      <ul class="plain small">
+        <li>Follow the handles you want updates from.</li>
+        <li>Share quick updates or questions.</li>
+        <li>Use direct posts for sensitive coordination.</li>
+      </ul>
+      <div class="onboarding-actions">
+        <a class="cta" href="#social-compose">Share an update</a>
+        <a class="ghost" href="#social-follows">Follow a handle</a>
+      </div>
+    </div>
+  `;
 }
 
 export function renderFollowList(follows) {

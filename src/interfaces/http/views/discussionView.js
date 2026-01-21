@@ -2,7 +2,6 @@ import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import {
   renderAuthorHashLine,
-  renderEmptyState,
   renderEvidenceLinks,
   renderIssuerPill,
   renderPreviewPill,
@@ -11,7 +10,7 @@ import {
 
 export function renderDiscussionList(entries, state) {
   if (!entries.length) {
-    return renderEmptyState('No discussion notes yet. Start a topic and post the first update.');
+    return renderDiscussionOnboarding();
   }
 
   const topicCache = new Map();
@@ -48,4 +47,22 @@ export function renderDiscussionList(entries, state) {
       `;
     })
     .join('\n');
+}
+
+function renderDiscussionOnboarding() {
+  return `
+    <div class="onboarding-card">
+      <p class="eyebrow">Getting started</p>
+      <h3>Start a discussion</h3>
+      <ul class="plain small">
+        <li>Pick a topic that needs input.</li>
+        <li>Post a concise update or question.</li>
+        <li>Add evidence links when available.</li>
+      </ul>
+      <div class="onboarding-actions">
+        <a class="cta" href="#discussion-compose">Start a post</a>
+        <a class="ghost" href="#discussion-topics">Set top topics</a>
+      </div>
+    </div>
+  `;
 }

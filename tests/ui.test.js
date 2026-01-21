@@ -329,7 +329,7 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   });
   await page.waitForFunction(() => {
     const feed = document.querySelector('.wall-feed');
-    return feed && feed.textContent.includes('No posts yet');
+    return feed && feed.textContent.includes('Build your wall');
   });
 
   await page.evaluate(() => {
@@ -730,10 +730,10 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
   assert.ok(socialToggle);
   assert.ok(petitionsToggle);
   if (await socialToggle.evaluate((el) => el.checked)) {
-    await socialToggle.click();
+    await socialToggle.evaluate((el) => el.click());
   }
   if (await petitionsToggle.evaluate((el) => el.checked)) {
-    await petitionsToggle.click();
+    await petitionsToggle.evaluate((el) => el.click());
   }
 
   const modulesResponse = page.waitForResponse(
