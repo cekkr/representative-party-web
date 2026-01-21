@@ -112,8 +112,8 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   const brandDefaults = {
     eyebrow: 'Representative Party Framework',
     title: 'Party Circle',
-    tagline: 'Verifier-first kernel with QR handoff and ActivityPub hooks.',
-    footer: 'Vanilla SSR + Party Circle kernel prototype',
+    tagline: 'Verified discussions, proposals, and coordination.',
+    footer: 'Vanilla SSR + Party Circle kernel',
   };
   layoutData.brandEyebrow = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandEyebrow', brandDefaults.eyebrow);
   layoutData.brandTitle = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandTitle', brandDefaults.title);

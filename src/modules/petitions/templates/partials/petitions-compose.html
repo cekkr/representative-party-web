@@ -1,6 +1,6 @@
 <section class="panel" id="petitions-compose">
-  <p class="eyebrow">Law proposals</p>
-  <h2>Draft → discuss → vote pipeline</h2>
+  <p class="eyebrow">Proposals</p>
+  <h2>Formal decisions pipeline</h2>
   <div class="callout is-verbose">
     <p class="muted small">Role: {{roleLabel}}</p>
     <p class="muted small">Petition gate: {{petitionStatus}}</p>
@@ -8,6 +8,7 @@
     {{petitionGateReasonLine}}
     {{voteGateReasonLine}}
     <p class="muted small">Handle: {{personHandle}}</p>
+    <p class="muted small">Use proposals when you need a decision; discussion and social lanes stay exploratory.</p>
     <p class="muted small">Party Circle policy governs quorum/votes; group cachets inform delegation only.</p>
     <p class="muted small">Delegation conflicts: {{conflictList}}</p>
     <p class="muted small">Quorum advance stage: {{quorumAdvanceLabel}}</p>
@@ -71,7 +72,7 @@
       </label>
       <div class="cta-row">
         <button class="cta" type="submit">Draft proposal</button>
-        <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
       </div>
     </form>
   </details>

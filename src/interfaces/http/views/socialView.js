@@ -7,7 +7,7 @@ export function renderSocialPosts(
   { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId } = {},
 ) {
   if (!posts || posts.length === 0) {
-    return renderEmptyState('No posts yet. Follow someone and start the conversation.');
+    return renderEmptyState('No posts yet. Follow a handle or share an update.');
   }
 
   return posts
@@ -65,7 +65,7 @@ export function renderSocialPosts(
 
 export function renderFollowList(follows) {
   if (!follows || follows.length === 0) {
-    return renderEmptyState('You are not following anyone yet.');
+    return renderEmptyState('You are not following anyone yet. Add a handle to tailor your wall.');
   }
 
   return follows

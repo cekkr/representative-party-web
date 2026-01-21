@@ -1,7 +1,7 @@
 <section class="panel" data-composer-section="auth-eudi">
   <p class="eyebrow">Verifier</p>
-  <h2>EUDI Wallet handshake</h2>
-  <p>This verifier issues a credential offer with a blinded session token. Scan the QR on desktop or open the deep link on mobile to return a PID hash.</p>
+  <h2>Verify with your wallet</h2>
+  <p>Scan the QR on desktop or open the deep link on mobile to return a blinded PID hash. No personal data is stored.</p>
   <div class="callout">
     <p class="muted small">{{hashOnlyMessage}}</p>
     <p class="muted small">{{policyNote}}</p>
@@ -15,7 +15,7 @@
       </div>
       <div class="cta-row">
         <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
-        <a class="ghost is-verbose inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Simulate callback</a>
+        <a class="ghost is-verbose inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Developer shortcut: simulate callback</a>
       </div>
       <p class="muted small">If your browser blocks the deep link, copy and paste it: <span data-deep-link-fallback>{{deepLink}}</span></p>
     </div>

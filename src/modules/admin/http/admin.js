@@ -1669,7 +1669,7 @@ function buildAdminViewModel(
     firstRunNote: effective.initialized ? '' : 'First installation mode: use the admin wizard to configure and persist Circle settings.',
     circleKeyCallout,
     flash,
-    postingGate: postingGate.allowed ? 'Open posting allowed (demo).' : postingGate.message || 'Verification required before posting.',
+    postingGate: postingGate.allowed ? 'Open posting allowed.' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
     modulesSummary: `Modules: ${modulesSummary}`,
     modulesList,

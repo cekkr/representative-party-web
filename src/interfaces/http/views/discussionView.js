@@ -11,7 +11,7 @@ import {
 
 export function renderDiscussionList(entries, state) {
   if (!entries.length) {
-    return renderEmptyState('No contributions yet. Be the first to start the debate.');
+    return renderEmptyState('No discussion notes yet. Start a topic and post the first update.');
   }
 
   const topicCache = new Map();

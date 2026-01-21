@@ -143,11 +143,15 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       person,
       personHandle: resolvePersonHandle(person),
       personStatus: person
-        ? `Posting as verified ${actorLabels.actorLabel} bound to a blinded PID hash.`
-        : 'Start the wallet flow to post with accountability.',
+        ? `Posting as verified ${actorLabels.actorLabel} with a blinded PID hash for accountability.`
+        : 'Verify your wallet to post with accountability.',
       discussionList: renderDiscussionList(discussionEntries, state),
-      verificationPolicy: policy.requireVerification ? 'Wallet verification required to post.' : 'Open posting allowed (demo mode).',
-      circlePolicy: policy.enforcement === 'strict' ? 'Circle enforcement active: verification required before posting.' : 'Circle policy observing: demo-friendly mode.',
+      verificationPolicy: policy.requireVerification
+        ? 'Wallet verification required to post.'
+        : 'Wallet verification optional; posting is still tied to your session.',
+      circlePolicy: policy.enforcement === 'strict'
+        ? 'Circle enforcement active: only verified people can post.'
+        : 'Circle enforcement observing: verified and unverified posting allowed.',
       policyId: policy.id,
       policyVersion: policy.version,
       circleName: policy.circleName,
@@ -163,7 +167,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       topicPinned: formatTopicList(topicConfig.pinned || []) || 'none',
       composeOpen,
     },
-    { wantsPartial, title: 'Deliberation Sandbox', state },
+    { wantsPartial, title: 'Discussion', state },
   );
 }
 

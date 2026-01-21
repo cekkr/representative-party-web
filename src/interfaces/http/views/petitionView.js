@@ -34,7 +34,7 @@ export function renderPetitionList(
   const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
   const state = options.state;
   if (!petitions.length) {
-    return renderEmptyState('No proposals yet. Draft the first one.');
+    return renderEmptyState('No proposals yet. Draft one when you need a decision.');
   }
 
   const voteBuckets = buildVoteBuckets(votes);

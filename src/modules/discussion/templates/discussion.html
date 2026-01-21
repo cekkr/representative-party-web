@@ -1,7 +1,7 @@
 <section class="panel" id="discussion-compose">
   <p class="eyebrow">Deliberation</p>
-  <h2>Discussion sandbox</h2>
-  <p class="is-verbose">Prototype debate module wired to verified sessions. Every post inherits the blinded PID hash of the {{actorLabel}}.</p>
+  <h2>Discussion hub</h2>
+  <p class="is-verbose">Topic-based conversations tied to verified sessions. Posts inherit the blinded PID hash of the {{actorLabel}} for accountability.</p>
   <div class="callout is-verbose">
     <p class="muted">Your handle</p>
     <code>{{personHandle}}</code>
@@ -15,9 +15,10 @@
     <p class="muted small">Circle: {{circleName}}</p>
     <p class="muted small">Ledger size: {{ledgerSize}}</p>
     <p class="muted small">{{hashOnlyMessage}}</p>
+    <p class="muted small">Use discussions to frame options; proposals and votes handle formal decisions.</p>
   </div>
   <details class="form-toggle" {{composeOpen}}>
-    <summary>Start a new discussion post</summary>
+    <summary>Start a discussion post</summary>
     <form class="stack" method="post" action="/discussion" data-enhance="discussion">
       <div class="form-grid">
         <label class="field">
@@ -35,8 +36,8 @@
         </label>
       </div>
       <label class="field">
-        <span>Comment</span>
-        <textarea name="content" rows="4" placeholder="Add a concise, accountable thought." required></textarea>
+        <span>Contribution</span>
+        <textarea name="content" rows="4" placeholder="Share a concise, accountable update or idea." required></textarea>
       </label>
       <label class="field">
         <span>Evidence / citations (optional)</span>
@@ -45,7 +46,7 @@
       <p class="muted small">One URL per line.</p>
       <div class="cta-row">
         <button class="cta" type="submit">Post to discussion</button>
-        <a class="ghost" href="/auth/eudi" data-partial>Verify wallet</a>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
       </div>
     </form>
   </details>

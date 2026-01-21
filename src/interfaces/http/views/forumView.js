@@ -22,7 +22,7 @@ export function renderForum(entries, person, state, options = {}) {
 
 function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
   if (!threads.length) {
-    return renderEmptyState('No threads yet. Start a discussion.');
+    return renderEmptyState('No forum threads yet. Publish an article or analysis.');
   }
   const topicCache = new Map();
   return threads

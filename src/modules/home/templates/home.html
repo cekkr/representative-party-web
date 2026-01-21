@@ -1,8 +1,8 @@
 <section class="panel" data-composer-section="home-hero">
   <div>
-    <p class="eyebrow">Phase 1 — Party Circle foundation</p>
-    <h2>Verifier-first onboarding with QR + ActivityPub hooks</h2>
-    <p class="is-verbose">The server now issues a QR-friendly credential offer, receives a blinded PID hash, persists it to the Uniqueness Ledger, and emits an ActivityPub actor for federation.</p>
+    <p class="eyebrow">Circle workspace</p>
+    <h2>Coordinate, deliberate, and decide with verified accountability.</h2>
+    <p class="is-verbose">Use discussions to surface options, proposals to formalize decisions, and the social feed for updates and coordination.</p>
     <div class="is-verbose">
       <p class="muted small">Circle: {{circleName}}</p>
       <p class="muted small">{{policyFlag}}</p>
@@ -12,8 +12,9 @@
       <p class="muted small">{{extensionsSummary}}</p>
     </div>
     <div class="cta-row">
-      <a class="cta" href="/auth/eudi" data-partial>Start wallet flow</a>
-      <a class="ghost" href="/discussion" data-partial>Open discussion sandbox</a>
+      <a class="cta" href="/auth/eudi" data-partial>Verify with wallet</a>
+      <a class="ghost" href="/discussion" data-partial>Open discussions</a>
+      <a class="ghost" href="/social/feed" data-partial>Open social feed</a>
       {{ledgerLink}}
     </div>
   </div>
@@ -31,47 +32,47 @@
     <div class="stat">
       <p class="eyebrow">Discussions</p>
       <p class="stat__value">{{discussionCount}}</p>
-      <p class="muted">Prototype debates bound to verified {{actorLabelPlural}}.</p>
+      <p class="muted">Topic-based conversations tied to verified {{actorLabelPlural}}.</p>
     </div>
     <div class="stat">
       <p class="eyebrow">Proposals</p>
       <p class="stat__value">{{petitionCount}}</p>
-      <p class="muted">Drafts ready for discussion and vote scaffold.</p>
+      <p class="muted">Formal proposals moving through draft, discussion, and vote.</p>
     </div>
     <div class="stat">
       <p class="eyebrow">Groups</p>
       <p class="stat__value">{{groupCount}}</p>
-      <p class="muted">Think tanks offering delegation cachets.</p>
+      <p class="muted">Groups sharing delegates, endorsements, and priorities.</p>
     </div>
   </div>
 </section>
 
 <section class="panel grid is-verbose" data-composer-section="home-highlights">
   <div>
-    <p class="eyebrow">Verifier</p>
-    <h3>OIDC4VP handshake</h3>
+    <p class="eyebrow">Verify</p>
+    <h3>Wallet-based verification</h3>
     <ul class="plain">
-      <li>Credential offer + deep link compatible with wallet handoff</li>
-      <li>QR generation for desktop scans and mobile handover</li>
-      <li>Blinded PID hashing with salted sessions</li>
+      <li>QR + deep link handoff for wallet verification</li>
+      <li>Hash-only identity: no raw PID stored</li>
+      <li>Verified sessions unlock posting and voting gates</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Federation</p>
-    <h3>ActivityPub + Gossip</h3>
+    <p class="eyebrow">Deliberate</p>
+    <h3>Discuss and propose</h3>
     <ul class="plain">
-      <li>Actors emitted per verified {{actorLabel}} hash</li>
-      <li>Gossip endpoint ready to sync uniqueness ledger with peers</li>
-      <li>Peer registry persisted for Circle coordination</li>
+      <li>Topic-based discussions tied to verified handles</li>
+      <li>Structured proposals with evidence and revision history</li>
+      <li>Clear stages from draft to vote</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Deliberation</p>
-    <h3>Discussion sandbox</h3>
+    <p class="eyebrow">Coordinate</p>
+    <h3>Social, groups, delegation</h3>
     <ul class="plain">
-      <li>Persistent thread list linked to verified sessions</li>
-      <li>SSR-first UI with partial navigation</li>
-      <li>Future-ready for proposals and proposal-to-vote flow</li>
+      <li>Follow updates and share quick posts</li>
+      <li>Groups surface delegate recommendations</li>
+      <li>Delegation stays advisory and overridable</li>
     </ul>
   </div>
 </section>
