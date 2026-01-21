@@ -2939,6 +2939,7 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
     const ledgerCounts = [];
     if (Number.isFinite(ledger.added) && ledger.added > 0) ledgerCounts.push(`+${ledger.added}`);
     const ledgerTail = ledgerCounts.length ? ` (${ledgerCounts.join(', ')})` : '';
+    const ledgerLine = ledger.skipped ? 'Ledger skipped' : `Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok${ledgerTail}`;
     const voteCounts = [];
     if (Number.isFinite(votes.added) && votes.added > 0) voteCounts.push(`+${votes.added}`);
     if (Number.isFinite(votes.updated) && votes.updated > 0) voteCounts.push(`~${votes.updated}`);
@@ -2951,7 +2952,7 @@ function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs ye
     const transactionLine = transactions.skipped
       ? 'transactions skipped'
       : `transactions ${transactions.ok || 0}/${transactions.sent || 0} ok${transactionTail}`;
-    lines.push(`Ledger ${ledger.ok || 0}/${ledger.sent || 0} ok${ledgerTail} · ${voteLine} · ${transactionLine}`);
+    lines.push(`${ledgerLine} · ${voteLine} · ${transactionLine}`);
     if (Number.isFinite(gossipState.lastSummary.durationMs)) {
       lines.push(`Duration: ${formatDuration(gossipState.lastSummary.durationMs)}`);
     }
@@ -3111,7 +3112,7 @@ function formatGossipFlash(summary) {
   const ledger = summary.ledger || {};
   const votes = summary.votes || {};
   const transactions = summary.transactions || {};
-  const ledgerLine = `ledger ${ledger.ok || 0}/${ledger.sent || 0} ok`;
+  const ledgerLine = ledger.skipped ? 'ledger skipped' : `ledger ${ledger.ok || 0}/${ledger.sent || 0} ok`;
   const votesLine = votes.skipped ? 'votes skipped' : `votes ${votes.ok || 0}/${votes.sent || 0} ok`;
   const transactionsLine = transactions.skipped
     ? 'transactions skipped'

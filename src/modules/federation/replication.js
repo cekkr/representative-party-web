@@ -11,21 +11,22 @@ export function getReplicationProfile(state) {
 }
 
 export function shouldAcceptPreviews(profile) {
-  if (!profile) return true;
-  if (profile.validationLevel === 'strict') return Boolean(profile.allowPreviews);
-  return true;
+  if (!profile) return DATA.allowPreviews;
+  if (typeof profile.allowPreviews === 'boolean') return profile.allowPreviews;
+  return DATA.allowPreviews;
 }
 
 export function decideStatus(profile, hintedStatus = 'validated') {
   const normalizedHint = hintedStatus === 'preview' ? 'preview' : 'validated';
   const allowPreview = shouldAcceptPreviews(profile);
+  const validationLevel = profile?.validationLevel || DATA.validationLevel;
   if (normalizedHint === 'preview' && !allowPreview) {
     return { status: 'rejected', reason: 'preview_blocked', allowPreview };
   }
-  if (profile.validationLevel === 'off') {
+  if (validationLevel === 'off') {
     return { status: 'validated', allowPreview };
   }
-  if (profile.validationLevel === 'observe' && normalizedHint === 'preview') {
+  if (validationLevel === 'observe' && normalizedHint === 'preview') {
     return { status: 'preview', allowPreview };
   }
   return { status: normalizedHint, allowPreview };

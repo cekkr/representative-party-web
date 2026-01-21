@@ -17,6 +17,20 @@ test('decideStatus marks previews when observe mode with previews allowed', () =
   assert.equal(status.allowPreview, true);
 });
 
+test('decideStatus blocks previews when validation is observe but previews are disabled', () => {
+  const profile = { mode: 'p2p', validationLevel: 'observe', allowPreviews: false };
+  const status = decideStatus(profile, 'preview');
+  assert.equal(status.status, 'rejected');
+  assert.equal(status.allowPreview, false);
+});
+
+test('decideStatus blocks previews when validation is off but previews are disabled', () => {
+  const profile = { mode: 'p2p', validationLevel: 'off', allowPreviews: false };
+  const status = decideStatus(profile, 'preview');
+  assert.equal(status.status, 'rejected');
+  assert.equal(status.allowPreview, false);
+});
+
 test('filterVisibleEntries hides preview entries when previews disabled', () => {
   const state = { dataConfig: { allowPreviews: false } };
   const entries = [

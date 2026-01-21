@@ -412,7 +412,7 @@ Adapter notes:
 ### Data management priorities
 
 - Provider‑local contact fields stay local (no gossip).
-- Previews are gated by `DATA_PREVIEW` + validation level.
+- Previews are gated by `DATA_PREVIEW`; when disabled, preview payloads are rejected even in `observe/off` validation modes. Validation level only decides whether allowed previews stay marked as preview or arrive as validated.
 - Redundancy is chosen via `DATA_MODE` (centralized/hybrid/p2p) and adapter.
 - Signatures/validation state decide what can be rendered or replicated.
 

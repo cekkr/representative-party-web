@@ -70,7 +70,15 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
       }),
     );
     const finishedAt = new Date().toISOString();
-    summary = summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload });
+    summary = summarizeResults({
+      peerResults,
+      peers,
+      reason,
+      startedAt,
+      finishedAt,
+      votesPayload,
+      transactionsPayload,
+    });
     await updatePeerHealthFromResults(state, peerResults);
     state.gossipState = updateGossipState(state.gossipState, { summary, peerResults, startedAt, finishedAt });
     return summary;
@@ -416,9 +424,18 @@ async function fetchJson(url, timeoutMs) {
   }
 }
 
-function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, votesPayload }) {
+function summarizeResults({
+  peerResults,
+  peers,
+  reason,
+  startedAt,
+  finishedAt,
+  votesPayload,
+  transactionsPayload,
+}) {
   const hasVotesPayload = Boolean(votesPayload);
-  const ledger = { sent: peers.length, ok: 0, failed: 0, added: 0 };
+  const hasTransactionsPayload = Boolean(transactionsPayload);
+  const ledger = { sent: peers.length, ok: 0, failed: 0, added: 0, skipped: false };
   const votes = {
     sent: hasVotesPayload ? peers.length : 0,
     ok: 0,
@@ -428,10 +445,10 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
     updated: 0,
   };
   const transactions = {
-    sent: peers.length,
+    sent: hasTransactionsPayload ? peers.length : 0,
     ok: 0,
     failed: 0,
-    skipped: false,
+    skipped: !hasTransactionsPayload,
     added: 0,
     updated: 0,
   };
@@ -440,6 +457,7 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
   for (const result of peerResults) {
     if (result.ledger?.skipped) {
       ledger.sent -= 1;
+      ledger.skipped = true;
     } else if (result.ledger?.ok) {
       ledger.ok += 1;
       if (Number.isFinite(result.ledger.added)) {
@@ -450,40 +468,46 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
       errors.push(buildError(result, 'ledger'));
     }
 
-    if (result.votes?.skipped) {
-      if (hasVotesPayload) {
+    if (hasVotesPayload) {
+      if (result.votes?.skipped) {
         votes.sent -= 1;
+        votes.skipped = true;
+        continue;
       }
+      if (result.votes?.ok) {
+        votes.ok += 1;
+        if (Number.isFinite(result.votes.added)) {
+          votes.added += result.votes.added;
+        }
+        if (Number.isFinite(result.votes.updated)) {
+          votes.updated += result.votes.updated;
+        }
+      } else {
+        votes.failed += 1;
+        errors.push(buildError(result, 'votes'));
+      }
+    } else if (result.votes?.skipped) {
       votes.skipped = true;
-      continue;
-    }
-    if (result.votes?.ok) {
-      votes.ok += 1;
-      if (Number.isFinite(result.votes.added)) {
-        votes.added += result.votes.added;
-      }
-      if (Number.isFinite(result.votes.updated)) {
-        votes.updated += result.votes.updated;
-      }
-    } else {
-      votes.failed += 1;
-      errors.push(buildError(result, 'votes'));
     }
 
-    if (result.transactions?.skipped) {
-      transactions.sent -= 1;
+    if (hasTransactionsPayload) {
+      if (result.transactions?.skipped) {
+        transactions.sent -= 1;
+        transactions.skipped = true;
+      } else if (result.transactions?.ok) {
+        transactions.ok += 1;
+        if (Number.isFinite(result.transactions.added)) {
+          transactions.added += result.transactions.added;
+        }
+        if (Number.isFinite(result.transactions.updated)) {
+          transactions.updated += result.transactions.updated;
+        }
+      } else if (result.transactions) {
+        transactions.failed += 1;
+        errors.push(buildError(result, 'transactions'));
+      }
+    } else if (result.transactions?.skipped) {
       transactions.skipped = true;
-    } else if (result.transactions?.ok) {
-      transactions.ok += 1;
-      if (Number.isFinite(result.transactions.added)) {
-        transactions.added += result.transactions.added;
-      }
-      if (Number.isFinite(result.transactions.updated)) {
-        transactions.updated += result.transactions.updated;
-      }
-    } else if (result.transactions) {
-      transactions.failed += 1;
-      errors.push(buildError(result, 'transactions'));
     }
   }
 
@@ -504,7 +528,7 @@ function summarizeResults({ peerResults, peers, reason, startedAt, finishedAt, v
 }
 
 function summarizePullResults({ peerResults, peers, reason, startedAt, finishedAt }) {
-  const ledger = { sent: peers.length, ok: 0, failed: 0, added: 0 };
+  const ledger = { sent: peers.length, ok: 0, failed: 0, added: 0, skipped: false };
   const votes = { sent: peers.length, ok: 0, failed: 0, skipped: false, added: 0, updated: 0 };
   const transactions = { sent: peers.length, ok: 0, failed: 0, skipped: false, added: 0, updated: 0 };
   const errors = [];
@@ -512,6 +536,7 @@ function summarizePullResults({ peerResults, peers, reason, startedAt, finishedA
   for (const result of peerResults) {
     if (result.ledger?.skipped) {
       ledger.sent -= 1;
+      ledger.skipped = true;
     } else if (result.ledger?.ok) {
       ledger.ok += 1;
       if (Number.isFinite(result.ledger.added)) {
@@ -591,7 +616,7 @@ function buildSkippedSummary({ reason, startedAt, finishedAt, skip }) {
     finishedAt,
     durationMs,
     peers: 0,
-    ledger: { sent: 0, ok: 0, failed: 0, added: 0 },
+    ledger: { sent: 0, ok: 0, failed: 0, added: 0, skipped: true },
     votes: { sent: 0, ok: 0, failed: 0, skipped: true, added: 0, updated: 0 },
     transactions: { sent: 0, ok: 0, failed: 0, skipped: true, added: 0, updated: 0 },
     errors: [],

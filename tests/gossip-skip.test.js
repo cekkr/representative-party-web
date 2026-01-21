@@ -78,3 +78,39 @@ test('gossip skips peers that disable votes without penalizing health', { timeou
   assert.ok(peerEntry.lastLedgerHash, 'expected peer ledger hash snapshot');
   assert.equal(peerEntry.lastLedgerMatch, true);
 });
+
+test('gossip marks ledger scope as skipped when peer disables gossip in centralized mode', { timeout: 60000 }, async (t) => {
+  const nodeA = await startServer({
+    port: await getAvailablePort(),
+    dataAdapter: 'memory',
+    dataMode: 'hybrid',
+  });
+  const nodeB = await startServer({
+    port: await getAvailablePort(),
+    dataAdapter: 'memory',
+    dataMode: 'centralized',
+  });
+
+  t.after(async () => {
+    await nodeA.stop();
+    await nodeB.stop();
+  });
+
+  await postJson(`${nodeA.baseUrl}/circle/peers`, { peer: nodeB.baseUrl });
+  await postForm(`${nodeA.baseUrl}/admin`, { intent: 'gossip-push' }, { partial: true });
+
+  const { payload: health } = await fetchJson(`${nodeA.baseUrl}/health`);
+  const summary = health?.gossip?.outbound?.summary;
+  assert.ok(summary, 'expected gossip summary');
+  assert.equal(summary.ledger?.skipped, true, 'ledger should be marked as skipped');
+  assert.equal(summary.ledger?.sent, 0);
+  assert.equal(summary.votes?.skipped, true);
+  assert.equal(summary.transactions?.skipped, true);
+
+  const peerHealth = health?.gossip?.peerHealth;
+  assert.ok(peerHealth, 'expected peer health summary');
+  const peerEntry = peerHealth.entries?.find((entry) => entry.peer === nodeB.baseUrl);
+  assert.ok(peerEntry, 'expected a peer health entry');
+  assert.ok(peerEntry.score >= 0, 'peer score should not be penalized for skipped gossip');
+  assert.equal(peerEntry.lastFailureReason, null);
+});
