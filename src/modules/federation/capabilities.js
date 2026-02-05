@@ -61,12 +61,14 @@ function normalizePeerCapabilities(snapshot = {}) {
   const ringId = sanitizeToken(snapshot.ringId || '', 64);
 
   if (!modules && !replication && !policy && !issuer && !ringId) return null;
+  const fingerprint = buildCapabilitiesFingerprint({ modules, replication, policy, issuer, ringId });
   return {
     modules: modules || undefined,
     replication: replication || undefined,
     policy: policy || undefined,
     issuer: issuer || undefined,
     ringId: ringId || undefined,
+    fingerprint: fingerprint || undefined,
   };
 }
 
@@ -95,6 +97,9 @@ function normalizePolicySnapshot(raw = {}) {
 
 function isSameCapabilities(existing, incoming) {
   if (!existing || !incoming) return false;
+  if (existing.fingerprint && incoming.fingerprint) {
+    return existing.fingerprint === incoming.fingerprint;
+  }
   const a = JSON.stringify({
     modules: existing.modules || null,
     replication: existing.replication || null,
@@ -166,4 +171,30 @@ function normalizeToken(value, { allowEmpty = false } = {}) {
 function sanitizeToken(value, maxLen) {
   const text = typeof value === 'string' ? value.trim() : '';
   return maxLen ? text.slice(0, maxLen) : text;
+}
+
+function buildCapabilitiesFingerprint({ modules, replication, policy, issuer, ringId } = {}) {
+  const parts = [];
+  if (modules && typeof modules === 'object') {
+    const keys = Object.keys(modules).sort();
+    const moduleParts = keys.map((key) => `${key}:${modules[key] === false ? '0' : '1'}`);
+    parts.push(`modules:${moduleParts.join(',')}`);
+  }
+  if (replication && typeof replication === 'object') {
+    const repParts = [];
+    if (replication.mode) repParts.push(`mode=${replication.mode}`);
+    if (replication.adapter) repParts.push(`adapter=${replication.adapter}`);
+    if (replication.validationLevel) repParts.push(`validation=${replication.validationLevel}`);
+    if (typeof replication.allowPreviews === 'boolean') {
+      repParts.push(`previews=${replication.allowPreviews ? '1' : '0'}`);
+    }
+    if (repParts.length) parts.push(`replication:${repParts.join(',')}`);
+  }
+  if (policy && typeof policy === 'object' && policy.id) {
+    const version = Number.isFinite(Number(policy.version)) ? Number(policy.version) : 0;
+    parts.push(`policy:${policy.id}@${version}`);
+  }
+  if (ringId) parts.push(`ring:${ringId}`);
+  if (issuer) parts.push(`issuer:${issuer}`);
+  return parts.join('|');
 }

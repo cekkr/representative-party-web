@@ -62,7 +62,13 @@ export async function ingestLedgerGossip({ state, envelope, hashes, ledgerHash, 
   if (providerBlindHint) {
     const merged = mergeProviderBlindAnnouncement(state.settings?.providerBlind || {}, providerBlindHint);
     if (merged.updated) {
-      state.settings = { ...(state.settings || {}), providerBlind: merged.settings };
+      state.settings = {
+        ...(state.settings || {}),
+        providerBlind: {
+          ...merged.settings,
+          updatedAt: new Date().toISOString(),
+        },
+      };
       await persistSettings(state);
     }
   }

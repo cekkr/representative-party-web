@@ -28,9 +28,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache grid drag candidate rects per drag session (or throttle dragover to rAF) to reduce layout thrash during composer reorder.
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
-- Cache provider-blind announcement payloads (ring + audit snapshots) and rebuild only when settings change to reduce per-gossip normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
-- Store a stable fingerprint for peer capability snapshots to avoid repeated JSON stringify comparisons on every gossip ingest.
+- Cache capabilities snapshots per gossip tick so ledger envelopes and gossip pushes reuse the same module/replication summary.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -92,3 +91,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added gzip responses for ledger, vote, and transaction exports when requested.
 - Skipped gzip compression for small JSON exports (2KB threshold) to avoid CPU overhead.
 - Batched MySQL/MongoDB saveData writes and added adapter drop/close helpers for cleaner test runs.
+- Cached provider-blind announcement payloads by `updatedAt` so gossip no longer rebuilds ring/audit snapshots on every sync.
+- Stored stable fingerprints for peer capability snapshots to avoid repeated JSON stringify comparisons during gossip ingest.

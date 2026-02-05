@@ -64,6 +64,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Libp2p readiness (optional)**: dependency included to evaluate P2P transport and future Circle key continuity not tied to the first provider.
 - **Peer ledger audits**: peer health tracks last ledger hash snapshots (match/mismatch) in `/admin` and `/health`.
 - **Peer capability hints**: ledger gossip includes module/data-mode snapshots so `/admin` can show peer capabilities and gossip skips disabled endpoints.
+- **Gossip efficiency**: peer capability hints are fingerprinted and provider-blind announcements are cached by `updatedAt` to reduce repeated gossip normalization work.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).

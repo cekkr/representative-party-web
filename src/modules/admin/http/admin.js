@@ -1058,7 +1058,10 @@ async function updateProviderBlind(state, body) {
     };
   }
 
-  const next = validation.settings;
+  const next = {
+    ...validation.settings,
+    updatedAt: new Date().toISOString(),
+  };
   state.settings = {
     ...(state.settings || {}),
     providerBlind: next,

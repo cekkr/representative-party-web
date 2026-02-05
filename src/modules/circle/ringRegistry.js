@@ -1,8 +1,10 @@
 const PROVIDER_BLIND_MODES = new Set(['off', 'observe', 'strict']);
 const AUDIT_ROLES = new Set(['member', 'provider', 'observer']);
+const ANNOUNCEMENT_CACHE = new WeakMap();
 
 const PROVIDER_BLIND_DEFAULTS = {
   mode: 'off',
+  updatedAt: '',
   ring: {
     currentId: '',
     epochSeconds: 2_592_000,
@@ -37,6 +39,7 @@ export function getProviderBlindSettings(state) {
 export function normalizeProviderBlindSettings(raw = {}) {
   const defaults = getProviderBlindDefaults();
   const mode = normalizeMode(raw.mode, defaults.mode);
+  const updatedAt = sanitizeToken(raw.updatedAt || raw.updated_at || '', 48);
   const ringInput = raw.ring || {};
   const envRingId = resolveEnvRingId();
   const ringSeed = { ...ringInput };
@@ -50,6 +53,7 @@ export function normalizeProviderBlindSettings(raw = {}) {
 
   return {
     mode,
+    updatedAt: updatedAt || undefined,
     ring,
     rings,
     audit,
@@ -115,7 +119,25 @@ export function upsertRingRegistryEntry(providerBlind, entry) {
 }
 
 export function buildProviderBlindAnnouncement(providerBlind) {
+  if (providerBlind && typeof providerBlind === 'object') {
+    const cached = ANNOUNCEMENT_CACHE.get(providerBlind);
+    const cacheKey = sanitizeToken(providerBlind.updatedAt || providerBlind.updated_at || '', 48);
+    if (cached && cached.updatedAt === cacheKey) {
+      return cached.announcement;
+    }
+    const normalized = normalizeProviderBlindSettings(providerBlind || {});
+    const announcement = buildProviderBlindAnnouncementFromNormalized(normalized);
+    ANNOUNCEMENT_CACHE.set(providerBlind, {
+      updatedAt: normalized.updatedAt || cacheKey || '',
+      announcement,
+    });
+    return announcement;
+  }
   const normalized = normalizeProviderBlindSettings(providerBlind || {});
+  return buildProviderBlindAnnouncementFromNormalized(normalized);
+}
+
+function buildProviderBlindAnnouncementFromNormalized(normalized) {
   const ring = normalized.ring.currentId
     ? {
         id: normalized.ring.currentId,
