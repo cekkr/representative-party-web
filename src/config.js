@@ -27,6 +27,7 @@ export const POLICIES = {
     process.env.GOSSIP_PEER_CAPABILITIES_MAX_AGE_HOURS,
     168,
   ),
+  gossipOptionalSkipSeconds: parseNumberEnv(process.env.GOSSIP_OPTIONAL_SKIP_SECONDS, 3600),
 };
 
 export const TOPIC_GARDENER_SYNC_SECONDS = Number(process.env.TOPIC_GARDENER_SYNC_SECONDS || 120);

@@ -2439,6 +2439,59 @@ function syncNavigationState() {
   });
 }
 
+function setComposePanelState(panel, { open, focus = false } = {}) {
+  if (!panel) return;
+  const toggle = panel.querySelector('[data-compose-toggle]');
+  const isOpen = Boolean(open);
+  panel.dataset.composeState = isOpen ? 'open' : 'collapsed';
+  if (toggle) {
+    toggle.setAttribute('aria-expanded', String(isOpen));
+    toggle.textContent = isOpen ? 'Collapse' : 'Expand';
+  }
+  if (isOpen) {
+    if (focus) {
+      const firstField = panel.querySelector('textarea, input, select');
+      if (firstField && typeof firstField.focus === 'function') {
+        firstField.focus();
+      }
+    }
+    return;
+  }
+  const focused = panel.querySelector(':focus');
+  if (focused && typeof focused.blur === 'function') {
+    focused.blur();
+  }
+}
+
+function initStickyComposerAutoCollapse() {
+  if (typeof window.__composeAutoCleanup === 'function') {
+    window.__composeAutoCleanup();
+    window.__composeAutoCleanup = null;
+  }
+  const panel = document.getElementById('social-compose');
+  if (!panel) return;
+  const toggle = panel.querySelector('[data-compose-toggle]');
+  if (!toggle) return;
+  let lastY = window.scrollY || window.pageYOffset || 0;
+  let lastTick = 0;
+  const onScroll = () => {
+    if (window.location.pathname !== '/social/feed') return;
+    const now = Date.now();
+    if (now - lastTick < 120) return;
+    lastTick = now;
+    const currentY = window.scrollY || window.pageYOffset || 0;
+    const delta = currentY - lastY;
+    lastY = currentY;
+    if (panel.dataset.composeState !== 'open') return;
+    if (panel.matches(':focus-within')) return;
+    if (currentY < 140) return;
+    if (delta < 56) return;
+    setComposePanelState(panel, { open: false, focus: false });
+  };
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.__composeAutoCleanup = () => window.removeEventListener('scroll', onScroll);
+}
+
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
@@ -2448,6 +2501,7 @@ function syncNavigationState() {
   applyPageLayout();
   initVerbosityToggle();
   initComposerTool();
+  initStickyComposerAutoCollapse();
 
   document.addEventListener('click', async (event) => {
     const anchor = event.target.closest('a[data-partial]');
@@ -2467,6 +2521,7 @@ function syncNavigationState() {
       applyPageLayout();
       initVerbosityToggle();
       initComposerTool();
+      initStickyComposerAutoCollapse();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
@@ -2483,21 +2538,7 @@ function syncNavigationState() {
     if (!panel) return;
     const current = panel.dataset.composeState || 'collapsed';
     const isOpen = current === 'open';
-    const next = isOpen ? 'collapsed' : 'open';
-    panel.dataset.composeState = next;
-    toggle.setAttribute('aria-expanded', String(!isOpen));
-    toggle.textContent = isOpen ? 'Expand' : 'Collapse';
-    if (isOpen) {
-      const focused = panel.querySelector(':focus');
-      if (focused && typeof focused.blur === 'function') {
-        focused.blur();
-      }
-      return;
-    }
-    const firstField = panel.querySelector('textarea, input, select');
-    if (firstField && typeof firstField.focus === 'function') {
-      firstField.focus();
-    }
+    setComposePanelState(panel, { open: !isOpen, focus: !isOpen });
   });
 
   document.addEventListener('change', (event) => {
@@ -2560,6 +2601,7 @@ function syncNavigationState() {
       applyPageLayout();
       initVerbosityToggle();
       initComposerTool();
+      initStickyComposerAutoCollapse();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {

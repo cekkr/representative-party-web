@@ -65,10 +65,13 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
 - Peer capability snapshots (module toggles + data mode) are gossiped alongside ledgers, cached per peer, surfaced in `/admin`, and used to skip disabled endpoints.
 - Peer capability hints now store stable fingerprints, and provider-blind announcements are cached by `updatedAt` to reduce repeated gossip normalization work.
+- Gossip pull now runs peer fetches in parallel and caches optional endpoint skips (`/votes/ledger`, `/transactions/ledger`) after module-disabled/not-found responses, reducing repeated failed probes.
+- `/admin` and `/health` now surface optional-endpoint skip cache summaries so operators can observe skip behavior and TTL impact.
 - Ledger/vote/transaction exports gzip-compress when clients request `Accept-Encoding: gzip` and payloads are at least ~2KB.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 - Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
+- Social feed UX now auto-collapses the sticky composer on downward scroll to keep the wall visible while preserving manual expand/collapse controls.
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.

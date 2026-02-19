@@ -15,6 +15,9 @@ import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from './
 const DEFAULT_TIMEOUT_MS = 8000;
 const SKIPPABLE_ERRORS = new Set(['module_disabled', 'gossip_disabled']);
 const SKIPPABLE_STATUS = new Set([404, 405, 410, 501]);
+const OPTIONAL_SKIP_SCOPES = ['votes', 'transactions'];
+const OPTIONAL_SKIP_TTL_MS = resolveOptionalSkipTtlMs();
+const OPTIONAL_SKIP_MAX_PEERS = 120;
 
 export { collectGossipPeers, normalizePeerUrl } from './peers.js';
 
@@ -137,10 +140,7 @@ export async function pullGossipNow(state, { reason = 'manual', timeoutMs = DEFA
   let summary;
 
   try {
-    for (const peer of peers) {
-      const result = await pullFromPeer(state, peer, { timeoutMs });
-      peerResults.push(result);
-    }
+    peerResults = await Promise.all(peers.map((peer) => pullFromPeer(state, peer, { timeoutMs })));
     const finishedAt = new Date().toISOString();
     summary = summarizePullResults({ peerResults, peers, reason, startedAt, finishedAt });
     await updatePeerHealthFromResults(state, peerResults);
@@ -325,48 +325,74 @@ async function pullFromPeer(state, peer, { timeoutMs }) {
   const capabilities = getPeerCapabilities(state, peer);
 
   let votes = { skipped: true };
-  if (isModuleEnabled(state, 'votes') && canSendVotes(capabilities)) {
-    const votesResponse = await fetchJson(`${peer}/votes/ledger`, timeoutMs);
-    votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
-    if (shouldSkipResponse(votesResponse.status, votesResponse.error, { skipNotFound: true })) {
-      votes = { skipped: true, status: votesResponse.status, error: votesResponse.error };
-    } else if (votesResponse.ok && votesResponse.payload) {
-      const entries = Array.isArray(votesResponse.payload.entries) ? votesResponse.payload.entries : [];
-      const ingest = await ingestVoteGossip({
-        state,
-        envelopes: entries,
-        statusHint: votesResponse.payload.status,
-        peerHint: peer,
-      });
-      votes = {
-        ok: true,
-        status: votesResponse.status,
-        added: ingest.added,
-        updated: ingest.updated,
-      };
+  const canPullVotes = isModuleEnabled(state, 'votes') && canSendVotes(capabilities);
+  if (canPullVotes) {
+    const cachedSkip = readOptionalEndpointSkip(state, peer, 'votes', { capabilities });
+    if (cachedSkip) {
+      votes = { skipped: true, cached: true, status: cachedSkip.status, error: cachedSkip.reason };
+    } else {
+      const votesResponse = await fetchJson(`${peer}/votes/ledger`, timeoutMs);
+      votes = { ok: false, status: votesResponse.status, error: votesResponse.error };
+      if (shouldSkipResponse(votesResponse.status, votesResponse.error, { skipNotFound: true })) {
+        markOptionalEndpointSkip(state, peer, 'votes', {
+          status: votesResponse.status,
+          reason: votesResponse.error,
+        });
+        votes = { skipped: true, status: votesResponse.status, error: votesResponse.error };
+      } else if (votesResponse.ok && votesResponse.payload) {
+        clearOptionalEndpointSkip(state, peer, 'votes');
+        const entries = Array.isArray(votesResponse.payload.entries) ? votesResponse.payload.entries : [];
+        const ingest = await ingestVoteGossip({
+          state,
+          envelopes: entries,
+          statusHint: votesResponse.payload.status,
+          peerHint: peer,
+        });
+        votes = {
+          ok: true,
+          status: votesResponse.status,
+          added: ingest.added,
+          updated: ingest.updated,
+        };
+      } else {
+        clearOptionalEndpointSkip(state, peer, 'votes');
+      }
     }
   }
 
   let transactions = { skipped: true };
-  if (isModuleEnabled(state, 'federation') && canSendTransactions(capabilities)) {
-    const transactionsResponse = await fetchJson(`${peer}/transactions/ledger`, timeoutMs);
-    transactions = { ok: false, status: transactionsResponse.status, error: transactionsResponse.error };
-    if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error, { skipNotFound: true })) {
-      transactions = { skipped: true, status: transactionsResponse.status, error: transactionsResponse.error };
-    } else if (transactionsResponse.ok && transactionsResponse.payload) {
-      const envelope = transactionsResponse.payload.envelope || transactionsResponse.payload;
-      const ingest = await ingestTransactionsSummary({
-        state,
-        envelope,
-        statusHint: transactionsResponse.payload.status,
-        peerHint: peer,
-      });
-      transactions = {
-        ok: ingest.statusCode < 400,
-        status: ingest.statusCode,
-        added: ingest.payload?.added || 0,
-        updated: ingest.payload?.updated || 0,
-      };
+  const canPullTransactions = isModuleEnabled(state, 'federation') && canSendTransactions(capabilities);
+  if (canPullTransactions) {
+    const cachedSkip = readOptionalEndpointSkip(state, peer, 'transactions', { capabilities });
+    if (cachedSkip) {
+      transactions = { skipped: true, cached: true, status: cachedSkip.status, error: cachedSkip.reason };
+    } else {
+      const transactionsResponse = await fetchJson(`${peer}/transactions/ledger`, timeoutMs);
+      transactions = { ok: false, status: transactionsResponse.status, error: transactionsResponse.error };
+      if (shouldSkipResponse(transactionsResponse.status, transactionsResponse.error, { skipNotFound: true })) {
+        markOptionalEndpointSkip(state, peer, 'transactions', {
+          status: transactionsResponse.status,
+          reason: transactionsResponse.error,
+        });
+        transactions = { skipped: true, status: transactionsResponse.status, error: transactionsResponse.error };
+      } else if (transactionsResponse.ok && transactionsResponse.payload) {
+        clearOptionalEndpointSkip(state, peer, 'transactions');
+        const envelope = transactionsResponse.payload.envelope || transactionsResponse.payload;
+        const ingest = await ingestTransactionsSummary({
+          state,
+          envelope,
+          statusHint: transactionsResponse.payload.status,
+          peerHint: peer,
+        });
+        transactions = {
+          ok: ingest.statusCode < 400,
+          status: ingest.statusCode,
+          added: ingest.payload?.added || 0,
+          updated: ingest.payload?.updated || 0,
+        };
+      } else {
+        clearOptionalEndpointSkip(state, peer, 'transactions');
+      }
     }
   }
 
@@ -422,6 +448,161 @@ async function fetchJson(url, timeoutMs) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+export function summarizeOptionalEndpointSkips(state, { now = Date.now(), includeEntries = true } = {}) {
+  const cache = pruneOptionalEndpointSkips(state, { now });
+  const entries = [];
+  for (const [peer, scopes] of Object.entries(cache)) {
+    if (!scopes || typeof scopes !== 'object') continue;
+    for (const scope of OPTIONAL_SKIP_SCOPES) {
+      const entry = scopes[scope];
+      if (!entry) continue;
+      entries.push({
+        peer,
+        scope,
+        status: Number.isFinite(Number(entry.status)) ? Number(entry.status) : 0,
+        reason: entry.reason || null,
+        untilMs: Number(entry.untilMs) || now,
+        expiresAt: new Date(Number(entry.untilMs) || now).toISOString(),
+        updatedAt: entry.updatedAt || null,
+      });
+    }
+  }
+  entries.sort((a, b) => {
+    if (a.peer < b.peer) return -1;
+    if (a.peer > b.peer) return 1;
+    if (a.scope < b.scope) return -1;
+    if (a.scope > b.scope) return 1;
+    return 0;
+  });
+  return {
+    peers: Object.keys(cache).length,
+    total: entries.length,
+    entries: includeEntries ? entries : [],
+    ttlMs: OPTIONAL_SKIP_TTL_MS,
+  };
+}
+
+function readOptionalEndpointSkip(state, peer, scope, { capabilities } = {}) {
+  if (!peer || !OPTIONAL_SKIP_SCOPES.includes(scope)) return null;
+  if (shouldBypassOptionalSkipCache(capabilities, scope)) {
+    clearOptionalEndpointSkip(state, peer, scope);
+    return null;
+  }
+  pruneOptionalEndpointSkips(state);
+  const entry = state?.gossipOptionalSkips?.[peer]?.[scope];
+  if (!entry) return null;
+  if (!Number.isFinite(Number(entry.untilMs)) || Number(entry.untilMs) <= Date.now()) {
+    clearOptionalEndpointSkip(state, peer, scope);
+    return null;
+  }
+  return entry;
+}
+
+function markOptionalEndpointSkip(state, peer, scope, { status = 0, reason = null } = {}) {
+  if (!peer || !OPTIONAL_SKIP_SCOPES.includes(scope)) return null;
+  if (!Number.isFinite(OPTIONAL_SKIP_TTL_MS) || OPTIONAL_SKIP_TTL_MS <= 0) return null;
+  const now = Date.now();
+  const untilMs = now + OPTIONAL_SKIP_TTL_MS;
+  const cleanedStatus = Number.isFinite(Number(status)) ? Number(status) : 0;
+  const cleanedReason = String(reason || '').trim().slice(0, 120) || null;
+  if (!state.gossipOptionalSkips || typeof state.gossipOptionalSkips !== 'object') {
+    state.gossipOptionalSkips = {};
+  }
+  const peerEntry = state.gossipOptionalSkips[peer] && typeof state.gossipOptionalSkips[peer] === 'object'
+    ? state.gossipOptionalSkips[peer]
+    : {};
+  peerEntry[scope] = {
+    status: cleanedStatus,
+    reason: cleanedReason,
+    untilMs,
+    updatedAt: new Date(now).toISOString(),
+  };
+  state.gossipOptionalSkips[peer] = peerEntry;
+  pruneOptionalEndpointSkips(state, { now });
+  return peerEntry[scope];
+}
+
+function clearOptionalEndpointSkip(state, peer, scope) {
+  if (!peer || !OPTIONAL_SKIP_SCOPES.includes(scope)) return;
+  if (!state?.gossipOptionalSkips || typeof state.gossipOptionalSkips !== 'object') return;
+  const peerEntry = state.gossipOptionalSkips[peer];
+  if (!peerEntry || typeof peerEntry !== 'object') return;
+  delete peerEntry[scope];
+  if (!Object.keys(peerEntry).length) {
+    delete state.gossipOptionalSkips[peer];
+    return;
+  }
+  state.gossipOptionalSkips[peer] = peerEntry;
+}
+
+function pruneOptionalEndpointSkips(state, { now = Date.now() } = {}) {
+  if (!state.gossipOptionalSkips || typeof state.gossipOptionalSkips !== 'object') {
+    state.gossipOptionalSkips = {};
+    return state.gossipOptionalSkips;
+  }
+  const next = {};
+  for (const [peer, scopes] of Object.entries(state.gossipOptionalSkips)) {
+    if (!scopes || typeof scopes !== 'object') continue;
+    const keep = {};
+    for (const scope of OPTIONAL_SKIP_SCOPES) {
+      const entry = scopes[scope];
+      const untilMs = Number(entry?.untilMs || 0);
+      if (!entry || !Number.isFinite(untilMs) || untilMs <= now) continue;
+      keep[scope] = {
+        status: Number.isFinite(Number(entry.status)) ? Number(entry.status) : 0,
+        reason: String(entry.reason || '').trim().slice(0, 120) || null,
+        untilMs,
+        updatedAt: entry.updatedAt || new Date(now).toISOString(),
+      };
+    }
+    if (Object.keys(keep).length) {
+      next[peer] = keep;
+    }
+  }
+
+  const peers = Object.entries(next);
+  if (peers.length > OPTIONAL_SKIP_MAX_PEERS) {
+    peers.sort((a, b) => getPeerSkipUpdatedAtMs(b[1]) - getPeerSkipUpdatedAtMs(a[1]));
+    const trimmed = peers.slice(0, OPTIONAL_SKIP_MAX_PEERS);
+    const reduced = {};
+    for (const [peer, entry] of trimmed) {
+      reduced[peer] = entry;
+    }
+    state.gossipOptionalSkips = reduced;
+    return state.gossipOptionalSkips;
+  }
+
+  state.gossipOptionalSkips = next;
+  return state.gossipOptionalSkips;
+}
+
+function getPeerSkipUpdatedAtMs(scopes = {}) {
+  let latest = 0;
+  for (const scope of OPTIONAL_SKIP_SCOPES) {
+    const value = Date.parse(scopes?.[scope]?.updatedAt || '');
+    if (Number.isFinite(value) && value > latest) latest = value;
+  }
+  return latest;
+}
+
+function shouldBypassOptionalSkipCache(capabilities, scope) {
+  const modules = capabilities?.modules;
+  if (!modules || typeof modules !== 'object') return false;
+  if (scope === 'votes') {
+    const hasVotes = Object.prototype.hasOwnProperty.call(modules, 'votes');
+    const hasPetitions = Object.prototype.hasOwnProperty.call(modules, 'petitions');
+    if (!hasVotes && !hasPetitions) return false;
+    const votesEnabled = modules.votes !== false;
+    const petitionsEnabled = modules.petitions !== false;
+    return votesEnabled && petitionsEnabled;
+  }
+  if (scope === 'transactions') {
+    if (!Object.prototype.hasOwnProperty.call(modules, 'federation')) return false;
+    return modules.federation !== false;
+  }
+  return false;
 }
 
 function summarizeResults({
@@ -721,4 +902,10 @@ function computeDurationMs(startedAt, finishedAt) {
   const finish = Date.parse(finishedAt || '');
   if (!Number.isFinite(start) || !Number.isFinite(finish)) return null;
   return Math.max(0, finish - start);
+}
+
+function resolveOptionalSkipTtlMs() {
+  const seconds = Number(POLICIES.gossipOptionalSkipSeconds);
+  if (!Number.isFinite(seconds) || seconds <= 0) return 0;
+  return seconds * 1000;
 }

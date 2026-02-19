@@ -366,6 +366,47 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
 });
 
+test('UI auto-collapses the sticky social composer on scroll', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'social-scroll-ui' });
+  for (let index = 0; index < 28; index += 1) {
+    await postForm(
+      `${server.baseUrl}/social/post`,
+      { content: `Scroll coverage post ${index + 1}`, visibility: 'public' },
+      { cookie: session.cookie },
+    );
+  }
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    return panel && panel.dataset.composeState === 'open';
+  });
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 1400, behavior: 'auto' });
+    window.dispatchEvent(new Event('scroll'));
+  });
+
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    const toggle = panel?.querySelector('[data-compose-toggle]');
+    return panel && toggle && panel.dataset.composeState === 'collapsed' && /expand/i.test(toggle.textContent || '');
+  });
+});
+
 test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory', allowPreviews: true });

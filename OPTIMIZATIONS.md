@@ -30,6 +30,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 - Cache capabilities snapshots per gossip tick so ledger envelopes and gossip pushes reuse the same module/replication summary.
+- Add adaptive gossip pull concurrency limits (batch peers in configurable windows) to avoid saturating sockets on large rings while keeping pull sync parallel.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -46,7 +47,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
 - Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
 - Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.
-- Auto-collapse the sticky social composer on scroll with a lightweight toggle so the wall stays visible while keeping posting easy to reach.
 
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
@@ -93,3 +93,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Batched MySQL/MongoDB saveData writes and added adapter drop/close helpers for cleaner test runs.
 - Cached provider-blind announcement payloads by `updatedAt` so gossip no longer rebuilds ring/audit snapshots on every sync.
 - Stored stable fingerprints for peer capability snapshots to avoid repeated JSON stringify comparisons during gossip ingest.
+- Parallelized gossip pull runs across peers instead of pulling sequentially.
+- Added a pull-side optional-endpoint skip cache (`/votes/ledger`, `/transactions/ledger`) after module-disabled/optional-endpoint misses to avoid repeated failing probes.
+- Surfaced optional-endpoint skip cache summaries in `/admin` and `/health` for replication observability.
+- Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.
