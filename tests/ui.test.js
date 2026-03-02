@@ -792,7 +792,7 @@ test('UI profile interface defaults hydrate runtime settings when local override
   assert.equal(localAfterReset, null);
 });
 
-test('UI mysql adapter keeps discussion and interface defaults across restart', { timeout: 120000 }, async (t) => {
+test('UI mysql adapter keeps discussion, interface defaults, and module toggles across restart', { timeout: 120000 }, async (t) => {
   if (MYSQL_UI_ENV.skip) {
     t.skip(MYSQL_UI_ENV.skip);
     return;
@@ -810,6 +810,11 @@ test('UI mysql adapter keeps discussion and interface defaults across restart', 
   t.after(async () => firstServer.stop());
 
   const session = await createVerifiedSession(firstServer.baseUrl, { pidHash: 'mysql-ui-session' });
+  await postForm(
+    `${firstServer.baseUrl}/admin`,
+    { intent: 'session', sessionId: session.sessionId, sessionRole: 'admin' },
+    { partial: true },
+  );
   await postForm(
     `${firstServer.baseUrl}/profile`,
     {
@@ -844,6 +849,34 @@ test('UI mysql adapter keeps discussion and interface defaults across restart', 
     () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
   );
 
+  await pageFirst.goto(`${firstServer.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  const modulesForm = await getAdminForm(pageFirst, 'modules');
+  const socialToggle = await modulesForm.$('input[name="module_social"]');
+  const petitionsToggle = await modulesForm.$('input[name="module_petitions"]');
+  assert.ok(socialToggle);
+  assert.ok(petitionsToggle);
+  if (await socialToggle.evaluate((el) => el.checked)) {
+    await socialToggle.evaluate((el) => el.click());
+  }
+  if (await petitionsToggle.evaluate((el) => el.checked)) {
+    await petitionsToggle.evaluate((el) => el.click());
+  }
+  const modulesResponse = pageFirst.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const modulesButton = await modulesForm.$('button[type="submit"]');
+  await modulesButton.click();
+  await modulesResponse;
+  await pageFirst.waitForFunction(() => document.body.textContent.includes('Module toggles updated'));
+
+  await pageFirst.goto(`${firstServer.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await pageFirst.$('[data-nav-section="social"]'), null);
+  assert.equal(await pageFirst.$('[data-nav-section="petitions"]'), null);
+  await pageFirst.goto(`${firstServer.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageFirst.$('[data-module-disabled="social"]'));
+  await pageFirst.goto(`${firstServer.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageFirst.$('[data-module-disabled="petitions"]'));
+
   await firstServer.stop();
 
   const portSecond = await getAvailablePort();
@@ -862,6 +895,13 @@ test('UI mysql adapter keeps discussion and interface defaults across restart', 
   await pageSecond.waitForFunction(
     () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
   );
+  await pageSecond.goto(`${secondServer.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await pageSecond.$('[data-nav-section="social"]'), null);
+  assert.equal(await pageSecond.$('[data-nav-section="petitions"]'), null);
+  await pageSecond.goto(`${secondServer.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageSecond.$('[data-module-disabled="social"]'));
+  await pageSecond.goto(`${secondServer.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageSecond.$('[data-module-disabled="petitions"]'));
 });
 
 test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {

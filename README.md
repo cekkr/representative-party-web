@@ -139,7 +139,7 @@ npm run db:check
 - `npm run test:ui` runs the UI‑only Puppeteer flow for a stable CI entry point.
 - If headless Chrome fails in CI, set up the system dependencies or skip the UI suite.
 - External adapter tests are opt-in: set `TEST_MYSQL_URL` or `TEST_MONGO_URL` (plus optional `TEST_MYSQL_TABLE` / `TEST_MONGO_COLLECTION`) to exercise MySQL/MongoDB adapters. The test runner will skip these checks with a reason if the servers are unreachable.
-- The UI suite also runs a MySQL-backed restart persistence flow when `TEST_MYSQL_*` variables are configured (supports optional `TEST_MYSQL_TABLE_PREFIX` for isolated table names).
+- The UI suite also runs a MySQL-backed restart persistence flow when `TEST_MYSQL_*` variables are configured (supports optional `TEST_MYSQL_TABLE_PREFIX` for isolated table names) and verifies persisted discussion/UI defaults plus module-toggle disabled-endpoint UX after restart.
 
 ### Defaults
 

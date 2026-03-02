@@ -37,6 +37,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
 - Consolidate repeated "hash-only guarantee" and verification copy into shared view strings to keep copy consistent.
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
+- Share MySQL test env/bootstrap helpers between `tests/ui.test.js` and `tests/external-adapters.test.js` to reduce drift in connection/availability checks.
 - Evaluate libp2p (gossipsub + peer discovery) as a resilient transport/ring-identity scaffold alongside HTTP gossip.
 
 ## UX Consistency
