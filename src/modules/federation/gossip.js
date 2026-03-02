@@ -18,6 +18,9 @@ const SKIPPABLE_STATUS = new Set([404, 405, 410, 501]);
 const OPTIONAL_SKIP_SCOPES = ['votes', 'transactions'];
 const OPTIONAL_SKIP_TTL_MS = resolveOptionalSkipTtlMs();
 const OPTIONAL_SKIP_MAX_PEERS = 120;
+const PUSH_SKIP_SCOPES = ['ledger', 'votes', 'transactions'];
+const PUSH_SKIP_TTL_MS = OPTIONAL_SKIP_TTL_MS;
+const PUSH_SKIP_MAX_PEERS = 120;
 
 export { collectGossipPeers, normalizePeerUrl } from './peers.js';
 
@@ -65,11 +68,12 @@ export async function pushGossipNow(state, { reason = 'manual', timeoutMs = DEFA
   let peerResults = [];
   let summary;
   try {
+    const peerCapabilities = new Map(peers.map((peer) => [peer, getPeerCapabilities(state, peer)]));
     peerResults = await Promise.all(
       peers.map((peer) => {
-        const capabilities = getPeerCapabilities(state, peer);
+        const capabilities = peerCapabilities.get(peer) || null;
         const payloads = selectPeerPayloads({ ledgerPayload, votesPayload, transactionsPayload, capabilities });
-        return pushToPeer(peer, { ...payloads, timeoutMs });
+        return pushToPeer(state, peer, { ...payloads, timeoutMs, capabilities });
       }),
     );
     const finishedAt = new Date().toISOString();
@@ -246,16 +250,31 @@ function canSendTransactions(capabilities) {
   return true;
 }
 
-async function pushToPeer(peer, { ledgerPayload, votesPayload, transactionsPayload, timeoutMs }) {
-  const ledger = await sendPayload(peer, '/circle/gossip', ledgerPayload, timeoutMs);
-  const votes = await sendPayload(peer, '/votes/gossip', votesPayload, timeoutMs, { skipNotFound: true });
-  const transactions = await sendPayload(peer, '/transactions/gossip', transactionsPayload, timeoutMs, { skipNotFound: true });
+async function pushToPeer(state, peer, { ledgerPayload, votesPayload, transactionsPayload, timeoutMs, capabilities }) {
+  const ledger = await sendPayload(state, peer, 'ledger', '/circle/gossip', ledgerPayload, timeoutMs, { capabilities });
+  const votes = await sendPayload(state, peer, 'votes', '/votes/gossip', votesPayload, timeoutMs, {
+    skipNotFound: true,
+    capabilities,
+  });
+  const transactions = await sendPayload(
+    state,
+    peer,
+    'transactions',
+    '/transactions/gossip',
+    transactionsPayload,
+    timeoutMs,
+    { skipNotFound: true, capabilities },
+  );
   return { peer, ledger, votes, transactions };
 }
 
-async function sendPayload(peer, path, payload, timeoutMs, { skipNotFound = false } = {}) {
+async function sendPayload(state, peer, scope, path, payload, timeoutMs, { skipNotFound = false, capabilities } = {}) {
   if (!payload) {
     return { skipped: true };
+  }
+  const cachedSkip = readPushEndpointSkip(state, peer, scope, { capabilities });
+  if (cachedSkip) {
+    return { skipped: true, cached: true, status: cachedSkip.status, error: cachedSkip.reason };
   }
   const url = `${peer}${path}`;
   const controller = new AbortController();
@@ -282,6 +301,14 @@ async function sendPayload(peer, path, payload, timeoutMs, { skipNotFound = fals
     }
     const skipped = shouldSkipResponse(response.status, error, { skipNotFound });
     const result = { ok: response.ok, status: response.status, error: error || undefined, skipped };
+    if (skipped) {
+      markPushEndpointSkip(state, peer, scope, {
+        status: response.status,
+        reason: error,
+      });
+    } else {
+      clearPushEndpointSkip(state, peer, scope);
+    }
     if (payloadBody && typeof payloadBody === 'object') {
       const added = Number(payloadBody.added);
       const updated = Number(payloadBody.updated);
@@ -484,6 +511,40 @@ export function summarizeOptionalEndpointSkips(state, { now = Date.now(), includ
   };
 }
 
+export function summarizePushEndpointSkips(state, { now = Date.now(), includeEntries = true } = {}) {
+  const cache = prunePushEndpointSkips(state, { now });
+  const entries = [];
+  for (const [peer, scopes] of Object.entries(cache)) {
+    if (!scopes || typeof scopes !== 'object') continue;
+    for (const scope of PUSH_SKIP_SCOPES) {
+      const entry = scopes[scope];
+      if (!entry) continue;
+      entries.push({
+        peer,
+        scope,
+        status: Number.isFinite(Number(entry.status)) ? Number(entry.status) : 0,
+        reason: entry.reason || null,
+        untilMs: Number(entry.untilMs) || now,
+        expiresAt: new Date(Number(entry.untilMs) || now).toISOString(),
+        updatedAt: entry.updatedAt || null,
+      });
+    }
+  }
+  entries.sort((a, b) => {
+    if (a.peer < b.peer) return -1;
+    if (a.peer > b.peer) return 1;
+    if (a.scope < b.scope) return -1;
+    if (a.scope > b.scope) return 1;
+    return 0;
+  });
+  return {
+    peers: Object.keys(cache).length,
+    total: entries.length,
+    entries: includeEntries ? entries : [],
+    ttlMs: PUSH_SKIP_TTL_MS,
+  };
+}
+
 function readOptionalEndpointSkip(state, peer, scope, { capabilities } = {}) {
   if (!peer || !OPTIONAL_SKIP_SCOPES.includes(scope)) return null;
   if (shouldBypassOptionalSkipCache(capabilities, scope)) {
@@ -601,6 +662,125 @@ function shouldBypassOptionalSkipCache(capabilities, scope) {
   if (scope === 'transactions') {
     if (!Object.prototype.hasOwnProperty.call(modules, 'federation')) return false;
     return modules.federation !== false;
+  }
+  return false;
+}
+
+function readPushEndpointSkip(state, peer, scope, { capabilities } = {}) {
+  if (!peer || !PUSH_SKIP_SCOPES.includes(scope)) return null;
+  if (shouldBypassPushSkipCache(capabilities, scope)) {
+    clearPushEndpointSkip(state, peer, scope);
+    return null;
+  }
+  prunePushEndpointSkips(state);
+  const entry = state?.gossipPushSkips?.[peer]?.[scope];
+  if (!entry) return null;
+  if (!Number.isFinite(Number(entry.untilMs)) || Number(entry.untilMs) <= Date.now()) {
+    clearPushEndpointSkip(state, peer, scope);
+    return null;
+  }
+  return entry;
+}
+
+function markPushEndpointSkip(state, peer, scope, { status = 0, reason = null } = {}) {
+  if (!peer || !PUSH_SKIP_SCOPES.includes(scope)) return null;
+  if (!Number.isFinite(PUSH_SKIP_TTL_MS) || PUSH_SKIP_TTL_MS <= 0) return null;
+  const now = Date.now();
+  const untilMs = now + PUSH_SKIP_TTL_MS;
+  const cleanedStatus = Number.isFinite(Number(status)) ? Number(status) : 0;
+  const cleanedReason = String(reason || '').trim().slice(0, 120) || null;
+  if (!state.gossipPushSkips || typeof state.gossipPushSkips !== 'object') {
+    state.gossipPushSkips = {};
+  }
+  const peerEntry = state.gossipPushSkips[peer] && typeof state.gossipPushSkips[peer] === 'object'
+    ? state.gossipPushSkips[peer]
+    : {};
+  peerEntry[scope] = {
+    status: cleanedStatus,
+    reason: cleanedReason,
+    untilMs,
+    updatedAt: new Date(now).toISOString(),
+  };
+  state.gossipPushSkips[peer] = peerEntry;
+  prunePushEndpointSkips(state, { now });
+  return peerEntry[scope];
+}
+
+function clearPushEndpointSkip(state, peer, scope) {
+  if (!peer || !PUSH_SKIP_SCOPES.includes(scope)) return;
+  if (!state?.gossipPushSkips || typeof state.gossipPushSkips !== 'object') return;
+  const peerEntry = state.gossipPushSkips[peer];
+  if (!peerEntry || typeof peerEntry !== 'object') return;
+  delete peerEntry[scope];
+  if (!Object.keys(peerEntry).length) {
+    delete state.gossipPushSkips[peer];
+    return;
+  }
+  state.gossipPushSkips[peer] = peerEntry;
+}
+
+function prunePushEndpointSkips(state, { now = Date.now() } = {}) {
+  if (!state.gossipPushSkips || typeof state.gossipPushSkips !== 'object') {
+    state.gossipPushSkips = {};
+    return state.gossipPushSkips;
+  }
+  const next = {};
+  for (const [peer, scopes] of Object.entries(state.gossipPushSkips)) {
+    if (!scopes || typeof scopes !== 'object') continue;
+    const keep = {};
+    for (const scope of PUSH_SKIP_SCOPES) {
+      const entry = scopes[scope];
+      const untilMs = Number(entry?.untilMs || 0);
+      if (!entry || !Number.isFinite(untilMs) || untilMs <= now) continue;
+      keep[scope] = {
+        status: Number.isFinite(Number(entry.status)) ? Number(entry.status) : 0,
+        reason: String(entry.reason || '').trim().slice(0, 120) || null,
+        untilMs,
+        updatedAt: entry.updatedAt || new Date(now).toISOString(),
+      };
+    }
+    if (Object.keys(keep).length) {
+      next[peer] = keep;
+    }
+  }
+
+  const peers = Object.entries(next);
+  if (peers.length > PUSH_SKIP_MAX_PEERS) {
+    peers.sort((a, b) => getPeerPushSkipUpdatedAtMs(b[1]) - getPeerPushSkipUpdatedAtMs(a[1]));
+    const trimmed = peers.slice(0, PUSH_SKIP_MAX_PEERS);
+    const reduced = {};
+    for (const [peer, entry] of trimmed) {
+      reduced[peer] = entry;
+    }
+    state.gossipPushSkips = reduced;
+    return state.gossipPushSkips;
+  }
+
+  state.gossipPushSkips = next;
+  return state.gossipPushSkips;
+}
+
+function getPeerPushSkipUpdatedAtMs(scopes = {}) {
+  let latest = 0;
+  for (const scope of PUSH_SKIP_SCOPES) {
+    const value = Date.parse(scopes?.[scope]?.updatedAt || '');
+    if (Number.isFinite(value) && value > latest) latest = value;
+  }
+  return latest;
+}
+
+function shouldBypassPushSkipCache(capabilities, scope) {
+  const modules = capabilities?.modules;
+  if (!modules || typeof modules !== 'object') return false;
+  if (scope === 'ledger') {
+    if (!Object.prototype.hasOwnProperty.call(modules, 'federation')) return false;
+    const federationEnabled = modules.federation !== false;
+    const replicationMode = capabilities?.replication?.mode;
+    const gossipEnabled = !replicationMode || replicationMode !== 'centralized';
+    return federationEnabled && gossipEnabled;
+  }
+  if (scope === 'votes' || scope === 'transactions') {
+    return shouldBypassOptionalSkipCache(capabilities, scope);
   }
   return false;
 }

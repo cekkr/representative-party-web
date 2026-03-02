@@ -43,7 +43,12 @@ import {
 } from '../../circle/ringRegistry.js';
 import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../circle/modules.js';
 import { listAvailableExtensions } from '../../extensions/registry.js';
-import { pullGossipNow, pushGossipNow, summarizeOptionalEndpointSkips } from '../../federation/gossip.js';
+import {
+  pullGossipNow,
+  pushGossipNow,
+  summarizeOptionalEndpointSkips,
+  summarizePushEndpointSkips,
+} from '../../federation/gossip.js';
 import { listPeerCapabilities } from '../../federation/capabilities.js';
 import { normalizePeerUrl } from '../../federation/peers.js';
 import { clearPeerHealth, listPeerHealth, resetPeerHealth } from '../../federation/quarantine.js';
@@ -1581,7 +1586,9 @@ function buildAdminViewModel(
   const gossipPullSummary = renderGossipSummary(state.gossipPullState, { emptyLabel: 'No inbound gossip pulls yet.' });
   const gossipPullPeers = renderGossipPeers(state.gossipPullState, { emptyLabel: 'No inbound peer results recorded yet.' });
   const optionalEndpointSkips = summarizeOptionalEndpointSkips(state, { includeEntries: true });
+  const pushEndpointSkips = summarizePushEndpointSkips(state, { includeEntries: true });
   const gossipOptionalSkipsSummary = renderOptionalEndpointSkipSummary(optionalEndpointSkips);
+  const gossipPushSkipsSummary = renderPushEndpointSkipSummary(pushEndpointSkips);
   const federationEnabled = isModuleEnabled(state, 'federation');
   const gossipAllowed = federationEnabled && isGossipEnabled(replicationProfile);
   let gossipDisabledNote = '';
@@ -1762,6 +1769,7 @@ function buildAdminViewModel(
     gossipPullSummary,
     gossipPullPeers,
     gossipOptionalSkipsSummary,
+    gossipPushSkipsSummary,
     gossipDisabledNote,
     gossipPushDisabledAttr,
     gossipPullDisabledAttr,
@@ -2953,6 +2961,35 @@ function renderOptionalEndpointSkipSummary(summary = {}) {
   return lines.map((line) => `<p class="muted small">${escapeHtml(line)}</p>`).join('');
 }
 
+function renderPushEndpointSkipSummary(summary = {}) {
+  const total = Number(summary?.total || 0);
+  const peers = Number(summary?.peers || 0);
+  const entries = Array.isArray(summary?.entries) ? summary.entries : [];
+  if (!total || !entries.length) {
+    return '<p class="muted small">Outbound endpoint skip cache: empty.</p>';
+  }
+  const ttlMs = Number(summary?.ttlMs || 0);
+  const ttlSeconds = ttlMs > 0 ? Math.round(ttlMs / 1000) : 0;
+  const preview = entries
+    .slice(0, 4)
+    .map((entry) => {
+      const scope = sanitizeText(entry.scope || '', 24) || 'unknown';
+      const peer = sanitizeText(entry.peer || '', 200) || 'peer';
+      const reason = sanitizeText(entry.reason || '', 64) || `status ${entry.status || 0}`;
+      return `${scope}@${peer} (${reason})`;
+    })
+    .join('; ');
+  const lines = [];
+  lines.push(`Outbound endpoint skip cache: ${total} active (${peers} peer${peers === 1 ? '' : 's'}).`);
+  if (ttlSeconds > 0) {
+    lines.push(`TTL ${ttlSeconds}s.`);
+  }
+  if (preview) {
+    lines.push(`Latest: ${preview}`);
+  }
+  return lines.map((line) => `<p class="muted small">${escapeHtml(line)}</p>`).join('');
+}
+
 function renderGossipSummary(gossipState = {}, { emptyLabel = 'No gossip runs yet.' } = {}) {
   if (!gossipState.lastAttemptAt) {
     return `<p class="muted small">${escapeHtml(emptyLabel)}</p>`;
@@ -3116,7 +3153,7 @@ function renderValidationErrors(errors = [], { title = 'Validation issues' } = {
 
 function formatGossipStatus(status = {}) {
   if (!status) return 'unknown';
-  if (status.skipped) return 'skipped';
+  if (status.skipped) return status.cached ? 'skipped (cached)' : 'skipped';
   if (status.ok) {
     const added = Number.isFinite(status.added) ? status.added : null;
     const updated = Number.isFinite(status.updated) ? status.updated : null;

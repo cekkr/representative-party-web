@@ -1,6 +1,6 @@
 import { MEDIA, POLICIES } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
-import { summarizeOptionalEndpointSkips } from '../../../modules/federation/gossip.js';
+import { summarizeOptionalEndpointSkips, summarizePushEndpointSkips } from '../../../modules/federation/gossip.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
 import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
@@ -14,6 +14,7 @@ export function renderHealth({ res, state }) {
   const outboundSummary = formatGossipState(state.gossipState);
   const pullSummary = formatGossipState(state.gossipPullState);
   const optionalEndpointSkips = summarizeOptionalEndpointSkips(state, { includeEntries: false });
+  const pushEndpointSkips = summarizePushEndpointSkips(state, { includeEntries: false });
   const peerHealthSummary = summarizePeerHealth(listPeerHealth(state), { limit: 20 });
   const peerCapabilities = listPeerCapabilities(state);
   const uploadCleanup = state.uploadCleanup || {};
@@ -56,6 +57,7 @@ export function renderHealth({ res, state }) {
       outbound: outboundSummary,
       pull: pullSummary,
       optionalEndpointSkips,
+      pushEndpointSkips,
       peerHealth: peerHealthSummary,
       peerCapabilities: {
         count: Object.keys(peerCapabilities || {}).length,

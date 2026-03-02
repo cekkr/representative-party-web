@@ -20,7 +20,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache vote and signature tallies per petition (or update incrementally on new votes/signatures) to avoid full scans on every proposal render.
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
-- Cache per-peer gossip disablement (centralized mode or module-disabled) and short-circuit outbound pushes until capability hints expire to avoid repeated skipped requests.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 - Use ResizeObserver/IntersectionObserver to update composer overlay bounds only when selection or layout changes, avoiding continuous scroll listeners.
 - Cache composer target queries (panels/nav zones) and refresh only on navigation or mutation events to avoid full DOM scans on every refresh/drag.
@@ -29,7 +28,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache ring public key sets per ringId and memoize ring signature verification results to reduce repeated verification during gossip syncs.
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
-- Cache capabilities snapshots per gossip tick so ledger envelopes and gossip pushes reuse the same module/replication summary.
 - Add adaptive gossip pull concurrency limits (batch peers in configurable windows) to avoid saturating sockets on large rings while keeping pull sync parallel.
 
 ## Redundancy
@@ -58,6 +56,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
 - Stream JSON parsing for ActivityPub/petitions and allow per-endpoint body limits to avoid buffering large payloads in memory.
+- Persist gossip skip-cache state (pull + push) in settings to keep skip hints across restarts and avoid warm-up retries.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.
@@ -96,4 +95,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Parallelized gossip pull runs across peers instead of pulling sequentially.
 - Added a pull-side optional-endpoint skip cache (`/votes/ledger`, `/transactions/ledger`) after module-disabled/optional-endpoint misses to avoid repeated failing probes.
 - Surfaced optional-endpoint skip cache summaries in `/admin` and `/health` for replication observability.
+- Added an outbound endpoint skip cache (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) so repeated push runs avoid retrying peers that currently return module-disabled/gossip-disabled responses.
+- Cached peer capability lookups per gossip push tick so payload selection reuses the same snapshot across ledger/votes/transactions routing.
 - Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.

@@ -67,6 +67,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Peer capability hints now store stable fingerprints, and provider-blind announcements are cached by `updatedAt` to reduce repeated gossip normalization work.
 - Gossip pull now runs peer fetches in parallel and caches optional endpoint skips (`/votes/ledger`, `/transactions/ledger`) after module-disabled/not-found responses, reducing repeated failed probes.
 - `/admin` and `/health` now surface optional-endpoint skip cache summaries so operators can observe skip behavior and TTL impact.
+- Gossip push now caches endpoint skips (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) after module-disabled/gossip-disabled responses, reducing repeated failed retries on outbound sync runs.
 - Ledger/vote/transaction exports gzip-compress when clients request `Accept-Encoding: gzip` and payloads are at least ~2KB.
 - Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
 - Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
@@ -84,7 +85,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
-- Next-next steps: add integration tests for oversized multipart fields + cleanup scheduling.
+- Next-next steps: expand multipart integration tests with malformed-boundary/fuzzed header cases to harden parser edge behavior.
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.

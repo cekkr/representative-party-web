@@ -160,6 +160,62 @@ test('social multipart rejects filename over limit', async (t) => {
   assert.equal(payload.error, 'filename_too_large');
 });
 
+test('social multipart rejects field names over limit', async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({
+    port,
+    dataAdapter: 'memory',
+    extraEnv: {
+      SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES: '8',
+      SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_COUNT: '10',
+    },
+  });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'multipart-field-name' });
+  const { body, contentType } = buildMultipart([{ name: 'content-field-too-long', value: 'hello' }]);
+
+  const response = await fetch(`${server.baseUrl}/social/post`, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType, Cookie: session.cookie },
+    body,
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 413);
+  assert.equal(payload.error, 'field_name_too_large');
+});
+
+test('social multipart rejects oversized part headers', async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({
+    port,
+    dataAdapter: 'memory',
+    extraEnv: {
+      SOCIAL_MEDIA_HEADER_MAX_BYTES: '24',
+      SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_BYTES: '1024',
+      SOCIAL_MEDIA_FIELD_MAX_COUNT: '10',
+    },
+  });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'multipart-header-size' });
+  const { body, contentType } = buildMultipart([{ name: 'content', value: 'hello' }]);
+
+  const response = await fetch(`${server.baseUrl}/social/post`, {
+    method: 'POST',
+    headers: { 'Content-Type': contentType, Cookie: session.cookie },
+    body,
+  });
+  const payload = await response.json();
+
+  assert.equal(response.status, 413);
+  assert.equal(payload.error, 'headers_too_large');
+});
+
 test('periodic upload cleanup removes stale temp files', async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({
