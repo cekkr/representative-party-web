@@ -47,6 +47,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
 - Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.
 - Optionally sync browser-local interface settings (large text, reduced motion, compact nav, partial navigation mode) to provider-local profile/session preferences for cross-device consistency.
+- Debounce inline Interface-panel session-default saves and skip no-op `/profile` writes when values have not changed.
 
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.

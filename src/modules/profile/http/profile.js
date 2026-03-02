@@ -40,15 +40,18 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       return sendJson(res, 404, { error: 'session_not_found', message: 'Session not found.' });
     }
     const normalized = normalizeVerbosityMode(body.uiVerbosity);
+    const uiSettings = normalizeInterfaceSettings(body);
     const next = { ...currentSession };
-    let flash = '';
+    const flashParts = [];
     if (normalized) {
       next.uiVerbosity = normalized;
-      flash = `UI verbosity set to ${normalized}.`;
+      flashParts.push(`UI verbosity set to ${normalized}.`);
     } else {
       delete next.uiVerbosity;
-      flash = 'UI verbosity reset to Circle default.';
+      flashParts.push('UI verbosity reset to Circle default.');
     }
+    next.uiSettings = uiSettings;
+    flashParts.push('Interface defaults updated.');
     state.sessions.set(person.sessionId, next);
     invalidateSessionIndex(state);
     await persistSessions(state);
@@ -58,7 +61,7 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       state,
       wantsPartial,
       person: { ...person, ...next },
-      uiFlash: flash,
+      uiFlash: flashParts.join(' '),
     });
   }
   const providerFields = normalizeProviderFields(state.profileStructures || []);
@@ -164,6 +167,7 @@ async function renderProfilePage({
     defaultMode: defaultVerbosity,
     overrideMode: overrideVerbosity,
     effectiveMode: effectiveVerbosity,
+    uiSettings: normalizeInterfaceSettings(person?.uiSettings || {}),
     flash: uiFlash,
   });
   const profileFlash = flash
@@ -200,4 +204,15 @@ function listMissingRequired(fields = [], attributes = {}) {
     missing.push(field.key);
   }
   return missing;
+}
+
+function normalizeInterfaceSettings(source = {}) {
+  const payload = source && typeof source === 'object' ? source : {};
+  return {
+    largeText: parseBoolean(payload.uiLargeText ?? payload.largeText, false),
+    reducedMotion: parseBoolean(payload.uiReducedMotion ?? payload.reducedMotion, false),
+    compactNav: parseBoolean(payload.uiCompactNav ?? payload.compactNav, false),
+    keepComposerOpen: parseBoolean(payload.uiKeepComposerOpen ?? payload.keepComposerOpen, false),
+    partialNavigation: parseBoolean(payload.uiPartialNavigation ?? payload.partialNavigation, true),
+  };
 }

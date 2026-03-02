@@ -68,7 +68,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Gossip pull skip-cache**: optional endpoint probes (`/votes/ledger`, `/transactions/ledger`) are cached after module-disabled/optional misses so repeated pulls avoid redundant failures; cache status is visible in `/admin` and `/health`.
 - **Gossip push skip-cache**: outbound endpoint posts (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) are cached after module-disabled/gossip-disabled responses so repeated pushes avoid redundant retries; cache status is visible in `/admin` and `/health`.
 - **Sticky composer UX**: social composer auto-collapses on downward scroll to keep the wall readable while preserving manual expand controls.
-- **Practical interface controls**: top bar includes a persistent Interface panel (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle), plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts.
+- **Practical interface controls**: top bar includes a persistent Interface panel (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle), inline save-to-session-defaults, plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
@@ -139,6 +139,7 @@ npm run db:check
 - `npm run test:ui` runs the UI‑only Puppeteer flow for a stable CI entry point.
 - If headless Chrome fails in CI, set up the system dependencies or skip the UI suite.
 - External adapter tests are opt-in: set `TEST_MYSQL_URL` or `TEST_MONGO_URL` (plus optional `TEST_MYSQL_TABLE` / `TEST_MONGO_COLLECTION`) to exercise MySQL/MongoDB adapters. The test runner will skip these checks with a reason if the servers are unreachable.
+- The UI suite also runs a MySQL-backed restart persistence flow when `TEST_MYSQL_*` variables are configured (supports optional `TEST_MYSQL_TABLE_PREFIX` for isolated table names).
 
 ### Defaults
 
@@ -164,6 +165,7 @@ npm run db:check
 ### Interface preferences
 
 - Interface preferences are stored in browser localStorage (`party-web-ui-settings`) and applied across partial/full navigations.
+- The top-bar Interface panel can persist the current toggles into session defaults without leaving the active page (`Save as session defaults`), and `Use session defaults` clears local overrides.
 - Current toggles: large text, reduced motion, compact nav, keep social composer open while scrolling, and fast partial navigation (off switches links/forms back to full-page loads).
 - Side navigation includes a jump filter with keyboard shortcuts: `Ctrl/Cmd+K` focuses search, `/` focuses search when not typing, `Esc` clears.
 

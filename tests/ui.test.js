@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -72,6 +73,175 @@ async function getAdminFormByAction(page, { intent, action }) {
     if (matches) return form;
   }
   return null;
+}
+
+loadMysqlTestEnv();
+const MYSQL_UI_ENV = await buildMysqlUiEnv();
+
+function loadMysqlTestEnv() {
+  try {
+    const raw = readFileSync(new URL('../.env', import.meta.url), 'utf-8');
+    const parsed = parseDotEnv(raw);
+    const keys = Object.keys(parsed || {});
+    for (const key of keys) {
+      if (!isMysqlTestEnvKey(key)) continue;
+      if (process.env[key] === undefined) {
+        process.env[key] = parsed[key];
+      }
+    }
+  } catch (_error) {
+    // .env is optional for tests
+  }
+}
+
+function parseDotEnv(text = '') {
+  const result = {};
+  const lines = String(text).split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+    }
+    if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+function isMysqlTestEnvKey(key = '') {
+  return key.startsWith('TEST_MYSQL_');
+}
+
+function normalizeMysqlTablePrefix(raw = '') {
+  const cleaned = String(raw || 'state_entries_ui')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || 'state_entries_ui';
+}
+
+async function buildMysqlUiEnv() {
+  const url = process.env.TEST_MYSQL_URL || '';
+  const host = process.env.TEST_MYSQL_HOST || '';
+  const user = process.env.TEST_MYSQL_USER || '';
+  const database = process.env.TEST_MYSQL_DATABASE || '';
+  const port = process.env.TEST_MYSQL_PORT || '';
+  const password = process.env.TEST_MYSQL_PASSWORD || '';
+  const enabled = Boolean(url || (host && user && database));
+  const tablePrefix = normalizeMysqlTablePrefix(process.env.TEST_MYSQL_TABLE_PREFIX);
+  const table = `${tablePrefix}_${process.pid}_${Date.now()}`;
+  if (!enabled) {
+    return { enabled: false, skip: 'mysql ui test env not configured' };
+  }
+  const availability = await checkMysqlAvailability({ url, host, port, user, password, database });
+  if (!availability.ok) {
+    return { enabled: false, skip: availability.reason };
+  }
+  return {
+    enabled: true,
+    skip: false,
+    url,
+    host,
+    port,
+    user,
+    password,
+    database,
+    table,
+    extraEnv: {
+      DATA_MYSQL_URL: url,
+      DATA_MYSQL_HOST: host,
+      DATA_MYSQL_PORT: port,
+      DATA_MYSQL_USER: user,
+      DATA_MYSQL_PASSWORD: password,
+      DATA_MYSQL_DATABASE: database,
+      DATA_MYSQL_TABLE: table,
+    },
+  };
+}
+
+async function checkMysqlAvailability({ url, host, port, user, password, database }) {
+  let mysql;
+  try {
+    const mod = await import('mysql2/promise');
+    mysql = mod.default || mod;
+  } catch (_error) {
+    return { ok: false, reason: 'mysql2 dependency missing' };
+  }
+  const config = resolveMysqlConfig({ url, host, port, user, password, database });
+  if (!config.user) {
+    return { ok: false, reason: 'mysql user missing' };
+  }
+  if (!config.database) {
+    return { ok: false, reason: 'mysql database missing' };
+  }
+  try {
+    const connection = await mysql.createConnection(config);
+    await connection.query('SELECT 1');
+    await connection.end();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: `mysql unavailable: ${error?.code || error?.message || 'unknown'}` };
+  }
+}
+
+function resolveMysqlConfig({ url, host, port, user, password, database }) {
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      const resolvedDatabase = parsed.pathname ? parsed.pathname.replace(/^\//, '') : '';
+      return {
+        host: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : 3306,
+        user: decodeURIComponent(parsed.username || ''),
+        password: decodeURIComponent(parsed.password || ''),
+        database: resolvedDatabase,
+        connectTimeout: 1000,
+      };
+    } catch (_error) {
+      return { host: '', port: 3306, user: '', password: '', database: '', connectTimeout: 1000 };
+    }
+  }
+  const config = {
+    host: host || '127.0.0.1',
+    port: port ? Number(port) : 3306,
+    user: user || '',
+    password: password || undefined,
+    database: database || '',
+    connectTimeout: 1000,
+  };
+  if (!config.password) delete config.password;
+  return config;
+}
+
+async function dropMysqlUiTable(mysqlEnv) {
+  if (!mysqlEnv?.enabled) return;
+  if (!/^[a-z0-9_]+$/i.test(mysqlEnv.table || '')) return;
+  let mysql;
+  try {
+    const mod = await import('mysql2/promise');
+    mysql = mod.default || mod;
+  } catch (_error) {
+    return;
+  }
+  const config = resolveMysqlConfig(mysqlEnv);
+  if (!config.user || !config.database) return;
+  let connection;
+  try {
+    connection = await mysql.createConnection(config);
+    await connection.query(`DROP TABLE IF EXISTS \`${mysqlEnv.table}\``);
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
 }
 
 test('UI respects roles, privileges, module toggles, and background styling', { timeout: 60000 }, async (t) => {
@@ -492,6 +662,206 @@ test('UI interface settings and nav filter improve practical navigation', { time
   const persisted = await page.evaluate(() => JSON.parse(window.localStorage.getItem('party-web-ui-settings') || '{}'));
   assert.equal(persisted.keepComposerOpen, true);
   assert.equal(persisted.partialNavigation, false);
+});
+
+test('UI interface panel can save session defaults without leaving the page', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-settings-inline-save' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const guestPage = await browser.newPage();
+  await configurePage(guestPage, server.baseUrl);
+  await guestPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await guestPage.click('[data-ui-settings-toggle]');
+  await guestPage.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const guestSaveDisabled = await guestPage.$eval('[data-ui-settings-save]', (el) => el.disabled);
+  assert.equal(guestSaveDisabled, true);
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const saveDisabled = await page.$eval('[data-ui-settings-save]', (el) => el.disabled);
+  assert.equal(saveDisabled, false);
+
+  const setToggle = async (selector, expectedChecked) => {
+    const input = await page.$(selector);
+    assert.ok(input, `missing input ${selector}`);
+    const checked = await input.evaluate((el) => el.checked);
+    if (checked !== expectedChecked) {
+      await input.click();
+    }
+  };
+
+  await setToggle('input[data-ui-setting="largeText"]', true);
+  await setToggle('input[data-ui-setting="partialNavigation"]', false);
+  await page.click('[data-ui-settings-save]');
+  await page.waitForFunction(() => document.body.textContent.includes('Session defaults saved.'));
+
+  await setToggle('input[data-ui-setting="partialNavigation"]', true);
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'on');
+  await page.click('[data-ui-settings-reset]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+  await page.waitForFunction(() => document.body.dataset.uiTextScale === 'large');
+
+  const freshContext = await browser.createBrowserContext();
+  const freshPage = await freshContext.newPage();
+  await configurePage(freshPage, server.baseUrl);
+  await setSessionCookie(freshPage, server.baseUrl, session.sessionId);
+  await freshPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await freshPage.waitForFunction(() => document.body.dataset.uiTextScale === 'large');
+  await freshPage.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+});
+
+test('UI profile interface defaults hydrate runtime settings when local overrides are absent', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-profile-defaults' });
+  await postForm(
+    `${server.baseUrl}/profile`,
+    {
+      intent: 'ui-preferences',
+      uiVerbosity: 'default',
+      uiLargeText: 'on',
+      uiReducedMotion: 'on',
+      uiCompactNav: 'on',
+      uiKeepComposerOpen: 'on',
+      uiPartialNavigation: 'off',
+    },
+    { cookie: session.cookie, partial: true },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const body = document.body;
+    return (
+      body.dataset.uiTextScale === 'large' &&
+      body.dataset.uiMotion === 'reduced' &&
+      body.dataset.uiNav === 'compact' &&
+      body.dataset.uiComposerAutocollapse === 'off' &&
+      body.dataset.uiPartialNav === 'off'
+    );
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const panelState = await page.evaluate(() => ({
+    large: document.querySelector('input[data-ui-setting="largeText"]')?.checked,
+    reduced: document.querySelector('input[data-ui-setting="reducedMotion"]')?.checked,
+    compact: document.querySelector('input[data-ui-setting="compactNav"]')?.checked,
+    keepOpen: document.querySelector('input[data-ui-setting="keepComposerOpen"]')?.checked,
+    partial: document.querySelector('input[data-ui-setting="partialNavigation"]')?.checked,
+  }));
+  assert.equal(panelState.large, true);
+  assert.equal(panelState.reduced, true);
+  assert.equal(panelState.compact, true);
+  assert.equal(panelState.keepOpen, true);
+  assert.equal(panelState.partial, false);
+
+  const partialToggle = await page.$('input[data-ui-setting="partialNavigation"]');
+  assert.ok(partialToggle);
+  await partialToggle.click();
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'on');
+  const localAfterToggle = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  assert.ok(localAfterToggle, 'expected local UI settings after local toggle');
+
+  await page.click('[data-ui-settings-reset]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+  const localAfterReset = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  assert.equal(localAfterReset, null);
+});
+
+test('UI mysql adapter keeps discussion and interface defaults across restart', { timeout: 120000 }, async (t) => {
+  if (MYSQL_UI_ENV.skip) {
+    t.skip(MYSQL_UI_ENV.skip);
+    return;
+  }
+  t.after(async () => {
+    await dropMysqlUiTable(MYSQL_UI_ENV);
+  });
+
+  const portFirst = await getAvailablePort();
+  const firstServer = await startServer({
+    port: portFirst,
+    dataAdapter: 'mysql',
+    extraEnv: MYSQL_UI_ENV.extraEnv,
+  });
+  t.after(async () => firstServer.stop());
+
+  const session = await createVerifiedSession(firstServer.baseUrl, { pidHash: 'mysql-ui-session' });
+  await postForm(
+    `${firstServer.baseUrl}/profile`,
+    {
+      intent: 'ui-preferences',
+      uiVerbosity: 'default',
+      uiLargeText: 'on',
+      uiReducedMotion: 'off',
+      uiCompactNav: 'off',
+      uiKeepComposerOpen: 'on',
+      uiPartialNavigation: 'off',
+    },
+    { cookie: session.cookie, partial: true },
+  );
+  await postForm(
+    `${firstServer.baseUrl}/discussion`,
+    { topic: 'mysql-persist', content: 'MySQL UI persistence discussion' },
+    { cookie: session.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const pageFirst = await browser.newPage();
+  await configurePage(pageFirst, firstServer.baseUrl);
+  await setSessionCookie(pageFirst, firstServer.baseUrl, session.sessionId);
+  await pageFirst.goto(`${firstServer.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await pageFirst.waitForFunction(() => document.body.textContent.includes('MySQL UI persistence discussion'));
+  await pageFirst.waitForFunction(
+    () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
+  );
+
+  await firstServer.stop();
+
+  const portSecond = await getAvailablePort();
+  const secondServer = await startServer({
+    port: portSecond,
+    dataAdapter: 'mysql',
+    extraEnv: MYSQL_UI_ENV.extraEnv,
+  });
+  t.after(async () => secondServer.stop());
+
+  const pageSecond = await browser.newPage();
+  await configurePage(pageSecond, secondServer.baseUrl);
+  await setSessionCookie(pageSecond, secondServer.baseUrl, session.sessionId);
+  await pageSecond.goto(`${secondServer.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await pageSecond.waitForFunction(() => document.body.textContent.includes('MySQL UI persistence discussion'));
+  await pageSecond.waitForFunction(
+    () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
+  );
 });
 
 test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {

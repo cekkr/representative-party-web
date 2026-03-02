@@ -32,14 +32,45 @@ function normalizeUiSettings(raw = {}) {
   };
 }
 
-function readUiSettings() {
+function hasStoredUiSettings() {
   try {
-    const raw = window.localStorage?.getItem(UI_SETTINGS_KEY);
-    if (!raw) return { ...DEFAULT_UI_SETTINGS };
+    return window.localStorage?.getItem(UI_SETTINGS_KEY) !== null;
+  } catch (_error) {
+    return false;
+  }
+}
+
+function clearStoredUiSettings() {
+  try {
+    window.localStorage?.removeItem(UI_SETTINGS_KEY);
+  } catch (_error) {
+    // Ignore private mode/storage failures.
+  }
+}
+
+function readServerUiSettings() {
+  if (!document.body) return { ...DEFAULT_UI_SETTINGS };
+  const raw = document.body.dataset.uiSettingsServer || '';
+  if (!raw) return { ...DEFAULT_UI_SETTINGS };
+  try {
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(parsed) };
   } catch (_error) {
     return { ...DEFAULT_UI_SETTINGS };
+  }
+}
+
+function readUiSettings() {
+  if (!hasStoredUiSettings()) {
+    return readServerUiSettings();
+  }
+  try {
+    const raw = window.localStorage?.getItem(UI_SETTINGS_KEY);
+    if (!raw) return readServerUiSettings();
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(parsed) };
+  } catch (_error) {
+    return readServerUiSettings();
   }
 }
 
@@ -2308,6 +2339,7 @@ function syncPageMeta() {
   if (meta.dataset.verbosityCanSave !== undefined) body.dataset.verbosityCanSave = meta.dataset.verbosityCanSave;
   if (meta.dataset.composerSettings !== undefined) body.dataset.composerSettings = meta.dataset.composerSettings;
   if (meta.dataset.composerAllowed !== undefined) body.dataset.composerAllowed = meta.dataset.composerAllowed;
+  if (meta.dataset.uiSettingsServer !== undefined) body.dataset.uiSettingsServer = meta.dataset.uiSettingsServer;
   meta.remove();
 }
 
@@ -2370,15 +2402,40 @@ function initUiSettingsPanel() {
     return;
   }
   const closeButton = panel.querySelector('[data-ui-settings-close]');
+  const saveButton = panel.querySelector('[data-ui-settings-save]');
+  const resetButton = panel.querySelector('[data-ui-settings-reset]');
   const inputs = Array.from(panel.querySelectorAll('input[data-ui-setting]'));
   let settings = applyUiSettings(readUiSettings());
   syncBusyIndicator();
+
+  const canSaveSessionDefaults = () => document.body?.dataset?.verbosityCanSave === 'true';
+
+  const buildUiPreferencesPayload = (nextSettings) => {
+    const payload = new URLSearchParams();
+    payload.set('intent', 'ui-preferences');
+    payload.set('uiVerbosity', document.body?.dataset?.verbosityOverride || '');
+    payload.set('uiLargeText', nextSettings.largeText ? 'on' : 'off');
+    payload.set('uiReducedMotion', nextSettings.reducedMotion ? 'on' : 'off');
+    payload.set('uiCompactNav', nextSettings.compactNav ? 'on' : 'off');
+    payload.set('uiKeepComposerOpen', nextSettings.keepComposerOpen ? 'on' : 'off');
+    payload.set('uiPartialNavigation', nextSettings.partialNavigation ? 'on' : 'off');
+    return payload;
+  };
 
   const syncInputs = () => {
     inputs.forEach((input) => {
       const key = input.dataset.uiSetting || '';
       input.checked = Boolean(settings[key]);
     });
+  };
+
+  const syncSaveButton = () => {
+    if (!saveButton) return;
+    const canSave = canSaveSessionDefaults();
+    saveButton.disabled = !canSave;
+    saveButton.title = canSave
+      ? 'Save current interface settings as session defaults.'
+      : 'Verify your wallet session to save defaults.';
   };
 
   const openPanel = () => {
@@ -2420,6 +2477,46 @@ function initUiSettingsPanel() {
     }
   };
 
+  const onSaveClick = async (event) => {
+    event.preventDefault();
+    if (!canSaveSessionDefaults()) {
+      showToast('Verify your wallet session to save defaults.', { tone: 'error' });
+      return;
+    }
+    setAppBusy(true);
+    try {
+      const response = await fetch('/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-Requested-With': 'partial' },
+        body: buildUiPreferencesPayload(settings),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to save interface defaults');
+      }
+      if (document.body) {
+        document.body.dataset.uiSettingsServer = JSON.stringify(settings);
+      }
+      showToast('Session defaults saved.', { tone: 'success' });
+    } catch (error) {
+      console.error(error);
+      showToast('Failed to save session defaults.', { tone: 'error' });
+    } finally {
+      setAppBusy(false);
+    }
+  };
+
+  const onResetClick = (event) => {
+    event.preventDefault();
+    clearStoredUiSettings();
+    settings = applyUiSettings(readUiSettings());
+    syncInputs();
+    syncBusyIndicator();
+    if (window.location.pathname === '/social/feed') {
+      initStickyComposerAutoCollapse();
+    }
+    showToast('Using session defaults.', { tone: 'success', timeoutMs: 1800 });
+  };
+
   const onDocumentClick = (event) => {
     if (panel.hidden) return;
     const target = event.target;
@@ -2435,19 +2532,32 @@ function initUiSettingsPanel() {
   };
 
   toggle.addEventListener('click', onToggleClick);
+  if (saveButton) {
+    saveButton.addEventListener('click', onSaveClick);
+  }
   if (closeButton) {
     closeButton.addEventListener('click', onCloseClick);
+  }
+  if (resetButton) {
+    resetButton.addEventListener('click', onResetClick);
   }
   inputs.forEach((input) => input.addEventListener('change', onInputChange));
   document.addEventListener('click', onDocumentClick);
   document.addEventListener('keydown', onDocumentKeydown);
   syncInputs();
+  syncSaveButton();
   closePanel();
 
   window.__uiSettingsCleanup = () => {
     toggle.removeEventListener('click', onToggleClick);
+    if (saveButton) {
+      saveButton.removeEventListener('click', onSaveClick);
+    }
     if (closeButton) {
       closeButton.removeEventListener('click', onCloseClick);
+    }
+    if (resetButton) {
+      resetButton.removeEventListener('click', onResetClick);
     }
     inputs.forEach((input) => input.removeEventListener('change', onInputChange));
     document.removeEventListener('click', onDocumentClick);

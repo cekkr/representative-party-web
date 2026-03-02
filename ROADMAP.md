@@ -73,7 +73,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
 - Social feed UX now auto-collapses the sticky composer on downward scroll to keep the wall visible while preserving manual expand/collapse controls.
-- Top-bar Interface settings now let users tune practical UX at runtime (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation mode), and side-nav jump filtering with `Ctrl/Cmd+K` + `/` shortcuts improves day-to-day navigation.
+- Top-bar Interface settings now let users tune practical UX at runtime (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation mode), side-nav jump filtering with `Ctrl/Cmd+K` + `/` shortcuts improves day-to-day navigation, and users can save those toggles as session defaults inline without leaving the current page.
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
@@ -83,7 +83,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
-- UI preferences: local browser controls are live; next step is optional provider-local/session sync for cross-device consistency.
+- UI preferences: browser-local controls plus inline session-default saves are live; next step is optional provider-profile sync across sessions/devices.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).

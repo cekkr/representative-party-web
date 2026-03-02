@@ -79,9 +79,16 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   const composerSettingsAttr = escapeHtml(JSON.stringify(composerPayload));
   const roleLabel = data.roleLabel || data.person?.role || '';
   const isAdmin = String(roleLabel || '').toLowerCase() === 'admin';
+  const uiSettingsServer = resolveInterfaceSettingsMeta(data.person);
   const verbosityMeta = resolveVerbosityMeta({ state, person: data.person, explicit: data.verbosityMode, pageKey });
   if (wantsPartial) {
-    const pageMeta = renderPageMeta({ pageKey, composerSettingsAttr, composerAllowed: isAdmin ? 'true' : '', ...verbosityMeta });
+    const pageMeta = renderPageMeta({
+      pageKey,
+      composerSettingsAttr,
+      composerAllowed: isAdmin ? 'true' : '',
+      uiSettingsServer,
+      ...verbosityMeta,
+    });
     return `${pageMeta}${statusStrip}${body}`;
   }
   const layout = await loadTemplate('layout');
@@ -131,6 +138,7 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.composerSettingsAttr = composerSettingsAttr;
   }
   layoutData.composerAllowed = isAdmin ? 'true' : '';
+  layoutData.uiSettingsServer = escapeHtml(uiSettingsServer);
   layoutData.composerControls = isAdmin ? buildComposerControls() : '';
   return applyTemplate(layout, layoutData);
 }
@@ -266,10 +274,26 @@ function renderPageMeta(meta = {}) {
     `data-verbosity-can-save="${escapeHtml(meta.verbosityCanSave || '')}"`,
     meta.composerSettingsAttr ? `data-composer-settings="${meta.composerSettingsAttr}"` : '',
     meta.composerAllowed !== undefined ? `data-composer-allowed="${escapeHtml(meta.composerAllowed)}"` : '',
+    meta.uiSettingsServer !== undefined ? `data-ui-settings-server="${escapeHtml(meta.uiSettingsServer)}"` : '',
   ]
     .filter(Boolean)
     .join(' ');
   return `<div ${attrs} hidden></div>`;
+}
+
+function resolveInterfaceSettingsMeta(person = {}) {
+  const raw = person?.uiSettings;
+  if (!raw || typeof raw !== 'object') {
+    return '{}';
+  }
+  const normalized = {
+    largeText: raw.largeText === true,
+    reducedMotion: raw.reducedMotion === true,
+    compactNav: raw.compactNav === true,
+    keepComposerOpen: raw.keepComposerOpen === true,
+    partialNavigation: raw.partialNavigation !== false,
+  };
+  return JSON.stringify(normalized);
 }
 
 function buildComposerControls() {

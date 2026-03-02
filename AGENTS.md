@@ -87,11 +87,11 @@ This file captures the essential implementation directives. Keep it in sync with
 - Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
 - Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
 - Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
-- Testing: run `npm test` for the node:test suite (hashing, migrations, module toggles, Circle policy gates, Puppeteer UI role flows, ring gossip consistency); `npm run test:ui` is the stable UI-only entry point.
+- Testing: run `npm test` for the node:test suite (hashing, migrations, module toggles, Circle policy gates, Puppeteer UI role flows, ring gossip consistency, and optional MySQL-backed UI restart persistence when `TEST_MYSQL_*` is configured); `npm run test:ui` is the stable UI-only entry point.
 - Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be toggled via `CIRCLE_EXTENSIONS`.
 - Module control center: `/admin` groups module toggles with a settings map and wizard step anchors so activation and configuration stay aligned; module definitions carry their own admin links so forks/extensions can plug into the map.
 - Theme verbosity controls: `/admin` sets the default UI verbosity (full vs compact); `/profile` and the top-bar toggle let users override per session, and Composer can set per-page presets.
-- Interface controls: top-bar Interface settings should stay practical for daily use (large text, reduced motion, compact nav, composer auto-collapse preference, partial-navigation mode), with side-nav jump filtering (`Ctrl/Cmd+K` and `/`) for fast section access.
+- Interface controls: top-bar Interface settings should stay practical for daily use (large text, reduced motion, compact nav, composer auto-collapse preference, partial-navigation mode), include inline save/reset session defaults, and keep side-nav jump filtering (`Ctrl/Cmd+K` and `/`) for fast section access.
 - Ops cues: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status + durations, peer health reset actions, optional pull-endpoint and outbound push skip-cache summaries, recent transactions, inbound transaction summaries, outbound delivery summaries, and persisted upload cleanup stats; `/health` includes peer health summaries plus vote/transactions gossip added/updated counts, gossip durations, optional pull-endpoint and outbound push skip-cache stats, outbound delivery stats, persisted upload cleanup stats, and ops metrics for dashboards.
 - Petition/vote scaffold: proposals persisted to JSON with per-role gating, structured outline fields, collaborative revisions + version history, revision diffs, evidence summaries + sources, stance-tagged discussion notes + fact-check flags, argument-map linking, quorum → discussion (or admin-configured vote), pre-vote freeze, and vote tallies; UI surfaces gate errors per role and stage cues.
 - Governance defaults: admin-managed constitution baseline (quorum, discussion/vote windows, vote method) surfaced at `/governance`; community proposal workflow remains pending.
@@ -106,4 +106,4 @@ This file captures the essential implementation directives. Keep it in sync with
 - Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
 
 ## Possible next steps:
-- Add module-aware UI tests (Puppeteer) to validate nav visibility and disabled endpoint UX.
+- Extend MySQL-backed UI tests to cover module toggles + disabled endpoint UX under persisted settings.
