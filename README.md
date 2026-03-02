@@ -68,6 +68,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Gossip pull skip-cache**: optional endpoint probes (`/votes/ledger`, `/transactions/ledger`) are cached after module-disabled/optional misses so repeated pulls avoid redundant failures; cache status is visible in `/admin` and `/health`.
 - **Gossip push skip-cache**: outbound endpoint posts (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) are cached after module-disabled/gossip-disabled responses so repeated pushes avoid redundant retries; cache status is visible in `/admin` and `/health`.
 - **Sticky composer UX**: social composer auto-collapses on downward scroll to keep the wall readable while preserving manual expand controls.
+- **Practical interface controls**: top bar includes a persistent Interface panel (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle), plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
@@ -159,6 +160,12 @@ npm run db:check
 
 - `GOSSIP_PEER_CAPABILITIES_MAX_AGE_HOURS` controls how long cached peer capability hints are trusted before re-probing (default 168h).
 - `GOSSIP_OPTIONAL_SKIP_SECONDS` controls how long gossip skip-cache entries live (optional pull endpoints and outbound push skips after module-disabled/not-found responses; default 3600s).
+
+### Interface preferences
+
+- Interface preferences are stored in browser localStorage (`party-web-ui-settings`) and applied across partial/full navigations.
+- Current toggles: large text, reduced motion, compact nav, keep social composer open while scrolling, and fast partial navigation (off switches links/forms back to full-page loads).
+- Side navigation includes a jump filter with keyboard shortcuts: `Ctrl/Cmd+K` focuses search, `/` focuses search when not typing, `Esc` clears.
 
 ### Useful endpoints
 

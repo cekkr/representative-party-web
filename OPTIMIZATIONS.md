@@ -29,6 +29,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Normalize and pre-parse ring public keys when saving provider-blind settings to avoid per-verify PEM normalization work.
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 - Add adaptive gossip pull concurrency limits (batch peers in configurable windows) to avoid saturating sockets on large rings while keeping pull sync parallel.
+- Precompute/lazily refresh side-nav search indexes (per nav item + child links) so keyboard filtering avoids rebuilding lowercase haystacks on each keystroke.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -45,6 +46,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
 - Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
 - Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.
+- Optionally sync browser-local interface settings (large text, reduced motion, compact nav, partial navigation mode) to provider-local profile/session preferences for cross-device consistency.
 
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
@@ -98,3 +100,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Added an outbound endpoint skip cache (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) so repeated push runs avoid retrying peers that currently return module-disabled/gossip-disabled responses.
 - Cached peer capability lookups per gossip push tick so payload selection reuses the same snapshot across ledger/votes/transactions routing.
 - Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.
+- Added a top-bar Interface settings panel with browser-local persistence (text scale, motion, compact nav, composer auto-collapse preference, partial-navigation mode) and non-blocking UI toasts for enhanced flows.
+- Added side-nav jump filtering with `Ctrl/Cmd+K` and `/` shortcuts for faster practical navigation in large module configurations.

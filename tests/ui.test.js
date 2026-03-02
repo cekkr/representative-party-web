@@ -407,6 +407,93 @@ test('UI auto-collapses the sticky social composer on scroll', { timeout: 60000 
   });
 });
 
+test('UI interface settings and nav filter improve practical navigation', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-settings-nav' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    return panel && panel.dataset.composeState === 'open';
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+
+  const enableToggle = async (selector) => {
+    const toggle = await page.$(selector);
+    assert.ok(toggle, `missing toggle ${selector}`);
+    const checked = await toggle.evaluate((el) => el.checked);
+    if (!checked) {
+      await toggle.click();
+    }
+  };
+
+  await enableToggle('input[data-ui-setting="keepComposerOpen"]');
+  await enableToggle('input[data-ui-setting="compactNav"]');
+  await page.click('[data-ui-settings-close]');
+  await page.waitForFunction(
+    () =>
+      document.body.dataset.uiComposerAutocollapse === 'off' && document.body.dataset.uiNav === 'compact',
+  );
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 1400, behavior: 'auto' });
+    window.dispatchEvent(new Event('scroll'));
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const composeState = await page.$eval('#social-compose', (el) => el.dataset.composeState);
+  assert.equal(composeState, 'open');
+
+  await page.keyboard.down('Control');
+  await page.keyboard.press('KeyK');
+  await page.keyboard.up('Control');
+  await page.keyboard.type('governance');
+  await page.waitForFunction(() => {
+    const home = document.querySelector('[data-nav-section="home"]');
+    const governance = document.querySelector('[data-nav-section="governance"]');
+    return home && governance && home.hidden === true && governance.hidden === false;
+  });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => {
+    const home = document.querySelector('[data-nav-section="home"]');
+    const filter = document.querySelector('[data-nav-filter-input]');
+    return home && filter && home.hidden === false && !filter.value;
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const partialToggle = await page.$('input[data-ui-setting="partialNavigation"]');
+  assert.ok(partialToggle);
+  const partialChecked = await partialToggle.evaluate((el) => el.checked);
+  if (partialChecked) {
+    await partialToggle.click();
+  }
+  await page.click('[data-ui-settings-close]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+
+  const navPromise = page.waitForNavigation({ waitUntil: 'networkidle0' });
+  await page.click('[data-nav-section="discussion"] [data-nav-link]');
+  await navPromise;
+  assert.match(page.url(), /\/discussion$/);
+
+  const persisted = await page.evaluate(() => JSON.parse(window.localStorage.getItem('party-web-ui-settings') || '{}'));
+  assert.equal(persisted.keepComposerOpen, true);
+  assert.equal(persisted.partialNavigation, false);
+});
+
 test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory', allowPreviews: true });

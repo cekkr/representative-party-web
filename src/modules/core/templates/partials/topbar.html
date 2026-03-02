@@ -24,6 +24,37 @@
     <button class="ghost verbosity-toggle" type="button" data-verbosity-toggle title="Verbosity: {{verbosityToggleSource}}">
       Verbosity: {{verbosityToggleLabel}}
     </button>
+    <button class="ghost ui-settings-toggle" type="button" data-ui-settings-toggle aria-expanded="false" aria-controls="ui-settings-panel">
+      Interface
+    </button>
+    <span class="muted tiny topbar__sync" data-ui-sync-indicator hidden>Syncing…</span>
+    <section class="ui-settings-panel" id="ui-settings-panel" data-ui-settings-panel hidden>
+      <p class="eyebrow">Interface settings</p>
+      <label class="field checkbox">
+        <input type="checkbox" data-ui-setting="largeText" />
+        <span>Larger text scale</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" data-ui-setting="reducedMotion" />
+        <span>Reduced motion</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" data-ui-setting="compactNav" />
+        <span>Compact side navigation</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" data-ui-setting="keepComposerOpen" />
+        <span>Keep social composer open while scrolling</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" data-ui-setting="partialNavigation" />
+        <span>Fast partial navigation</span>
+      </label>
+      <p class="muted tiny">Saved locally in this browser.</p>
+      <div class="cta-row">
+        <button class="ghost tiny" type="button" data-ui-settings-close>Close</button>
+      </div>
+    </section>
     <div class="quick-nav">
       {{quickLinks}}
     </div>

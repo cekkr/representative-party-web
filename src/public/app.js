@@ -11,22 +11,139 @@ function triggerDeepLink() {
 
 triggerDeepLink();
 
+const UI_SETTINGS_KEY = 'party-web-ui-settings';
+const DEFAULT_UI_SETTINGS = {
+  largeText: false,
+  reducedMotion: false,
+  compactNav: false,
+  keepComposerOpen: false,
+  partialNavigation: true,
+};
+let appBusyDepth = 0;
+
+function normalizeUiSettings(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  return {
+    largeText: source.largeText === true,
+    reducedMotion: source.reducedMotion === true,
+    compactNav: source.compactNav === true,
+    keepComposerOpen: source.keepComposerOpen === true,
+    partialNavigation: source.partialNavigation !== false,
+  };
+}
+
+function readUiSettings() {
+  try {
+    const raw = window.localStorage?.getItem(UI_SETTINGS_KEY);
+    if (!raw) return { ...DEFAULT_UI_SETTINGS };
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(parsed) };
+  } catch (_error) {
+    return { ...DEFAULT_UI_SETTINGS };
+  }
+}
+
+function writeUiSettings(next) {
+  const normalized = { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(next) };
+  try {
+    window.localStorage?.setItem(UI_SETTINGS_KEY, JSON.stringify(normalized));
+  } catch (_error) {
+    // Ignore private mode/storage failures.
+  }
+  return normalized;
+}
+
+function applyUiSettings(settings = readUiSettings()) {
+  const normalized = { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(settings) };
+  if (!document.body) return normalized;
+  document.body.dataset.uiTextScale = normalized.largeText ? 'large' : 'normal';
+  document.body.dataset.uiMotion = normalized.reducedMotion ? 'reduced' : 'normal';
+  document.body.dataset.uiNav = normalized.compactNav ? 'compact' : 'normal';
+  document.body.dataset.uiComposerAutocollapse = normalized.keepComposerOpen ? 'off' : 'on';
+  document.body.dataset.uiPartialNav = normalized.partialNavigation ? 'on' : 'off';
+  return normalized;
+}
+
+function isPartialNavigationEnabled() {
+  if (!document.body) return true;
+  return document.body.dataset.uiPartialNav !== 'off';
+}
+
+function prefersReducedMotion() {
+  if (!document.body) return false;
+  return document.body.dataset.uiMotion === 'reduced';
+}
+
+function syncBusyIndicator() {
+  const busy = appBusyDepth > 0;
+  if (document.body) {
+    document.body.dataset.appBusy = busy ? 'true' : 'false';
+  }
+  const indicator = document.querySelector('[data-ui-sync-indicator]');
+  if (!indicator) return;
+  indicator.hidden = !busy;
+}
+
+function setAppBusy(active) {
+  if (active) {
+    appBusyDepth += 1;
+  } else {
+    appBusyDepth = Math.max(0, appBusyDepth - 1);
+  }
+  syncBusyIndicator();
+}
+
+function ensureToastHost() {
+  let host = document.querySelector('[data-ui-toasts]');
+  if (host) return host;
+  host = document.createElement('div');
+  host.className = 'ui-toast-stack';
+  host.dataset.uiToasts = 'true';
+  document.body.appendChild(host);
+  return host;
+}
+
+function showToast(message, { tone = 'info', timeoutMs = 2600 } = {}) {
+  if (!document.body) return;
+  const text = String(message || '').trim();
+  if (!text) return;
+  const host = ensureToastHost();
+  const toast = document.createElement('div');
+  toast.className = `ui-toast ui-toast--${tone}`;
+  toast.textContent = text;
+  host.appendChild(toast);
+  window.setTimeout(() => {
+    toast.remove();
+    if (!host.children.length) {
+      host.remove();
+    }
+  }, Math.max(900, timeoutMs));
+}
+
+function isTextInputLike(target) {
+  if (!(target instanceof Element)) return false;
+  if (target.matches('input, textarea, select')) return true;
+  return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
+}
+
 function scrollToHash(url) {
   const targetUrl = new URL(url, window.location.origin);
   const hash = targetUrl.hash;
+  const behavior = prefersReducedMotion() ? 'auto' : 'smooth';
   if (hash) {
     const target = document.querySelector(hash);
     if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      target.scrollIntoView({ behavior, block: 'start' });
       return;
     }
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior });
 }
 
 async function submitExtensionsForm(form) {
   const checkboxes = Array.from(form.querySelectorAll('input[name="extensions"]'));
   const enabled = checkboxes.filter((box) => box.checked).map((box) => box.value);
+  setAppBusy(true);
   try {
     const response = await fetch(form.action, {
       method: 'POST',
@@ -34,16 +151,21 @@ async function submitExtensionsForm(form) {
       body: JSON.stringify({ extensions: enabled }),
     });
     if (!response.ok) throw new Error('Extensions update failed');
-    alert('Extensions updated. Reloading to apply.');
-    window.location.reload();
+    showToast('Extensions updated. Reloading…', { tone: 'success' });
+    window.setTimeout(() => {
+      window.location.reload();
+    }, 180);
   } catch (error) {
     console.error(error);
-    alert('Failed to update extensions.');
+    showToast('Failed to update extensions.', { tone: 'error' });
+  } finally {
+    setAppBusy(false);
   }
 }
 
 async function submitDelegationChoice(form) {
   const formData = new FormData(form);
+  setAppBusy(true);
   try {
     const response = await fetch(form.action, {
       method: 'POST',
@@ -51,10 +173,12 @@ async function submitDelegationChoice(form) {
       body: JSON.stringify({ topic: formData.get('topic'), delegateHash: formData.get('delegateHash') }),
     });
     if (!response.ok) throw new Error('Delegation choice failed');
-    alert('Delegation updated. It will be used for auto votes.');
+    showToast('Delegation updated.', { tone: 'success' });
   } catch (error) {
     console.error(error);
-    alert('Failed to update delegation choice.');
+    showToast('Failed to update delegation choice.', { tone: 'error' });
+  } finally {
+    setAppBusy(false);
   }
 }
 
@@ -2234,6 +2358,226 @@ function initVerbosityToggle() {
   });
 }
 
+function initUiSettingsPanel() {
+  if (typeof window.__uiSettingsCleanup === 'function') {
+    window.__uiSettingsCleanup();
+    window.__uiSettingsCleanup = null;
+  }
+  const toggle = document.querySelector('[data-ui-settings-toggle]');
+  const panel = document.querySelector('[data-ui-settings-panel]');
+  if (!toggle || !panel) {
+    syncBusyIndicator();
+    return;
+  }
+  const closeButton = panel.querySelector('[data-ui-settings-close]');
+  const inputs = Array.from(panel.querySelectorAll('input[data-ui-setting]'));
+  let settings = applyUiSettings(readUiSettings());
+  syncBusyIndicator();
+
+  const syncInputs = () => {
+    inputs.forEach((input) => {
+      const key = input.dataset.uiSetting || '';
+      input.checked = Boolean(settings[key]);
+    });
+  };
+
+  const openPanel = () => {
+    panel.hidden = false;
+    toggle.setAttribute('aria-expanded', 'true');
+  };
+
+  const closePanel = () => {
+    panel.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+  };
+
+  const onToggleClick = (event) => {
+    event.preventDefault();
+    if (panel.hidden) {
+      openPanel();
+    } else {
+      closePanel();
+    }
+  };
+
+  const onCloseClick = (event) => {
+    event.preventDefault();
+    closePanel();
+  };
+
+  const onInputChange = () => {
+    const next = { ...settings };
+    inputs.forEach((input) => {
+      const key = input.dataset.uiSetting || '';
+      if (!key) return;
+      next[key] = input.checked;
+    });
+    settings = writeUiSettings(next);
+    applyUiSettings(settings);
+    syncBusyIndicator();
+    if (window.location.pathname === '/social/feed') {
+      initStickyComposerAutoCollapse();
+    }
+  };
+
+  const onDocumentClick = (event) => {
+    if (panel.hidden) return;
+    const target = event.target;
+    if (!(target instanceof Node)) return;
+    if (panel.contains(target) || toggle.contains(target)) return;
+    closePanel();
+  };
+
+  const onDocumentKeydown = (event) => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      closePanel();
+    }
+  };
+
+  toggle.addEventListener('click', onToggleClick);
+  if (closeButton) {
+    closeButton.addEventListener('click', onCloseClick);
+  }
+  inputs.forEach((input) => input.addEventListener('change', onInputChange));
+  document.addEventListener('click', onDocumentClick);
+  document.addEventListener('keydown', onDocumentKeydown);
+  syncInputs();
+  closePanel();
+
+  window.__uiSettingsCleanup = () => {
+    toggle.removeEventListener('click', onToggleClick);
+    if (closeButton) {
+      closeButton.removeEventListener('click', onCloseClick);
+    }
+    inputs.forEach((input) => input.removeEventListener('change', onInputChange));
+    document.removeEventListener('click', onDocumentClick);
+    document.removeEventListener('keydown', onDocumentKeydown);
+  };
+}
+
+function initNavFilter() {
+  if (typeof window.__navFilterCleanup === 'function') {
+    window.__navFilterCleanup();
+    window.__navFilterCleanup = null;
+  }
+  const shell = document.querySelector('[data-nav-shell]');
+  if (!shell) return;
+  const input = shell.querySelector('[data-nav-filter-input]');
+  const clearButton = shell.querySelector('[data-nav-filter-clear]');
+  const emptyState = shell.querySelector('[data-nav-filter-empty]');
+  const groups = Array.from(shell.querySelectorAll('.side-nav__group'));
+  const items = Array.from(shell.querySelectorAll('.side-nav__item'));
+  if (!input || !groups.length || !items.length) return;
+
+  const restoreChildrenState = () => {
+    shell.querySelectorAll('[data-nav-children]').forEach((childBlock) => {
+      if (childBlock.dataset.navFilterHiddenBase === undefined) return;
+      childBlock.hidden = childBlock.dataset.navFilterHiddenBase === 'true';
+      delete childBlock.dataset.navFilterHiddenBase;
+    });
+  };
+
+  const applyFilter = () => {
+    const query = (input.value || '').trim().toLowerCase();
+    if (clearButton) clearButton.hidden = !query;
+    if (!query) {
+      items.forEach((item) => {
+        item.hidden = false;
+      });
+      groups.forEach((group) => {
+        group.hidden = false;
+      });
+      restoreChildrenState();
+      if (emptyState) emptyState.hidden = true;
+      syncNavigationState();
+      return;
+    }
+
+    let visibleCount = 0;
+    items.forEach((item) => {
+      const linkText = item.querySelector('.side-nav__link')?.textContent || '';
+      const childText = Array.from(item.querySelectorAll('.side-nav__child'))
+        .map((node) => node.textContent || '')
+        .join(' ');
+      const haystack = `${linkText} ${childText}`.toLowerCase();
+      const matched = haystack.includes(query);
+      item.hidden = !matched;
+      if (matched) {
+        visibleCount += 1;
+      }
+      const childBlock = item.querySelector('[data-nav-children]');
+      if (!childBlock) return;
+      if (childBlock.dataset.navFilterHiddenBase === undefined) {
+        childBlock.dataset.navFilterHiddenBase = childBlock.hidden ? 'true' : 'false';
+      }
+      if (matched && childText.toLowerCase().includes(query)) {
+        childBlock.hidden = false;
+      }
+    });
+
+    groups.forEach((group) => {
+      const hasVisible = Array.from(group.querySelectorAll('.side-nav__item')).some((item) => !item.hidden);
+      group.hidden = !hasVisible;
+    });
+    if (emptyState) emptyState.hidden = visibleCount > 0;
+  };
+
+  const clearFilter = () => {
+    if (!input.value) return;
+    input.value = '';
+    applyFilter();
+  };
+
+  const onInput = () => {
+    applyFilter();
+  };
+
+  const onClear = (event) => {
+    event.preventDefault();
+    clearFilter();
+    input.focus();
+  };
+
+  const onDocumentKeydown = (event) => {
+    const active = document.activeElement;
+    const typing = isTextInputLike(active);
+    const isHotkey = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
+    if (isHotkey) {
+      event.preventDefault();
+      input.focus();
+      input.select();
+      return;
+    }
+    if (event.key === '/' && !typing && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      input.focus();
+      return;
+    }
+    if (event.key === 'Escape' && active === input) {
+      if (input.value) {
+        clearFilter();
+      } else {
+        input.blur();
+      }
+    }
+  };
+
+  input.addEventListener('input', onInput);
+  if (clearButton) {
+    clearButton.addEventListener('click', onClear);
+  }
+  document.addEventListener('keydown', onDocumentKeydown);
+  applyFilter();
+
+  window.__navFilterCleanup = () => {
+    input.removeEventListener('input', onInput);
+    if (clearButton) {
+      clearButton.removeEventListener('click', onClear);
+    }
+    document.removeEventListener('keydown', onDocumentKeydown);
+  };
+}
+
 function applyPageLayout() {
   const settings = readComposerSettings();
   applyPageLayoutFromSettings(settings);
@@ -2468,6 +2812,7 @@ function initStickyComposerAutoCollapse() {
     window.__composeAutoCleanup();
     window.__composeAutoCleanup = null;
   }
+  if (document.body?.dataset?.uiComposerAutocollapse === 'off') return;
   const panel = document.getElementById('social-compose');
   if (!panel) return;
   const toggle = panel.querySelector('[data-compose-toggle]');
@@ -2495,38 +2840,50 @@ function initStickyComposerAutoCollapse() {
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
+  applyUiSettings(readUiSettings());
   initInstallWizard(root);
   syncPageMeta();
   syncNavigationState();
   applyPageLayout();
+  initUiSettingsPanel();
+  initNavFilter();
   initVerbosityToggle();
   initComposerTool();
   initStickyComposerAutoCollapse();
+  syncBusyIndicator();
 
   document.addEventListener('click', async (event) => {
     const anchor = event.target.closest('a[data-partial]');
     if (!anchor) return;
+    if (!isPartialNavigationEnabled()) return;
     const url = anchor.href;
     if (!url.startsWith(window.location.origin)) return;
     event.preventDefault();
+    setAppBusy(true);
     try {
       const response = await fetch(url, { headers: { 'X-Requested-With': 'partial' } });
       if (!response.ok) throw new Error('Navigation failed');
       const html = await response.text();
       root.innerHTML = html;
       window.history.pushState({}, '', url);
+      applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
       syncNavigationState();
       applyPageLayout();
+      initUiSettingsPanel();
+      initNavFilter();
       initVerbosityToggle();
       initComposerTool();
       initStickyComposerAutoCollapse();
+      syncBusyIndicator();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
       window.location.href = url;
+    } finally {
+      setAppBusy(false);
     }
   });
 
@@ -2554,6 +2911,9 @@ function initStickyComposerAutoCollapse() {
   document.addEventListener('submit', async (event) => {
     const form = event.target.closest('form[data-enhance]');
     if (!form) return;
+    const mode = form.dataset.enhance || '';
+    const requiresEnhancedSubmit = mode === 'extensions' || mode === 'delegation-conflict';
+    if (!isPartialNavigationEnabled() && !requiresEnhancedSubmit) return;
     event.preventDefault();
     if (form.dataset.enhance === 'extensions') {
       await submitExtensionsForm(form);
@@ -2564,6 +2924,7 @@ function initStickyComposerAutoCollapse() {
       return;
     }
     try {
+      setAppBusy(true);
       const formData = new FormData(form);
       const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
       const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
@@ -2595,18 +2956,24 @@ function initStickyComposerAutoCollapse() {
       const html = await response.text();
       root.innerHTML = html;
       window.history.pushState({}, '', url);
+      applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
       syncNavigationState();
       applyPageLayout();
+      initUiSettingsPanel();
+      initNavFilter();
       initVerbosityToggle();
       initComposerTool();
       initStickyComposerAutoCollapse();
+      syncBusyIndicator();
       scrollToHash(url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
       form.submit();
+    } finally {
+      setAppBusy(false);
     }
   });
 
