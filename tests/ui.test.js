@@ -499,7 +499,7 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   });
   await page.waitForFunction(() => {
     const feed = document.querySelector('.wall-feed');
-    return feed && feed.textContent.includes('Build your wall');
+    return feed && feed.textContent.includes('No posts visible yet');
   });
 
   await page.evaluate(() => {

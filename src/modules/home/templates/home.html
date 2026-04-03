@@ -1,8 +1,8 @@
 <section class="panel" data-composer-section="home-hero">
   <div>
-    <p class="eyebrow">Circle workspace</p>
-    <h2>Coordinate, deliberate, and decide with verified accountability.</h2>
-    <p class="is-verbose">Use discussions to surface options, proposals to formalize decisions, and the social feed for updates and coordination.</p>
+    <p class="eyebrow">Workspace</p>
+    <h2>Operate social coordination first, then enable governance modules as needed.</h2>
+    <p class="is-verbose">This provider can run as a general social community or as a full e-party Circle. Module lanes stay explicit so teams can scale policy only when required.</p>
     <div class="is-verbose">
       <p class="muted small">Circle: {{circleName}}</p>
       <p class="muted small">{{policyFlag}}</p>
@@ -10,17 +10,21 @@
       <p class="muted small">{{firstRunNote}}</p>
       <p class="muted small">Gates: {{gateSummary}}</p>
       <p class="muted small">{{extensionsSummary}}</p>
+      <p class="muted small">Social lane: {{socialLaneSummary}}</p>
+      <p class="muted small">Governance lane: {{governanceLaneSummary}}</p>
+      <p class="muted small">Federation lane: {{federationLaneSummary}}</p>
     </div>
     <div class="cta-row">
-      <a class="cta" href="/auth/eudi" data-partial>Verify with wallet</a>
-      <a class="ghost" href="/discussion" data-partial>Open discussions</a>
-      <a class="ghost" href="/social/feed" data-partial>Open social feed</a>
+      {{socialLink}}
+      <a class="ghost" href="/discussion" data-partial>Open discussion</a>
+      {{proposalsLink}}
+      <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
       {{ledgerLink}}
     </div>
   </div>
   <div class="grid stats is-verbose">
     <div class="stat">
-      <p class="eyebrow">Uniqueness ledger</p>
+      <p class="eyebrow">Circle ledger</p>
       <p class="stat__value">{{ledgerSize}}</p>
       <p class="muted">Persisted blinded hashes across the Circle.</p>
     </div>
@@ -49,30 +53,30 @@
 
 <section class="panel grid is-verbose" data-composer-section="home-highlights">
   <div>
-    <p class="eyebrow">Verify</p>
-    <h3>Wallet-based verification</h3>
+    <p class="eyebrow">Lane 1</p>
+    <h3>P2P social/community</h3>
     <ul class="plain">
-      <li>QR + deep link handoff for wallet verification</li>
-      <li>Hash-only identity: no raw PID stored</li>
-      <li>Verified sessions unlock posting and voting gates</li>
+      <li>Social feed, discussion, forum, and notifications</li>
+      <li>Identity-aware posting with role/ban policy checks</li>
+      <li>{{socialLaneStatus}}</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Deliberate</p>
-    <h3>Discuss and propose</h3>
+    <p class="eyebrow">Lane 2</p>
+    <h3>E-party governance</h3>
     <ul class="plain">
-      <li>Topic-based discussions tied to verified handles</li>
-      <li>Structured proposals with evidence and revision history</li>
-      <li>Clear stages from draft to vote</li>
+      <li>Petitions, votes, delegation, and groups/elections</li>
+      <li>Structured proposals and signed envelope audit trails</li>
+      <li>{{governanceLaneStatus}}</li>
     </ul>
   </div>
   <div>
-    <p class="eyebrow">Coordinate</p>
-    <h3>Social, groups, delegation</h3>
+    <p class="eyebrow">Lane 3</p>
+    <h3>Federation and resilience</h3>
     <ul class="plain">
-      <li>Follow updates and share quick posts</li>
-      <li>Groups surface delegate recommendations</li>
-      <li>Delegation stays advisory and overridable</li>
+      <li>Gossip sync, peer health, and capability hints</li>
+      <li>Provider-blind ring scaffolding and signed summaries</li>
+      <li>{{federationLaneStatus}}</li>
     </ul>
   </div>
 </section>

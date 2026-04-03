@@ -52,8 +52,8 @@ export function renderDiscussionList(entries, state) {
 function renderDiscussionOnboarding() {
   return `
     <div class="onboarding-card">
-      <p class="eyebrow">Getting started</p>
-      <h3>Start a discussion</h3>
+      <p class="eyebrow">Discussion</p>
+      <h3>No discussion posts yet</h3>
       <ul class="plain small">
         <li>Pick a topic that needs input.</li>
         <li>Post a concise update or question.</li>

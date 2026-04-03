@@ -30,6 +30,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Maintain follower/following adjacency maps keyed by hash to avoid scanning `state.socialFollows` for feed and relationship lookups.
 - Add adaptive gossip pull concurrency limits (batch peers in configurable windows) to avoid saturating sockets on large rings while keeping pull sync parallel.
 - Precompute/lazily refresh side-nav search indexes (per nav item + child links) so keyboard filtering avoids rebuilding lowercase haystacks on each keystroke.
+- Cache module-family grouping summaries (home/admin module lanes) and refresh only when module settings change to avoid repeated per-request regrouping.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
@@ -39,6 +40,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
 - Share MySQL test env/bootstrap helpers between `tests/ui.test.js` and `tests/external-adapters.test.js` to reduce drift in connection/availability checks.
 - Evaluate libp2p (gossipsub + peer discovery) as a resilient transport/ring-identity scaffold alongside HTTP gossip.
+- Centralize module-lane definitions (social/community vs e-party governance vs federation) so admin, nav, and home summaries cannot drift.
 
 ## UX Consistency
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
@@ -61,6 +63,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Distribute ring key sets once per epoch and reference by ringId in envelopes to avoid repeating large key lists.
 - Stream JSON parsing for ActivityPub/petitions and allow per-endpoint body limits to avoid buffering large payloads in memory.
 - Persist gossip skip-cache state (pull + push) in settings to keep skip hints across restarts and avoid warm-up retries.
+- Pilot libp2p gossipsub channels for social-lane event replication (with bounded replay + signature checks) to reduce HTTP gossip overhead on high-churn feeds.
 
 ## Completed
 - Added session index helpers for handle/pidHash lookup and invalidation on session updates.

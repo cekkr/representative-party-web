@@ -150,8 +150,8 @@ export function renderPetitionList(
 function renderPetitionOnboarding() {
   return `
     <div class="onboarding-card">
-      <p class="eyebrow">Getting started</p>
-      <h3>Draft a proposal</h3>
+      <p class="eyebrow">Proposals</p>
+      <h3>No proposals yet</h3>
       <ul class="plain small">
         <li>Summarize the decision you need.</li>
         <li>Add structured outline details if helpful.</li>

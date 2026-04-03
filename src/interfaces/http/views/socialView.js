@@ -66,12 +66,12 @@ export function renderSocialPosts(
 function renderSocialOnboarding() {
   return `
     <div class="onboarding-card">
-      <p class="eyebrow">Getting started</p>
-      <h3>Build your wall</h3>
+      <p class="eyebrow">Social feed</p>
+      <h3>No posts visible yet</h3>
       <ul class="plain small">
-        <li>Follow the handles you want updates from.</li>
-        <li>Share quick updates or questions.</li>
-        <li>Use direct posts for sensitive coordination.</li>
+        <li>Follow handles to populate this feed.</li>
+        <li>Publish short updates for quick coordination.</li>
+        <li>Use direct visibility for private exchanges.</li>
       </ul>
       <div class="onboarding-actions">
         <a class="cta" href="#social-compose">Share an update</a>

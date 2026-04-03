@@ -462,10 +462,11 @@
 <section class="panel" id="modules">
   <p class="eyebrow">Modules</p>
   <h2>Module control center</h2>
-  <p class="muted small">Toggle modules and jump to their settings without hunting across panels.</p>
+  <p class="muted small">Toggle modules by lane so social-community deployments can stay lean while e-party governance stays optional.</p>
+  <p class="muted small">{{moduleFamilySummary}}</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">
     <input type="hidden" name="intent" value="modules" />
-    <div class="form-grid">{{modulesList}}</div>
+    <div class="stack">{{modulesList}}</div>
     <div class="cta-row">
       <button class="cta" type="submit">Save module toggles</button>
     </div>
@@ -473,7 +474,7 @@
   </form>
   <div class="stack">
     <p class="muted small">Module settings map</p>
-    <div class="grid two">
+    <div class="stack">
       {{moduleSettingsList}}
     </div>
   </div>

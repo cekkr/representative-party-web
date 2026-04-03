@@ -19,6 +19,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Gossip identity**: set a stable issuer URL/identifier (`CIRCLE_ISSUER` or `/admin`) so peers can track envelope provenance.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
+- **Module families**: optional modules are grouped as `P2P social/community`, `E-party governance`, and `Federation/resilience` so providers can reuse the framework for non-party communities without carrying civic flows by default.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request with author notifications, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
 - **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state, ledger/actor/discussion counts, and gossip ingest state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
@@ -56,6 +57,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Governance defaults (quorum, timing windows, vote method) are editable in `/admin` and published at `/governance`.
 - `/admin` now includes a first-run installation wizard for Circle basics, data mode, peer alignment, and optional defaults.
 - `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned (links live with module metadata).
+- Module control center now groups optional modules by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) and surfaces per-lane enabled summaries for faster non-party deployments.
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Theme-level verbosity controls are live: admin default + per-session overrides in `/profile`, plus a top‑bar toggle and per‑page presets via Composer.
 - Composer mode now supports per-page layout ordering (including main/aside swaps), panel hiding, per-page verbosity presets, and persisted text/style + DOM order overrides for composer-keyed elements.
@@ -74,6 +76,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
 - Social feed UX now auto-collapses the sticky composer on downward scroll to keep the wall visible while preserving manual expand/collapse controls.
 - Top-bar Interface settings now let users tune practical UX at runtime (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation mode), side-nav jump filtering with `Ctrl/Cmd+K` + `/` shortcuts improves day-to-day navigation, and users can save those toggles as session defaults inline without leaving the current page.
+- Home/discussion/social/petitions templates were cleaned to reduce demo-like filler text (`Next action`, generic onboarding headings) and now present concise operational copy focused on real workflows.
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
@@ -85,6 +88,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
 - UI preferences: browser-local controls plus inline session-default saves are live; next step is optional provider-profile sync across sessions/devices.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
+- Module boundary hardening: continue separating reusable `social/community` kernel code from `e-party governance` modules (clear namespaces/contracts) so deployments can compose only what they need.
+- Evaluate libp2p gossipsub channels for social-lane transport while keeping civic vote/transactions envelopes on signed audit paths.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
 - Next-next steps: expand multipart integration tests with malformed-boundary/fuzzed header cases to harden parser edge behavior.

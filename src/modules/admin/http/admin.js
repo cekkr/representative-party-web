@@ -41,7 +41,13 @@ import {
   normalizeProviderBlindSettings,
   validateProviderBlindSettings,
 } from '../../circle/ringRegistry.js';
-import { isModuleEnabled, listModuleDefinitions, listModuleToggles, normalizeModuleSettings } from '../../circle/modules.js';
+import {
+  isModuleEnabled,
+  listModuleDefinitions,
+  listModuleFamilyDefinitions,
+  listModuleToggles,
+  normalizeModuleSettings,
+} from '../../circle/modules.js';
 import { listAvailableExtensions } from '../../extensions/registry.js';
 import {
   pullGossipNow,
@@ -1506,10 +1512,12 @@ function buildAdminViewModel(
   const extensions = state.extensions?.active || [];
   const roleFlags = roleSelectFlags(sessionForm.sessionRole || defaultRole);
   const extensionsList = renderExtensions(availableExtensions);
+  const moduleFamilies = listModuleFamilyDefinitions();
   const moduleToggles = decorateModules(listModuleToggles(state));
-  const modulesList = renderModules(moduleToggles);
-  const moduleSettingsList = renderModuleSettingsList(moduleToggles);
+  const modulesList = renderModules(moduleToggles, moduleFamilies);
+  const moduleSettingsList = renderModuleSettingsList(moduleToggles, moduleFamilies);
   const modulesSummary = moduleToggles.filter((mod) => mod.enabled).map((mod) => mod.key).join(', ') || 'None';
+  const moduleFamilySummary = summarizeModuleFamilies(moduleToggles, moduleFamilies);
   const defaultElectionMode = state.settings?.groupPolicy?.electionMode || 'priority';
   const defaultConflictRule = state.settings?.groupPolicy?.conflictRule || 'highest_priority';
   const petitionQuorumAdvance = normalizeQuorumAdvance(state.settings?.petitionQuorumAdvance || 'discussion');
@@ -1684,6 +1692,7 @@ function buildAdminViewModel(
     postingGate: postingGate.allowed ? 'Open posting allowed.' : postingGate.message || 'Verification required before posting.',
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
     modulesSummary: `Modules: ${modulesSummary}`,
+    moduleFamilySummary,
     modulesList,
     moduleSettingsList,
     defaultElectionModePriority: defaultElectionMode === 'priority' ? 'selected' : '',
@@ -3253,28 +3262,42 @@ function decorateModules(list = []) {
   });
 }
 
-function renderModuleSettingsList(list) {
+function renderModuleSettingsList(list, familyDefinitions = []) {
   if (!list || !list.length) return '<p class="muted small">No module settings map available.</p>';
-  return list
-    .map((mod) => {
-      const statusPill = mod.enabled ? '<span class="pill">Enabled</span>' : '<span class="pill ghost">Disabled</span>';
-      const requiresNote = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
-      const blockedNote = mod.missingDependencies?.length
-        ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
-        : '';
-      const description = [mod.description, requiresNote, blockedNote].filter(Boolean).join(' ');
-      const links = renderModuleSettingsLinks(mod.settingsLinks || []);
+  return groupModulesByFamily(list, familyDefinitions)
+    .map(({ family, modules }) => {
+      const familyDescription = family.description ? `<p class="muted small">${escapeHtml(family.description)}</p>` : '';
+      const cards = modules
+        .map((mod) => {
+          const statusPill = mod.enabled ? '<span class="pill">Enabled</span>' : '<span class="pill ghost">Disabled</span>';
+          const requiresNote = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
+          const blockedNote = mod.missingDependencies?.length
+            ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
+            : '';
+          const description = [mod.description, requiresNote, blockedNote].filter(Boolean).join(' ');
+          const links = renderModuleSettingsLinks(mod.settingsLinks || []);
+          return `
+            <article class="callout">
+              <div class="discussion__meta">
+                <span class="pill">${escapeHtml(mod.label || mod.key)}</span>
+                ${statusPill}
+              </div>
+              <p class="muted small">${escapeHtml(description || 'Optional module')}</p>
+              <div class="discussion__meta">
+                ${links}
+              </div>
+            </article>
+          `;
+        })
+        .join('\n');
       return `
-        <article class="callout">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(mod.label || mod.key)}</span>
-            ${statusPill}
+        <section class="stack">
+          <p class="eyebrow">${escapeHtml(family.label || family.key)}</p>
+          ${familyDescription}
+          <div class="stack">
+            ${cards}
           </div>
-          <p class="muted small">${escapeHtml(description || 'Optional module')}</p>
-          <div class="discussion__meta">
-            ${links}
-          </div>
-        </article>
+        </section>
       `;
     })
     .join('\n');
@@ -3293,21 +3316,76 @@ function renderModuleSettingsLinks(list) {
     .join('\n');
 }
 
-function renderModules(list) {
+function renderModules(list, familyDefinitions = []) {
   if (!list || !list.length) return '<p class="muted small">No module toggles available.</p>';
-  return list
-    .map((mod) => {
-      const requires = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
-      const blocked = mod.missingDependencies?.length
-        ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
-        : '';
-      const description = [mod.description, requires, blocked].filter(Boolean).join(' ');
+  return groupModulesByFamily(list, familyDefinitions)
+    .map(({ family, modules }) => {
+      const familyDescription = family.description ? `<p class="muted small">${escapeHtml(family.description)}</p>` : '';
+      const toggles = modules
+        .map((mod) => {
+          const requires = mod.requires?.length ? `Requires: ${mod.requires.join(', ')}.` : '';
+          const blocked = mod.missingDependencies?.length
+            ? `Disabled until ${mod.missingDependencies.join(', ')} enabled.`
+            : '';
+          const description = [mod.description, requires, blocked].filter(Boolean).join(' ');
+          return `
+            <label class="field checkbox">
+              <input type="checkbox" name="module_${mod.key}" ${mod.enabled ? 'checked' : ''} data-module-toggle="${mod.key}" />
+              <span>${mod.label} — ${description || 'Optional module'}</span>
+            </label>
+          `;
+        })
+        .join('\n');
       return `
-        <label class="field checkbox">
-          <input type="checkbox" name="module_${mod.key}" ${mod.enabled ? 'checked' : ''} data-module-toggle="${mod.key}" />
-          <span>${mod.label} — ${description || 'Optional module'}</span>
-        </label>
+        <section class="stack">
+          <p class="eyebrow">${escapeHtml(family.label || family.key)}</p>
+          ${familyDescription}
+          <div class="stack">
+            ${toggles}
+          </div>
+        </section>
       `;
     })
     .join('\n');
+}
+
+function summarizeModuleFamilies(modules = [], familyDefinitions = []) {
+  const groups = groupModulesByFamily(modules, familyDefinitions);
+  const summaries = groups
+    .map(({ family, modules: familyModules }) => {
+      const enabled = familyModules.filter((mod) => mod.enabled).map((mod) => mod.key);
+      const enabledLabel = enabled.length ? enabled.join(', ') : 'none';
+      return `${family.label}: ${enabledLabel}`;
+    })
+    .filter(Boolean);
+  return summaries.length ? summaries.join(' | ') : 'No module families configured.';
+}
+
+function groupModulesByFamily(modules = [], familyDefinitions = []) {
+  const order = [];
+  const groups = new Map();
+
+  for (const family of familyDefinitions || []) {
+    if (!family?.key) continue;
+    order.push(family.key);
+    groups.set(family.key, { family: { ...family }, modules: [] });
+  }
+
+  for (const mod of modules || []) {
+    const familyKey = mod.family || 'unclassified';
+    if (!groups.has(familyKey)) {
+      groups.set(familyKey, {
+        family: {
+          key: familyKey,
+          label: familyKey === 'unclassified' ? 'Other modules' : familyKey,
+          description: '',
+        },
+        modules: [],
+      });
+      order.push(familyKey);
+    }
+    groups.get(familyKey).modules.push(mod);
+  }
+
+  return order.map((key) => groups.get(key)).filter((entry) => entry && entry.modules.length);
 }
