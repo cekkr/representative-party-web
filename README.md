@@ -56,6 +56,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with a public read-only view.
 - **Module control center**: admin toggles plus a settings map with jump links so module activation and configuration stay in one place (links are defined alongside module metadata).
 - **Module lanes**: optional modules are grouped by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) to keep non-party community deployments clean.
+- **Operational home workspace**: `/` stays useful for guests and signed-in members, showing access gates, recent lane activity, and operator cues instead of acting like a brochure or a forced redirect.
 - **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions with history diff previews.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.

@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
@@ -749,6 +753,107 @@ body[data-composer-mode="on"] .composer-tool__panel {
 
 .grid.two {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.home-overview__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.home-overview__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.home-access {
+  border: 1px solid rgba(154, 177, 211, 0.2);
+  border-radius: 1rem;
+  background: rgba(4, 6, 15, 0.28);
+  padding: 1rem;
+}
+
+.home-access__list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-access__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed rgba(154, 177, 211, 0.22);
+}
+
+.home-access__item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.home-access__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.home-stats {
+  margin-top: 1rem;
+}
+
+.home-stat {
+  border: 1px solid rgba(154, 177, 211, 0.18);
+  border-radius: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.home-stat__value {
+  margin: 0.1rem 0 0.3rem;
+  font-size: 2rem;
+  letter-spacing: -0.03em;
+}
+
+.home-panel-grid {
+  align-items: stretch;
+}
+
+.home-lane {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.home-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.home-list__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px dashed rgba(154, 177, 211, 0.22);
+}
+
+.home-list__item:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.home-list__title {
+  color: var(--text);
+  font-weight: 600;
+  margin: 0;
+}
+
+a.home-list__title:hover {
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .cta-row {
@@ -1586,6 +1691,15 @@ code {
 
   .shell {
     grid-template-columns: 1fr;
+  }
+
+  .home-overview__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .home-access__row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .side-nav {

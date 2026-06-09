@@ -56,14 +56,14 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { key: 'start', label: 'Start', keys: ['home', 'auth', 'profile', 'notifications'] },
-  { key: 'conversation', label: 'Social network', keys: ['social', 'discussion', 'forum'] },
+  { key: 'start', label: 'Workspace', keys: ['home', 'auth', 'profile', 'notifications'] },
+  { key: 'conversation', label: 'Social/community', keys: ['social', 'discussion', 'forum'] },
   { key: 'governance', label: 'E-party governance', keys: ['petitions', 'delegation', 'groups', 'governance'] },
   { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
 ];
 
 const QUICK_ACTIONS = [
-  { key: 'home', label: 'Info', href: '/', partial: true },
+  { key: 'home', label: 'Home', href: '/', partial: true },
   { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, hideWhenVerified: true },
   { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true, requiresVerified: true },
   { key: 'forum', label: 'Forum', href: '/forum', partial: true },
@@ -101,6 +101,12 @@ const CONTEXT_ACTIONS = {
 };
 
 const CHILD_SECTIONS = {
+  home: [
+    { label: 'Workspace', href: '/#home-overview', partial: true },
+    { label: 'Access', href: '/#home-access', partial: true },
+    { label: 'Lane activity', href: '/#home-lanes', partial: true },
+    { label: 'Operations', href: '/#home-ops', partial: true },
+  ],
   social: [
     { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },
     { label: 'Feed', href: '/social/feed#social-wall', partial: true },

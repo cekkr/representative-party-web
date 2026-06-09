@@ -76,12 +76,13 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
 - Social feed UX now auto-collapses the sticky composer on downward scroll to keep the wall visible while preserving manual expand/collapse controls.
 - Top-bar Interface settings now let users tune practical UX at runtime (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation mode), side-nav jump filtering with `Ctrl/Cmd+K` + `/` shortcuts improves day-to-day navigation, and users can save those toggles as session defaults inline without leaving the current page.
+- Home route now behaves as an operational workspace for guests and signed-in members, surfacing access gates, recent conversation/proposal/audit activity, and operator cues instead of redirecting verified sessions straight to `/social/feed`.
 - Home/discussion/social/petitions templates were cleaned to reduce demo-like filler text (`Next action`, generic onboarding headings) and now present concise operational copy focused on real workflows.
 
 ## Near-term next steps (Phase 2 focus)
 - Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
 - Admin Composer: extend the layout builder with component palette + insert/delete/wrap operations and richer component-level property editing beyond panels + nav (multi-select, reusable blocks, richer property groups).
-- Template hygiene: split remaining module templates into `templates/partials/` for composable subcomponents (admin, groups, discussion, delegation, notifications, profile, forum, home, governance).
+- Template hygiene: split remaining module templates into `templates/partials/` for composable subcomponents (admin, groups, discussion, delegation, notifications, profile, forum, governance).
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
 - Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.

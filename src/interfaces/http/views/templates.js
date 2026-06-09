@@ -117,10 +117,10 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.themeVars = asideWidth ? `--page-aside-width: ${asideWidth}px;` : '';
   }
   const brandDefaults = {
-    eyebrow: 'Community Deliberation Framework',
-    title: 'Circle Network',
-    tagline: 'Social coordination with optional civic governance.',
-    footer: 'Vanilla SSR + modular Circle kernel',
+    eyebrow: 'Operational workspace',
+    title: state?.settings?.circleName || 'Party Circle',
+    tagline: 'Messaging, deliberation, and accountability in one place.',
+    footer: 'SSR-first workspace with modular Circle lanes',
   };
   layoutData.brandEyebrow = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandEyebrow', brandDefaults.eyebrow);
   layoutData.brandTitle = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandTitle', brandDefaults.title);
