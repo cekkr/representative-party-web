@@ -1,6 +1,15 @@
 import { getPerson } from '../../identity/person.js';
 import { evaluateAction } from '../../circle/policy.js';
-import { buildDelegationChain, chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../delegation/delegation.js';
+import {
+  buildDelegationChain,
+  chooseDelegation,
+  clearDelegation,
+  describeDelegationFreshness,
+  getDelegationDecayDays,
+  listDelegationsForPerson,
+  renewDelegation,
+  setDelegation,
+} from '../../delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../groups/groups.js';
 import { getTopicConfig } from '../../topics/topicGardenerClient.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../topics/preferences.js';
@@ -67,7 +76,8 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       delegationReason: permission.allowed ? '' : permission.reason,
       delegationSuggestions,
       effectiveDelegations: renderEffectiveDelegations({ person, state, delegations }),
-      delegationList: renderDelegationList(delegations),
+      delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state) }),
+      delegationDecayNote: renderDecayNote(getDelegationDecayDays(state)),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
       topicAnchors: formatTopicList(topicConfig.anchors || []),
@@ -92,6 +102,13 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
   const topic = sanitizeText(body.topic || 'general', 64);
   if (intent === 'clear') {
     await clearDelegation({ person, topic, state });
+    if (wantsPartial) {
+      return renderDelegation({ req, res, state, wantsPartial });
+    }
+    return sendRedirect(res, '/delegation');
+  }
+  if (intent === 'renew') {
+    await renewDelegation({ person, topic, state });
     if (wantsPartial) {
       return renderDelegation({ req, res, state, wantsPartial });
     }
@@ -161,30 +178,63 @@ function renderChainCard({ topicLabel, chain }) {
   `;
 }
 
-function renderDelegationList(delegations = []) {
+function renderDecayNote(decayDays = 0) {
+  if (!decayDays) {
+    return '<p class="muted tiny">Delegation decay is off — preferences stay active until cleared.</p>';
+  }
+  return `<p class="muted tiny">Delegations lapse after ${decayDays} day${decayDays === 1 ? '' : 's'} without renewal. Renew to keep them active.</p>`;
+}
+
+function renderFreshnessPill(freshness) {
+  if (!freshness || !freshness.decayDays) return '';
+  if (freshness.status === 'expired') {
+    return '<span class="pill warning">Lapsed</span>';
+  }
+  if (freshness.status === 'expiring') {
+    const days = Math.max(0, Math.ceil(freshness.expiresInDays));
+    return `<span class="pill warning">Expires in ${days}d</span>`;
+  }
+  return '<span class="pill ghost">Active</span>';
+}
+
+function renderDelegationList(delegations = [], { decayDays = 0 } = {}) {
   if (!delegations.length) {
     return '<p class="muted">No delegation preferences yet.</p>';
   }
+  const now = Date.now();
   const items = delegations
     .map((entry) => {
-      const createdAt = formatTimestamp(entry.createdAt);
+      const createdAt = formatTimestamp(entry.renewedAt || entry.createdAt);
       const delegateHash = escapeHtml(entry.delegateHash || 'unknown');
+      const topicValue = escapeHtml(entry.topic || 'general');
       const profileLink = entry.delegateHash
         ? `<a class="muted tiny" href="/delegates/${delegateHash}" data-partial>Profile</a>`
         : '';
       const previewPill = renderPreviewPill(entry);
       const issuerPill = renderIssuerPill(entry);
+      const freshness = describeDelegationFreshness(entry, decayDays, now);
+      const freshnessPill = renderFreshnessPill(freshness);
+      const renewForm = decayDays
+        ? `
+          <form class="form-inline" method="post" action="/delegation" data-enhance="delegation-renew">
+            <input type="hidden" name="intent" value="renew" />
+            <input type="hidden" name="topic" value="${topicValue}" />
+            <button type="submit" class="ghost">Renew</button>
+          </form>`
+        : '';
       return `
         <div class="list-row">
           <div>
-            <p class="small">${escapeHtml(entry.topic || 'general')}</p>
+            <p class="small">${topicValue}</p>
             <p class="muted tiny">delegate ${delegateHash}${profileLink ? ` · ${profileLink}` : ''}</p>
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(entry.provider || 'manual')}</span>
+            ${freshnessPill}
             ${previewPill}
             ${issuerPill}
             ${createdAt ? `<span class="muted tiny">${createdAt}</span>` : ''}
+            ${renewForm}
           </div>
         </div>
       `;

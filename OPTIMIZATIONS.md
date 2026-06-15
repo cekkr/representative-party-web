@@ -23,6 +23,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
 - Memoize the deliberation-score inputs alongside delegate profile stats so the reputation badge does not re-scan votes/petitions/discussions per profile render.
 - Build the per-topic `byOwner` delegation map once per request (or cache by topic + delegations revision) instead of rebuilding it on every `resolveDelegation`/`buildDelegationChain` call when resolving many topics (e.g., the `/delegation` effective-chains view or batch auto-vote resolution).
+- Memoize `getDelegationDecayDays`/`activeDelegations` per request: each `resolveDelegation` call re-reads + normalizes governance settings and re-filters/re-decays the full delegations list, so the effective-chains view (one call per topic) repeats that work N times.
 - Use ResizeObserver/IntersectionObserver to update composer overlay bounds only when selection or layout changes, avoiding continuous scroll listeners.
 - Cache composer target queries (panels/nav zones) and refresh only on navigation or mutation events to avoid full DOM scans on every refresh/drag.
 - Rebuild composer hierarchy trees via a MutationObserver + debounce rather than regenerating the full tree on every refresh or reorder.

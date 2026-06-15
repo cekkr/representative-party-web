@@ -23,6 +23,11 @@ export async function renderGovernance({ req, res, state, wantsPartial }) {
       voteWindowDays: escapeHtml(String(governance.voteWindowDays)),
       reviewWindowHours: escapeHtml(String(governance.reviewWindowHours)),
       defaultVoteMethod: escapeHtml(governance.defaultVoteMethod),
+      delegationDecayDays: escapeHtml(
+        governance.delegationDecayDays
+          ? `${governance.delegationDecayDays} day(s) without renewal`
+          : 'Off (delegations stay active until cleared)',
+      ),
       governanceNotes: escapeHtml(governance.notes || 'No governance notes published yet.'),
       governanceUpdatedAt: escapeHtml(updatedAt),
       governanceUpdatedBy: escapeHtml(updatedBy),

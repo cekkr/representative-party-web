@@ -6,6 +6,7 @@ const DEFAULT_GOVERNANCE = {
   voteWindowDays: 7,
   reviewWindowHours: 24,
   defaultVoteMethod: 'majority',
+  delegationDecayDays: 0,
   notes: '',
   updatedAt: null,
   updatedBy: null,
@@ -33,12 +34,17 @@ export function normalizeGovernanceSettings(input = {}) {
   const defaultVoteMethod = ALLOWED_VOTE_METHODS.has(rawVoteMethod)
     ? rawVoteMethod
     : DEFAULT_GOVERNANCE.defaultVoteMethod;
+  const delegationDecayDays = normalizeNumber(input.delegationDecayDays, DEFAULT_GOVERNANCE.delegationDecayDays, {
+    min: 0,
+    max: 3650,
+  });
   return {
     quorumDefault,
     discussionWindowDays,
     voteWindowDays,
     reviewWindowHours,
     defaultVoteMethod,
+    delegationDecayDays,
     notes: sanitizeText(input.notes || DEFAULT_GOVERNANCE.notes, 400),
     updatedAt: input.updatedAt || null,
     updatedBy: input.updatedBy || null,

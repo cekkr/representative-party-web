@@ -857,6 +857,7 @@ async function updateGovernance(state, body) {
   const voteInput = sanitizeText(body.governanceVoteWindowDays || '', 12);
   const reviewInput = sanitizeText(body.governanceReviewWindowHours || '', 12);
   const methodInput = sanitizeText(body.governanceVoteMethod || prev.defaultVoteMethod || '', 32).toLowerCase();
+  const decayInput = sanitizeText(body.governanceDelegationDecayDays || '', 12);
   const notesInput = sanitizeText(body.governanceNotes || '', 400);
 
   const quorumResult = normalizeNumericInput(quorumInput, {
@@ -883,6 +884,12 @@ async function updateGovernance(state, body) {
     max: 168,
     label: 'Review window hours',
   });
+  const decayResult = normalizeNumericInput(decayInput, {
+    fallback: prev.delegationDecayDays,
+    min: 0,
+    max: 3650,
+    label: 'Delegation decay days',
+  });
 
   const draft = normalizeGovernanceSettings({
     ...prev,
@@ -891,6 +898,7 @@ async function updateGovernance(state, body) {
     voteWindowDays: voteResult.value ?? prev.voteWindowDays,
     reviewWindowHours: reviewResult.value ?? prev.reviewWindowHours,
     defaultVoteMethod: methodInput || prev.defaultVoteMethod,
+    delegationDecayDays: decayResult.value ?? prev.delegationDecayDays,
     notes: notesInput,
   });
 
@@ -899,6 +907,7 @@ async function updateGovernance(state, body) {
     ...discussionResult.errors,
     ...voteResult.errors,
     ...reviewResult.errors,
+    ...decayResult.errors,
   ];
   if (methodInput && methodInput !== draft.defaultVoteMethod) {
     errors.push('Default vote method must be one of: majority, approval, ranked, condorcet, star.');
@@ -913,6 +922,7 @@ async function updateGovernance(state, body) {
       governanceVoteWindowDaysValue: voteInput || String(prev.voteWindowDays),
       governanceReviewWindowHoursValue: reviewInput || String(prev.reviewWindowHours),
       governanceVoteMethodValue: methodInput || prev.defaultVoteMethod,
+      governanceDelegationDecayDaysValue: decayInput || String(prev.delegationDecayDays),
       governanceNotesValue: notesInput || prev.notes,
     };
   }
@@ -930,7 +940,7 @@ async function updateGovernance(state, body) {
   };
   recordAdminAudit(state, {
     action: 'governance.update',
-    summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod}`,
+    summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod} decay=${next.delegationDecayDays}d`,
   });
   await persistSettings(state);
 
@@ -941,6 +951,7 @@ async function updateGovernance(state, body) {
     governanceVoteWindowDaysValue: String(next.voteWindowDays),
     governanceReviewWindowHoursValue: String(next.reviewWindowHours),
     governanceVoteMethodValue: next.defaultVoteMethod,
+    governanceDelegationDecayDaysValue: String(next.delegationDecayDays),
     governanceNotesValue: next.notes,
   };
 }
@@ -1485,6 +1496,7 @@ function buildAdminViewModel(
     governanceVoteWindowDaysValue,
     governanceReviewWindowHoursValue,
     governanceVoteMethodValue,
+    governanceDelegationDecayDaysValue,
     governanceNotesValue,
     providerBlindErrors,
     providerBlindModeValue,
@@ -1630,6 +1642,7 @@ function buildAdminViewModel(
   const governanceVoteWindowDays = governanceVoteWindowDaysValue ?? String(governance.voteWindowDays);
   const governanceReviewWindowHours = governanceReviewWindowHoursValue ?? String(governance.reviewWindowHours);
   const governanceVoteMethod = governanceVoteMethodValue ?? governance.defaultVoteMethod;
+  const governanceDelegationDecayDays = governanceDelegationDecayDaysValue ?? String(governance.delegationDecayDays);
   const governanceNotes = governanceNotesValue ?? governance.notes;
   const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
   const providerBlind = getProviderBlindSettings(state);
@@ -1802,6 +1815,7 @@ function buildAdminViewModel(
     governanceVoteMethodRanked: governanceVoteMethod === 'ranked' ? 'selected' : '',
     governanceVoteMethodCondorcet: governanceVoteMethod === 'condorcet' ? 'selected' : '',
     governanceVoteMethodStar: governanceVoteMethod === 'star' ? 'selected' : '',
+    governanceDelegationDecayDays,
     governanceNotes,
     governanceUpdatedAt,
     providerBlindErrors: providerBlindErrorsRendered,

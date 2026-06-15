@@ -267,6 +267,15 @@
         <p class="muted small">Review window notes inform the pre-vote freeze check.</p>
       </div>
     </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Delegation decay (days)</span>
+        <input name="governanceDelegationDecayDays" type="number" min="0" max="3650" value="{{governanceDelegationDecayDays}}" />
+      </label>
+      <div class="stack">
+        <p class="muted small">0 disables decay. Otherwise delegations lapse after this many days without renewal so liquid power does not persist unattended.</p>
+      </div>
+    </div>
     <label class="field">
       <span>Governance notes</span>
       <textarea name="governanceNotes" rows="3" placeholder="Document constitution intent">{{governanceNotes}}</textarea>
