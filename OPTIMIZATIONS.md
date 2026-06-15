@@ -48,8 +48,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralize module-lane definitions (social/community vs e-party governance vs federation) so admin, nav, and home summaries cannot drift.
 
 ## UX Consistency
-- Finish wiring `renderActorLabel`/`resolveHandleForHash` into the remaining raw-hash spots that lack `state` in scope: the standalone proposal discussion-feed widget (`renderProposalDiscussionFeed` "Comment by …"), petition argument-map nodes (`renderArgumentNode`), and `renderUpdatedMeta`/freeze `frozenBy`/`updatedBy` lines in `petitionView.js` (thread `state` or pre-resolve handles in the controller).
-- Surface human-readable notification titles instead of raw event types (e.g. `petition_created`) in `/notifications` (P1 follow-up from the UI audit).
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
@@ -114,3 +112,5 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.
 - Added a top-bar Interface settings panel with browser-local persistence (text scale, motion, compact nav, composer auto-collapse preference, partial-navigation mode) and non-blocking UI toasts for enhanced flows.
 - Added side-nav jump filtering with `Ctrl/Cmd+K` and `/` shortcuts for faster practical navigation in large module configurations.
+- Wired `renderActorLabel`/`resolveHandleForHash` into the remaining raw-hash spots (proposal discussion-feed widget, petition argument-map nodes, `renderUpdatedMeta`, and freeze `frozenBy`/`updatedBy` lines) so no actor hash renders as bare identity.
+- Surfaced human-readable notification titles (`humanizeNotificationType`) so `/notifications` no longer shows raw event types like `petition_created`.

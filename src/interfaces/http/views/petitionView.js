@@ -13,6 +13,7 @@ import {
   renderPreviewPill,
   resolveTopicBreadcrumb,
 } from './shared.js';
+import { resolveHandleForHash } from './actorLabel.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -69,7 +70,7 @@ export function renderPetitionList(
         : Array.isArray(petition.evidenceLinks)
           ? petition.evidenceLinks
           : [];
-      const freezeNotice = renderFreezeNotice(petition);
+      const freezeNotice = renderFreezeNotice(petition, state);
       const reviewPrompt = renderReviewPrompt(petition, revisions);
       const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
       const evidencePill = evidenceBlock ? '<span class="pill ghost">Evidence</span>' : '';
@@ -83,7 +84,7 @@ export function renderPetitionList(
             ${renderPreviewPill(petition)}
             ${renderIssuerPill(petition)}
             ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-            ${renderUpdatedMeta(petition)}
+            ${renderUpdatedMeta(petition, state)}
             <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
             <span class="pill">Quorum: ${petition.quorum || 0}</span>
             <span class="pill ghost">Signatures: ${signatureCount}</span>
@@ -140,7 +141,7 @@ export function renderPetitionList(
             actorLabelPlural,
           })}
           ${renderRevisionHistory(petition, state)}
-          ${canModerate ? renderModerationForm(petition) : ''}
+          ${canModerate ? renderModerationForm(petition, state) : ''}
         </article>
       `;
     })
@@ -200,10 +201,10 @@ function buildSignatureBuckets(signatures = [], person) {
   return buckets;
 }
 
-function renderModerationForm(petition) {
+function renderModerationForm(petition, state) {
   const status = petition.status === 'open' ? 'vote' : petition.status;
   const frozenAt = formatTimestamp(petition.freeze?.frozenAt);
-  const frozenBy = petition.freeze?.frozenBy || '';
+  const frozenBy = petition.freeze?.frozenBy ? `@${resolveHandleForHash(state, petition.freeze.frozenBy)}` : '';
   const freezeNote = frozenAt ? `<p class="muted small">Frozen at ${escapeHtml(frozenAt)} ${frozenBy ? `by ${escapeHtml(frozenBy)}` : ''}.</p>` : '';
   return `
     <form class="form-inline" method="post" action="/petitions/status" data-enhance="petitions">
@@ -358,7 +359,7 @@ function renderDiscussionBlock(petition, comments, state) {
   const discussionList = renderPetitionComments(comments, state);
   const stanceSummary = renderCommentStanceSummary(comments);
   const argumentData = collectArgumentNodes(comments);
-  const argumentMap = renderArgumentMap(argumentData);
+  const argumentMap = renderArgumentMap(argumentData, state);
   const argumentDatalistId = `argument-map-${petition.id}`;
   const argumentDatalist = renderArgumentDatalist(argumentData.nodes, argumentDatalistId);
   return `
@@ -462,7 +463,7 @@ function renderPetitionComments(comments, state) {
     .join('\n');
 }
 
-export function renderProposalDiscussionFeed(items) {
+export function renderProposalDiscussionFeed(items, state) {
   if (!items.length) {
     return renderEmptyState('No proposal discussions yet. Join a discussion to surface activity.');
   }
@@ -500,7 +501,7 @@ export function renderProposalDiscussionFeed(items) {
           <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
           ${argumentLine}
           <p>${escapeHtml(snippet)}</p>
-          <p class="muted small">Comment by ${escapeHtml(comment.authorHash || 'anonymous')}</p>
+          ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state, label: 'Comment by' })}
         </article>
       `;
     })
@@ -588,7 +589,7 @@ function collectArgumentNodes(comments = []) {
   return { nodes: limited, total: sorted.length, truncated };
 }
 
-function renderArgumentMap(argumentData) {
+function renderArgumentMap(argumentData, state) {
   if (!argumentData || !argumentData.nodes.length) return '';
   const { nodes, total, truncated } = argumentData;
   const nodeMap = new Map(nodes.map((node) => [node.id, node]));
@@ -612,7 +613,7 @@ function renderArgumentMap(argumentData) {
   }
 
   const visited = new Set();
-  const items = roots.map((node) => renderArgumentNode(node, childMap, visited, 0)).join('');
+  const items = roots.map((node) => renderArgumentNode(node, childMap, visited, 0, state)).join('');
   const truncatedNote = truncated
     ? `<p class="muted small">Showing latest ${nodes.length} of ${total} argument nodes.</p>`
     : '';
@@ -627,7 +628,7 @@ function renderArgumentMap(argumentData) {
   `;
 }
 
-function renderArgumentNode(node, childMap, visited, depth) {
+function renderArgumentNode(node, childMap, visited, depth, state) {
   if (!node || visited.has(node.id) || depth > MAX_ARGUMENT_DEPTH) return '';
   visited.add(node.id);
   const stanceLabel = getCommentStanceLabel(node.stance);
@@ -641,9 +642,9 @@ function renderArgumentNode(node, childMap, visited, depth) {
     ? `Builds on ${escapeHtml(String(node.argumentParentId).slice(0, 8))}`
     : '';
   const content = node.content ? `<p>${escapeHtml(node.content)}</p>` : '';
-  const author = renderAuthorHashLine(node.authorHash, { size: 'tiny' });
+  const author = renderAuthorHashLine(node.authorHash, { size: 'tiny', state });
   const children = childMap.get(node.id) || [];
-  const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1)).join('');
+  const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1, state)).join('');
   const childBlock = childItems ? `<ul class="argument-children">${childItems}</ul>` : '';
   return `
     <li>
@@ -729,20 +730,20 @@ function sortByCreatedAt(a, b) {
   return aTime - bTime;
 }
 
-function renderUpdatedMeta(petition) {
+function renderUpdatedMeta(petition, state) {
   const updatedAt = petition.updatedAt || '';
   if (!updatedAt) return '';
   if (petition.createdAt && petition.createdAt === updatedAt && !petition.updatedBy) return '';
   const label = formatTimestamp(updatedAt);
-  const author = petition.updatedBy ? ` by ${petition.updatedBy}` : '';
+  const author = petition.updatedBy ? ` by @${resolveHandleForHash(state, petition.updatedBy)}` : '';
   return `<span class="muted small">Updated ${escapeHtml(label)}${escapeHtml(author)}</span>`;
 }
 
 
-function renderFreezeNotice(petition) {
+function renderFreezeNotice(petition, state) {
   if (!petition?.freeze) return '';
   const frozenAt = formatTimestamp(petition.freeze.frozenAt);
-  const frozenBy = petition.freeze.frozenBy ? `by ${petition.freeze.frozenBy}` : '';
+  const frozenBy = petition.freeze.frozenBy ? `by @${resolveHandleForHash(state, petition.freeze.frozenBy)}` : '';
   const revisionId = petition.freeze.revisionId ? petition.freeze.revisionId.slice(0, 8) : '';
   const revisionLine = revisionId ? `<p class="muted small">Revision: ${escapeHtml(revisionId)}</p>` : '';
   return `

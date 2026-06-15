@@ -91,7 +91,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
       quorumDefault: governance.quorumDefault,
-      discussionFeed: renderProposalDiscussionFeed(discussionFeedItems),
+      discussionFeed: renderProposalDiscussionFeed(discussionFeedItems, state),
       stageFilterOptions,
       composeOpen,
     },
