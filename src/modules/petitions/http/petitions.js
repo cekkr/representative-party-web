@@ -21,6 +21,8 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../../../interfaces/http/views/petitionView.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
@@ -65,6 +67,12 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
   const composeOpen = query.searchParams.get('compose') ? 'open' : '';
   const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
+  const petitionsPageInfo = paginate(filteredPetitions, { page: parsePage(query.searchParams.get('page')) });
+  const petitionsPager = renderPager(petitionsPageInfo, {
+    baseHref: '/petitions',
+    query: { stage: stageFilter === 'all' ? '' : stageFilter },
+    label: 'proposals',
+  });
   const petitionLookup = buildPetitionLookup(petitions);
   const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
   const stageFilterOptions = renderStageFilterOptions(stageFilter);
@@ -79,7 +87,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       petitionGateReasonLine,
       voteGateReasonLine,
       roleLabel: person?.role || 'guest',
-      petitionsList: renderPetitionList(filteredPetitions, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
+      petitionsList: renderPetitionList(petitionsPageInfo.items, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
         allowDelegation: delegationEnabled,
         allowVoting: modules.votes,
         allowEditing: petitionGate.allowed,
@@ -87,6 +95,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
         actorLabels,
         state,
       }),
+      petitionsPager,
       conflictList: delegationEnabled ? conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected' : 'Delegation disabled.',
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,

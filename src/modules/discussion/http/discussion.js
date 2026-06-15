@@ -15,6 +15,8 @@ import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimi
 import { recordRateLimit } from '../../ops/metrics.js';
 import { renderDiscussionList } from '../../../interfaces/http/views/discussionView.js';
 import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../../../interfaces/http/views/topicHelpers.js';
 import { renderCalloutRow } from '../../../interfaces/http/views/shared.js';
@@ -136,6 +138,13 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       ? baseEntries
       : baseEntries.filter((entry) => normalizeTopicKey(entry.topic) === topicFilterKey);
 
+  const pageInfo = paginate(discussionEntries, { page: parsePage(url?.searchParams?.get('page')) });
+  const discussionPager = renderPager(pageInfo, {
+    baseHref: '/discussion',
+    query: { topic: topicFilterKey === 'all' ? '' : topicFilterKey },
+    label: 'posts',
+  });
+
   return renderPage(
     'discussion',
     {
@@ -145,7 +154,8 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
       personStatus: person
         ? `Posting as verified ${actorLabels.actorLabel} with a blinded PID hash for accountability.`
         : 'Verify your wallet to post with accountability.',
-      discussionList: renderDiscussionList(discussionEntries, state),
+      discussionList: renderDiscussionList(pageInfo.items, state),
+      discussionPager,
       verificationPolicy: policy.requireVerification
         ? 'Wallet verification required to post.'
         : 'Wallet verification optional; posting is still tied to your session.',

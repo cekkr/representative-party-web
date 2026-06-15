@@ -3,7 +3,7 @@
 This file tracks follow-up ideas that are out of scope for the current patch but would further improve performance, reduce redundancy, or tighten UX consistency.
 
 ## Performance
-- Add pagination/cursors for discussion, forum, petitions, and social feeds to avoid full list rendering on large datasets.
+- Extend pagination to the forum and social feed (discussion + petitions now paginate via the shared `paginate`/`renderPager` helpers); consider cursor-based windows for very large datasets.
 - Cache rendered navigation links keyed by module settings to avoid rebuilding nav HTML on every request.
 - Lazy-load heavyweight admin panels (transactions, media review, topic gardener) via partial renders to shrink initial HTML payloads.
 - Maintain optional maps for frequently accessed collections (posts/media/petitions) to avoid repeated `Array.find` calls in hot paths.
@@ -112,5 +112,6 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.
 - Added a top-bar Interface settings panel with browser-local persistence (text scale, motion, compact nav, composer auto-collapse preference, partial-navigation mode) and non-blocking UI toasts for enhanced flows.
 - Added side-nav jump filtering with `Ctrl/Cmd+K` and `/` shortcuts for faster practical navigation in large module configurations.
+- Added shared `paginate`/`renderPager` helpers and applied SSR pagination (page size 20, query-preserving prev/next) to the discussion and petitions lists so large datasets no longer render in full.
 - Wired `renderActorLabel`/`resolveHandleForHash` into the remaining raw-hash spots (proposal discussion-feed widget, petition argument-map nodes, `renderUpdatedMeta`, and freeze `frozenBy`/`updatedBy` lines) so no actor hash renders as bare identity.
 - Surfaced human-readable notification titles (`humanizeNotificationType`) so `/notifications` no longer shows raw event types like `petition_created`.

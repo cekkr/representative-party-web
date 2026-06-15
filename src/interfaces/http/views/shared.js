@@ -36,6 +36,37 @@ export function renderPreviewPill(entry) {
   return '';
 }
 
+// Render prev/next pagination controls for a list. `query` holds extra params (e.g. topic
+// filter) to preserve across pages; nothing renders when there is only a single page.
+export function renderPager(pageInfo, { baseHref = '', query = {}, partial = true, label = 'items' } = {}) {
+  if (!pageInfo || pageInfo.pageCount <= 1) return '';
+  const buildHref = (page) => {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query || {})) {
+      if (value === undefined || value === null || value === '') continue;
+      params.set(key, String(value));
+    }
+    params.set('page', String(page));
+    const qs = params.toString();
+    return `${baseHref}${qs ? `?${qs}` : ''}`;
+  };
+  const partialAttr = partial ? ' data-partial' : '';
+  const prev = pageInfo.hasPrev
+    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page - 1))}"${partialAttr}>← Newer</a>`
+    : '<span class="muted tiny">← Newer</span>';
+  const next = pageInfo.hasNext
+    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page + 1))}"${partialAttr}>Older →</a>`
+    : '<span class="muted tiny">Older →</span>';
+  const summary = `Page ${pageInfo.page} of ${pageInfo.pageCount} · ${pageInfo.startIndex}-${pageInfo.endIndex} of ${pageInfo.total} ${escapeHtml(label)}`;
+  return `
+    <nav class="pager" aria-label="Pagination">
+      ${prev}
+      <span class="muted tiny">${summary}</span>
+      ${next}
+    </nav>
+  `;
+}
+
 export function renderEmptyState(message, { size = 'normal' } = {}) {
   if (!message) return '';
   const sizeClass = size === 'small' ? 'muted small' : size === 'tiny' ? 'muted tiny' : 'muted';
