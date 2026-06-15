@@ -37,6 +37,17 @@ export function buildDelegateProfile(state, delegateHash) {
     ...socialPosts.map((post) => post.createdAt),
   ]);
 
+  const uniqueOwners = countUnique(incoming, 'ownerHash');
+  const deliberationScore = computeDeliberationScore({
+    uniqueOwners,
+    votes: voteSummary,
+    petitions: petitions.length,
+    discussions: discussions.length,
+    groupEndorsements: groupEndorsements.length,
+    electionWins: electionWins.length,
+    lastActiveAt,
+  });
+
   return {
     hash: normalizedHash,
     handle,
@@ -45,7 +56,7 @@ export function buildDelegateProfile(state, delegateHash) {
     bio,
     incoming: {
       total: incoming.length,
-      uniqueOwners: countUnique(incoming, 'ownerHash'),
+      uniqueOwners,
       topics: incomingTopics,
     },
     outgoing: {
@@ -64,7 +75,47 @@ export function buildDelegateProfile(state, delegateHash) {
       groups: groupEndorsements,
       elections: electionWins,
     },
+    deliberationScore,
   };
+}
+
+// Transparent, advisory reputation signal blending trust, participation, deliberation, and
+// endorsements, scaled down for stale delegates. Caps at 100 so the badge stays comparable.
+function computeDeliberationScore({
+  uniqueOwners = 0,
+  votes = {},
+  petitions = 0,
+  discussions = 0,
+  groupEndorsements = 0,
+  electionWins = 0,
+  lastActiveAt = null,
+} = {}) {
+  const components = {
+    trust: uniqueOwners * 4,
+    participation: (votes.total || 0) * 2,
+    deliberation: discussions + petitions * 3,
+    endorsement: groupEndorsements * 2 + electionWins * 5,
+  };
+  const raw = components.trust + components.participation + components.deliberation + components.endorsement;
+  const recencyMultiplier = recencyMultiplierFor(lastActiveAt);
+  const score = Math.min(100, Math.round(raw * recencyMultiplier));
+  return {
+    score,
+    raw,
+    recencyMultiplier,
+    components,
+    risingStar: score >= 25 && uniqueOwners <= 3,
+  };
+}
+
+function recencyMultiplierFor(lastActiveAt) {
+  const parsed = Date.parse(lastActiveAt || '');
+  if (!Number.isFinite(parsed)) return 0.6;
+  const ageDays = (Date.now() - parsed) / (1000 * 60 * 60 * 24);
+  if (ageDays <= 30) return 1;
+  if (ageDays <= 90) return 0.85;
+  if (ageDays <= 180) return 0.7;
+  return 0.6;
 }
 
 function resolvePublicBio(state, session) {

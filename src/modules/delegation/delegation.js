@@ -2,22 +2,24 @@ import { persistDelegations } from '../../infra/persistence/storage.js';
 import { logTransaction } from '../transactions/registry.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { recommendDelegationForPerson } from '../groups/groups.js';
+import { findSessionByHash } from '../identity/sessions.js';
 
-// Resolve delegation choice for a topic using stored delegations or extension hooks.
-export function resolveDelegation(person, topic, state, { notify } = {}) {
-  if (!person || !person.pidHash) return null;
-  const topicKey = normalizeTopic(topic);
+// Cap how far a liquid-delegation chain is followed to bound work and guard runaway chains.
+export const MAX_DELEGATION_CHAIN_DEPTH = 8;
+
+// Resolve the first delegation hop for a topic using stored delegations, extensions, or group recs.
+function resolveFirstHop(person, topicKey, state, { notify } = {}) {
   const delegations = filterVisibleEntries(state.delegations || [], state);
   const direct = delegations.find(
     (entry) => entry.ownerHash === person.pidHash && entry.topic === topicKey,
   );
-  if (direct) return direct;
+  if (direct) return { ...direct, via: direct.via || 'direct' };
 
   const extensions = state?.extensions?.active || [];
   for (const extension of extensions) {
     if (typeof extension.resolveDelegation === 'function') {
       const result = extension.resolveDelegation({ person, topic: topicKey, delegations: state.delegations }, state);
-      if (result) return result;
+      if (result) return { ...result, via: result.via || 'extension' };
     }
   }
 
@@ -42,6 +44,111 @@ export function resolveDelegation(person, topic, state, { notify } = {}) {
   }
 
   return null;
+}
+
+// Follow direct (manual) delegations transitively from a starting delegate (liquid democracy).
+// Group/extension recommendations resolve the first hop only; subsequent hops follow explicit
+// per-topic delegations so the chain reflects choices delegates made for themselves.
+function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topicKey }) {
+  const delegations = filterVisibleEntries(state.delegations || [], state);
+  const byOwner = new Map();
+  for (const entry of delegations) {
+    if (entry.topic !== topicKey || !entry.ownerHash || !entry.delegateHash) continue;
+    if (!byOwner.has(entry.ownerHash)) byOwner.set(entry.ownerHash, entry);
+  }
+
+  const visited = new Set([startOwnerHash, firstDelegateHash]);
+  const hops = [];
+  let current = firstDelegateHash;
+  let truncated = false;
+  let cycle = false;
+  let blockedBanned = false;
+
+  while (true) {
+    const next = byOwner.get(current);
+    if (!next) break;
+    const target = next.delegateHash;
+    if (visited.has(target)) {
+      cycle = true;
+      break;
+    }
+    const session = findSessionByHash(state, target);
+    if (session?.banned) {
+      blockedBanned = true;
+      break;
+    }
+    if (hops.length >= MAX_DELEGATION_CHAIN_DEPTH) {
+      truncated = true;
+      break;
+    }
+    hops.push({ from: current, to: target, via: next.via || 'direct', provider: next.provider || 'manual' });
+    visited.add(target);
+    current = target;
+  }
+
+  return { terminal: current, hops, truncated, cycle, blockedBanned };
+}
+
+// Resolve delegation for a topic, following the liquid chain to its terminal delegate.
+export function resolveDelegation(person, topic, state, { notify } = {}) {
+  if (!person || !person.pidHash) return null;
+  const topicKey = normalizeTopic(topic);
+  const first = resolveFirstHop(person, topicKey, state, { notify });
+  if (!first || !first.delegateHash) return first;
+
+  const chain = followDelegationChain({
+    state,
+    startOwnerHash: person.pidHash,
+    firstDelegateHash: first.delegateHash,
+    topicKey,
+  });
+
+  return {
+    ...first,
+    immediateDelegateHash: first.delegateHash,
+    delegateHash: chain.terminal,
+    transitive: chain.hops.length > 0,
+    hops: chain.hops,
+    chainTruncated: chain.truncated,
+    chainCycle: chain.cycle,
+    chainBlockedBanned: chain.blockedBanned,
+  };
+}
+
+// Build a human-readable resolution path (owner → … → terminal) for chain visualization.
+export function buildDelegationChain(state, ownerHash, topic) {
+  if (!ownerHash) return null;
+  const topicKey = normalizeTopic(topic);
+  const resolved = resolveDelegation({ pidHash: ownerHash }, topicKey, state);
+  if (!resolved || !resolved.delegateHash) return null;
+  const path = [ownerHash, resolved.immediateDelegateHash || resolved.delegateHash];
+  for (const hop of resolved.hops || []) {
+    path.push(hop.to);
+  }
+  return {
+    topic: topicKey,
+    ownerHash,
+    via: resolved.via || 'direct',
+    terminal: resolved.delegateHash,
+    immediateDelegateHash: resolved.immediateDelegateHash || resolved.delegateHash,
+    transitive: Boolean(resolved.transitive),
+    hops: resolved.hops || [],
+    path: dedupePath(path),
+    truncated: Boolean(resolved.chainTruncated),
+    cycle: Boolean(resolved.chainCycle),
+    blockedBanned: Boolean(resolved.chainBlockedBanned),
+    conflict: Boolean(resolved.conflict),
+  };
+}
+
+function dedupePath(path = []) {
+  const output = [];
+  for (const hash of path) {
+    if (!hash) continue;
+    if (output[output.length - 1] === hash) continue;
+    output.push(hash);
+  }
+  return output;
 }
 
 export async function chooseDelegation({ person, topic, delegateHash, state }) {

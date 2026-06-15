@@ -34,6 +34,7 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
       delegateRole: escapeHtml(roleLabel),
       delegateStatus: escapeHtml(statusLabel),
       delegateBio: escapeHtml(bio),
+      delegateReputation: renderReputation(profile.deliberationScore),
       delegateStats: renderStats(profile),
       incomingDelegations: renderDelegationTopics('Delegations received', profile.incoming, { showOwners: true }),
       outgoingDelegations: renderDelegationTopics('Delegations set', profile.outgoing),
@@ -46,6 +47,34 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
   );
 
   return sendHtml(res, html);
+}
+
+function renderReputation(deliberationScore = {}) {
+  const score = Number.isFinite(deliberationScore?.score) ? deliberationScore.score : 0;
+  const components = deliberationScore?.components || {};
+  const multiplier = Number.isFinite(deliberationScore?.recencyMultiplier)
+    ? deliberationScore.recencyMultiplier
+    : 1;
+  const risingStar = deliberationScore?.risingStar
+    ? '<span class="pill">Rising star</span>'
+    : '';
+  const breakdown = [
+    `trust ${components.trust || 0}`,
+    `participation ${components.participation || 0}`,
+    `deliberation ${components.deliberation || 0}`,
+    `endorsement ${components.endorsement || 0}`,
+  ];
+  const recencyNote = multiplier < 1
+    ? `<p class="muted tiny">Recency factor ${multiplier.toFixed(2)} applied for inactivity.</p>`
+    : '';
+  return `
+    <div class="callout">
+      <p class="muted small">Deliberation score: <strong>${score}</strong> / 100 ${risingStar}</p>
+      <p class="muted tiny">${escapeHtml(breakdown.join(' · '))}</p>
+      ${recencyNote}
+      <p class="muted tiny">Advisory only — delegations always stay overridable per topic.</p>
+    </div>
+  `;
 }
 
 function renderStats(profile) {

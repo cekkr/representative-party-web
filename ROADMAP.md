@@ -59,6 +59,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned (links live with module metadata).
 - Module control center now groups optional modules by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) and surfaces per-lane enabled summaries for faster non-party deployments.
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
+- Liquid delegation now resolves transitively: `resolveDelegation` follows a delegate's own per-topic choices to the terminal delegate with cycle detection, a depth cap, and banned-delegate stops; `/delegation` shows an "explain my influence" chain view and delegate profiles expose an advisory deliberation score (trust/participation/deliberation/endorsement with a recency factor) plus a "rising star" cue.
 - Theme-level verbosity controls are live: admin default + per-session overrides in `/profile`, plus a top‑bar toggle and per‑page presets via Composer.
 - Composer mode now supports per-page layout ordering (including main/aside swaps), panel hiding, per-page verbosity presets, and persisted text/style + DOM order overrides for composer-keyed elements.
 - HTTP templates now live under `src/modules/<module>/templates/` with per-module controllers in `src/modules/<module>/http/` for clearer ownership (partials under `templates/partials/`).
@@ -85,8 +86,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Template hygiene: split remaining module templates into `templates/partials/` for composable subcomponents (admin, groups, discussion, delegation, notifications, profile, forum, governance).
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
 - Governance module: constitution defaults are live; community proposal/change workflow and audit trail still pending.
-- Delegation trust UX: delegate profile views are live; chain visualization and reputation metrics (deliberation score) remain.
-- Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
+- Delegation trust UX: delegate profile views, transitive chain visualization, and an advisory deliberation score are live; reputation depth (topic-expertise weighting, cross-provider reputation) remains.
+- Delegation safeguards: transitive delegation resolution (cycle/depth/banned guards) and a "rising star" discovery cue are live; decay/renewal cycles and transitive power-weight computation remain.
 - UI preferences: browser-local controls plus inline session-default saves are live; next step is optional provider-profile sync across sessions/devices.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
 - Module boundary hardening: continue separating reusable `social/community` kernel code from `e-party governance` modules (clear namespaces/contracts) so deployments can compose only what they need.

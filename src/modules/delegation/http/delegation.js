@@ -1,6 +1,6 @@
 import { getPerson } from '../../identity/person.js';
 import { evaluateAction } from '../../circle/policy.js';
-import { chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../delegation/delegation.js';
+import { buildDelegationChain, chooseDelegation, clearDelegation, listDelegationsForPerson, setDelegation } from '../../delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../groups/groups.js';
 import { getTopicConfig } from '../../topics/topicGardenerClient.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../topics/preferences.js';
@@ -66,6 +66,7 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       delegationStatus: permission.allowed ? 'Delegation preferences enabled.' : permission.message || 'Delegation blocked.',
       delegationReason: permission.allowed ? '' : permission.reason,
       delegationSuggestions,
+      effectiveDelegations: renderEffectiveDelegations({ person, state, delegations }),
       delegationList: renderDelegationList(delegations),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
@@ -107,6 +108,58 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
   return sendRedirect(res, '/delegation');
 }
 
+
+function renderEffectiveDelegations({ person, state, delegations = [] } = {}) {
+  if (!person?.pidHash) {
+    return '<p class="muted">Login to see how your delegations resolve.</p>';
+  }
+  const topics = dedupeTopics(delegations.map((entry) => entry.topic));
+  if (!topics.length) {
+    return '<p class="muted">No delegations set yet — set one below to see its effective chain.</p>';
+  }
+  const cards = [];
+  for (const topicLabel of topics) {
+    const chain = buildDelegationChain(state, person.pidHash, topicLabel);
+    if (!chain) continue;
+    cards.push(renderChainCard({ topicLabel, chain }));
+  }
+  if (!cards.length) {
+    return '<p class="muted">No effective delegations resolved.</p>';
+  }
+  return `<div class="list-stack">${cards.join('\n')}</div>`;
+}
+
+function renderChainCard({ topicLabel, chain }) {
+  const steps = chain.path
+    .map((hash, index) => {
+      const label = index === 0 ? 'You' : escapeHtml(hash);
+      const link = index === 0 || !hash
+        ? label
+        : `<a class="muted tiny" href="/delegates/${escapeHtml(hash)}" data-partial>${label}</a>`;
+      return `<span class="pill ghost">${link}</span>`;
+    })
+    .join('<span class="muted tiny"> → </span>');
+  const flags = [];
+  if (chain.transitive) flags.push('<span class="pill">Liquid chain</span>');
+  if (chain.via === 'group') flags.push('<span class="pill ghost">via group</span>');
+  if (chain.cycle) flags.push('<span class="pill warning">Cycle stopped</span>');
+  if (chain.blockedBanned) flags.push('<span class="pill warning">Banned delegate skipped</span>');
+  if (chain.truncated) flags.push('<span class="pill warning">Chain truncated</span>');
+  const hopCount = chain.hops?.length || 0;
+  const explain = chain.transitive
+    ? `Your vote flows through ${hopCount} forwarding ${hopCount === 1 ? 'step' : 'steps'} to the terminal delegate.`
+    : 'Your vote goes directly to this delegate.';
+  return `
+    <article class="discussion">
+      <div class="discussion__meta">
+        <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
+        ${flags.join(' ')}
+      </div>
+      <p class="small">${steps}</p>
+      <p class="muted tiny">${escapeHtml(explain)}</p>
+    </article>
+  `;
+}
 
 function renderDelegationList(delegations = []) {
   if (!delegations.length) {
