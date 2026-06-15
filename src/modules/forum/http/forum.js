@@ -11,6 +11,7 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { renderForum } from '../../../interfaces/http/views/forumView.js';
+import { parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { recordRateLimit } from '../../ops/metrics.js';
@@ -149,8 +150,9 @@ async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
   const resolvedUrl = url || new URL(req.url, `http://${req.headers.host}`);
   const composeOpen = resolvedUrl.searchParams.get('compose') ? 'open' : '';
   const replyOpenId = resolvedUrl.searchParams.get('reply') || '';
+  const page = parsePage(resolvedUrl.searchParams.get('page'));
   const forumEntries = filterForumEntries(state);
-  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId });
+  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId, page });
   forumData.person = activePerson;
   const html = await renderPage('forum', forumData, { wantsPartial, title: 'Forum', state });
   return sendHtml(res, html);

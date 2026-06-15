@@ -31,6 +31,8 @@ import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shar
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../../../interfaces/http/views/socialView.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
@@ -51,10 +53,16 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const followStats = summarizeFollows(state, person?.pidHash);
   const allFollows = followStats.follows;
   const feed = buildFeed(state, person, { followType: followTypeFilter || undefined, follows: allFollows });
+  const feedPage = paginate(feed, { page: parsePage(url.searchParams.get('page')) });
+  const feedPager = renderPager(feedPage, {
+    baseHref: '/social/feed',
+    query: { type: followTypeFilter || '' },
+    label: 'posts',
+  });
   const followTypeByHash = followStats.followTypeByHash;
   const followTypeCounts = followStats.followTypeCounts;
   const followTypeList = buildFollowTypeList(followTypeCounts);
-  const mediaById = buildMediaLookup(feed, state);
+  const mediaById = buildMediaLookup(feedPage.items, state);
   const permission = evaluateAction(state, person, 'post');
   const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
   const postingReasonLine = renderCalloutRow(postingReason);
@@ -70,7 +78,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       followCount: allFollows.length,
       followerCount: followStats.followerCount,
       followList: renderFollowList(allFollows),
-      feedList: renderSocialPosts(feed, {
+      feedList: renderSocialPosts(feedPage.items, {
         enableReplies: Boolean(person),
         followTypeByHash,
         mediaById,
@@ -78,6 +86,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
         openReshareId,
         state,
       }),
+      feedPager,
       followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: followTypeList }),
       followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false, types: followTypeList }),
       followPeopleDatalist: renderFollowPeopleOptions(state, person),

@@ -87,3 +87,63 @@ test('discussion list paginates across pages', async (t) => {
   assert.equal(countPosts(page2), 3, 'remaining posts on page 2');
   assert.notEqual(page1, page2);
 });
+
+test('social feed paginates across pages', async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  // social_post is rate-limited (12/min), so spread 23 posts across sessions. The feed only
+  // shows followed authors, so the viewer follows the other authors first.
+  const sessions = [];
+  for (let i = 0; i < 3; i += 1) {
+    const session = await createVerifiedSession(server.baseUrl, { pidHash: `feed-${i}` });
+    await postForm(`${server.baseUrl}/profile`, { intent: 'handle', handle: `feeduser${i}` }, { cookie: session.cookie });
+    sessions.push(session);
+  }
+  const cookie = sessions[0].cookie;
+  await postForm(`${server.baseUrl}/social/follow`, { handle: 'feeduser1', type: 'circle' }, { cookie });
+  await postForm(`${server.baseUrl}/social/follow`, { handle: 'feeduser2', type: 'circle' }, { cookie });
+
+  for (let i = 0; i < 23; i += 1) {
+    const session = sessions[i % sessions.length];
+    await postForm(
+      `${server.baseUrl}/social/post`,
+      { content: `Feed post number ${i}`, visibility: 'public' },
+      { cookie: session.cookie },
+    );
+  }
+
+  const { text: page1 } = await fetchText(`${server.baseUrl}/social/feed`, { headers: { Cookie: cookie } });
+  assert.match(page1, /Page 1 of 2/);
+  const { text: page2 } = await fetchText(`${server.baseUrl}/social/feed?page=2`, { headers: { Cookie: cookie } });
+  assert.match(page2, /Page 2 of 2/);
+  assert.notEqual(page1, page2);
+});
+
+test('forum threads paginate across pages', async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  // forum_thread is rate-limited (3 per 5 min), so spread 21 threads across sessions.
+  const sessions = [];
+  for (let i = 0; i < 8; i += 1) {
+    sessions.push(await createVerifiedSession(server.baseUrl, { pidHash: `forum-${i}` }));
+  }
+  for (let i = 0; i < 21; i += 1) {
+    const session = sessions[i % sessions.length];
+    await postForm(
+      `${server.baseUrl}/forum`,
+      { title: `Forum thread number ${i}`, content: `Body for thread ${i}`, topic: 'general' },
+      { cookie: session.cookie },
+    );
+  }
+
+  const cookie = sessions[0].cookie;
+  const { text: page1 } = await fetchText(`${server.baseUrl}/forum`, { headers: { Cookie: cookie } });
+  assert.match(page1, /Page 1 of 2/);
+  const { text: page2 } = await fetchText(`${server.baseUrl}/forum?page=2`, { headers: { Cookie: cookie } });
+  assert.match(page2, /Page 2 of 2/);
+  assert.notEqual(page1, page2);
+});

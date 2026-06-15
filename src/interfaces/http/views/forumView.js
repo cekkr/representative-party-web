@@ -6,14 +6,18 @@ import {
   renderEmptyState,
   renderEvidenceLinks,
   renderIssuerPill,
+  renderPager,
   renderPreviewPill,
   resolveTopicBreadcrumb,
 } from './shared.js';
+import { paginate } from '../../../shared/utils/pagination.js';
 
 export function renderForum(entries, person, state, options = {}) {
   const { threads, commentsByThread } = splitForumEntries(entries);
+  const pageInfo = paginate(threads, { page: options.page || 1 });
   return {
-    threads: renderThreads(threads, commentsByThread, state, options),
+    threads: renderThreads(pageInfo.items, commentsByThread, state, options),
+    threadsPager: renderPager(pageInfo, { baseHref: '/forum', label: 'threads' }),
     personHandle: resolvePersonHandle(person),
     roleLabel: person?.role || 'guest',
     composeOpen: options.composeOpen || '',
