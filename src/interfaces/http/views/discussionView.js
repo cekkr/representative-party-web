@@ -41,7 +41,7 @@ export function renderDiscussionList(entries, state) {
             ${evidenceBlock}
           </div>
           <div class="topic-footer">
-            ${renderAuthorHashLine(entry.authorHash)}
+            ${renderAuthorHashLine(entry.authorHash, { state })}
           </div>
         </article>
       `;

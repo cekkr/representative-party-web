@@ -4,7 +4,7 @@ import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreview
 
 export function renderSocialPosts(
   posts,
-  { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId } = {},
+  { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId, state } = {},
 ) {
   if (!posts || posts.length === 0) {
     return renderSocialOnboarding();
@@ -54,7 +54,7 @@ export function renderSocialPosts(
           ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
           ${mentionsLine}
           ${tagsLine}
-          ${renderAuthorHashLine(post.authorHash)}
+          ${renderAuthorHashLine(post.authorHash, { state })}
           ${enableReplies ? renderReplyForm(post, { open: openReplyId === post.id }) : ''}
           ${enableReplies && !mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
         </article>

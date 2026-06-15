@@ -1,5 +1,6 @@
 import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../../../modules/topics/registry.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { renderActorLabel } from './actorLabel.js';
 
 export function resolveTopicBreadcrumb(entry, state, cache) {
   const cacheKey = buildTopicCacheKey(entry);
@@ -47,11 +48,18 @@ export function renderCalloutRow(message, { className = 'muted small' } = {}) {
   return `<p class="${className}">${escapeHtml(String(text))}</p>`;
 }
 
-export function renderAuthorHashLine(value, { size = 'small', label = 'Author hash' } = {}) {
+export function renderAuthorHashLine(value, { size = 'small', label, state } = {}) {
   const resolved = value === null || value === undefined ? '' : String(value);
   if (!resolved) return '';
   const className = size === 'tiny' ? 'muted tiny' : 'muted small';
-  return `<p class="${className}">${escapeHtml(label)}: ${escapeHtml(resolved)}</p>`;
+  // When state is available, resolve the hash to a readable @handle (with the short hash
+  // kept as a secondary cue); fall back to the raw hash for state-less callers.
+  if (state) {
+    const effectiveLabel = label || 'Author';
+    return `<p class="${className}">${escapeHtml(effectiveLabel)}: ${renderActorLabel(state, resolved)}</p>`;
+  }
+  const effectiveLabel = label || 'Author hash';
+  return `<p class="${className}">${escapeHtml(effectiveLabel)}: ${escapeHtml(resolved)}</p>`;
 }
 
 export function renderEvidenceLinks(links = [], { limit = 4, label = 'Evidence' } = {}) {

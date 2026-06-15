@@ -15,7 +15,7 @@ import { listTransactions } from '../../transactions/registry.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import {
   renderHomeAccessList,
   renderHomeList,
@@ -153,7 +153,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
         : 'Governance modules are disabled for this provider.',
     },
   );
-  const federationList = renderHomeList(transactionEntries.map((entry) => formatFederationItem(entry)), {
+  const federationList = renderHomeList(transactionEntries.map((entry) => formatFederationItem(entry, state)), {
     emptyMessage: 'No recent audit events recorded yet.',
   });
 
@@ -438,12 +438,13 @@ function formatGovernanceItem(entry = {}) {
   };
 }
 
-function formatFederationItem(entry = {}) {
+function formatFederationItem(entry = {}, state) {
   const createdAt = formatTimestamp(entry.createdAt, 'Unknown date');
+  const actorLabel = entry.actorHash ? `@${resolveHandleForHash(state, entry.actorHash)}` : '';
   return {
     title: humanizeTransactionType(entry.type),
     summary: summarizeTransaction(entry),
-    meta: `${createdAt}${entry.actorHash ? ` · ${entry.actorHash}` : ''}`,
+    meta: `${createdAt}${actorLabel ? ` · ${actorLabel}` : ''}`,
     href: '/transactions',
     partial: true,
     pills: [entry.validationStatus === 'preview' ? { label: 'Preview', tone: 'warning' } : { label: 'Validated' }],

@@ -6,6 +6,54 @@ import { pickWinner } from '../groups/groupElections.js';
 
 const PUBLIC_BIO_KEYS = ['publicbio', 'public_bio', 'delegatebio', 'delegate_bio'];
 
+// Lightweight directory of known verified people for discovery (no per-person full scans):
+// incoming-delegation tallies are computed in a single pass over the delegation list.
+export function listPeopleDirectory(state, { query = '' } = {}) {
+  const sessions = state?.sessions ? [...state.sessions.values()] : [];
+  const delegations = filterVisibleEntries(state.delegations || [], state);
+  const incomingByHash = new Map();
+  for (const entry of delegations) {
+    if (!entry.delegateHash) continue;
+    const bucket = incomingByHash.get(entry.delegateHash) || { total: 0, owners: new Set() };
+    bucket.total += 1;
+    if (entry.ownerHash) bucket.owners.add(entry.ownerHash);
+    incomingByHash.set(entry.delegateHash, bucket);
+  }
+
+  const normalizedQuery = String(query || '').trim().toLowerCase().replace(/^@+/, '');
+  const people = [];
+  const seen = new Set();
+  for (const session of sessions) {
+    if (!session || session.status !== 'verified' || !session.pidHash) continue;
+    if (seen.has(session.pidHash)) continue;
+    seen.add(session.pidHash);
+    const incoming = incomingByHash.get(session.pidHash) || { total: 0, owners: new Set() };
+    const role = session.role || 'user';
+    const handle = session.handle || '';
+    if (normalizedQuery) {
+      const haystack = `${handle} ${session.pidHash} ${role}`.toLowerCase();
+      if (!haystack.includes(normalizedQuery)) continue;
+    }
+    people.push({
+      hash: session.pidHash,
+      handle,
+      role,
+      banned: Boolean(session.banned),
+      incomingTotal: incoming.total,
+      incomingUniqueOwners: incoming.owners.size,
+      isDelegate: role === 'delegate' || incoming.total > 0,
+    });
+  }
+
+  people.sort(
+    (a, b) =>
+      Number(b.isDelegate) - Number(a.isDelegate) ||
+      b.incomingUniqueOwners - a.incomingUniqueOwners ||
+      String(a.handle || a.hash).localeCompare(String(b.handle || b.hash)),
+  );
+  return people;
+}
+
 export function buildDelegateProfile(state, delegateHash) {
   const normalizedHash = sanitizeText(delegateHash || '', 120);
   const session = normalizedHash ? findSessionByHash(state, normalizedHash) : null;

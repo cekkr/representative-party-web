@@ -104,7 +104,7 @@ export function renderPetitionList(
           ${structuredOutline}
           ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
-          ${renderAuthorHashLine(petition.authorHash || 'anonymous')}
+          ${renderAuthorHashLine(petition.authorHash || 'anonymous', { state })}
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
           ${
             hasSigned
@@ -132,7 +132,7 @@ export function renderPetitionList(
           </form>
           `
           }
-          ${renderDiscussionBlock(petition, comments)}
+          ${renderDiscussionBlock(petition, comments, state)}
           ${renderDraftUpdateForm(petition, {
             canEdit,
             allowEditing,
@@ -352,10 +352,10 @@ function renderRevisionHistory(petition, state) {
   `;
 }
 
-function renderDiscussionBlock(petition, comments) {
+function renderDiscussionBlock(petition, comments, state) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
-  const discussionList = renderPetitionComments(comments);
+  const discussionList = renderPetitionComments(comments, state);
   const stanceSummary = renderCommentStanceSummary(comments);
   const argumentData = collectArgumentNodes(comments);
   const argumentMap = renderArgumentMap(argumentData);
@@ -415,7 +415,7 @@ function renderDiscussionBlock(petition, comments) {
   `;
 }
 
-function renderPetitionComments(comments) {
+function renderPetitionComments(comments, state) {
   if (!comments.length) {
     return renderEmptyState('No discussion notes yet.', { size: 'small' });
   }
@@ -455,7 +455,7 @@ function renderPetitionComments(comments) {
           <p>${escapeHtml(comment.content)}</p>
           ${renderEvidenceLinks(evidenceLinks)}
           ${argumentId}
-          ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
+          ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state })}
         </article>
       `;
     })

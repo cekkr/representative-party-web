@@ -54,10 +54,10 @@ function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
             <p>${escapeHtml(thread.content)}</p>
           </div>
           <div class="topic-footer">
-            ${renderAuthorHashLine(thread.authorHash || 'anonymous')}
+            ${renderAuthorHashLine(thread.authorHash || 'anonymous', { state })}
           </div>
           <div class="reply-list">
-            ${renderComments(threadComments)}
+            ${renderComments(threadComments, state)}
           </div>
           <details class="reply-composer" ${replyOpen}>
             <summary>
@@ -108,7 +108,7 @@ function splitForumEntries(entries = []) {
   return { threads, commentsByThread };
 }
 
-function renderComments(comments) {
+function renderComments(comments, state) {
   if (!comments.length) {
     return renderEmptyState('No comments yet.', { size: 'small' });
   }
@@ -131,7 +131,7 @@ function renderComments(comments) {
             </div>
             <p class="reply-card__text">${escapeHtml(comment.content)}</p>
             ${evidenceBlock}
-            ${renderAuthorHashLine(comment.authorHash || 'anonymous')}
+            ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state })}
           </div>
         </article>
       `;

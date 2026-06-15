@@ -34,15 +34,19 @@
         <input name="topic" list="delegation-topics" placeholder="general" />
       </label>
       <label class="field">
-        <span>Delegate hash</span>
-        <input name="delegateHash" placeholder="delegate-hash" required />
+        <span>Delegate</span>
+        <input name="delegateHash" list="delegation-people" placeholder="search by handle" autocomplete="off" required />
       </label>
     </div>
+    <p class="muted tiny">Start typing a handle and pick a person. Don't know who? Browse the People directory.</p>
     <div class="cta-row">
       <button class="cta" type="submit">Save delegation</button>
-      <a class="ghost" href="/groups" data-partial>Find delegates</a>
+      <a class="ghost" href="/delegates" data-partial>Browse people</a>
     </div>
   </form>
+  <datalist id="delegation-people">
+    {{peopleDatalist}}
+  </datalist>
   <form class="stack" method="post" action="/delegation" data-enhance="delegation-clear">
     <input type="hidden" name="intent" value="clear" />
     <label class="field">

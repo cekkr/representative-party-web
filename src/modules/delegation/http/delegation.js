@@ -12,6 +12,9 @@ import {
 } from '../../delegation/delegation.js';
 import { recommendDelegationForPerson } from '../../groups/groups.js';
 import { getTopicConfig } from '../../topics/topicGardenerClient.js';
+import { listPeopleDirectory } from '../../delegation/delegateProfiles.js';
+import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
+import { renderActorLabel, resolveHandleForHash } from '../../../interfaces/http/views/actorLabel.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey } from '../../topics/preferences.js';
 import { isModuleEnabled } from '../../circle/modules.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
@@ -76,8 +79,9 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       delegationReason: permission.allowed ? '' : permission.reason,
       delegationSuggestions,
       effectiveDelegations: renderEffectiveDelegations({ person, state, delegations }),
-      delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state) }),
+      delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state), state }),
       delegationDecayNote: renderDecayNote(getDelegationDecayDays(state)),
+      peopleDatalist: renderPeopleDatalist(state, person),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
       topicAnchors: formatTopicList(topicConfig.anchors || []),
@@ -114,11 +118,18 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
     }
     return sendRedirect(res, '/delegation');
   }
-  const delegateHash = sanitizeText(body.delegateHash || '', 80);
-  if (!delegateHash) {
-    return sendJson(res, 400, { error: 'missing_delegate', message: 'Delegate hash required.' });
+  const rawTarget = sanitizeText(body.delegateHash || '', 80);
+  if (!rawTarget) {
+    return sendJson(res, 400, { error: 'missing_delegate', message: 'Pick a person to delegate to.' });
   }
-  await setDelegation({ person, topic, delegateHash, provider: 'manual', state });
+  const resolved = resolveDelegateTarget(state, rawTarget);
+  if (!resolved) {
+    return sendJson(res, 404, {
+      error: 'unknown_delegate',
+      message: 'No verified person matches that handle or hash. Browse People to find a delegate.',
+    });
+  }
+  await setDelegation({ person, topic, delegateHash: resolved, provider: 'manual', state });
   if (wantsPartial) {
     return renderDelegation({ req, res, state, wantsPartial });
   }
@@ -138,7 +149,7 @@ function renderEffectiveDelegations({ person, state, delegations = [] } = {}) {
   for (const topicLabel of topics) {
     const chain = buildDelegationChain(state, person.pidHash, topicLabel);
     if (!chain) continue;
-    cards.push(renderChainCard({ topicLabel, chain }));
+    cards.push(renderChainCard({ state, topicLabel, chain }));
   }
   if (!cards.length) {
     return '<p class="muted">No effective delegations resolved.</p>';
@@ -146,13 +157,14 @@ function renderEffectiveDelegations({ person, state, delegations = [] } = {}) {
   return `<div class="list-stack">${cards.join('\n')}</div>`;
 }
 
-function renderChainCard({ topicLabel, chain }) {
+function renderChainCard({ state, topicLabel, chain }) {
   const steps = chain.path
     .map((hash, index) => {
-      const label = index === 0 ? 'You' : escapeHtml(hash);
-      const link = index === 0 || !hash
-        ? label
-        : `<a class="muted tiny" href="/delegates/${escapeHtml(hash)}" data-partial>${label}</a>`;
+      if (index === 0) return '<span class="pill ghost">You</span>';
+      const label = renderActorLabel(state, hash, { showHash: false });
+      const link = hash
+        ? `<a href="/delegates/${escapeHtml(hash)}" data-partial>${label}</a>`
+        : label;
       return `<span class="pill ghost">${link}</span>`;
     })
     .join('<span class="muted tiny"> → </span>');
@@ -178,6 +190,32 @@ function renderChainCard({ topicLabel, chain }) {
   `;
 }
 
+// Resolve a typed delegate reference (handle or hash) to a known verified person's hash.
+function resolveDelegateTarget(state, input) {
+  const value = String(input || '').trim().replace(/^@+/, '');
+  if (!value) return null;
+  const byHandle = findSessionByHandle(state, value);
+  if (byHandle?.pidHash) return byHandle.pidHash;
+  const byHash = findSessionByHash(state, value);
+  if (byHash?.pidHash) return byHash.pidHash;
+  return null;
+}
+
+// Datalist of verified people so the delegate field autocompletes handles instead of
+// forcing the user to know a raw hash. Self is excluded.
+function renderPeopleDatalist(state, person) {
+  const people = listPeopleDirectory(state).filter((entry) => entry.hash !== person?.pidHash);
+  const options = people
+    .map((entry) => {
+      const value = entry.handle || entry.hash;
+      const handleLabel = resolveHandleForHash(state, entry.hash);
+      const roleLabel = entry.isDelegate ? `${entry.role} · delegate` : entry.role;
+      return `<option value="${escapeHtml(value)}">@${escapeHtml(handleLabel)} · ${escapeHtml(roleLabel)}</option>`;
+    })
+    .join('\n');
+  return options;
+}
+
 function renderDecayNote(decayDays = 0) {
   if (!decayDays) {
     return '<p class="muted tiny">Delegation decay is off — preferences stay active until cleared.</p>';
@@ -197,7 +235,7 @@ function renderFreshnessPill(freshness) {
   return '<span class="pill ghost">Active</span>';
 }
 
-function renderDelegationList(delegations = [], { decayDays = 0 } = {}) {
+function renderDelegationList(delegations = [], { decayDays = 0, state } = {}) {
   if (!delegations.length) {
     return '<p class="muted">No delegation preferences yet.</p>';
   }
@@ -205,10 +243,13 @@ function renderDelegationList(delegations = [], { decayDays = 0 } = {}) {
   const items = delegations
     .map((entry) => {
       const createdAt = formatTimestamp(entry.renewedAt || entry.createdAt);
-      const delegateHash = escapeHtml(entry.delegateHash || 'unknown');
+      const delegateHashAttr = escapeHtml(entry.delegateHash || '');
+      const delegateLabel = entry.delegateHash
+        ? renderActorLabel(state, entry.delegateHash, { showHash: true })
+        : 'unknown';
       const topicValue = escapeHtml(entry.topic || 'general');
       const profileLink = entry.delegateHash
-        ? `<a class="muted tiny" href="/delegates/${delegateHash}" data-partial>Profile</a>`
+        ? `<a class="muted tiny" href="/delegates/${delegateHashAttr}" data-partial>Profile</a>`
         : '';
       const previewPill = renderPreviewPill(entry);
       const issuerPill = renderIssuerPill(entry);
@@ -226,7 +267,7 @@ function renderDelegationList(delegations = [], { decayDays = 0 } = {}) {
         <div class="list-row">
           <div>
             <p class="small">${topicValue}</p>
-            <p class="muted tiny">delegate ${delegateHash}${profileLink ? ` · ${profileLink}` : ''}</p>
+            <p class="muted tiny">delegate ${delegateLabel}${profileLink ? ` · ${profileLink}` : ''}</p>
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(entry.provider || 'manual')}</span>
@@ -258,7 +299,7 @@ function renderDelegationSuggestions({ person, state, topics = [], delegations =
     const rec = recommendDelegationForPerson(person, topicKey, state);
     if (!rec?.suggestions?.length) continue;
     const manual = delegations.find((entry) => normalizeTopicKey(entry.topic) === topicKey);
-    cards.push(renderSuggestionCard({ topicLabel, topicKey, rec, manual }));
+    cards.push(renderSuggestionCard({ state, topicLabel, topicKey, rec, manual }));
   }
 
   if (!cards.length) {
@@ -267,16 +308,16 @@ function renderDelegationSuggestions({ person, state, topics = [], delegations =
   return `<div class="list-stack">${cards.join('\n')}</div>`;
 }
 
-function renderSuggestionCard({ topicLabel, topicKey, rec, manual }) {
+function renderSuggestionCard({ state, topicLabel, topicKey, rec, manual }) {
   const conflictPill = rec.conflict ? '<span class="pill warning">Conflict</span>' : '<span class="pill ghost">Suggested</span>';
   const manualNote = manual
-    ? `<p class="muted small">Manual override set: ${escapeHtml(manual.delegateHash)}.</p>`
+    ? `<p class="muted small">Manual override set: ${renderActorLabel(state, manual.delegateHash, { showHash: false })}.</p>`
     : '';
   const conflictNote = rec.conflict
     ? `<p class="muted small">Conflict rule: ${escapeHtml(rec.conflictRule || 'highest_priority')}. Choose a delegate.</p>`
     : '';
   const rows = rec.suggestions
-    .map((suggestion) => renderSuggestionRow({ suggestion, topicKey, chosen: rec.chosen }))
+    .map((suggestion) => renderSuggestionRow({ state, suggestion, topicKey, chosen: rec.chosen }))
     .join('\n');
 
   return `
@@ -294,7 +335,7 @@ function renderSuggestionCard({ topicLabel, topicKey, rec, manual }) {
   `;
 }
 
-function renderSuggestionRow({ suggestion, topicKey, chosen }) {
+function renderSuggestionRow({ state, suggestion, topicKey, chosen }) {
   const isChosen = chosen && chosen.delegateHash === suggestion.delegateHash;
   const meta = formatSuggestionMeta(suggestion);
   const chosenPill = isChosen ? '<span class="pill">Chosen</span>' : '';
@@ -304,7 +345,7 @@ function renderSuggestionRow({ suggestion, topicKey, chosen }) {
   return `
     <div class="list-row">
       <div>
-        <p class="small">${escapeHtml(suggestion.delegateHash)}</p>
+        <p class="small">${renderActorLabel(state, suggestion.delegateHash, { showHash: true })}</p>
         <p class="muted tiny">${escapeHtml(meta)}</p>
       </div>
       <div>

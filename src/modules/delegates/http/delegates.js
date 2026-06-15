@@ -1,12 +1,67 @@
 import { isModuleEnabled } from '../../circle/modules.js';
 import { getPerson } from '../../identity/person.js';
-import { buildDelegateProfile } from '../../delegation/delegateProfiles.js';
+import { buildDelegateProfile, listPeopleDirectory } from '../../delegation/delegateProfiles.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { getActorLabels, renderActorLabel, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderModuleDisabled } from '../../../interfaces/http/views/moduleGate.js';
+
+export async function renderDelegateDirectory({ req, res, state, wantsPartial, url }) {
+  if (!isModuleEnabled(state, 'delegation')) {
+    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'delegation' });
+  }
+  const person = getPerson(req, state);
+  const query = sanitizeText(url?.searchParams?.get('q') || '', 64);
+  const people = listPeopleDirectory(state, { query });
+  const actorLabels = getActorLabels(state);
+
+  const html = await renderPage(
+    'delegate-directory',
+    {
+      person,
+      personHandle: resolvePersonHandle(person),
+      roleLabel: person?.role || 'guest',
+      directoryQuery: escapeHtml(query),
+      directoryActorPlural: escapeHtml(actorLabels.actorLabelPluralTitle),
+      directoryCount: String(people.length),
+      directoryList: renderDirectoryList(state, people, actorLabels),
+    },
+    { wantsPartial, title: 'People & delegates', state },
+  );
+  return sendHtml(res, html);
+}
+
+function renderDirectoryList(state, people = [], actorLabels = {}) {
+  if (!people.length) {
+    return '<p class="muted">No matching people yet. Verified members appear here once they join.</p>';
+  }
+  const actorLabel = actorLabels.actorLabel || 'user';
+  const rows = people
+    .map((entry) => {
+      const label = renderActorLabel(state, entry.hash, { showHash: true });
+      const roleLabel = entry.banned ? `${entry.role} · banned` : entry.role;
+      const delegateBadge = entry.isDelegate ? '<span class="pill ghost">Delegate</span>' : '';
+      const received = entry.incomingTotal
+        ? `Receives ${entry.incomingTotal} delegation${entry.incomingTotal === 1 ? '' : 's'} from ${entry.incomingUniqueOwners} ${entry.incomingUniqueOwners === 1 ? actorLabel : (actorLabels.actorLabelPlural || 'users')}`
+        : 'No delegations received yet';
+      return `
+        <div class="list-row">
+          <div>
+            <p class="small">${label}</p>
+            <p class="muted tiny">${escapeHtml(roleLabel)} · ${escapeHtml(received)}</p>
+          </div>
+          <div>
+            ${delegateBadge}
+            <a class="ghost" href="/delegates/${escapeHtml(entry.hash)}" data-partial>View profile</a>
+          </div>
+        </div>
+      `;
+    })
+    .join('\n');
+  return `<div class="list-stack">${rows}</div>`;
+}
 
 export async function renderDelegateProfile({ req, res, state, wantsPartial, params }) {
   if (!isModuleEnabled(state, 'delegation')) {
@@ -18,7 +73,7 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
     return sendJson(res, 400, { error: 'missing_delegate', message: 'Delegate hash required.' });
   }
   const profile = buildDelegateProfile(state, delegateHash);
-  const handleLabel = profile.handle || 'Unknown handle';
+  const handleLabel = profile.handle || resolveHandleForHash(state, profile.hash || delegateHash);
   const roleLabel = profile.role || 'unknown';
   const statusLabel = profile.banned ? 'banned' : 'active';
   const bio = profile.bio || 'No public bio on file. Add a "publicBio" field in profile settings to share.';

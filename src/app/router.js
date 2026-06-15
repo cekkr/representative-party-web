@@ -24,7 +24,7 @@ import { getExtensions, toggleExtension } from '../interfaces/http/controllers/e
 import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../modules/notifications/http/notifications.js';
 import { renderProfile, updateProfileAttributes } from '../modules/profile/http/profile.js';
 import { renderDelegation, resolveConflict, updateDelegation } from '../modules/delegation/http/delegation.js';
-import { renderDelegateProfile } from '../modules/delegates/http/delegates.js';
+import { renderDelegateDirectory, renderDelegateProfile } from '../modules/delegates/http/delegates.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
   renderSocialFeed,
@@ -90,6 +90,7 @@ const routes = [
   { method: 'GET', path: '/delegation', action: renderDelegation },
   { method: 'POST', path: '/delegation', action: updateDelegation },
   { method: 'POST', path: '/delegation/conflict', action: resolveConflict },
+  { method: 'GET', path: '/delegates', action: renderDelegateDirectory },
   {
     method: 'GET',
     prefix: '/delegates/',

@@ -19,8 +19,9 @@ import {
   renderProfileSummary,
   renderUiPreferencesForm,
 } from '../../../interfaces/http/views/profileView.js';
-import { invalidateSessionIndex } from '../../identity/sessions.js';
+import { invalidateSessionIndex, validateHandleChoice } from '../../identity/sessions.js';
 import { persistSessions } from '../../../infra/persistence/storage.js';
+import { logTransaction } from '../../transactions/registry.js';
 
 export async function renderProfile({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -34,6 +35,42 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
   }
   const body = await readRequestBody(req);
   const intent = body.intent || 'profile';
+  if (intent === 'handle') {
+    const currentSession = state.sessions.get(person.sessionId);
+    if (!currentSession) {
+      return sendJson(res, 404, { error: 'session_not_found', message: 'Session not found.' });
+    }
+    const result = validateHandleChoice(state, body.handle, { sessionId: person.sessionId });
+    if (!result.ok) {
+      return renderProfilePage({
+        req,
+        res,
+        state,
+        wantsPartial,
+        person,
+        handleErrors: [result.error],
+        handleValue: String(body.handle || ''),
+      });
+    }
+    const previousHandle = currentSession.handle || person.handle;
+    const next = { ...currentSession, handle: result.handle };
+    state.sessions.set(person.sessionId, next);
+    invalidateSessionIndex(state);
+    await persistSessions(state);
+    await logTransaction(state, {
+      type: 'handle_set',
+      actorHash: person.pidHash,
+      payload: { handle: result.handle, previousHandle },
+    });
+    return renderProfilePage({
+      req,
+      res,
+      state,
+      wantsPartial,
+      person: { ...person, ...next },
+      handleFlash: `Handle updated to @${result.handle}.`,
+    });
+  }
   if (intent === 'ui-preferences') {
     const currentSession = state.sessions.get(person.sessionId);
     if (!currentSession) {
@@ -128,6 +165,9 @@ async function renderProfilePage({
   uiFlash,
   entry,
   consentChecked,
+  handleErrors = [],
+  handleValue,
+  handleFlash,
 }) {
   const actorLabels = getActorLabels(state);
   const providerFields = normalizeProviderFields(state.profileStructures || []);
@@ -159,6 +199,13 @@ async function renderProfilePage({
     updatedAt,
   });
   const profileSummary = renderProfileSummary(person, actorLabels);
+  const handleForm = renderHandleForm({
+    person,
+    actorLabels,
+    errors: handleErrors,
+    value: handleValue,
+    flash: handleFlash,
+  });
   const defaultVerbosity = normalizeVerbosityMode(state.settings?.verbosityMode) || 'full';
   const overrideVerbosity = normalizeVerbosityMode(person?.uiVerbosity);
   const effectiveVerbosity = overrideVerbosity || defaultVerbosity;
@@ -181,6 +228,7 @@ async function renderProfilePage({
       roleLabel: person?.role || 'guest',
       profileForm,
       profileSummary,
+      handleForm,
       profileFlash,
       uiPreferencesForm,
       profileSchemaNote,
@@ -189,6 +237,34 @@ async function renderProfilePage({
     { wantsPartial, title: 'Profile', state },
   );
   return sendHtml(res, html);
+}
+
+function renderHandleForm({ person, actorLabels, errors = [], value, flash } = {}) {
+  if (!person) {
+    return '<p class="muted small">Verify a session to choose a handle.</p>';
+  }
+  const actorLabel = actorLabels?.actorLabel || 'user';
+  const current = escapeHtml(person.handle || '');
+  const inputValue = escapeHtml(value ?? person.handle ?? '');
+  const flashBlock = flash ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>` : '';
+  const errorBlock = errors.length
+    ? `<div class="callout warning"><ul class="plain">${errors
+        .map((error) => `<li class="muted small">${escapeHtml(error)}</li>`)
+        .join('')}</ul></div>`
+    : '';
+  return `
+    ${flashBlock}
+    ${errorBlock}
+    <form class="stack" method="post" action="/profile" data-enhance="profile-handle">
+      <input type="hidden" name="intent" value="handle" />
+      <label class="field">
+        <span>Public handle</span>
+        <input name="handle" value="${inputValue}" placeholder="your-handle" maxlength="30" required />
+      </label>
+      <p class="muted tiny">This is how other ${escapeHtml(actorLabels?.actorLabelPlural || 'users')} see you across the Circle (currently <strong>@${current || actorLabel}</strong>). Letters, numbers, dashes, underscores; 3-30 characters. Your blinded hash stays the canonical identifier.</p>
+      <button class="cta" type="submit">Save handle</button>
+    </form>
+  `;
 }
 
 function findProfileAttributes(state, sessionId) {

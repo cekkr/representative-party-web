@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { key: 'petitions', label: 'Proposals', href: '/petitions', module: 'petitions', partial: true, match: { prefix: '/petitions' } },
   { key: 'governance', label: 'Governance', href: '/governance', partial: true, match: { prefix: '/governance' } },
   { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true, match: { prefix: '/delegation' } },
+  { key: 'delegates', label: 'People', href: '/delegates', module: 'delegation', partial: true, match: { prefix: '/delegates' } },
   { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true, match: { prefix: '/groups' } },
   {
     key: 'notifications',
@@ -58,7 +59,7 @@ const NAV_ITEMS = [
 const NAV_GROUPS = [
   { key: 'start', label: 'Workspace', keys: ['home', 'auth', 'profile', 'notifications'] },
   { key: 'conversation', label: 'Social/community', keys: ['social', 'discussion', 'forum'] },
-  { key: 'governance', label: 'E-party governance', keys: ['petitions', 'delegation', 'groups', 'governance'] },
+  { key: 'governance', label: 'E-party governance', keys: ['petitions', 'delegation', 'delegates', 'groups', 'governance'] },
   { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
 ];
 

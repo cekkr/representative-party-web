@@ -28,7 +28,7 @@ import { notifyMediaViewRequest, notifySocialParticipants } from '../../social/n
 import { logTransaction } from '../../transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderFollowList, renderSocialPosts } from '../../../interfaces/http/views/socialView.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
@@ -76,9 +76,11 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
         mediaById,
         openReplyId,
         openReshareId,
+        state,
       }),
       followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: followTypeList }),
       followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false, types: followTypeList }),
+      followPeopleDatalist: renderFollowPeopleOptions(state, person),
       followTypeFilter,
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
@@ -627,4 +629,22 @@ function buildFollowTypeList(counts = new Map()) {
 function buildFollowTypeAllLabel(count) {
   const total = Number.isFinite(count) ? count : 0;
   return total > 0 ? `All (${total})` : 'All';
+}
+
+// Datalist of verified people (with chosen handles) so the follow field autocompletes
+// real handles instead of asking the user to recall a generated identifier. Self excluded.
+function renderFollowPeopleOptions(state, person) {
+  const sessions = state?.sessions ? [...state.sessions.values()] : [];
+  const seen = new Set();
+  const options = [];
+  for (const session of sessions) {
+    if (!session || session.status !== 'verified' || !session.handle) continue;
+    if (session.pidHash && session.pidHash === person?.pidHash) continue;
+    const handle = String(session.handle);
+    if (seen.has(handle.toLowerCase())) continue;
+    seen.add(handle.toLowerCase());
+    const role = session.role || 'user';
+    options.push(`<option value="${escapeHtml(handle)}">@${escapeHtml(handle)} · ${escapeHtml(role)}</option>`);
+  }
+  return options.join('\n');
 }

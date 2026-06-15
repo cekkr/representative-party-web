@@ -25,6 +25,7 @@ const TEMPLATE_MODULES = {
   groups: 'groups',
   delegation: 'delegation',
   'delegate-profile': 'delegates',
+  'delegate-directory': 'delegates',
   notifications: 'notifications',
   profile: 'profile',
   social: 'social',

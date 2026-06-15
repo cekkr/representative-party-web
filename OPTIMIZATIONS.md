@@ -21,6 +21,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Memoize petition argument-map trees and structured-outline rendering so large proposal pages avoid repeated traversal work.
 - Cache sorted viewport element lists and build locator indexes in `agent-viewport` when running many assertions to avoid repeated sort/filter passes.
 - Cache delegate profile stats (delegations, votes, activity totals) to avoid scanning full collections on every profile view.
+- `renderActorLabel`/`resolveHandleForHash` call `findSessionByHash` per actor per render (feeds/lists can resolve the same hashes repeatedly); build a per-request hash→handle memo (the session index is already cached, but the lookup + fallback synthesis repeats) when rendering large lists.
 - Memoize the deliberation-score inputs alongside delegate profile stats so the reputation badge does not re-scan votes/petitions/discussions per profile render.
 - Build the per-topic `byOwner` delegation map once per request (or cache by topic + delegations revision) instead of rebuilding it on every `resolveDelegation`/`buildDelegationChain` call when resolving many topics (e.g., the `/delegation` effective-chains view or batch auto-vote resolution).
 - Memoize `getDelegationDecayDays`/`activeDelegations` per request: each `resolveDelegation` call re-reads + normalizes governance settings and re-filters/re-decays the full delegations list, so the effective-chains view (one call per topic) repeats that work N times.
@@ -47,6 +48,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralize module-lane definitions (social/community vs e-party governance vs federation) so admin, nav, and home summaries cannot drift.
 
 ## UX Consistency
+- Finish wiring `renderActorLabel`/`resolveHandleForHash` into the remaining raw-hash spots that lack `state` in scope: the standalone proposal discussion-feed widget (`renderProposalDiscussionFeed` "Comment by …"), petition argument-map nodes (`renderArgumentNode`), and `renderUpdatedMeta`/freeze `frozenBy`/`updatedBy` lines in `petitionView.js` (thread `state` or pre-resolve handles in the controller).
+- Surface human-readable notification titles instead of raw event types (e.g. `petition_created`) in `/notifications` (P1 follow-up from the UI audit).
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
