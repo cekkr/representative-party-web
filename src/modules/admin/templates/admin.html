@@ -227,7 +227,7 @@
 <section class="panel" id="governance-settings">
   <p class="eyebrow">Governance</p>
   <h2>Digital constitution defaults</h2>
-  <p class="muted small">These defaults inform proposal quorum and stage timing. Community proposal workflows are forthcoming.</p>
+  <p class="muted small">These defaults inform proposal quorum and stage timing. Community change proposals can be reviewed below.</p>
   <p class="muted small">Last updated: {{governanceUpdatedAt}}</p>
   {{governanceErrors}}
   <form class="stack" method="post" action="/admin" data-enhance="admin">
@@ -284,6 +284,14 @@
       <button class="ghost" type="submit">Save governance defaults</button>
     </div>
   </form>
+  <div class="stack">
+    <p class="muted small">Community change proposals</p>
+    {{governanceProposalList}}
+  </div>
+  <div class="stack">
+    <p class="muted small">Governance history</p>
+    {{governanceHistoryList}}
+  </div>
 </section>
 
 <section class="panel" id="topic-gardener-review">

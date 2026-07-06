@@ -16,7 +16,7 @@ import {
 } from '../modules/petitions/http/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../modules/forum/http/forum.js';
 import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../modules/groups/http/groups.js';
-import { renderGovernance } from '../modules/governance/http/governance.js';
+import { proposeGovernanceChange, renderGovernance } from '../modules/governance/http/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
 import { renderHome } from '../modules/home/http/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
@@ -49,6 +49,7 @@ const routes = [
   { method: 'POST', path: '/forum', action: postThread },
   { method: 'POST', path: '/forum/comment', action: postComment },
   { method: 'GET', path: '/governance', action: renderGovernance },
+  { method: 'POST', path: '/governance/proposals', action: proposeGovernanceChange },
   { method: 'GET', path: '/petitions', action: renderPetitions },
   { method: 'POST', path: '/petitions', action: submitPetition },
   { method: 'POST', path: '/petitions/update', action: updatePetitionDraft },

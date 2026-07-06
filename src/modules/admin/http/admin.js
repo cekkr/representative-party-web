@@ -8,7 +8,15 @@ import {
 } from '../../circle/signingKeys.js';
 import { DEFAULT_TOPIC_ANCHORS } from '../../topics/topicGardenerClient.js';
 import { syncTopicGardenerOperations } from '../../topics/gardenerSync.js';
-import { getGovernanceSettings, normalizeGovernanceSettings } from '../../governance/constitution.js';
+import {
+  decideGovernanceProposal,
+  diffGovernanceSettings,
+  getGovernanceSettings,
+  listGovernanceHistory,
+  listGovernanceProposals,
+  normalizeGovernanceSettings,
+  recordGovernanceHistory,
+} from '../../governance/constitution.js';
 import {
   appendTopicHistory,
   applyTopicMerge,
@@ -135,7 +143,11 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     return renderWithPerson(result);
   }
   if (intent === 'governance') {
-    const result = await updateGovernance(state, body);
+    const result = await updateGovernance(state, body, person);
+    return renderWithPerson(result);
+  }
+  if (intent === 'governance-proposal-decision') {
+    const result = await decideGovernanceProposalRoute(state, body, person);
     return renderWithPerson(result);
   }
   if (intent === 'provider-blind') {
@@ -850,7 +862,7 @@ async function updateOpsMetrics(state, body) {
   };
 }
 
-async function updateGovernance(state, body) {
+async function updateGovernance(state, body, person) {
   const prev = getGovernanceSettings(state);
   const quorumInput = sanitizeText(body.governanceQuorumDefault || '', 12);
   const discussionInput = sanitizeText(body.governanceDiscussionWindowDays || '', 12);
@@ -928,19 +940,35 @@ async function updateGovernance(state, body) {
   }
 
   const now = new Date().toISOString();
+  const updatedBy = person?.handle || 'admin';
   const next = {
     ...draft,
     updatedAt: now,
-    updatedBy: 'admin',
+    updatedBy,
   };
+  const changes = diffGovernanceSettings(prev, next);
 
   state.settings = {
     ...(state.settings || {}),
     governance: next,
   };
+  recordGovernanceHistory(state, {
+    type: 'admin_update',
+    actorHash: person?.pidHash || null,
+    actorHandle: updatedBy,
+    changes,
+  });
   recordAdminAudit(state, {
     action: 'governance.update',
     summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod} decay=${next.delegationDecayDays}d`,
+  });
+  await logTransaction(state, {
+    type: 'governance_update',
+    actorHash: person?.pidHash || null,
+    payload: {
+      source: 'admin',
+      changes: changes.map((change) => change.field),
+    },
   });
   await persistSettings(state);
 
@@ -953,6 +981,46 @@ async function updateGovernance(state, body) {
     governanceVoteMethodValue: next.defaultVoteMethod,
     governanceDelegationDecayDaysValue: String(next.delegationDecayDays),
     governanceNotesValue: next.notes,
+  };
+}
+
+async function decideGovernanceProposalRoute(state, body, person) {
+  const proposalId = sanitizeText(body.proposalId || '', 80);
+  const decision = sanitizeText(body.decision || '', 20);
+  const result = decideGovernanceProposal(state, proposalId, {
+    decision,
+    actorHash: person?.pidHash || null,
+    actorHandle: person?.handle || 'admin',
+  });
+
+  if (!result.ok) {
+    const message =
+      result.error === 'already_decided'
+        ? 'Governance proposal was already decided.'
+        : 'Governance proposal not found.';
+    return { flash: message };
+  }
+
+  recordAdminAudit(state, {
+    action: `governance.proposal.${result.proposal.status}`,
+    summary: `${result.proposal.title} (${result.proposal.id})`,
+  });
+  await logTransaction(state, {
+    type: `governance_proposal_${result.proposal.status}`,
+    actorHash: person?.pidHash || null,
+    payload: {
+      proposalId: result.proposal.id,
+      title: result.proposal.title,
+      changes: (result.proposal.changes || []).map((change) => change.field),
+    },
+  });
+  await persistSettings(state);
+
+  return {
+    flash:
+      result.proposal.status === 'approved'
+        ? 'Governance proposal approved and defaults updated.'
+        : 'Governance proposal rejected.',
   };
 }
 
@@ -1645,6 +1713,8 @@ function buildAdminViewModel(
   const governanceDelegationDecayDays = governanceDelegationDecayDaysValue ?? String(governance.delegationDecayDays);
   const governanceNotes = governanceNotesValue ?? governance.notes;
   const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
+  const governanceProposalList = renderGovernanceProposalDecisionList(listGovernanceProposals(state, { limit: 20 }));
+  const governanceHistoryList = renderGovernanceHistoryList(listGovernanceHistory(state, { limit: 12 }));
   const providerBlind = getProviderBlindSettings(state);
   const providerBlindMode = providerBlindModeValue ?? providerBlind.mode;
   const providerBlindRingId = providerBlindRingIdValue ?? providerBlind.ring.currentId;
@@ -1818,6 +1888,8 @@ function buildAdminViewModel(
     governanceDelegationDecayDays,
     governanceNotes,
     governanceUpdatedAt,
+    governanceProposalList,
+    governanceHistoryList,
     providerBlindErrors: providerBlindErrorsRendered,
     providerBlindModeOff: providerBlindMode === 'off' ? 'selected' : '',
     providerBlindModeObserve: providerBlindMode === 'observe' ? 'selected' : '',
@@ -2618,6 +2690,84 @@ function renderAuditLog(entries = []) {
         .slice(-10)
         .reverse()
         .map((entry) => `<li><strong>${entry.action}</strong> — ${entry.summary} <span class="muted">${entry.at}</span></li>`)
+        .join('')}
+    </ul>
+  `;
+}
+
+function renderGovernanceProposalDecisionList(proposals = []) {
+  if (!proposals.length) {
+    return '<p class="muted small">No governance proposals yet.</p>';
+  }
+  return `
+    <ul class="stack small">
+      ${proposals
+        .map((proposal) => {
+          const status = proposal.status || 'open';
+          const author = proposal.authorHandle || String(proposal.authorHash || '').slice(0, 12) || 'verified user';
+          const changes = renderGovernanceChangeList(proposal.changes || []);
+          const controls =
+            status === 'open'
+              ? `
+                <form class="cta-row" method="post" action="/admin" data-enhance="admin">
+                  <input type="hidden" name="intent" value="governance-proposal-decision" />
+                  <input type="hidden" name="proposalId" value="${escapeHtml(proposal.id)}" />
+                  <button class="cta" type="submit" name="decision" value="approve">Approve</button>
+                  <button class="ghost" type="submit" name="decision" value="reject">Reject</button>
+                </form>
+              `
+              : `<p class="muted small">Decision: ${escapeHtml(status)} ${escapeHtml(formatTimestamp(proposal.decidedAt))}</p>`;
+          return `
+            <li class="callout">
+              <strong>${escapeHtml(proposal.title || 'Untitled governance proposal')}</strong>
+              <p class="muted small">${escapeHtml(proposal.reason || '')}</p>
+              <p class="muted small">Status: ${escapeHtml(status)} · ${escapeHtml(author)} · ${escapeHtml(
+                formatTimestamp(proposal.createdAt),
+              )}</p>
+              ${changes}
+              ${controls}
+            </li>
+          `;
+        })
+        .join('')}
+    </ul>
+  `;
+}
+
+function renderGovernanceHistoryList(entries = []) {
+  if (!entries.length) {
+    return '<p class="muted small">No governance history entries yet.</p>';
+  }
+  return `
+    <ul class="stack small">
+      ${entries
+        .map((entry) => {
+          const actor = entry.actorHandle || String(entry.actorHash || '').slice(0, 12) || 'admin';
+          const title = entry.title ? ` · ${escapeHtml(entry.title)}` : '';
+          return `
+            <li>
+              <strong>${escapeHtml(entry.type || 'governance_update')}${title}</strong>
+              <span class="muted">${escapeHtml(entry.summary || '')}</span>
+              <span class="muted">${escapeHtml(formatTimestamp(entry.at))} by ${escapeHtml(actor)}</span>
+            </li>
+          `;
+        })
+        .join('')}
+    </ul>
+  `;
+}
+
+function renderGovernanceChangeList(changes = []) {
+  if (!changes.length) return '<p class="muted small">No field changes recorded.</p>';
+  return `
+    <ul>
+      ${changes
+        .map(
+          (change) =>
+            `<li>${escapeHtml(change.label || change.field)}: ${escapeHtml(String(change.from ?? ''))} -> ${escapeHtml(
+              String(change.to ?? ''),
+            )}</li>`,
+        )
         .join('')}
     </ul>
   `;

@@ -53,7 +53,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Provider-blind option (scaffold)**: `/admin` policy fields for observe/strict, ring registry gossip, and ringSignature placeholders for votes/transactions; issuer escrow + mixnet transport planned.
 - **Privilege-free genesis (optional)**: Circles can bootstrap without preassigned roles beyond provider admins; groups and member votes can evolve governance structures over time.
 - **Petitions → votes pipeline**: proposals with evidence summaries + source links, structured outline fields (problem/action/impact/risks/plan), collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed with stance tags (support/concern/question) + fact‑check flags + evidence/citation prompts, and argument‑map linking for pro/con trees.
-- **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with a public read-only view.
+- **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with verified-user change proposals, admin decisions, and public decision history.
 - **Module control center**: admin toggles plus a settings map with jump links so module activation and configuration stay in one place (links are defined alongside module metadata).
 - **Module lanes**: optional modules are grouped by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) to keep non-party community deployments clean.
 - **Operational home workspace**: `/` stays useful for guests and signed-in members, showing access gates, recent lane activity, and operator cues instead of acting like a brochure or a forced redirect.
@@ -177,7 +177,7 @@ npm run db:check
 - `/auth/eudi` start verification, `/auth/callback` return
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
 - `/profile` (provider‑local profile attributes editor)
-- `/governance` (public constitution defaults)
+- `/governance` (public constitution defaults + community change proposals), `/governance/proposals` (POST verified-user change proposal)
 - `/delegates/{hash}` (delegate profile summary)
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
@@ -214,7 +214,7 @@ Optional modules are organized in three lanes so you can deploy only the layer y
 - **Votes**: one vote per person when enabled; exports + envelope signing/verification when keys are configured.
 - **Delegation**: topic‑scoped delegation with conflict resolution UI.
 - **Groups/elections**: group‑level delegate preferences and elections (advisory by design, with optional conflict prompts); in `electionMode=vote`, recommendations prefer the latest closed election winner.
-- **Governance defaults**: admin-set constitution settings surfaced under `/governance` (community proposal workflow pending).
+- **Governance defaults**: admin-set constitution settings surfaced under `/governance`, with verified-user change proposals, admin approve/reject decisions, and auditable history.
 - **Topics & gardener**: dynamic topic labeling with admin review (rename/merge/split + anchor promotion/archival suggestions).
 
 ### Circle & federation scaffolding
