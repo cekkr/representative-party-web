@@ -1,0 +1,754 @@
+<section class="panel" id="circle-settings">
+  <p class="eyebrow">Admin</p>
+  <h2>Circle settings and policy</h2>
+  <p>Configure how this node enforces wallet verification, circle alignment, and peer aggregation.</p>
+  <div class="callout is-verbose">
+    <p class="muted small">Circle name: {{circleName}}</p>
+    <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
+    <p class="muted small">Issuer: {{issuer}}</p>
+    <p class="muted small">Posting gate: {{postingGate}}</p>
+    <p class="muted small">Ledger entries: {{ledgerEntries}} - Peers: {{peersKnown}}</p>
+    <p class="muted small">Ledger hash: {{ledgerHash}}</p>
+    <p class="muted small">Data: {{dataProfile}}</p>
+    <p class="muted small">Gossip ingest: {{gossipIngest}}</p>
+    <p class="muted small">Extensions: {{extensionsSummary}}</p>
+    <p class="muted small">{{modulesSummary}}</p>
+    <p class="muted small">Initialized: {{initialized}}</p>
+    <p class="muted small">{{notes}}</p>
+    <p class="muted small">{{firstRunNote}}</p>
+  </div>
+  {{circleKeyCallout}}
+  <p class="muted small">{{flash}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="signing-keys" />
+    <p class="muted small">Generate or rotate the signing keypair. Keys are stored in settings and loaded into memory immediately.</p>
+    <label class="field checkbox">
+      <input type="checkbox" name="signingKeysConfirm" />
+      <span>Confirm key generation (overwrites existing keys)</span>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Generate signing keys</button>
+    </div>
+    <p class="muted small">If `CIRCLE_PRIVATE_KEY` / `CIRCLE_PUBLIC_KEY` env vars are set, they override settings on restart.</p>
+  </form>
+  <form class="stack install-wizard" method="post" action="/admin" data-enhance="admin" data-install-wizard data-install-mode="{{installWizardMode}}">
+    <input type="hidden" name="intent" value="settings" />
+    {{installWizardIntro}}
+    <div class="wizard-progress" data-wizard-progress>
+      <span class="muted small" data-wizard-status>Step 1 of 4</span>
+      <div class="wizard-progress__bar" aria-hidden="true">
+        <span class="wizard-progress__fill" data-wizard-bar></span>
+      </div>
+    </div>
+    <ol class="wizard-steps" data-wizard-steps>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="0">1. Circle basics</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="1">2. Data and validation</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="2">3. Identity and peers</button>
+      </li>
+      <li class="wizard-step-indicator" data-wizard-indicator>
+        <button type="button" data-wizard-jump="3">4. Optional defaults</button>
+      </li>
+    </ol>
+    <section class="wizard-step stack" data-wizard-step="0" id="wizard-step-0">
+      <p class="eyebrow">Step 1</p>
+      <h3>Circle basics</h3>
+      <p class="muted small">Define the Circle identity and verification stance for users.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Circle name</span>
+          <input name="circleName" value="{{circleName}}" placeholder="Party Circle" />
+        </label>
+        <label class="field">
+          <span>Policy ID</span>
+          <input name="policyId" value="{{policyId}}" placeholder="party-circle-alpha" />
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field checkbox">
+          <input type="checkbox" name="enforceCircle" {{enforceCircleChecked}} />
+          <span>Enforce Circle (verification before posting/voting)</span>
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="requireVerification" {{requireVerificationChecked}} />
+          <span>Require wallet verification for posting</span>
+        </label>
+      </div>
+      <p class="muted small">Enforcement switches the UI label from user to person when verification is required.</p>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="1" id="wizard-step-1">
+      <p class="eyebrow">Step 2</p>
+      <h3>Data and validation</h3>
+      <p class="muted small">Choose how data is stored and whether preview entries can be kept.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Data mode</span>
+          <select name="dataMode">
+            <option value="centralized" {{dataModeCentralized}}>centralized</option>
+            <option value="hybrid" {{dataModeHybrid}}>hybrid</option>
+            <option value="p2p" {{dataModeP2P}}>p2p</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Validation level</span>
+          <select name="dataValidation">
+            <option value="strict" {{dataValidationStrict}}>strict</option>
+            <option value="observe" {{dataValidationObserve}}>observe</option>
+            <option value="off" {{dataValidationOff}}>off</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Data adapter</span>
+          <select name="dataAdapter">
+            <option value="json" {{dataAdapterJson}}>json (default)</option>
+            <option value="memory" {{dataAdapterMemory}}>memory (ephemeral)</option>
+            <option value="sql" {{dataAdapterSql}}>sql (sqlite3 optional dep)</option>
+            <option value="kv" {{dataAdapterKv}}>kv (file-based)</option>
+            <option value="mysql" {{dataAdapterMysql}}>mysql (mysql2 optional dep)</option>
+            <option value="mongodb" {{dataAdapterMongodb}}>mongodb (mongodb optional dep)</option>
+          </select>
+        </label>
+        <label class="field checkbox">
+          <input type="checkbox" name="dataPreview" {{dataPreviewChecked}} />
+          <span>Allow preview data (store uncertified entries)</span>
+        </label>
+      </div>
+      <p class="muted small">Centralized mode disables gossip ingest; hybrid and p2p keep it enabled.</p>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="2" id="wizard-step-2">
+      <p class="eyebrow">Step 3</p>
+      <h3>Circle identity and peers</h3>
+      <p class="muted small">Set an issuer URL and optional peer hints for audits and alignment.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Admin contact</span>
+          <input name="adminContact" value="{{adminContact}}" placeholder="admin@example.org" />
+        </label>
+        <label class="field">
+          <span>Circle issuer (public URL)</span>
+          <input name="issuer" value="{{issuer}}" placeholder="https://provider.party" />
+        </label>
+        <label class="field">
+          <span>Preferred peer (Circle anchor)</span>
+          <input name="preferredPeer" value="{{preferredPeer}}" placeholder="https://peer.party" />
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Add peer and aggregate</span>
+          <input name="peerJoin" placeholder="https://peer.party" />
+        </label>
+        <div class="stack">
+          <p class="muted small">Add a trusted peer to sync ledger/policies. This will persist to the peer registry.</p>
+        </div>
+      </div>
+    </section>
+    <section class="wizard-step stack" data-wizard-step="3" id="wizard-step-3">
+      <p class="eyebrow">Step 4</p>
+      <h3>Optional defaults</h3>
+      <p class="muted small">Optional settings you can revisit in Admin at any time.</p>
+      <div class="form-grid">
+        <label class="field">
+          <span>Default group election mode</span>
+          <select name="defaultElectionMode">
+            <option value="priority" {{defaultElectionModePriority}}>Priority</option>
+            <option value="vote" {{defaultElectionModeVote}}>Vote</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>Default group conflict rule</span>
+          <select name="defaultConflictRule">
+            <option value="highest_priority" {{defaultConflictHighest}}>Highest priority</option>
+            <option value="prompt_user" {{defaultConflictPrompt}}>Prompt user</option>
+          </select>
+        </label>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Quorum advance stage (proposals)</span>
+          <select name="petitionQuorumAdvance">
+            <option value="discussion" {{petitionQuorumAdvanceDiscussion}}>discussion</option>
+            <option value="vote" {{petitionQuorumAdvanceVote}}>vote</option>
+          </select>
+        </label>
+        <div class="stack">
+          <p class="muted small">Choose whether quorum moves proposals into discussion or directly into the vote stage.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>UI verbosity</span>
+          <select name="verbosityMode">
+            <option value="full" {{verbosityModeFull}}>full (show guidance + telemetry cues)</option>
+            <option value="compact" {{verbosityModeCompact}}>compact (hide verbose callouts)</option>
+          </select>
+        </label>
+        <div class="stack">
+          <p class="muted small">Users can override this per session from their profile page.</p>
+        </div>
+      </div>
+      <div class="form-grid">
+        <label class="field">
+          <span>Topic gardener URL (optional)</span>
+          <input name="topicGardenerUrl" value="{{topicGardenerUrl}}" placeholder="http://localhost:8070/classify" />
+        </label>
+        <label class="field">
+          <span>Topic anchors (comma separated)</span>
+          <input name="topicAnchors" value="{{topicAnchors}}" placeholder="general,governance,economy" />
+        </label>
+      </div>
+      <label class="field">
+        <span>Pinned topics (comma separated)</span>
+        <input name="topicPinned" value="{{topicPinned}}" placeholder="climate,health,education" />
+      </label>
+      <p class="muted small">Anchors and pins guide the topic gardener to reconcile provider labels.</p>
+      <label class="field">
+        <span>Notes</span>
+        <textarea name="notes" rows="3" placeholder="Document circle intent or shared policy">{{notes}}</textarea>
+      </label>
+      <p class="muted small">Governance defaults can be tuned in the section below.</p>
+    </section>
+    <div class="cta-row wizard-actions">
+      <button class="ghost" type="button" data-wizard-prev>Back</button>
+      <button class="cta" type="button" data-wizard-next>Next</button>
+      <button class="cta" type="submit" data-wizard-submit>Save settings</button>
+      <a class="ghost" href="/" data-partial>Back home</a>
+    </div>
+    {{installWizardHint}}
+  </form>
+</section>
+
+<section class="panel" id="governance-settings">
+  <p class="eyebrow">Governance</p>
+  <h2>Digital constitution defaults</h2>
+  <p class="muted small">These defaults inform proposal quorum and stage timing. Community change proposals can be reviewed below.</p>
+  <p class="muted small">Last updated: {{governanceUpdatedAt}}</p>
+  {{governanceErrors}}
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="governance" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Default quorum</span>
+        <input name="governanceQuorumDefault" type="number" min="0" value="{{governanceQuorumDefault}}" />
+      </label>
+      <label class="field">
+        <span>Default vote method</span>
+        <select name="governanceVoteMethod">
+          <option value="majority" {{governanceVoteMethodMajority}}>majority</option>
+          <option value="approval" {{governanceVoteMethodApproval}}>approval</option>
+          <option value="ranked" {{governanceVoteMethodRanked}}>ranked</option>
+          <option value="condorcet" {{governanceVoteMethodCondorcet}}>condorcet</option>
+          <option value="star" {{governanceVoteMethodStar}}>star</option>
+        </select>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Discussion window (days)</span>
+        <input name="governanceDiscussionWindowDays" type="number" min="0" value="{{governanceDiscussionWindowDays}}" />
+      </label>
+      <label class="field">
+        <span>Vote window (days)</span>
+        <input name="governanceVoteWindowDays" type="number" min="0" value="{{governanceVoteWindowDays}}" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Review window (hours)</span>
+        <input name="governanceReviewWindowHours" type="number" min="0" value="{{governanceReviewWindowHours}}" />
+      </label>
+      <div class="stack">
+        <p class="muted small">Review window notes inform the pre-vote freeze check.</p>
+      </div>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Delegation decay (days)</span>
+        <input name="governanceDelegationDecayDays" type="number" min="0" max="3650" value="{{governanceDelegationDecayDays}}" />
+      </label>
+      <div class="stack">
+        <p class="muted small">0 disables decay. Otherwise delegations lapse after this many days without renewal so liquid power does not persist unattended.</p>
+      </div>
+    </div>
+    <label class="field">
+      <span>Governance notes</span>
+      <textarea name="governanceNotes" rows="3" placeholder="Document constitution intent">{{governanceNotes}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Save governance defaults</button>
+    </div>
+  </form>
+  <div class="stack">
+    <p class="muted small">Community change proposals</p>
+    {{governanceProposalList}}
+  </div>
+  <div class="stack">
+    <p class="muted small">Governance history</p>
+    {{governanceHistoryList}}
+  </div>
+</section>
+
+<section class="panel" id="topic-gardener-review">
+  <p class="eyebrow">Topics</p>
+  <h2>Topic gardener review</h2>
+  <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>
+  <p class="muted small">Last operation: {{topicGardenerLastOperationAt}}</p>
+  <p class="muted small">Pending renames: {{topicRenameCount}} · merges: {{topicMergeCount}} · splits: {{topicSplitCount}} · anchors: {{topicAnchorCount}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="topic-gardener-sync" />
+    <div class="cta-row">
+      <button class="ghost" type="submit">Sync topic gardener now</button>
+    </div>
+  </form>
+  <div class="discussion-list">
+    <div class="stack">
+      <p class="muted small">Rename suggestions</p>
+      {{topicRenameList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Merge suggestions</p>
+      {{topicMergeList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Split suggestions</p>
+      {{topicSplitList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Anchor suggestions</p>
+      {{topicAnchorList}}
+    </div>
+  </div>
+  <div class="stack">
+    <p class="muted small">Topic history</p>
+    {{topicHistoryList}}
+  </div>
+</section>
+
+<section class="panel" id="federation-gossip">
+  <p class="eyebrow">Federation</p>
+  <h2>Gossip sync</h2>
+  <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>
+  <p class="muted small">{{gossipDisabledNote}}</p>
+  {{gossipOptionalSkipsSummary}}
+  {{gossipPushSkipsSummary}}
+  <div class="stack">
+    <div class="callout">
+      <p class="muted small">Outbound push</p>
+      {{gossipPushSummary}}
+      {{gossipPushPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-push" />
+        <div class="cta-row">
+          <button class="cta" type="submit" data-gossip="push" {{gossipPushDisabledAttr}}>Push gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
+    </div>
+    <div class="callout">
+      <p class="muted small">Inbound pull</p>
+      {{gossipPullSummary}}
+      {{gossipPullPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-pull" />
+        <div class="cta-row">
+          <button class="cta" type="submit" data-gossip="pull" {{gossipPullDisabledAttr}}>Pull gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
+    </div>
+    <div class="callout">
+      <p class="muted small">Peer health</p>
+      {{peerHealthList}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <label class="field">
+          <span>Reset peer health entry</span>
+          <select name="peerKey">
+            {{peerHealthOptions}}
+          </select>
+        </label>
+        <div class="cta-row">
+          <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset selected</button>
+          <span class="muted small">Entries: {{peerHealthCount}}</span>
+        </div>
+      </form>
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <input type="hidden" name="resetAll" value="true" />
+        <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset all peer health</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="provider-blind">
+  <p class="eyebrow">Federation</p>
+  <h2>Provider-blind mode</h2>
+  <p class="muted small">Hide provider attribution in gossip envelopes while keeping auditability via a quorum reveal.</p>
+  {{providerBlindErrors}}
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="provider-blind" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Mode</span>
+        <select name="providerBlindMode">
+          <option value="off" {{providerBlindModeOff}}>off</option>
+          <option value="observe" {{providerBlindModeObserve}}>observe</option>
+          <option value="strict" {{providerBlindModeStrict}}>strict</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Ring ID</span>
+        <input name="providerBlindRingId" value="{{providerBlindRingId}}" placeholder="circle-2025-09" />
+        <span class="muted small">Tip: set CIRCLE_RING_ID to prefill this value from the libp2p key generator.</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Ring epoch (seconds)</span>
+        <input name="providerBlindRingEpoch" type="number" min="86400" value="{{providerBlindRingEpoch}}" />
+      </label>
+      <label class="field">
+        <span>Ring size cap</span>
+        <input name="providerBlindRingMaxSize" type="number" min="3" value="{{providerBlindRingMaxSize}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Ring provider public keys (one per block)</span>
+      <span class="muted small">Paste full PEM blocks separated by blank lines (or one-line PEM with \n escapes).</span>
+      <textarea name="providerBlindRingKeys" rows="4" placeholder="provider-key-a">{{providerBlindRingKeys}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Audit threshold (t)</span>
+        <input name="providerBlindAuditThreshold" type="number" min="2" value="{{providerBlindAuditThreshold}}" />
+      </label>
+      <label class="field">
+        <span>Max reveal scope (days)</span>
+        <input name="providerBlindAuditMaxScopeDays" type="number" min="1" value="{{providerBlindAuditMaxScopeDays}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Audit committee members (keyId:role:termStart:termEnd)</span>
+      <textarea name="providerBlindAuditMembers" rows="4" placeholder="key-a:member:2025-01-01:2026-01-01">{{providerBlindAuditMembers}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditRequireReason" {{providerBlindAuditRequireReasonChecked}} />
+        <span>Require reason for issuer reveal</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditEmergencyOverride" {{providerBlindAuditEmergencyOverrideChecked}} />
+        <span>Allow emergency override</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditOverride" {{providerBlindAuditOverrideChecked}} />
+        <span>Allow custom committee composition</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindTransportMixnet" {{providerBlindTransportMixnetChecked}} />
+        <span>Enable mixnet relays</span>
+      </label>
+      <label class="field">
+        <span>Mixnet max hops</span>
+        <input name="providerBlindTransportMaxHops" type="number" min="1" value="{{providerBlindTransportMaxHops}}" />
+      </label>
+      <label class="field">
+        <span>Mixnet timeout (ms)</span>
+        <input name="providerBlindTransportTimeoutMs" type="number" min="1000" value="{{providerBlindTransportTimeoutMs}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Mixnet relay URLs (one per line)</span>
+      <textarea name="providerBlindTransportRelays" rows="3" placeholder="https://relay.example">{{providerBlindTransportRelays}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider-blind settings</button>
+    </div>
+  </form>
+</section>
+
+<section class="panel" id="modules">
+  <p class="eyebrow">Modules</p>
+  <h2>Module control center</h2>
+  <p class="muted small">Toggle modules by lane so social-community deployments can stay lean while e-party governance stays optional.</p>
+  <p class="muted small">{{moduleFamilySummary}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="modules" />
+    <div class="stack">{{modulesList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save module toggles</button>
+    </div>
+    <p class="muted small">Reload to refresh navigation after changing modules.</p>
+  </form>
+  <div class="stack">
+    <p class="muted small">Module settings map</p>
+    <div class="stack">
+      {{moduleSettingsList}}
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="composer">
+  <p class="eyebrow">Composer</p>
+  <h2>Theme + layout composer</h2>
+  <p class="muted small">Early scaffolding: apply custom CSS and reorder navigation/quick actions. Drag-and-drop layout editing ships next.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="composer" />
+    <label class="field">
+      <span>Quick actions order (comma separated keys)</span>
+      <input
+        name="composerQuickActionsOrder"
+        value="{{composerQuickActionsOrder}}"
+        placeholder="home, auth, social, forum, notifications, profile"
+      />
+    </label>
+    <label class="field">
+      <span>Side nav order (comma separated keys)</span>
+      <input
+        name="composerSideNavOrder"
+        value="{{composerSideNavOrder}}"
+        placeholder="home, auth, social, discussion, forum, petitions, governance, delegation, groups, notifications, profile, admin"
+      />
+    </label>
+    <label class="field">
+      <span>Composer panel width (px)</span>
+      <input name="composerAsideWidth" type="number" min="240" max="600" value="{{composerAsideWidth}}" />
+    </label>
+    <label class="field">
+      <span>Theme CSS overrides</span>
+      <textarea name="composerThemeCss" rows="6" placeholder=":root { --page-aside-width: 420px; }">{{composerThemeCss}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save composer settings</button>
+    </div>
+  </form>
+  <div class="stack">
+    {{composerErrors}}
+  </div>
+</section>
+
+<section class="panel" id="rate-limits">
+  <p class="eyebrow">Rate limits</p>
+  <h2>Identity throttles</h2>
+  <p class="muted small">Throttle write-heavy actions per verified handle/session (IP fallback) to curb spam without CAPTCHA.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="rate-limits" />
+    <label class="field">
+      <span>Overrides (key:windowSeconds:max)</span>
+      <textarea name="rateLimitOverrides" rows="5" placeholder="discussion_post:60:6">{{rateLimitOverridesValue}}</textarea>
+    </label>
+    <p class="muted small">JSON object or one entry per line. Leave blank to clear overrides.</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save rate limits</button>
+    </div>
+  </form>
+  <div class="stack">
+    {{rateLimitErrors}}
+  </div>
+  <div class="callout">
+    <p class="muted small">Defaults</p>
+    {{rateLimitDefaults}}
+  </div>
+</section>
+
+<section class="panel" id="social-media">
+  <p class="eyebrow">Social media</p>
+  <h2>Media moderation</h2>
+  <p class="muted small">Uploads stay with this provider, lock by default, and can be blocked after mass reports or manual review.</p>
+  <p class="muted small">Total media entries: {{socialMediaCount}}</p>
+  <div class="stack">
+    {{socialMediaList}}
+  </div>
+</section>
+
+<section class="panel" id="upload-cleanup">
+  <p class="eyebrow">Ops</p>
+  <h2>Upload cleanup</h2>
+  <p class="muted small">Temp upload files are pruned from <code>src/data/uploads</code> based on retention settings.</p>
+  <p class="muted small">{{uploadCleanupConfigNote}}</p>
+  <div class="stack">
+    {{uploadCleanupSummary}}
+  </div>
+</section>
+
+<section class="panel" id="structure-manager">
+  <p class="eyebrow">Structure manager</p>
+  <h2>Profile schema (canonical + provider-local)</h2>
+  <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
+  <p class="muted small">Schema version: {{profileSchemaVersion}} · Updated: {{profileSchemaUpdatedAt}} {{profileSchemaUpdatedBy}}</p>
+  <p class="muted small">{{profileSchemaStaleNote}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="structure" />
+    <label class="field">
+      <span>Provider-local fields (one per line: key:type:label, add ! for required)</span>
+      <textarea name="providerFields" rows="4" placeholder="email:email:Contact email">{{providerFieldsValue}}</textarea>
+    </label>
+    <p class="muted small">Example: <code>email:email:Contact email</code>. Allowed types: string, email, phone, boolean, number. Canonical fields stay fixed across the party ring (handle, credential/wallet binding, blinded hash, role, banned).</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider schema</button>
+      <span class="muted small">Fields saved: {{providerFieldCount}}</span>
+    </div>
+  </form>
+  {{providerFieldErrors}}
+</section>
+
+<section class="panel" id="provider-profiles">
+  <p class="eyebrow">Provider profile data</p>
+  <h2>Contact/notification attributes</h2>
+  <p class="muted small">Persist provider-local profile values for a session/handle (email, notification prefs). Values stay local; provider owns delivery/consent.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="profile-attributes" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Session ID</span>
+        <input name="attributesSessionId" value="{{attributesSessionId}}" placeholder="copy from /health or logs" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Provider attributes (JSON object or key:value per line)</span>
+      <textarea name="attributesPayload" rows="4" placeholder="email: user@example.org&#10;notify: true">{{attributesPayloadValue}}</textarea>
+    </label>
+    <p class="muted small">Only fields defined in your provider schema are stored. Canonical fields remain fixed and shared across the party ring.</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider attributes</button>
+    </div>
+  </form>
+  {{profileAttributeErrors}}
+</section>
+
+<section class="panel" id="admin-audit">
+  <p class="eyebrow">Admin audit</p>
+  <h2>Recent configuration changes</h2>
+  <p class="muted small">Last 10 actions are listed; older entries roll off for privacy. Includes schema and profile updates.</p>
+  <div class="stack">
+    {{auditLog}}
+  </div>
+</section>
+
+<section class="panel" id="ops-metrics">
+  <p class="eyebrow">Ops</p>
+  <h2>Runtime metrics</h2>
+  <p class="muted small">{{metricsNote}}</p>
+  <div class="stack">
+    {{metricsList}}
+  </div>
+</section>
+
+<section class="panel" id="metrics-retention">
+  <p class="eyebrow">Ops</p>
+  <h2>Metrics retention</h2>
+  <p class="muted small">Snapshots persist to <code>settings.json</code>. Interval min 60s; retention min 1h.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="ops-metrics" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Snapshot interval (seconds)</span>
+        <input name="opsMetricsIntervalSeconds" value="{{opsMetricsIntervalValue}}" placeholder="300" />
+      </label>
+      <label class="field">
+        <span>Retention window (hours)</span>
+        <input name="opsMetricsRetentionHours" value="{{opsMetricsRetentionValue}}" placeholder="24" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save ops settings</button>
+    </div>
+  </form>
+  {{opsMetricsErrors}}
+</section>
+
+<section class="panel" id="admin-transactions">
+  <p class="eyebrow">Transactions</p>
+  <h2>Recent ledgered actions</h2>
+  <p class="muted small">Append-only log for sensitive actions (petitions, votes, delegations, social, groups). Export JSON for audits.</p>
+  <div class="stack">
+    {{transactionsList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions" target="_blank" rel="noreferrer">Open JSON log</a>
+    <a class="ghost" href="/transactions/export" target="_blank" rel="noreferrer">Export signed summary</a>
+  </div>
+</section>
+
+<section class="panel" id="outbound-delivery">
+  <p class="eyebrow">Outbound</p>
+  <h2>Notification delivery</h2>
+  <p class="muted small">{{outboundSummaryNote}}</p>
+  <div class="stack">
+    {{outboundSummaryList}}
+  </div>
+</section>
+
+<section class="panel" id="transaction-summaries">
+  <p class="eyebrow">Transactions gossip</p>
+  <h2>Inbound summaries</h2>
+  <p class="muted small">Signed summaries received from peers (digest lists + policy/profile).</p>
+  <div class="stack">
+    {{transactionSummariesList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions/ledger" target="_blank" rel="noreferrer">Open local summary feed</a>
+  </div>
+</section>
+
+<section class="panel" id="extensions">
+  <p class="eyebrow">Extensions</p>
+  <h2>Toggle extensions</h2>
+  <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>
+  <form class="stack" method="post" action="/extensions" data-enhance="extensions">
+    <div class="form-grid">{{extensionsList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Apply extensions</button>
+    </div>
+    <p class="muted small">POSTs to /extensions; reload applies hooks immediately.</p>
+  </form>
+</section>
+
+<section class="panel" id="session-overrides">
+  <p class="eyebrow">Session overrides</p>
+  <h2>Roles and bans</h2>
+  <p class="muted small">Update a session role/handle or ban a handle to exercise Circle gates without editing JSON manually.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="session" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Session ID</span>
+        <input name="sessionId" value="{{sessionIdValue}}" placeholder="copy from /health or logs" required />
+      </label>
+      <label class="field">
+        <span>Handle override (optional)</span>
+        <input name="sessionHandle" value="{{sessionHandleValue}}" placeholder="{{actorLabel}}-abcd1234" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Role</span>
+        <select name="sessionRole">
+          <option value="user" {{sessionRoleUser}}>user</option>
+          <option value="person" {{sessionRolePerson}}>person</option>
+          <option value="delegate" {{sessionRoleDelegate}}>delegate</option>
+          <option value="moderator" {{sessionRoleModerator}}>moderator</option>
+          <option value="admin" {{sessionRoleAdmin}}>admin</option>
+        </select>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="sessionBanned" {{sessionBannedChecked}} />
+        <span>Ban this handle/session</span>
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Update session</button>
+      <a class="ghost" href="/health" target="_blank" rel="noreferrer">Open /health to fetch session IDs</a>
+    </div>
+    <p class="muted small">Changes persist to <code>src/data/sessions.json</code> and are used by Circle gates immediately.</p>
+  </form>
+</section>

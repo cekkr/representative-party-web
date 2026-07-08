@@ -1,0 +1,79 @@
+<section class="panel" id="petitions-compose">
+  <p class="eyebrow">Proposals</p>
+  <h2>Decision proposals</h2>
+  <div class="callout is-verbose">
+    <p class="muted small">Role: {{roleLabel}}</p>
+    <p class="muted small">Petition gate: {{petitionStatus}}</p>
+    <p class="muted small">Vote gate: {{voteStatus}}</p>
+    {{petitionGateReasonLine}}
+    {{voteGateReasonLine}}
+    <p class="muted small">Handle: {{personHandle}}</p>
+    <p class="muted small">Use proposals when you need a decision; discussion and social lanes stay exploratory.</p>
+    <p class="muted small">Party Circle policy governs quorum/votes; group cachets inform delegation only.</p>
+    <p class="muted small">Delegation conflicts: {{conflictList}}</p>
+    <p class="muted small">Quorum advance stage: {{quorumAdvanceLabel}}</p>
+    <div class="muted small">
+      <p>Suggested delegates (from your groups):</p>
+      {{delegationSuggestions}}
+    </div>
+  </div>
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Draft a new proposal</summary>
+    <form class="stack" method="post" action="/petitions" data-enhance="petitions">
+      <div class="form-grid">
+        <label class="field">
+          <span>Title</span>
+          <input name="title" placeholder="Energy transition plan" required />
+        </label>
+        <label class="field">
+          <span>Quorum target</span>
+          <input name="quorum" type="number" min="0" placeholder="{{quorumDefault}}" />
+          <span class="muted tiny">Default: {{quorumDefault}}</span>
+        </label>
+      </div>
+      <label class="field">
+        <span>Summary</span>
+        <textarea name="summary" rows="3" placeholder="Describe the proposal goals" required></textarea>
+      </label>
+      <details class="note">
+        <summary>Structured outline (optional)</summary>
+        <label class="field">
+          <span>Problem statement</span>
+          <textarea name="problem" rows="3" placeholder="What issue are we solving?"></textarea>
+        </label>
+        <label class="field">
+          <span>Proposed action</span>
+          <textarea name="proposedAction" rows="3" placeholder="What should change or be implemented?"></textarea>
+        </label>
+        <label class="field">
+          <span>Impact</span>
+          <textarea name="impact" rows="3" placeholder="Who benefits, and how?"></textarea>
+        </label>
+        <label class="field">
+          <span>Risks and trade-offs</span>
+          <textarea name="risks" rows="3" placeholder="What could go wrong?"></textarea>
+        </label>
+        <label class="field">
+          <span>Implementation plan</span>
+          <textarea name="implementationPlan" rows="3" placeholder="Timeline, owners, milestones"></textarea>
+        </label>
+      </details>
+      <label class="field">
+        <span>Proposal text (optional)</span>
+        <textarea name="body" rows="6" placeholder="Write the draft legal or policy text"></textarea>
+      </label>
+      <label class="field">
+        <span>Evidence summary (optional)</span>
+        <textarea name="evidenceSummary" rows="3" placeholder="Key evidence, datasets, or reference context"></textarea>
+      </label>
+      <label class="field">
+        <span>Evidence links (optional, one per line)</span>
+        <textarea name="evidenceLinks" rows="3" placeholder="https://example.org/report"></textarea>
+      </label>
+      <div class="cta-row">
+        <button class="cta" type="submit">Draft proposal</button>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
+      </div>
+    </form>
+  </details>
+</section>

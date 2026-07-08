@@ -1,21 +1,35 @@
 import { buildVoteEnvelope } from '../../../modules/votes/voteEnvelope.js';
 import { getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { sendJson } from '../../../shared/utils/http.js';
+import { sendJson, sendJsonWithEncoding } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { ingestVoteGossip } from '../../../modules/federation/ingest.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
-export function exportVotes({ res, state }) {
+export function exportVotes({ req, res, state }) {
   if (!isModuleEnabled(state, 'votes')) {
     return sendModuleDisabledJson({ res, moduleKey: 'votes', state });
   }
   const policy = getEffectivePolicy(state);
   const visibleVotes = filterVisibleEntries(state.votes, state);
-  const envelopes = visibleVotes.map((vote) => vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer }));
+  const providerBlind = state.settings?.providerBlind;
+  const providerBlindMode = providerBlind?.mode || 'off';
+  const useRing = providerBlindMode !== 'off';
+  const envelopes = visibleVotes.map((vote) => {
+    if (useRing && vote?.issuer === state.issuer) {
+      if (!vote.envelope || !vote.envelope.ringSignature || providerBlindMode === 'strict') {
+        return buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+      }
+    }
+    return vote.envelope || buildVoteEnvelope(vote, { policy, issuer: state.issuer, providerBlind });
+  });
   const hasPreview = envelopes.some((entry) => entry?.status === 'preview');
-  return sendJson(res, 200, { entries: envelopes, status: hasPreview ? 'preview' : 'validated', replication: getReplicationProfile(state) });
+  return sendJsonWithEncoding(req, res, 200, {
+    entries: envelopes,
+    status: hasPreview ? 'preview' : 'validated',
+    replication: getReplicationProfile(state),
+  }, { allowGzip: true });
 }
 
 export async function gossipVotes({ req, res, state }) {

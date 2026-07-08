@@ -1,10 +1,10 @@
 import { URL } from 'node:url';
 
-import { renderAdmin, updateAdmin, exportAuditLog } from '../interfaces/http/controllers/admin.js';
+import { renderAdmin, updateAdmin, exportAuditLog } from '../modules/admin/http/admin.js';
 import { serveActor, serveOutbox, serveOutboxCollection, serveObject, inbox } from '../interfaces/http/controllers/activitypub.js';
-import { completeAuth, startAuth } from '../interfaces/http/controllers/auth.js';
+import { completeAuth, startAuth } from '../modules/auth/http/auth.js';
 import { handleGossip, exportLedger, listPeers, registerPeer } from '../interfaces/http/controllers/circle.js';
-import { renderDiscussion, postDiscussion } from '../interfaces/http/controllers/discussion.js';
+import { renderDiscussion, postDiscussion } from '../modules/discussion/http/discussion.js';
 import {
   renderPetitions,
   submitPetition,
@@ -13,16 +13,18 @@ import {
   updatePetitionStatus,
   signPetitionRoute,
   postPetitionComment,
-} from '../interfaces/http/controllers/petitions.js';
-import { renderForumRoute, postThread, postComment } from '../interfaces/http/controllers/forum.js';
-import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../interfaces/http/controllers/groups.js';
+} from '../modules/petitions/http/petitions.js';
+import { renderForumRoute, postThread, postComment } from '../modules/forum/http/forum.js';
+import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../modules/groups/http/groups.js';
+import { proposeGovernanceChange, renderGovernance } from '../modules/governance/http/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
-import { renderHome } from '../interfaces/http/controllers/home.js';
+import { renderHome } from '../modules/home/http/home.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
 import { getExtensions, toggleExtension } from '../interfaces/http/controllers/extensions.js';
-import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../interfaces/http/controllers/notifications.js';
-import { renderProfile, updateProfileAttributes } from '../interfaces/http/controllers/profile.js';
-import { renderDelegation, resolveConflict, updateDelegation } from '../interfaces/http/controllers/delegation.js';
+import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../modules/notifications/http/notifications.js';
+import { renderProfile, updateProfileAttributes } from '../modules/profile/http/profile.js';
+import { renderDelegation, resolveConflict, updateDelegation } from '../modules/delegation/http/delegation.js';
+import { renderDelegateDirectory, renderDelegateProfile } from '../modules/delegates/http/delegates.js';
 import { exportVotes, gossipVotes } from '../interfaces/http/controllers/votes.js';
 import {
   renderSocialFeed,
@@ -32,7 +34,7 @@ import {
   listRelationships,
   serveSocialMedia,
   reportSocialMedia,
-} from '../interfaces/http/controllers/social.js';
+} from '../modules/social/http/social.js';
 import { renderTransactions, exportTransactions, exportTransactionsLedger, gossipTransactions } from '../interfaces/http/controllers/transactions.js';
 import { sendNotFound } from '../shared/utils/http.js';
 
@@ -46,6 +48,8 @@ const routes = [
   { method: 'GET', path: '/forum', action: renderForumRoute },
   { method: 'POST', path: '/forum', action: postThread },
   { method: 'POST', path: '/forum/comment', action: postComment },
+  { method: 'GET', path: '/governance', action: renderGovernance },
+  { method: 'POST', path: '/governance/proposals', action: proposeGovernanceChange },
   { method: 'GET', path: '/petitions', action: renderPetitions },
   { method: 'POST', path: '/petitions', action: submitPetition },
   { method: 'POST', path: '/petitions/update', action: updatePetitionDraft },
@@ -87,6 +91,17 @@ const routes = [
   { method: 'GET', path: '/delegation', action: renderDelegation },
   { method: 'POST', path: '/delegation', action: updateDelegation },
   { method: 'POST', path: '/delegation/conflict', action: resolveConflict },
+  { method: 'GET', path: '/delegates', action: renderDelegateDirectory },
+  {
+    method: 'GET',
+    prefix: '/delegates/',
+    buildParams: (pathname) => {
+      const segments = pathname.split('/').filter(Boolean);
+      return { hash: segments[segments.length - 1] || '' };
+    },
+    action: ({ req, res, state, wantsPartial, params }) =>
+      renderDelegateProfile({ req, res, state, wantsPartial, params }),
+  },
   { method: 'GET', path: '/votes/ledger', action: exportVotes },
   { method: 'POST', path: '/votes/gossip', action: gossipVotes },
   { method: 'GET', path: '/extensions', action: getExtensions },
@@ -134,21 +149,46 @@ const routes = [
   },
 ];
 
+const routesByMethod = buildRouteIndex(routes);
+
 export async function routeRequest(req, res, state) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const wantsPartial = req.headers['x-requested-with'] === 'partial';
   const context = { req, res, url, state, wantsPartial };
+  const methodRoutes = routesByMethod.get(req.method);
+  if (!methodRoutes) {
+    return sendNotFound(res);
+  }
+  const pathname = url.pathname;
+  const exactRoute = methodRoutes.exact.get(pathname);
+  if (exactRoute) {
+    return exactRoute.action(context);
+  }
 
-  for (const route of routes) {
-    if (route.method !== req.method) continue;
-    if (route.path && url.pathname === route.path) {
-      return route.action(context);
-    }
-    if (route.prefix && url.pathname.startsWith(route.prefix)) {
-      const params = route.buildParams ? route.buildParams(url.pathname, url) : {};
+  for (const route of methodRoutes.prefixes) {
+    if (pathname.startsWith(route.prefix)) {
+      const params = route.buildParams ? route.buildParams(pathname, url) : {};
       return route.action({ ...context, params });
     }
   }
 
   return sendNotFound(res);
+}
+
+function buildRouteIndex(entries = []) {
+  const index = new Map();
+  for (const route of entries) {
+    if (!route?.method) continue;
+    let bucket = index.get(route.method);
+    if (!bucket) {
+      bucket = { exact: new Map(), prefixes: [] };
+      index.set(route.method, bucket);
+    }
+    if (route.path) {
+      bucket.exact.set(route.path, route);
+    } else if (route.prefix) {
+      bucket.prefixes.push(route);
+    }
+  }
+  return index;
 }

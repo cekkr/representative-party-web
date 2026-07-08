@@ -69,6 +69,83 @@ export function renderProfileSummary(person, actorLabels) {
   `;
 }
 
+export function renderUiPreferencesForm({
+  person,
+  defaultMode = 'full',
+  overrideMode,
+  effectiveMode,
+  uiSettings = {},
+  flash,
+} = {}) {
+  if (!person) {
+    return `
+      <div class="callout">
+        <p class="muted small">Verify your wallet to set per-session UI preferences.</p>
+      </div>
+    `;
+  }
+  const selection = overrideMode || 'default';
+  const defaultLabel = defaultMode === 'compact' ? 'Compact' : 'Full';
+  const effectiveLabel = effectiveMode === 'compact' ? 'Compact' : 'Full';
+  const flashNote = flash
+    ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>`
+    : '';
+  const normalizedSettings = {
+    largeText: uiSettings?.largeText === true,
+    reducedMotion: uiSettings?.reducedMotion === true,
+    compactNav: uiSettings?.compactNav === true,
+    keepComposerOpen: uiSettings?.keepComposerOpen === true,
+    partialNavigation: uiSettings?.partialNavigation !== false,
+  };
+  const checked = (value) => (value ? 'checked' : '');
+  return `
+    ${flashNote}
+    <form class="stack" method="post" action="/profile" data-enhance="profile">
+      <input type="hidden" name="intent" value="ui-preferences" />
+      <label class="field">
+        <span>UI verbosity</span>
+        <select name="uiVerbosity">
+          <option value="default" ${selection === 'default' ? 'selected' : ''}>Use Circle default (${defaultLabel})</option>
+          <option value="full" ${selection === 'full' ? 'selected' : ''}>Full (show guidance + telemetry cues)</option>
+          <option value="compact" ${selection === 'compact' ? 'selected' : ''}>Compact (hide verbose cues)</option>
+        </select>
+      </label>
+      <div class="stack">
+        <p class="muted small">Interface defaults (used when browser-local overrides are not set):</p>
+        <label class="field checkbox">
+          <input type="hidden" name="uiLargeText" value="off" />
+          <input type="checkbox" name="uiLargeText" ${checked(normalizedSettings.largeText)} />
+          <span>Larger text scale</span>
+        </label>
+        <label class="field checkbox">
+          <input type="hidden" name="uiReducedMotion" value="off" />
+          <input type="checkbox" name="uiReducedMotion" ${checked(normalizedSettings.reducedMotion)} />
+          <span>Reduced motion</span>
+        </label>
+        <label class="field checkbox">
+          <input type="hidden" name="uiCompactNav" value="off" />
+          <input type="checkbox" name="uiCompactNav" ${checked(normalizedSettings.compactNav)} />
+          <span>Compact side navigation</span>
+        </label>
+        <label class="field checkbox">
+          <input type="hidden" name="uiKeepComposerOpen" value="off" />
+          <input type="checkbox" name="uiKeepComposerOpen" ${checked(normalizedSettings.keepComposerOpen)} />
+          <span>Keep social composer open while scrolling</span>
+        </label>
+        <label class="field checkbox">
+          <input type="hidden" name="uiPartialNavigation" value="off" />
+          <input type="checkbox" name="uiPartialNavigation" ${checked(normalizedSettings.partialNavigation)} />
+          <span>Fast partial navigation</span>
+        </label>
+      </div>
+      <div class="cta-row">
+        <button class="ghost" type="submit">Save UI preferences</button>
+      </div>
+    </form>
+    <p class="muted small">Current view: ${escapeHtml(effectiveLabel)}.</p>
+  `;
+}
+
 export function buildProfileValues(providerFields = [], entry) {
   const values = {};
   const provider = entry?.provider || {};

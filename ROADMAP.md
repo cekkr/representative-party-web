@@ -3,6 +3,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Anchoring Principles (from Representative Parties)
 - **One person/person, One Voice** backed by blinded identity; federation guards against double representation and toxic providers. “Person” is a Circle-specific label layered on top of the user role when civic proof is enabled.
 - **Exclusion principle**: only natural persons can hold handles or act; org/bot/service accounts are blocked via verification policy and banned flagging.
+- **Provider-blind option (optional)**: user ids are Circle-unique independent of provider; explore P2P protocols to obscure provider attribution in gossip/UX where feasible without breaking auditability.
+- **Privilege-free Circle genesis (optional)**: Circles can start with no special roles beyond provider admins; governance can emerge via groups, member votes, and contextual dynamic structures.
 - **Soft-power accountability**: transparency and auditable trails instead of hard imperative mandates.
 - **Liquid representation**: delegation is topic-scoped, revocable, and visible; users/people can migrate without losing history.
 - **Phygital inclusion**: the digital platform must remain accessible via desktop/mobile and be mirrored by physical “agorà” touchpoints.
@@ -17,7 +19,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Gossip identity**: set a stable issuer URL/identifier (`CIRCLE_ISSUER` or `/admin`) so peers can track envelope provenance.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
-- **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
+- **Module families**: optional modules are grouped as `P2P social/community`, `E-party governance`, and `Federation/resilience` so providers can reuse the framework for non-party communities without carrying civic flows by default.
+- **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request with author notifications, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
 - **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state, ledger/actor/discussion counts, and gossip ingest state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
 
@@ -43,26 +46,64 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 ## Implementation Roadmap
 
 ## Current status snapshot (Phase 1 largely shipped)
-- Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation.
-- Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default, blockable after reports), gated by the same role/ban checks.
+- Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation; discussion notes and forum comments accept optional evidence/citation links.
+- Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default with view-request notifications, blockable after reports), gated by the same role/ban checks.
+- Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads; cleanup stats surface in `/health` and `/admin` and persist in settings for restart-safe ops cues.
+- Media uploads enforce filename length caps to prevent oversized multipart metadata.
+- Request body limits now cap non-media payloads and reject unexpected multipart forms.
 - Circle policy gates, session roles/ban flags, and identity-based rate limits are wired into posting flows.
-- Petitions/signatures/votes pipeline exists with vote envelopes, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags, transactions log + gossip summaries, and admin controls.
+- Petitions/signatures/votes pipeline exists with vote envelopes, structured proposal outline fields, collaborative revisions + version history, stage cues, evidence summaries + sources, stance-tagged comments + fact-check flags + evidence prompts, argument-map linking, transactions log + gossip summaries, and admin controls.
 - Delegation + groups + elections (ranked-choice with second/third picks) are implemented and surfaced in UI.
+- Governance defaults (quorum, timing windows, vote method, delegation decay window) are editable in `/admin` and published at `/governance`.
+- `/admin` now includes a first-run installation wizard for Circle basics, data mode, peer alignment, and optional defaults.
+- `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned (links live with module metadata).
+- Module control center now groups optional modules by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) and surfaces per-lane enabled summaries for faster non-party deployments.
+- Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
+- Governance defaults now accept verified-user change proposals from `/governance`; admins approve/reject them in `/admin`, accepted proposals update the constitution defaults, and decisions append governance history plus transaction/audit entries.
+- Liquid delegation now resolves transitively: `resolveDelegation` follows a delegate's own per-topic choices to the terminal delegate with cycle detection, a depth cap, and banned-delegate stops; `/delegation` shows an "explain my influence" chain view and delegate profiles expose an advisory deliberation score (trust/participation/deliberation/endorsement with a recency factor) plus a "rising star" cue.
+- Delegation decay/renewal is live: an admin-configurable `delegationDecayDays` governance setting (0 = off) lapses un-renewed delegations so they drop out of resolution; `/delegation` shows freshness pills (active/expiring/lapsed) with a per-topic Renew action, and `/governance` surfaces the decay window.
+- Theme-level verbosity controls are live: admin default + per-session overrides in `/profile`, plus a top‑bar toggle and per‑page presets via Composer.
+- Composer mode now supports per-page layout ordering (including main/aside swaps), panel hiding, per-page verbosity presets, and persisted text/style + DOM order overrides for composer-keyed elements.
+- HTTP templates now live under `src/modules/<module>/templates/` with per-module controllers in `src/modules/<module>/http/` for clearer ownership (partials under `templates/partials/`).
 - Persistence adapters (json/memory/sql/kv/mysql/mongodb), data modes, preview gating, gossip scheduler, and peer health/quarantine are in place.
 - Structure manager UI for provider-local fields and attributes is available, with schema-staleness cues on profile edits; topic preferences + topic registry/breadcrumbs + gardener worker with scheduled refactors and admin review for rename/merge/split + anchor suggestions are wired.
-- Peer health now records peer ledger hash snapshots with match/mismatch cues for audits.
+- Peer health now records peer ledger hash snapshots with match/mismatch cues for audits; gossip summaries include run durations in `/admin` and `/health`.
+- Peer capability snapshots (module toggles + data mode) are gossiped alongside ledgers, cached per peer, surfaced in `/admin`, and used to skip disabled endpoints.
+- Peer capability hints now store stable fingerprints, and provider-blind announcements are cached by `updatedAt` to reduce repeated gossip normalization work.
+- Gossip pull now runs peer fetches in parallel and caches optional endpoint skips (`/votes/ledger`, `/transactions/ledger`) after module-disabled/not-found responses, reducing repeated failed probes.
+- `/admin` and `/health` now surface optional-endpoint skip cache summaries so operators can observe skip behavior and TTL impact.
+- Gossip push now caches endpoint skips (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) after module-disabled/gossip-disabled responses, reducing repeated failed retries on outbound sync runs.
+- Ledger/vote/transaction exports gzip-compress when clients request `Accept-Encoding: gzip` and payloads are at least ~2KB.
+- Provider-blind scaffolding is live: `/admin` policy fields (observe/strict), ring registry + audit committee metadata, canonical envelope helpers, ringSignature placeholders on vote/transaction envelopes, and gossip announcements for ring registry + audit keys.
+- Optional Circle key generator ships with libp2p-backed ring identity output; `CIRCLE_RING_ID` pre-fills provider-blind ring IDs in `/admin`, which also surfaces signing key status and accepts PEM ring key blocks.
+- `/admin` can generate signing keypairs and persist them into settings (env overrides on restart).
+- Social feed UX now auto-collapses the sticky composer on downward scroll to keep the wall visible while preserving manual expand/collapse controls.
+- Top-bar Interface settings now let users tune practical UX at runtime (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation mode), side-nav jump filtering with `Ctrl/Cmd+K` + `/` shortcuts improves day-to-day navigation, and users can save those toggles as session defaults inline without leaving the current page.
+- Home route now behaves as an operational workspace for guests and signed-in members, surfacing access gates, recent conversation/proposal/audit activity, and operator cues instead of redirecting verified sessions straight to `/social/feed`.
+- Home/discussion/social/petitions templates were cleaned to reduce demo-like filler text (`Next action`, generic onboarding headings) and now present concise operational copy focused on real workflows.
+- Identity is now legible and discoverable (real-life-readiness pass): members set a validated, unique handle on `/profile`; a shared `resolveHandleForHash`/`renderActorLabel` helper renders `@handle` (with a short hash cue) across delegation, delegate profiles, petitions (including the discussion-feed widget, argument-map nodes, and updated/freeze meta), discussion, forum, social, and the home audit lane instead of raw pid hashes; a browsable People directory at `/delegates` (with search) plus handle pickers (datalists) on the delegation and follow forms replace free-text hash entry, and delegation resolves a typed handle/hash to a known verified person.
+- Notification labels are humanized (`humanizeNotificationType`) so `/notifications` shows readable titles (e.g. "Proposal created", "You were mentioned") instead of raw event types like `petition_created`.
+- Long lists paginate: shared `paginate`/`renderPager` helpers add SSR pagination (page size 20, query-preserving prev/next that respects topic/stage/follow-type filters and partial navigation) across all four high-traffic lists — discussion, petitions, forum threads, and the social feed.
 
 ## Near-term next steps (Phase 2 focus)
-- Deliberative workbench upgrades: structured proposal templates (evidence fields), argument mapping UI (pro/con trees, building on stance tags), evidence/citation prompts, and community fact-check flags.
-- Governance module: digital constitution for quorum/debate/voting-method parameters with a community proposal/change workflow and audit trail.
-- Delegation trust UX: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
-- Delegation safeguards: transitive delegation model plus decay/renewal cycles and “rising stars” discovery cues.
+- Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
+- Admin Composer: extend the layout builder with component palette + insert/delete/wrap operations and richer component-level property editing beyond panels + nav (multi-select, reusable blocks, richer property groups).
+- Template hygiene: split remaining module templates into `templates/partials/` for composable subcomponents (admin, groups, discussion, delegation, notifications, profile, forum, governance).
+- Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
+- Governance module: constitution defaults plus community change proposals, admin decisions, and auditable history are live; deeper member-ratified constitution changes remain pending.
+- Delegation trust UX: delegate profile views, transitive chain visualization, and an advisory deliberation score are live; reputation depth (topic-expertise weighting, cross-provider reputation) remains.
+- Delegation safeguards: transitive delegation resolution (cycle/depth/banned guards), decay/renewal cycles (admin-configurable `delegationDecayDays`), and a "rising star" discovery cue are live; transitive power-weight computation ("explain my influence" weighting) remains.
+- UI preferences: browser-local controls plus inline session-default saves are live; next step is optional provider-profile sync across sessions/devices.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
+- Module boundary hardening: continue separating reusable `social/community` kernel code from `e-party governance` modules (clear namespaces/contracts) so deployments can compose only what they need.
+- Evaluate libp2p gossipsub channels for social-lane transport while keeping civic vote/transactions envelopes on signed audit paths.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
+- Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
+- Next-next steps: expand multipart integration tests with malformed-boundary/fuzzed header cases to harden parser edge behavior.
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
-- Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares plus optional provider-local media uploads; keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
+- Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares plus optional provider-local media uploads (view requests notify authors); keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
 - Add core module toggles in `/admin` so petitions/votes/delegation/groups/federation/topic gardener/social can be disabled for messaging-only deployments; nav and endpoints respect disabled modules.
 - Add ledger digests to gossip envelopes and reject mismatched ledgers; centralized mode disables gossip ingest to avoid unintended replication.
 - Add scheduled gossip push/pull and admin controls for manual sync runs.
@@ -86,8 +127,9 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
 - **Topic gardener helper**: implement the DynamicTopicCategorization flow (online ingestion + scheduled merge/split/rename) as a Python service in `src/infra/workers/`, exposed via a stable API to `src/modules/topics/classification.js` so multiple providers stay reconciled (no conflicting labels) and redundant processing is avoided. Use it to surface trends, aggregate dispersed discussions, and pull isolated clusters toward active threads.
 - **Group delegation & elections**: groups manage internal delegate cachets and elections; recommendations remain advisory, users can always override. Conflict rules can require user choice instead of auto-selection, and vote-mode recommendations should prefer the latest closed election winner.
+- **Privilege-free Circle bootstrap (optional)**: allow Circles to start without seeded roles beyond provider admins; group elections and member votes can grant roles and context-specific structures as they evolve.
 - UX: guided flows for “draft → discuss”, inline status chips (petition stage, quorum), and topic breadcrumbs.
-- **Deliberative workbench**: structured proposal templates with evidence fields, collaborative drafting upgrades, argument mapping UI (building on stance tags), and evidence/citation prompts with community fact-check flags.
+- **Deliberative workbench**: structured proposal templates and argument-map linking are shipped in petitions; next steps include deeper pro/con trees, evidence/citation prompts, and community fact-check workflows.
 - **Governance module**: digital constitution for quorum/debate windows/voting-method defaults, with community proposals, audits, and admin emergency overrides.
 - **Delegation trust UX**: delegate profiles (bio, vote history, delegation counts), chain visualization, and initial reputation metrics (deliberation score).
 - **Topics/Taxonomy**: reinforce dynamic topics + anchors with clearer stewardship cues and topic history context across deliberation surfaces.
@@ -104,6 +146,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Claim & Seize** protocol: signed migration requests to move history across providers when the same wallet re-verifies.
 - **Circle health**: scheduled peer audits for policy compliance; automatic quarantine of toxic peers.
 - **Cross-provider access**: view/vote on petitions across providers with signed envelopes and policy gating.
+- **Provider-blind mode (optional)**: complete ring signatures + issuer escrow, finalize audit-reveal governance, and add mixnet/onion transport so provider attribution is hidden without losing accountability.
 - UX: migration status banners and audit transparency dashboard.
 
 ### Phase 5 — Accountability & Launch (Months 15+)
@@ -231,6 +274,9 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
 3.  **Delegation & Trust UX:**
       * Delegate profiles (bio, vote history, delegation counts) and delegation chain visualization.
       * Delegation decay/renewal controls and reputation scaffolds (deliberation score, topic expertise).
+4.  **Privilege-free Circle bootstrap (optional):**
+      * Allow Circles to start without seeded roles beyond provider admins.
+      * Enable groups + member votes to grant roles and evolve contextual structures over time.
 
 #### **Phase 3: The Decision Engine (Months 8-11)**
 
@@ -257,6 +303,8 @@ To ensure **One Person = One Vote** across the entire federation (not just one s
       * **Policy Verification:** Servers periodically audit each other (e.g., checking if they are correctly enforcing OIDC4VP checks). If a server fails, it is automatically removed from the "Trusted Circle," isolating the toxic provider.
 3.  **Cross-Provider Access:**
       * Allow a user on *Server A* to view and vote on a Petition hosted on *Server B* seamlessly, using the ActivityPub federation to transport the vote authentication.
+4.  **Provider-blind mode (optional):**
+      * Complete ring signatures + issuer escrow, finalize audit-reveal governance, and add mixnet/onion routing so provider attribution is hidden without losing accountability.
 
 #### **Phase 5: Accountability & Launch (Months 15+)**
 

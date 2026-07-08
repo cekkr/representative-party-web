@@ -3,7 +3,7 @@ import { ingestTransactionsSummary } from '../../../modules/transactions/gossip.
 import { getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sendJson } from '../../../shared/utils/http.js';
+import { sendJson, sendJsonWithEncoding } from '../../../shared/utils/http.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
 export function renderTransactions({ res, state, url }) {
@@ -13,18 +13,18 @@ export function renderTransactions({ res, state, url }) {
   return sendJson(res, 200, { transactions: entries });
 }
 
-export function exportTransactions({ res, state, url }) {
+export function exportTransactions({ req, res, state, url }) {
   const limit = Number(url.searchParams.get('limit') || 100);
   const envelope = exportTransactionsEnvelope(state, { limit: Number.isFinite(limit) ? limit : 100 });
-  return sendJson(res, 200, envelope);
+  return sendJsonWithEncoding(req, res, 200, envelope, { allowGzip: true });
 }
 
-export function exportTransactionsLedger({ res, state }) {
+export function exportTransactionsLedger({ req, res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
   const envelope = exportTransactionsEnvelope(state, { limit: 100 });
-  return sendJson(res, 200, { envelope, replication: getReplicationProfile(state) });
+  return sendJsonWithEncoding(req, res, 200, { envelope, replication: getReplicationProfile(state) }, { allowGzip: true });
 }
 
 export async function gossipTransactions({ req, res, state }) {

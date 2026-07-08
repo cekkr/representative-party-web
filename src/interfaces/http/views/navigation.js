@@ -1,34 +1,338 @@
 import { resolveModuleSettings } from '../../../modules/circle/modules.js';
+import { getPrivilegesForPerson } from '../../../modules/identity/privileges.js';
+import { escapeHtml } from '../../../shared/utils/text.js';
+import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
 
 const NAV_ITEMS = [
-  { key: 'home', label: 'Home', href: '/', partial: true },
-  { key: 'auth', label: 'Wallet Login (demo)', href: '/auth/eudi', partial: true },
-  { key: 'discussion', label: 'Discussion', href: '/discussion', partial: true },
-  { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true },
-  { key: 'forum', label: 'Forum', href: '/forum', partial: true },
-  { key: 'petitions', label: 'Proposals/Vote', href: '/petitions', module: 'petitions', partial: true },
-  { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true },
-  { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true },
-  { key: 'notifications', label: 'Notifications', href: '/notifications', partial: true },
-  { key: 'profile', label: 'Profile', href: '/profile', partial: true },
-  { key: 'admin', label: 'Admin', href: '/admin', partial: true },
-  { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer', partial: false },
+  { key: 'home', label: 'Home', href: '/', partial: true, match: { path: '/', exact: true } },
+  {
+    key: 'auth',
+    label: 'Wallet Login',
+    href: '/auth/eudi',
+    partial: true,
+    match: { prefix: '/auth' },
+    hideWhenVerified: true,
+  },
+  {
+    key: 'social',
+    label: 'Social feed',
+    href: '/social/feed',
+    module: 'social',
+    partial: true,
+    match: { prefix: '/social' },
+    requiresVerified: true,
+  },
+  { key: 'discussion', label: 'Discussion', href: '/discussion', partial: true, match: { prefix: '/discussion' } },
+  { key: 'forum', label: 'Forum', href: '/forum', partial: true, match: { prefix: '/forum' } },
+  { key: 'petitions', label: 'Proposals', href: '/petitions', module: 'petitions', partial: true, match: { prefix: '/petitions' } },
+  { key: 'governance', label: 'Governance', href: '/governance', partial: true, match: { prefix: '/governance' } },
+  { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true, match: { prefix: '/delegation' } },
+  { key: 'delegates', label: 'People', href: '/delegates', module: 'delegation', partial: true, match: { prefix: '/delegates' } },
+  { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true, match: { prefix: '/groups' } },
+  {
+    key: 'notifications',
+    label: 'Notifications',
+    href: '/notifications',
+    partial: true,
+    match: { prefix: '/notifications' },
+    requiresVerified: true,
+  },
+  {
+    key: 'profile',
+    label: 'Profile',
+    href: '/profile',
+    partial: true,
+    match: { prefix: '/profile' },
+    requiresVerified: true,
+  },
+  {
+    key: 'admin',
+    label: 'Admin',
+    href: '/admin',
+    partial: true,
+    match: { prefix: '/admin' },
+    requiresVerified: true,
+  },
+  { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer', partial: false, match: { prefix: '/health' } },
 ];
 
-export function renderNav(state) {
+const NAV_GROUPS = [
+  { key: 'start', label: 'Workspace', keys: ['home', 'auth', 'profile', 'notifications'] },
+  { key: 'conversation', label: 'Social/community', keys: ['social', 'discussion', 'forum'] },
+  { key: 'governance', label: 'E-party governance', keys: ['petitions', 'delegation', 'delegates', 'groups', 'governance'] },
+  { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
+];
+
+const QUICK_ACTIONS = [
+  { key: 'home', label: 'Home', href: '/', partial: true },
+  { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, hideWhenVerified: true },
+  { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true, requiresVerified: true },
+  { key: 'forum', label: 'Forum', href: '/forum', partial: true },
+  { key: 'notifications', label: 'Alerts', href: '/notifications', partial: true, requiresVerified: true },
+  { key: 'profile', label: 'Profile', href: '/profile', partial: true, requiresVerified: true },
+];
+
+const CONTEXT_ACTIONS = {
+  social: [
+    {
+      key: 'social-compose',
+      label: 'New Post',
+      href: '/social/feed?compose=post#social-compose',
+      partial: true,
+      module: 'social',
+      requiresVerified: true,
+    },
+  ],
+  discussion: [
+    { key: 'discussion-compose', label: 'New Post', href: '/discussion?compose=post#discussion-compose', partial: true },
+  ],
+  forum: [
+    { key: 'forum-compose', label: 'New Article', href: '/forum?compose=thread#forum-compose', partial: true },
+  ],
+  petitions: [
+    {
+      key: 'petitions-compose',
+      label: 'New Proposal',
+      href: '/petitions?compose=proposal#petitions-compose',
+      partial: true,
+      module: 'petitions',
+    },
+  ],
+  admin: [{ key: 'admin-modules', label: 'Modules', href: '/admin#modules', partial: true, requiresVerified: true }],
+};
+
+const CHILD_SECTIONS = {
+  home: [
+    { label: 'Workspace', href: '/#home-overview', partial: true },
+    { label: 'Access', href: '/#home-access', partial: true },
+    { label: 'Lane activity', href: '/#home-lanes', partial: true },
+    { label: 'Operations', href: '/#home-ops', partial: true },
+  ],
+  social: [
+    { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },
+    { label: 'Feed', href: '/social/feed#social-wall', partial: true },
+    { label: 'Follows', href: '/social/feed#social-follows', partial: true },
+  ],
+  discussion: [
+    { label: 'New post', href: '/discussion?compose=post#discussion-compose', partial: true },
+    { label: 'Latest contributions', href: '/discussion#discussion-feed', partial: true },
+    { label: 'Topic preferences', href: '/discussion#discussion-topics', partial: true },
+  ],
+  forum: [
+    { label: 'New article', href: '/forum?compose=thread#forum-compose', partial: true },
+    { label: 'Threads', href: '/forum#forum-threads', partial: true },
+  ],
+  petitions: [
+    { label: 'New proposal', href: '/petitions?compose=proposal#petitions-compose', partial: true },
+    { label: 'Active deliberations', href: '/petitions#petitions-discussion', partial: true },
+    { label: 'Active proposals', href: '/petitions#petitions-active', partial: true },
+  ],
+  admin: [
+    { label: 'Circle settings', href: '/admin#circle-settings', partial: true },
+    { label: 'Governance defaults', href: '/admin#governance-settings', partial: true },
+    { label: 'Topic gardener', href: '/admin#topic-gardener-review', partial: true },
+    { label: 'Gossip sync', href: '/admin#federation-gossip', partial: true },
+    { label: 'Provider-blind', href: '/admin#provider-blind', partial: true },
+    { label: 'Modules', href: '/admin#modules', partial: true },
+    { label: 'Composer', href: '/admin#composer', partial: true },
+    { label: 'Rate limits', href: '/admin#rate-limits', partial: true },
+    { label: 'Social media', href: '/admin#social-media', partial: true },
+    { label: 'Upload cleanup', href: '/admin#upload-cleanup', partial: true },
+    { label: 'Structure manager', href: '/admin#structure-manager', partial: true },
+    { label: 'Provider profiles', href: '/admin#provider-profiles', partial: true },
+    { label: 'Admin audit', href: '/admin#admin-audit', partial: true },
+    { label: 'Runtime metrics', href: '/admin#ops-metrics', partial: true },
+    { label: 'Metrics retention', href: '/admin#metrics-retention', partial: true },
+    { label: 'Transactions', href: '/admin#admin-transactions', partial: true },
+    { label: 'Outbound delivery', href: '/admin#outbound-delivery', partial: true },
+    { label: 'Transaction summaries', href: '/admin#transaction-summaries', partial: true },
+    { label: 'Extensions', href: '/admin#extensions', partial: true },
+    { label: 'Session overrides', href: '/admin#session-overrides', partial: true },
+  ],
+};
+
+export function renderNav(state, context = {}) {
   const modules = resolveModuleSettings(state);
-  return NAV_ITEMS.filter((item) => {
-    if (!item.module) return true;
-    return modules[item.module] !== false;
-  })
-    .map((item) => {
-      const attributes = [];
-      if (item.partial) attributes.push('data-partial');
-      if (item.target) attributes.push(`target="${item.target}"`);
-      if (item.rel) attributes.push(`rel="${item.rel}"`);
-      if (item.module) attributes.push(`data-module="${item.module}"`);
-      attributes.push(`data-nav="${item.key}"`);
-      return `<a href="${item.href}" ${attributes.join(' ')}>${item.label}</a>`;
-    })
+  const composerSettings = resolveComposerSettings(state);
+  const navContext = resolveNavContext(state, context);
+  navContext.quickOrder = composerSettings.quickActionsOrder;
+  navContext.sideOrder = composerSettings.sideNavOrder;
+  navContext.textOverrides = composerSettings.textOverrides;
+  navContext.styleOverrides = composerSettings.styleOverrides;
+  const sideNav = renderSideNav(modules, navContext);
+  const quickLinks = renderQuickLinks(modules, navContext);
+  return { sideNav, quickLinks };
+}
+
+function renderSideNav(modules, navContext) {
+  const byKey = new Map(NAV_ITEMS.map((item) => [item.key, item]));
+  return NAV_GROUPS.map((group) => renderNavGroup(group, byKey, modules, navContext))
+    .filter(Boolean)
     .join('\n');
+}
+
+function renderNavGroup(group, byKey, modules, navContext) {
+  const items = group.keys
+    .map((key) => byKey.get(key))
+    .filter((item) => item && isItemAllowed(item, modules, navContext));
+  const orderedItems = applyOrder(items, navContext.sideOrder);
+  if (!orderedItems.length) return '';
+  const links = orderedItems.map((item) => renderSideItem(item, modules, navContext)).join('\n');
+  const groupKey = `nav.group.${group.key || group.label}`;
+  const groupLabel = resolveComposerTextEscaped(navContext.textOverrides, groupKey, group.label);
+  const groupStyle = resolveComposerStyle(navContext.styleOverrides, groupKey);
+  const groupAttrs = [
+    `data-composer-key="${escapeHtml(groupKey)}"`,
+    `data-composer-default="${escapeHtml(group.label)}"`,
+    groupStyle ? `style="${escapeHtml(groupStyle)}"` : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `
+    <div class="side-nav__group">
+      <p class="eyebrow" ${groupAttrs}>${groupLabel}</p>
+      ${links}
+    </div>
+  `;
+}
+
+function renderSideItem(item, modules, navContext) {
+  const childSections = (CHILD_SECTIONS[item.key] || []).filter((child) => isItemAllowed(child, modules, navContext));
+  const matchAttrs = buildMatchAttributes(item);
+  return `
+    <div class="side-nav__item" data-nav-section="${item.key}" ${matchAttrs}>
+      ${renderLink(item, { className: 'side-nav__link', extraAttrs: ['data-nav-link'], navContext })}
+      <div class="side-nav__children" data-nav-children="${item.key}" hidden>
+        ${childSections.map((child) => renderLink(child, { className: 'side-nav__child', navContext })).join('\n')}
+      </div>
+    </div>
+  `;
+}
+
+function renderQuickLinks(modules, navContext) {
+  const globalLinks = QUICK_ACTIONS.filter((item) => isItemAllowed(item, modules, navContext));
+  const orderedGlobal = applyOrder(globalLinks, navContext.quickOrder);
+  const contextLinks = Object.entries(CONTEXT_ACTIONS)
+    .flatMap(([section, items]) =>
+      items.filter((item) => isItemAllowed(item, modules, navContext)).map((item) => ({ ...item, section })),
+    );
+  const orderedContext = applyOrder(contextLinks, navContext.quickOrder);
+  const globalHtml = orderedGlobal.map((item) => renderLink(item, { className: 'quick-link', navContext })).join('\n');
+  const orderedContextHtml = orderedContext
+    .map((item) =>
+      renderLink(item, {
+        className: 'quick-link quick-link--context',
+        extraAttrs: [`data-quick-section="${item.section}"`, 'hidden'],
+        navContext,
+      }),
+    )
+    .join('\n');
+  return [globalHtml, orderedContextHtml].filter(Boolean).join('\n');
+}
+
+function renderLink(item, { className, extraAttrs = [], navContext } = {}) {
+  const attributes = [];
+  const labelKey = item.key ? `nav.item.${item.key}` : '';
+  const label = resolveComposerTextEscaped(navContext?.textOverrides, labelKey, item.label);
+  const style = labelKey ? resolveComposerStyle(navContext?.styleOverrides, labelKey) : '';
+  if (item.partial) attributes.push('data-partial');
+  if (item.target) attributes.push(`target="${item.target}"`);
+  if (item.rel) attributes.push(`rel="${item.rel}"`);
+  if (item.module) attributes.push(`data-module="${item.module}"`);
+  if (className) attributes.push(`class="${className}"`);
+  if (item.key) {
+    attributes.push(`data-nav-key="${escapeHtml(item.key)}"`);
+    attributes.push(`data-composer-key="${escapeHtml(labelKey)}"`);
+    attributes.push(`data-composer-default="${escapeHtml(item.label)}"`);
+  }
+  if (style) {
+    attributes.push(`style="${escapeHtml(style)}"`);
+  }
+  return `<a href="${item.href}" ${attributes.concat(extraAttrs).join(' ')}>${label}</a>`;
+}
+
+function buildMatchAttributes(item) {
+  const match = item.match || {};
+  if (match.exact && match.path) {
+    return `data-nav-path="${match.path}" data-nav-exact="true"`;
+  }
+  if (match.prefix) {
+    return `data-nav-prefix="${match.prefix}"`;
+  }
+  return '';
+}
+
+function isItemAllowed(item, modules, navContext) {
+  if (item.module && modules[item.module] === false) return false;
+  if (item.requiresVerified && !navContext.isVerified) return false;
+  if (item.hideWhenVerified && navContext.isVerified) return false;
+  if (item.requiresModerate && !navContext.canModerate) return false;
+  return true;
+}
+
+function applyOrder(items, order = []) {
+  if (!order || !order.length) return items;
+  const byKey = new Map(items.map((item) => [item.key, item]));
+  const ordered = [];
+  for (const key of order) {
+    const match = byKey.get(key);
+    if (match) {
+      ordered.push(match);
+      byKey.delete(key);
+    }
+  }
+  for (const item of items) {
+    if (byKey.has(item.key)) {
+      ordered.push(item);
+      byKey.delete(item.key);
+    }
+  }
+  return ordered;
+}
+
+function resolveComposerSettings(state) {
+  const composer = state?.settings?.composer || {};
+  return {
+    quickActionsOrder: Array.isArray(composer.quickActionsOrder) ? composer.quickActionsOrder : [],
+    sideNavOrder: Array.isArray(composer.sideNavOrder) ? composer.sideNavOrder : [],
+    textOverrides: composer.textOverrides && typeof composer.textOverrides === 'object' ? composer.textOverrides : {},
+    styleOverrides: composer.styleOverrides && typeof composer.styleOverrides === 'object' ? composer.styleOverrides : {},
+  };
+}
+
+function resolveNavContext(state, context = {}) {
+  if (context.person) {
+    const privileges = getPrivilegesForPerson(context.person, state);
+    return {
+      isVerified: privileges.role !== 'guest',
+      canModerate: privileges.canModerate,
+      role: privileges.role,
+    };
+  }
+
+  const roleLabel = context.roleLabel || context.role || '';
+  const normalizedRole = roleLabel ? String(roleLabel).toLowerCase() : '';
+  const explicitVerified = typeof context.isVerified === 'boolean';
+  const isVerified = explicitVerified ? context.isVerified : normalizedRole ? normalizedRole !== 'guest' : false;
+  if (normalizedRole) {
+    return {
+      isVerified,
+      canModerate: normalizedRole === 'admin' || normalizedRole === 'moderator',
+      role: normalizedRole,
+    };
+  }
+  if (explicitVerified) {
+    return {
+      isVerified,
+      canModerate: Boolean(context.canModerate),
+      role: isVerified ? 'user' : 'guest',
+    };
+  }
+  const handle = context.personHandle || '';
+  const handleVerified = Boolean(handle && handle !== 'Guest session');
+  return {
+    isVerified: handleVerified,
+    canModerate: false,
+    role: handleVerified ? 'user' : 'guest',
+  };
 }

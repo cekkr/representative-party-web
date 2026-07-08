@@ -1,0 +1,706 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Forum Topic + Non-Invasive Reply</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --text:#0f172a;
+      --muted:#64748b;
+      --border:#e5e7eb;
+      --shadow:0 1px 2px rgba(0,0,0,.06);
+      --radius:14px;
+      --pill:#f1f5f9;
+
+      --accent:#2563eb;
+      --danger:#ef4444;
+      --ok:#16a34a;
+
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--sans);
+      background:var(--bg);
+      color:var(--text);
+      display:grid;
+      place-items:start center;
+      padding:24px 12px;
+    }
+
+    /* Page layout */
+    .wrap{
+      width:min(980px, 100%);
+      display:grid;
+      grid-template-columns: 1fr 300px;
+      gap:14px;
+      align-items:start;
+    }
+
+    @media (max-width: 920px){
+      .wrap{ grid-template-columns: 1fr; }
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+    }
+
+    /* Topic header */
+    .topicHead{
+      padding:14px 14px 10px;
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .avatar{
+      width:44px; height:44px;
+      border-radius:999px;
+      background:linear-gradient(135deg,#cbd5e1,#f1f5f9);
+      border:1px solid var(--border);
+      flex:0 0 auto;
+      position:relative;
+      overflow:hidden;
+    }
+    .avatar::after{
+      content:"";
+      position:absolute;
+      inset:10px 12px 8px 12px;
+      border-radius:999px;
+      background:rgba(0,0,0,.10);
+    }
+
+    .titleBlock{ flex:1; }
+    .breadcrumbs{
+      font-size:12px;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+    .topicTitle{
+      font-size:20px;
+      line-height:1.2;
+      margin:0 0 6px;
+      font-weight:800;
+      letter-spacing:-0.01em;
+    }
+    .metaRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .tag{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border:1px solid var(--border);
+      background:#fff;
+      padding:5px 10px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--text);
+    }
+
+    .topicBody{
+      padding:0 14px 14px;
+      color:var(--text);
+      line-height:1.55;
+      font-size:15px;
+    }
+    .topicBody p{ margin:10px 0; }
+    .topicBody code{
+      font-family:var(--mono);
+      font-size:13px;
+      background:var(--pill);
+      border:1px solid var(--border);
+      padding:2px 6px;
+      border-radius:8px;
+    }
+    pre{
+      background: #0b1220;
+      color:#e5e7eb;
+      border-radius:12px;
+      padding:12px;
+      overflow:auto;
+      border:1px solid rgba(255,255,255,.06);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.02);
+    }
+    pre code{
+      background:transparent;
+      border:none;
+      padding:0;
+      color:inherit;
+      font-family:var(--mono);
+      font-size:13px;
+    }
+
+    /* Replies list */
+    .repliesHead{
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      border-top:1px solid var(--border);
+    }
+    .repliesHead h2{
+      margin:0;
+      font-size:14px;
+      letter-spacing:.02em;
+      color:var(--muted);
+      text-transform:uppercase;
+    }
+    .sort{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      color:var(--muted);
+      font-size:13px;
+    }
+    .select{
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:#fff;
+      padding:8px 10px;
+      font:inherit;
+      color:var(--text);
+    }
+
+    .reply{
+      padding:14px;
+      border-top:1px solid var(--border);
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .reply .content{ flex:1; min-width:0; }
+    .replyTop{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:8px;
+    }
+    .authorLine{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      min-width:0;
+    }
+    .name{
+      font-weight:800;
+      font-size:14px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:220px;
+    }
+    .when{ color:var(--muted); font-size:12px; }
+    .replyActions{
+      display:flex;
+      gap:6px;
+      align-items:center;
+    }
+    .iconBtn{
+      width:34px; height:34px;
+      border-radius:10px;
+      border:1px solid transparent;
+      background:transparent;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      color:var(--muted);
+      transition: background .12s ease, border-color .12s ease, color .12s ease;
+    }
+    .iconBtn:hover{ background:var(--pill); }
+    .iconBtn:focus-visible{
+      outline:2px solid rgba(37,99,235,.35);
+      outline-offset:2px;
+    }
+
+    .replyText{
+      color:var(--text);
+      line-height:1.55;
+      font-size:15px;
+      margin:0;
+    }
+    .replyText a{ color:var(--accent); text-decoration:none; }
+    .replyText a:hover{ text-decoration:underline; }
+
+    .quote{
+      margin:10px 0 0;
+      border-left:3px solid var(--border);
+      padding-left:10px;
+      color:var(--muted);
+      font-size:14px;
+    }
+
+    /* Right sidebar */
+    .side{
+      padding:14px;
+      position:sticky;
+      top:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    @media (max-width: 920px){
+      .side{ position:static; }
+    }
+
+    .side h3{
+      margin:0 0 4px;
+      font-size:13px;
+      letter-spacing:.02em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+    .kv{
+      display:grid;
+      grid-template-columns: 1fr auto;
+      gap:8px;
+      font-size:14px;
+      align-items:center;
+      padding:8px 0;
+      border-top:1px solid var(--border);
+    }
+    .kv:first-of-type{ border-top:none; padding-top:0; }
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      border-radius:999px;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      background:#fff;
+      font-size:12px;
+      color:var(--text);
+    }
+
+    /* Non-invasive reply affordance */
+    .replyHint{
+      margin-top:12px;
+      border-top:1px solid var(--border);
+      padding:12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      background:linear-gradient(180deg, #ffffff, #fbfdff);
+      border-bottom-left-radius:var(--radius);
+      border-bottom-right-radius:var(--radius);
+    }
+    .hintLeft{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      min-width:0;
+    }
+    .miniAvatar{
+      width:34px; height:34px;
+      border-radius:999px;
+      background:linear-gradient(135deg,#cbd5e1,#f1f5f9);
+      border:1px solid var(--border);
+      flex:0 0 auto;
+    }
+    .hintText{
+      min-width:0;
+    }
+    .hintText .line1{
+      font-weight:800;
+      font-size:13px;
+      line-height:1.2;
+    }
+    .hintText .line2{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.2;
+      margin-top:2px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:520px;
+    }
+    .hintCtas{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex:0 0 auto;
+    }
+
+    .btn{
+      border:1px solid transparent;
+      background:var(--pill);
+      color:var(--text);
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-weight:800;
+      font-size:14px;
+      transition: background .12s ease, border-color .12s ease;
+      user-select:none;
+      white-space:nowrap;
+    }
+    .btn:hover{ background:#e9eef6; }
+    .btn.primary{
+      background:var(--accent);
+      color:white;
+    }
+    .btn.primary:hover{ background:#1d4ed8; }
+    .btn:focus-visible{
+      outline:2px solid rgba(37,99,235,.35);
+      outline-offset:2px;
+    }
+
+    /* Composer (hidden by default; appears "when needed") */
+    details.replyComposer{
+      border-top:1px solid var(--border);
+      padding:0;
+      margin:0;
+    }
+    details.replyComposer > summary{
+      list-style:none;
+      cursor:pointer;
+      display:none; /* we provide our own visible triggers */
+    }
+    details.replyComposer[open] .composerBox{
+      animation: pop .12s ease-out;
+    }
+    @keyframes pop{
+      from{ transform: translateY(4px); opacity:.7; }
+      to{ transform: translateY(0); opacity:1; }
+    }
+
+    .composerBox{
+      padding:12px 14px 14px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      background:#fff;
+      border-bottom-left-radius:var(--radius);
+      border-bottom-right-radius:var(--radius);
+    }
+
+    .formatBar{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .tools{
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .toolBtn{
+      width:36px; height:36px;
+      border-radius:10px;
+      border:1px solid transparent;
+      background:transparent;
+      cursor:pointer;
+      display:grid;
+      place-items:center;
+      transition: background .12s ease;
+      color:var(--muted);
+      user-select:none;
+    }
+    .toolBtn:hover{ background:var(--pill); }
+    .toolBtn:focus-visible{
+      outline:2px solid rgba(37,99,235,.35);
+      outline-offset:2px;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border:1px solid var(--border);
+      background:#fff;
+      padding:8px 10px;
+      border-radius:999px;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    textarea.replyBox{
+      width:100%;
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:12px 12px;
+      font:inherit;
+      font-size:15px;
+      line-height:1.5;
+      min-height:120px;
+      outline:none;
+      background:#fff;
+    }
+    textarea.replyBox:focus{
+      border-color: rgba(37,99,235,.35);
+      box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+    }
+
+    .composerFooter{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .file{
+      position:absolute;
+      width:1px; height:1px;
+      padding:0; margin:-1px;
+      overflow:hidden;
+      clip:rect(0,0,0,0);
+      white-space:nowrap;
+      border:0;
+    }
+
+    .helper{
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    /* Simple inline icons */
+    .i{
+      width:16px; height:16px;
+      display:inline-grid;
+      place-items:center;
+      font-size:14px;
+      line-height:1;
+    }
+
+    /* “Reply where you need it”: per-reply mini prompt */
+    .inlineReplyHint{
+      margin-top:10px;
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .inlineReplyHint .btn{ padding:8px 10px; font-size:13px; border-radius:10px; }
+    .mutedLink{
+      color:var(--muted);
+      font-size:13px;
+      text-decoration:none;
+      padding:8px 10px;
+      border-radius:10px;
+    }
+    .mutedLink:hover{ background:var(--pill); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- MAIN -->
+    <main class="card" aria-label="Forum topic">
+      <div class="topicHead">
+        <div class="avatar" aria-hidden="true"></div>
+        <div class="titleBlock">
+          <div class="breadcrumbs">Forum / Web UI / Templates</div>
+          <h1 class="topicTitle">How do you design a reply box that doesn’t feel intrusive?</h1>
+          <div class="metaRow">
+            <span class="tag">💬 UX</span>
+            <span class="tag">🧩 Components</span>
+            <span class="tag">📝 Formatting</span>
+            <span class="when">Started by <b>Alice</b> • 2 hours ago</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="topicBody">
+        <p>
+          I’d like a forum-like topic layout where the reply UI appears only when the user wants to engage,
+          but is still available <i>right when needed</i> (end of thread, or per-reply).
+        </p>
+        <p>
+          Ideally there’s a small formatting bar (bold/italic/code/quote), plus non-invasive options like
+          attach media and link.
+        </p>
+        <p>Example inline code: <code>&lt;details&gt;</code> is often a nice pattern.</p>
+
+        <pre><code>// pseudo
+// show small "Reply…" affordance
+// expand composer only on intent
+</code></pre>
+      </div>
+
+      <div class="repliesHead">
+        <h2>Replies</h2>
+        <div class="sort">
+          Sort
+          <select class="select" aria-label="Sort replies">
+            <option>Best</option>
+            <option>Newest</option>
+            <option>Oldest</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Reply 1 -->
+      <article class="reply" aria-label="Reply">
+        <div class="avatar" aria-hidden="true" style="width:36px;height:36px;"></div>
+        <div class="content">
+          <div class="replyTop">
+            <div class="authorLine">
+              <div class="name">Marco</div>
+              <div class="when">1 hour ago</div>
+            </div>
+            <div class="replyActions" aria-label="Reply actions">
+              <button class="iconBtn" type="button" title="Like" aria-label="Like"><span class="i">👍</span></button>
+              <button class="iconBtn" type="button" title="Share" aria-label="Share"><span class="i">↗</span></button>
+              <button class="iconBtn" type="button" title="More" aria-label="More"><span class="i">⋯</span></button>
+            </div>
+          </div>
+
+          <p class="replyText">
+            A good pattern is a <b>small reply affordance</b> + a collapsible composer.
+            Keep the composer out of the scroll flow until the user opts in.
+          </p>
+
+          <div class="quote">
+            Also consider per-reply “Reply” links so users can respond in context.
+          </div>
+
+          <!-- Per-reply "reply where needed" affordance (no JS: demo only) -->
+          <div class="inlineReplyHint" aria-label="Inline reply controls">
+            <button class="btn" type="button">Reply</button>
+            <a class="mutedLink" href="#" aria-label="Quote reply">Quote</a>
+            <a class="mutedLink" href="#" aria-label="Copy link to reply">Copy link</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Reply 2 -->
+      <article class="reply" aria-label="Reply">
+        <div class="avatar" aria-hidden="true" style="width:36px;height:36px;"></div>
+        <div class="content">
+          <div class="replyTop">
+            <div class="authorLine">
+              <div class="name">Giulia</div>
+              <div class="when">35 minutes ago</div>
+            </div>
+            <div class="replyActions" aria-label="Reply actions">
+              <button class="iconBtn" type="button" title="Like" aria-label="Like"><span class="i">👍</span></button>
+              <button class="iconBtn" type="button" title="Bookmark" aria-label="Bookmark"><span class="i">🔖</span></button>
+              <button class="iconBtn" type="button" title="More" aria-label="More"><span class="i">⋯</span></button>
+            </div>
+          </div>
+
+          <p class="replyText">
+            I like a bottom “Reply…” strip that’s visible, but doesn’t steal attention.
+            When expanded, add <code>formatting</code> tools, and keep a short helper line.
+          </p>
+
+          <div class="inlineReplyHint" aria-label="Inline reply controls">
+            <button class="btn" type="button">Reply</button>
+            <a class="mutedLink" href="#" aria-label="Quote reply">Quote</a>
+          </div>
+        </div>
+      </article>
+
+      <!-- Non-invasive bottom affordance -->
+      <div class="replyHint" aria-label="Quick reply affordance">
+        <div class="hintLeft">
+          <div class="miniAvatar" aria-hidden="true"></div>
+          <div class="hintText">
+            <div class="line1">Write a reply</div>
+            <div class="line2">Be concise, or expand with formatting, quote, and attachments when needed.</div>
+          </div>
+        </div>
+        <div class="hintCtas">
+          <!-- In a real app this would toggle details.open (JS). Template only. -->
+          <button class="btn primary" type="button">Reply</button>
+          <button class="btn" type="button">Quote last</button>
+        </div>
+      </div>
+
+      <!-- Collapsible composer (simulates “appears when user needs”) -->
+      <details class="replyComposer" open>
+        <!-- summary hidden; this is a visual template -->
+        <summary>Reply</summary>
+
+        <div class="composerBox" aria-label="Reply composer">
+          <div class="formatBar">
+            <div class="tools" aria-label="Formatting tools">
+              <button class="toolBtn" type="button" title="Bold" aria-label="Bold"><span class="i">B</span></button>
+              <button class="toolBtn" type="button" title="Italic" aria-label="Italic"><span class="i"><i>I</i></span></button>
+              <button class="toolBtn" type="button" title="Inline code" aria-label="Inline code"><span class="i">{ }</span></button>
+              <button class="toolBtn" type="button" title="Quote" aria-label="Quote"><span class="i">❝</span></button>
+              <button class="toolBtn" type="button" title="Link" aria-label="Insert link"><span class="i">🔗</span></button>
+
+              <span class="pill" aria-label="Mode">
+                <span class="i">📝</span>
+                Simple
+              </span>
+            </div>
+
+            <div class="tools" aria-label="Attachment tools">
+              <input class="file" id="attach" type="file" multiple accept="image/*,video/*,.pdf" />
+              <label class="toolBtn" for="attach" title="Attach" aria-label="Attach files"><span class="i">📎</span></label>
+              <button class="toolBtn" type="button" title="Emoji" aria-label="Emoji"><span class="i">😊</span></button>
+              <button class="toolBtn" type="button" title="Mention" aria-label="Mention"><span class="i">@</span></button>
+            </div>
+          </div>
+
+          <textarea class="replyBox" placeholder="Reply… (supports basic formatting, code, and quotes)" aria-label="Reply text"></textarea>
+
+          <div class="composerFooter">
+            <div class="helper">
+              Tip: use <b>Quote</b> to reference a message, or <code>`code`</code> for snippets.
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+              <button class="btn" type="button" aria-label="Preview">Preview</button>
+              <button class="btn primary" type="button" aria-label="Post reply">Post reply</button>
+            </div>
+          </div>
+        </div>
+      </details>
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside class="card side" aria-label="Topic sidebar">
+      <div>
+        <h3>Topic</h3>
+        <div class="kv">
+          <div style="color:var(--muted);">Replies</div><div><span class="badge">24</span></div>
+        </div>
+        <div class="kv">
+          <div style="color:var(--muted);">Views</div><div><span class="badge">1.2k</span></div>
+        </div>
+        <div class="kv">
+          <div style="color:var(--muted);">Status</div><div><span class="badge">Open</span></div>
+        </div>
+      </div>
+
+      <div>
+        <h3>Actions</h3>
+        <button class="btn" type="button" style="width:100%;">Follow</button>
+        <button class="btn" type="button" style="width:100%;">Bookmark</button>
+        <button class="btn" type="button" style="width:100%;">Report</button>
+      </div>
+
+      <div>
+        <h3>Formatting</h3>
+        <div class="badge">Bold</div>
+        <div class="badge">Italic</div>
+        <div class="badge">Code</div>
+        <div class="badge">Quote</div>
+        <div class="badge">Links</div>
+      </div>
+    </aside>
+  </div>
+</body>
+</html>

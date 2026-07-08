@@ -1,11 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 
 import { MEDIA, PATHS } from '../../config.js';
 import { getEffectivePolicy } from '../circle/policy.js';
 import { stampLocalEntry } from '../federation/replication.js';
 import { sanitizeText } from '../../shared/utils/text.js';
+
+const EMPTY_MEDIA_INDEX = { byId: new Map(), version: 0, size: 0 };
 
 const ALLOWED_MEDIA_TYPES = new Set([
   'image/jpeg',
@@ -31,7 +33,14 @@ const EXTENSION_BY_TYPE = {
 
 export function findMedia(state, mediaId) {
   if (!mediaId) return null;
-  return (state.socialMedia || []).find((entry) => entry.id === mediaId) || null;
+  const index = getMediaIndex(state);
+  return index.byId.get(mediaId) || null;
+}
+
+export function invalidateMediaIndex(state) {
+  if (!state) return;
+  state.mediaIndexVersion = (state.mediaIndexVersion || 0) + 1;
+  state.mediaIndexCache = null;
 }
 
 export function listMediaForPost(state, post) {
@@ -45,67 +54,87 @@ export function hasBlockedMedia(state, post) {
 }
 
 export async function createMedia(state, { postId, file, person }) {
-  if (!file || !file.data || !file.filename) {
+  if (!file || (!file.data && !file.tempPath) || !file.filename) {
     const error = new Error('missing_media');
     error.code = 'missing_media';
     throw error;
   }
+  let tempPath = file.tempPath || '';
+  try {
+    let size = Number(file.size);
+    if (!Number.isFinite(size) || size <= 0) {
+      if (file.data) {
+        size = file.data.length;
+      } else if (tempPath) {
+        const info = await stat(tempPath);
+        size = info.size;
+      }
+    }
+    if (!size) {
+      const error = new Error('empty_media');
+      error.code = 'empty_media';
+      throw error;
+    }
+    if (Number.isFinite(MEDIA.maxBytes) && size > MEDIA.maxBytes) {
+      const error = new Error('media_too_large');
+      error.code = 'media_too_large';
+      error.maxBytes = MEDIA.maxBytes;
+      throw error;
+    }
 
-  const size = Number(file.size || file.data.length || 0);
-  if (!size) {
-    const error = new Error('empty_media');
-    error.code = 'empty_media';
+    const contentType = String(file.contentType || '').toLowerCase();
+    if (!ALLOWED_MEDIA_TYPES.has(contentType)) {
+      const error = new Error('unsupported_media');
+      error.code = 'unsupported_media';
+      throw error;
+    }
+
+    const kind = contentType.startsWith('image/') ? 'image' : 'video';
+    const safeName = normalizeFilename(file.filename);
+    const extension = resolveExtension(safeName, contentType);
+    const id = randomUUID();
+    const storedName = `${id}${extension}`;
+    await mkdir(PATHS.MEDIA_ROOT, { recursive: true });
+    const storedPath = join(PATHS.MEDIA_ROOT, storedName);
+    if (tempPath) {
+      await moveTempFile(tempPath, storedPath);
+      tempPath = '';
+    } else {
+      await writeFile(storedPath, file.data);
+    }
+
+    const policy = getEffectivePolicy(state);
+    const now = new Date().toISOString();
+    const entry = stampLocalEntry(state, {
+      id,
+      postId: postId || '',
+      authorHash: person?.pidHash || 'anonymous',
+      authorHandle: person?.handle || 'guest',
+      originalName: sanitizeText(safeName, 160),
+      storedName,
+      contentType,
+      size,
+      kind,
+      status: 'locked',
+      reportCount: 0,
+      reporters: [],
+      viewRequests: 0,
+      createdAt: now,
+      updatedAt: now,
+      blockedAt: null,
+      blockedReason: '',
+      policyId: policy.id,
+      policyVersion: policy.version,
+    });
+
+    upsertMedia(state, entry);
+    return entry;
+  } catch (error) {
+    if (tempPath) {
+      await safeUnlink(tempPath);
+    }
     throw error;
   }
-  if (Number.isFinite(MEDIA.maxBytes) && size > MEDIA.maxBytes) {
-    const error = new Error('media_too_large');
-    error.code = 'media_too_large';
-    error.maxBytes = MEDIA.maxBytes;
-    throw error;
-  }
-
-  const contentType = String(file.contentType || '').toLowerCase();
-  if (!ALLOWED_MEDIA_TYPES.has(contentType)) {
-    const error = new Error('unsupported_media');
-    error.code = 'unsupported_media';
-    throw error;
-  }
-
-  const kind = contentType.startsWith('image/') ? 'image' : 'video';
-  const safeName = normalizeFilename(file.filename);
-  const extension = resolveExtension(safeName, contentType);
-  const id = randomUUID();
-  const storedName = `${id}${extension}`;
-  await mkdir(PATHS.MEDIA_ROOT, { recursive: true });
-  const storedPath = join(PATHS.MEDIA_ROOT, storedName);
-  await writeFile(storedPath, file.data);
-
-  const policy = getEffectivePolicy(state);
-  const now = new Date().toISOString();
-  const entry = stampLocalEntry(state, {
-    id,
-    postId: postId || '',
-    authorHash: person?.pidHash || 'anonymous',
-    authorHandle: person?.handle || 'guest',
-    originalName: sanitizeText(safeName, 160),
-    storedName,
-    contentType,
-    size,
-    kind,
-    status: 'locked',
-    reportCount: 0,
-    reporters: [],
-    viewRequests: 0,
-    createdAt: now,
-    updatedAt: now,
-    blockedAt: null,
-    blockedReason: '',
-    policyId: policy.id,
-    policyVersion: policy.version,
-  });
-
-  upsertMedia(state, entry);
-  return entry;
 }
 
 export function recordMediaViewRequest(state, media, { actorHash } = {}) {
@@ -176,6 +205,22 @@ function upsertMedia(state, entry) {
   } else {
     state.socialMedia.unshift(entry);
   }
+  invalidateMediaIndex(state);
+}
+
+function getMediaIndex(state) {
+  if (!state?.socialMedia) return EMPTY_MEDIA_INDEX;
+  const version = state.mediaIndexVersion || 0;
+  const size = state.socialMedia.length || 0;
+  const cached = state.mediaIndexCache;
+  if (cached && cached.version === version && cached.size === size) return cached;
+  const byId = new Map();
+  for (const media of state.socialMedia || []) {
+    if (media?.id) byId.set(media.id, media);
+  }
+  const index = { byId, version, size };
+  state.mediaIndexCache = index;
+  return index;
 }
 
 function normalizeFilename(name = '') {
@@ -188,4 +233,27 @@ function resolveExtension(filename, contentType) {
   const ext = extname(filename || '').toLowerCase();
   if (ext) return ext;
   return EXTENSION_BY_TYPE[contentType] || '.bin';
+}
+
+async function moveTempFile(source, destination) {
+  try {
+    await rename(source, destination);
+  } catch (error) {
+    if (error.code === 'EXDEV') {
+      await copyFile(source, destination);
+      await unlink(source);
+      return;
+    }
+    throw error;
+  }
+}
+
+async function safeUnlink(filePath) {
+  try {
+    await unlink(filePath);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
 }

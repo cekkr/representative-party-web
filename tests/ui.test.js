@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,6 +12,7 @@ import { fetchText, postForm, postJson } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
 import { LATEST_SCHEMA_VERSION } from '../src/infra/persistence/migrations.js';
 import { buildActivityPubCreateNote } from './helpers/activitypub.js';
+import { captureViewport, assertSnapshot } from '../scripts/agent-viewport.js';
 
 async function configurePage(page, baseUrl) {
   await page.setRequestInterception(true);
@@ -73,6 +75,175 @@ async function getAdminFormByAction(page, { intent, action }) {
   return null;
 }
 
+loadMysqlTestEnv();
+const MYSQL_UI_ENV = await buildMysqlUiEnv();
+
+function loadMysqlTestEnv() {
+  try {
+    const raw = readFileSync(new URL('../.env', import.meta.url), 'utf-8');
+    const parsed = parseDotEnv(raw);
+    const keys = Object.keys(parsed || {});
+    for (const key of keys) {
+      if (!isMysqlTestEnvKey(key)) continue;
+      if (process.env[key] === undefined) {
+        process.env[key] = parsed[key];
+      }
+    }
+  } catch (_error) {
+    // .env is optional for tests
+  }
+}
+
+function parseDotEnv(text = '') {
+  const result = {};
+  const lines = String(text).split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    let value = trimmed.slice(idx + 1).trim();
+    if (value.startsWith('"') && value.endsWith('"')) {
+      value = value.slice(1, -1);
+    }
+    if (value.startsWith("'") && value.endsWith("'")) {
+      value = value.slice(1, -1);
+    }
+    result[key] = value;
+  }
+  return result;
+}
+
+function isMysqlTestEnvKey(key = '') {
+  return key.startsWith('TEST_MYSQL_');
+}
+
+function normalizeMysqlTablePrefix(raw = '') {
+  const cleaned = String(raw || 'state_entries_ui')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return cleaned || 'state_entries_ui';
+}
+
+async function buildMysqlUiEnv() {
+  const url = process.env.TEST_MYSQL_URL || '';
+  const host = process.env.TEST_MYSQL_HOST || '';
+  const user = process.env.TEST_MYSQL_USER || '';
+  const database = process.env.TEST_MYSQL_DATABASE || '';
+  const port = process.env.TEST_MYSQL_PORT || '';
+  const password = process.env.TEST_MYSQL_PASSWORD || '';
+  const enabled = Boolean(url || (host && user && database));
+  const tablePrefix = normalizeMysqlTablePrefix(process.env.TEST_MYSQL_TABLE_PREFIX);
+  const table = `${tablePrefix}_${process.pid}_${Date.now()}`;
+  if (!enabled) {
+    return { enabled: false, skip: 'mysql ui test env not configured' };
+  }
+  const availability = await checkMysqlAvailability({ url, host, port, user, password, database });
+  if (!availability.ok) {
+    return { enabled: false, skip: availability.reason };
+  }
+  return {
+    enabled: true,
+    skip: false,
+    url,
+    host,
+    port,
+    user,
+    password,
+    database,
+    table,
+    extraEnv: {
+      DATA_MYSQL_URL: url,
+      DATA_MYSQL_HOST: host,
+      DATA_MYSQL_PORT: port,
+      DATA_MYSQL_USER: user,
+      DATA_MYSQL_PASSWORD: password,
+      DATA_MYSQL_DATABASE: database,
+      DATA_MYSQL_TABLE: table,
+    },
+  };
+}
+
+async function checkMysqlAvailability({ url, host, port, user, password, database }) {
+  let mysql;
+  try {
+    const mod = await import('mysql2/promise');
+    mysql = mod.default || mod;
+  } catch (_error) {
+    return { ok: false, reason: 'mysql2 dependency missing' };
+  }
+  const config = resolveMysqlConfig({ url, host, port, user, password, database });
+  if (!config.user) {
+    return { ok: false, reason: 'mysql user missing' };
+  }
+  if (!config.database) {
+    return { ok: false, reason: 'mysql database missing' };
+  }
+  try {
+    const connection = await mysql.createConnection(config);
+    await connection.query('SELECT 1');
+    await connection.end();
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, reason: `mysql unavailable: ${error?.code || error?.message || 'unknown'}` };
+  }
+}
+
+function resolveMysqlConfig({ url, host, port, user, password, database }) {
+  if (url) {
+    try {
+      const parsed = new URL(url);
+      const resolvedDatabase = parsed.pathname ? parsed.pathname.replace(/^\//, '') : '';
+      return {
+        host: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : 3306,
+        user: decodeURIComponent(parsed.username || ''),
+        password: decodeURIComponent(parsed.password || ''),
+        database: resolvedDatabase,
+        connectTimeout: 1000,
+      };
+    } catch (_error) {
+      return { host: '', port: 3306, user: '', password: '', database: '', connectTimeout: 1000 };
+    }
+  }
+  const config = {
+    host: host || '127.0.0.1',
+    port: port ? Number(port) : 3306,
+    user: user || '',
+    password: password || undefined,
+    database: database || '',
+    connectTimeout: 1000,
+  };
+  if (!config.password) delete config.password;
+  return config;
+}
+
+async function dropMysqlUiTable(mysqlEnv) {
+  if (!mysqlEnv?.enabled) return;
+  if (!/^[a-z0-9_]+$/i.test(mysqlEnv.table || '')) return;
+  let mysql;
+  try {
+    const mod = await import('mysql2/promise');
+    mysql = mod.default || mod;
+  } catch (_error) {
+    return;
+  }
+  const config = resolveMysqlConfig(mysqlEnv);
+  if (!config.user || !config.database) return;
+  let connection;
+  try {
+    connection = await mysql.createConnection(config);
+    await connection.query(`DROP TABLE IF EXISTS \`${mysqlEnv.table}\``);
+  } finally {
+    if (connection) {
+      await connection.end();
+    }
+  }
+}
+
 test('UI respects roles, privileges, module toggles, and background styling', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
@@ -109,28 +280,28 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const background = await guestPage.evaluate(() => window.getComputedStyle(document.body).backgroundImage || '');
   assert.ok(background.includes('gradient') || background.includes('radial-gradient'));
 
-  await guestPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await guestPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await guestPage.type('input[name="topic"]', 'Access');
   await guestPage.type('textarea[name="content"]', 'Guest post attempt');
   await expectDialog(
     guestPage,
-    () => guestPage.click('button[type="submit"]'),
+    () => guestPage.click('form[action="/discussion"] button[type="submit"]'),
     /verification|required|blocked/i,
   );
 
   const personPage = await personContext.newPage();
   await configurePage(personPage, server.baseUrl);
   await setSessionCookie(personPage, server.baseUrl, personSession.sessionId);
-  await personPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await personPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="topic"]', 'Energy');
   await personPage.type('textarea[name="content"]', 'Person post');
-  await personPage.click('button[type="submit"]');
+  await personPage.click('form[action="/discussion"] button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('Person post'));
 
-  await personPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await personPage.goto(`${server.baseUrl}/petitions?compose=proposal`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="title"]', 'UI Petition');
   await personPage.type('textarea[name="summary"]', 'Testing petition flow');
-  await personPage.click('button[type="submit"]');
+  await personPage.click('form[action="/petitions"] button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('UI Petition'));
   const moderationForm = await personPage.$('form[action="/petitions/status"]');
   assert.equal(moderationForm, null);
@@ -146,12 +317,12 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const bannedPage = await bannedContext.newPage();
   await configurePage(bannedPage, server.baseUrl);
   await setSessionCookie(bannedPage, server.baseUrl, bannedSession.sessionId);
-  await bannedPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await bannedPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await bannedPage.type('input[name="topic"]', 'Ban');
   await bannedPage.type('textarea[name="content"]', 'Banned post attempt');
   await expectDialog(
     bannedPage,
-    () => bannedPage.click('button[type="submit"]'),
+    () => bannedPage.click('form[action="/discussion"] button[type="submit"]'),
     /banned/i,
   );
 
@@ -162,9 +333,9 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   );
 
   await guestPage.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
-  assert.equal(await guestPage.$('a[data-nav="social"]'), null);
-  assert.equal(await guestPage.$('a[data-nav="petitions"]'), null);
-  assert.equal(await guestPage.$('a[data-nav="groups"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="social"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="petitions"]'), null);
+  assert.equal(await guestPage.$('[data-nav-section="groups"]'), null);
 
   await guestPage.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
   assert.ok(await guestPage.$('[data-module-disabled="social"]'));
@@ -314,14 +485,46 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
   await page.waitForFunction(() => document.body.textContent.includes('Follow: interest'));
 
+  await page.evaluate(() => {
+    const details = document.querySelector('#social-wall details.form-toggle');
+    if (details) details.open = true;
+  });
   await page.select('form[action="/social/feed"] select[name="type"]', 'alerts');
-  await page.click('form[action="/social/feed"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('No posts yet'));
+  await page.$eval('form[action="/social/feed"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForFunction(() => {
+    const feed = document.querySelector('.wall-feed');
+    return feed && feed.textContent.includes('No posts visible yet');
+  });
 
+  await page.evaluate(() => {
+    const details = document.querySelector('#social-wall details.form-toggle');
+    if (details) details.open = true;
+  });
   await page.select('form[action="/social/feed"] select[name="type"]', 'interest');
-  await page.click('form[action="/social/feed"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
+  await page.$eval('form[action="/social/feed"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForFunction(() => {
+    const feed = document.querySelector('.wall-feed');
+    return feed && feed.textContent.includes('Bob update for follow');
+  });
 
+  await page.evaluate(() => {
+    const details = Array.from(document.querySelectorAll('details.form-toggle')).find((node) =>
+      node.querySelector('summary')?.textContent?.includes('Reshare'),
+    );
+    if (details) details.open = true;
+  });
   const reshareForm = await page.$('form[data-enhance="social-reshare"]');
   assert.ok(reshareForm);
   const reshareTextarea = await reshareForm.$('textarea[name="content"]');
@@ -331,6 +534,374 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   const reshareButton = await reshareForm.$('button[type="submit"]');
   await reshareButton.click();
   await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
+});
+
+test('UI auto-collapses the sticky social composer on scroll', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'social-scroll-ui' });
+  for (let index = 0; index < 28; index += 1) {
+    await postForm(
+      `${server.baseUrl}/social/post`,
+      { content: `Scroll coverage post ${index + 1}`, visibility: 'public' },
+      { cookie: session.cookie },
+    );
+  }
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    return panel && panel.dataset.composeState === 'open';
+  });
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 1400, behavior: 'auto' });
+    window.dispatchEvent(new Event('scroll'));
+  });
+
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    const toggle = panel?.querySelector('[data-compose-toggle]');
+    return panel && toggle && panel.dataset.composeState === 'collapsed' && /expand/i.test(toggle.textContent || '');
+  });
+});
+
+test('UI interface settings and nav filter improve practical navigation', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-settings-nav' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const panel = document.querySelector('#social-compose');
+    return panel && panel.dataset.composeState === 'open';
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+
+  const enableToggle = async (selector) => {
+    const toggle = await page.$(selector);
+    assert.ok(toggle, `missing toggle ${selector}`);
+    const checked = await toggle.evaluate((el) => el.checked);
+    if (!checked) {
+      await toggle.click();
+    }
+  };
+
+  await enableToggle('input[data-ui-setting="keepComposerOpen"]');
+  await enableToggle('input[data-ui-setting="compactNav"]');
+  await page.click('[data-ui-settings-close]');
+  await page.waitForFunction(
+    () =>
+      document.body.dataset.uiComposerAutocollapse === 'off' && document.body.dataset.uiNav === 'compact',
+  );
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 1400, behavior: 'auto' });
+    window.dispatchEvent(new Event('scroll'));
+  });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const composeState = await page.$eval('#social-compose', (el) => el.dataset.composeState);
+  assert.equal(composeState, 'open');
+
+  await page.keyboard.down('Control');
+  await page.keyboard.press('KeyK');
+  await page.keyboard.up('Control');
+  await page.keyboard.type('governance');
+  await page.waitForFunction(() => {
+    const home = document.querySelector('[data-nav-section="home"]');
+    const governance = document.querySelector('[data-nav-section="governance"]');
+    return home && governance && home.hidden === true && governance.hidden === false;
+  });
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => {
+    const home = document.querySelector('[data-nav-section="home"]');
+    const filter = document.querySelector('[data-nav-filter-input]');
+    return home && filter && home.hidden === false && !filter.value;
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const partialToggle = await page.$('input[data-ui-setting="partialNavigation"]');
+  assert.ok(partialToggle);
+  const partialChecked = await partialToggle.evaluate((el) => el.checked);
+  if (partialChecked) {
+    await partialToggle.click();
+  }
+  await page.click('[data-ui-settings-close]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+
+  const navPromise = page.waitForNavigation({ waitUntil: 'networkidle0' });
+  await page.click('[data-nav-section="discussion"] [data-nav-link]');
+  await navPromise;
+  assert.match(page.url(), /\/discussion$/);
+
+  const persisted = await page.evaluate(() => JSON.parse(window.localStorage.getItem('party-web-ui-settings') || '{}'));
+  assert.equal(persisted.keepComposerOpen, true);
+  assert.equal(persisted.partialNavigation, false);
+});
+
+test('UI interface panel can save session defaults without leaving the page', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-settings-inline-save' });
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const guestPage = await browser.newPage();
+  await configurePage(guestPage, server.baseUrl);
+  await guestPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await guestPage.click('[data-ui-settings-toggle]');
+  await guestPage.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const guestSaveDisabled = await guestPage.$eval('[data-ui-settings-save]', (el) => el.disabled);
+  assert.equal(guestSaveDisabled, true);
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const saveDisabled = await page.$eval('[data-ui-settings-save]', (el) => el.disabled);
+  assert.equal(saveDisabled, false);
+
+  const setToggle = async (selector, expectedChecked) => {
+    const input = await page.$(selector);
+    assert.ok(input, `missing input ${selector}`);
+    const checked = await input.evaluate((el) => el.checked);
+    if (checked !== expectedChecked) {
+      await input.click();
+    }
+  };
+
+  await setToggle('input[data-ui-setting="largeText"]', true);
+  await setToggle('input[data-ui-setting="partialNavigation"]', false);
+  await page.click('[data-ui-settings-save]');
+  await page.waitForFunction(() => document.body.textContent.includes('Session defaults saved.'));
+
+  await setToggle('input[data-ui-setting="partialNavigation"]', true);
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'on');
+  await page.click('[data-ui-settings-reset]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+  await page.waitForFunction(() => document.body.dataset.uiTextScale === 'large');
+
+  const freshContext = await browser.createBrowserContext();
+  const freshPage = await freshContext.newPage();
+  await configurePage(freshPage, server.baseUrl);
+  await setSessionCookie(freshPage, server.baseUrl, session.sessionId);
+  await freshPage.goto(`${server.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await freshPage.waitForFunction(() => document.body.dataset.uiTextScale === 'large');
+  await freshPage.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+});
+
+test('UI profile interface defaults hydrate runtime settings when local overrides are absent', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'ui-profile-defaults' });
+  await postForm(
+    `${server.baseUrl}/profile`,
+    {
+      intent: 'ui-preferences',
+      uiVerbosity: 'default',
+      uiLargeText: 'on',
+      uiReducedMotion: 'on',
+      uiCompactNav: 'on',
+      uiKeepComposerOpen: 'on',
+      uiPartialNavigation: 'off',
+    },
+    { cookie: session.cookie, partial: true },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
+  await page.waitForFunction(() => {
+    const body = document.body;
+    return (
+      body.dataset.uiTextScale === 'large' &&
+      body.dataset.uiMotion === 'reduced' &&
+      body.dataset.uiNav === 'compact' &&
+      body.dataset.uiComposerAutocollapse === 'off' &&
+      body.dataset.uiPartialNav === 'off'
+    );
+  });
+
+  await page.click('[data-ui-settings-toggle]');
+  await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
+  const panelState = await page.evaluate(() => ({
+    large: document.querySelector('input[data-ui-setting="largeText"]')?.checked,
+    reduced: document.querySelector('input[data-ui-setting="reducedMotion"]')?.checked,
+    compact: document.querySelector('input[data-ui-setting="compactNav"]')?.checked,
+    keepOpen: document.querySelector('input[data-ui-setting="keepComposerOpen"]')?.checked,
+    partial: document.querySelector('input[data-ui-setting="partialNavigation"]')?.checked,
+  }));
+  assert.equal(panelState.large, true);
+  assert.equal(panelState.reduced, true);
+  assert.equal(panelState.compact, true);
+  assert.equal(panelState.keepOpen, true);
+  assert.equal(panelState.partial, false);
+
+  const partialToggle = await page.$('input[data-ui-setting="partialNavigation"]');
+  assert.ok(partialToggle);
+  await partialToggle.click();
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'on');
+  const localAfterToggle = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  assert.ok(localAfterToggle, 'expected local UI settings after local toggle');
+
+  await page.click('[data-ui-settings-reset]');
+  await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
+  const localAfterReset = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  assert.equal(localAfterReset, null);
+});
+
+test('UI mysql adapter keeps discussion, interface defaults, and module toggles across restart', { timeout: 120000 }, async (t) => {
+  if (MYSQL_UI_ENV.skip) {
+    t.skip(MYSQL_UI_ENV.skip);
+    return;
+  }
+  t.after(async () => {
+    await dropMysqlUiTable(MYSQL_UI_ENV);
+  });
+
+  const portFirst = await getAvailablePort();
+  const firstServer = await startServer({
+    port: portFirst,
+    dataAdapter: 'mysql',
+    extraEnv: MYSQL_UI_ENV.extraEnv,
+  });
+  t.after(async () => firstServer.stop());
+
+  const session = await createVerifiedSession(firstServer.baseUrl, { pidHash: 'mysql-ui-session' });
+  await postForm(
+    `${firstServer.baseUrl}/admin`,
+    { intent: 'session', sessionId: session.sessionId, sessionRole: 'admin' },
+    { partial: true },
+  );
+  await postForm(
+    `${firstServer.baseUrl}/profile`,
+    {
+      intent: 'ui-preferences',
+      uiVerbosity: 'default',
+      uiLargeText: 'on',
+      uiReducedMotion: 'off',
+      uiCompactNav: 'off',
+      uiKeepComposerOpen: 'on',
+      uiPartialNavigation: 'off',
+    },
+    { cookie: session.cookie, partial: true },
+  );
+  await postForm(
+    `${firstServer.baseUrl}/discussion`,
+    { topic: 'mysql-persist', content: 'MySQL UI persistence discussion' },
+    { cookie: session.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const pageFirst = await browser.newPage();
+  await configurePage(pageFirst, firstServer.baseUrl);
+  await setSessionCookie(pageFirst, firstServer.baseUrl, session.sessionId);
+  await pageFirst.goto(`${firstServer.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await pageFirst.waitForFunction(() => document.body.textContent.includes('MySQL UI persistence discussion'));
+  await pageFirst.waitForFunction(
+    () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
+  );
+
+  await pageFirst.goto(`${firstServer.baseUrl}/admin`, { waitUntil: 'networkidle0' });
+  const modulesForm = await getAdminForm(pageFirst, 'modules');
+  const socialToggle = await modulesForm.$('input[name="module_social"]');
+  const petitionsToggle = await modulesForm.$('input[name="module_petitions"]');
+  assert.ok(socialToggle);
+  assert.ok(petitionsToggle);
+  if (await socialToggle.evaluate((el) => el.checked)) {
+    await socialToggle.evaluate((el) => el.click());
+  }
+  if (await petitionsToggle.evaluate((el) => el.checked)) {
+    await petitionsToggle.evaluate((el) => el.click());
+  }
+  const modulesResponse = pageFirst.waitForResponse(
+    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+  );
+  const modulesButton = await modulesForm.$('button[type="submit"]');
+  await modulesButton.click();
+  await modulesResponse;
+  await pageFirst.waitForFunction(() => document.body.textContent.includes('Module toggles updated'));
+
+  await pageFirst.goto(`${firstServer.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await pageFirst.$('[data-nav-section="social"]'), null);
+  assert.equal(await pageFirst.$('[data-nav-section="petitions"]'), null);
+  await pageFirst.goto(`${firstServer.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageFirst.$('[data-module-disabled="social"]'));
+  await pageFirst.goto(`${firstServer.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageFirst.$('[data-module-disabled="petitions"]'));
+
+  await firstServer.stop();
+
+  const portSecond = await getAvailablePort();
+  const secondServer = await startServer({
+    port: portSecond,
+    dataAdapter: 'mysql',
+    extraEnv: MYSQL_UI_ENV.extraEnv,
+  });
+  t.after(async () => secondServer.stop());
+
+  const pageSecond = await browser.newPage();
+  await configurePage(pageSecond, secondServer.baseUrl);
+  await setSessionCookie(pageSecond, secondServer.baseUrl, session.sessionId);
+  await pageSecond.goto(`${secondServer.baseUrl}/discussion`, { waitUntil: 'networkidle0' });
+  await pageSecond.waitForFunction(() => document.body.textContent.includes('MySQL UI persistence discussion'));
+  await pageSecond.waitForFunction(
+    () => document.body.dataset.uiTextScale === 'large' && document.body.dataset.uiPartialNav === 'off',
+  );
+  await pageSecond.goto(`${secondServer.baseUrl}/`, { waitUntil: 'networkidle0' });
+  assert.equal(await pageSecond.$('[data-nav-section="social"]'), null);
+  assert.equal(await pageSecond.$('[data-nav-section="petitions"]'), null);
+  await pageSecond.goto(`${secondServer.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageSecond.$('[data-module-disabled="social"]'));
+  await pageSecond.goto(`${secondServer.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  assert.ok(await pageSecond.$('[data-module-disabled="petitions"]'));
 });
 
 test('UI marks ActivityPub inbound posts', { timeout: 60000 }, async (t) => {
@@ -403,7 +974,7 @@ test('UI social feed supports media uploads with locked view and report blocking
   assert.ok(fileInput);
   await fileInput.uploadFile(mediaPath);
   await page.click('form[action="/social/post"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Locked media'));
+  await page.waitForSelector('.media-card.locked');
 
   const requestHref = await page.$eval(
     'a[href^="/social/media/"][href*="view=1"]',
@@ -426,8 +997,14 @@ test('UI social feed supports media uploads with locked view and report blocking
   assert.equal(viewResult.status, 200);
   assert.ok(viewResult.type.includes('image/'));
 
-  await page.click('form[data-enhance="social-media-report"] button[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Blocked media'));
+  await page.$eval('form[data-enhance="social-media-report"]', (form) => {
+    if (form.requestSubmit) {
+      form.requestSubmit();
+    } else {
+      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    }
+  });
+  await page.waitForSelector('.media-card.blocked');
   assert.equal(await page.$('form[data-enhance="social-reshare"]'), null);
 
   const blockedStatus = await page.evaluate(async (id) => {
@@ -691,10 +1268,10 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
   assert.ok(socialToggle);
   assert.ok(petitionsToggle);
   if (await socialToggle.evaluate((el) => el.checked)) {
-    await socialToggle.click();
+    await socialToggle.evaluate((el) => el.click());
   }
   if (await petitionsToggle.evaluate((el) => el.checked)) {
-    await petitionsToggle.click();
+    await petitionsToggle.evaluate((el) => el.click());
   }
 
   const modulesResponse = page.waitForResponse(
@@ -706,8 +1283,8 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
   await page.waitForFunction(() => document.body.textContent.includes('Module toggles updated'));
 
   await page.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
-  assert.equal(await page.$('a[data-nav="social"]'), null);
-  assert.equal(await page.$('a[data-nav="petitions"]'), null);
+  assert.equal(await page.$('[data-nav-section="social"]'), null);
+  assert.equal(await page.$('[data-nav-section="petitions"]'), null);
 
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
   assert.ok(await page.$('[data-module-disabled="social"]'));
@@ -836,4 +1413,42 @@ test('UI admin reviews topic anchor suggestions and logs history', { timeout: 60
   assert.ok(!anchorsAfterArchive.includes('economy'));
   await page.waitForFunction(() => document.body.textContent.includes('anchor_archive_accept'));
   await page.waitForFunction(() => document.body.textContent.includes('No anchor suggestions'));
+});
+
+test('UI petition discussion exposes evidence prompt (agent viewport)', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'evidence-ui' });
+  await postForm(
+    `${server.baseUrl}/petitions`,
+    { title: 'Evidence UI', summary: 'Testing evidence prompt', body: '' },
+    { cookie: session.cookie },
+  );
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await configurePage(page, server.baseUrl);
+  await setSessionCookie(page, server.baseUrl, session.sessionId);
+  await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+
+  await page.evaluate(() => {
+    const discussion = Array.from(document.querySelectorAll('details.note')).find((node) =>
+      node.querySelector('summary')?.textContent?.includes('Discussion'),
+    );
+    if (discussion) {
+      discussion.open = true;
+      discussion.scrollIntoView({ block: 'center' });
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 200));
+
+  const snapshot = await captureViewport(page);
+  assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, min: 1 });
 });

@@ -1,6 +1,8 @@
 import { DATA, DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
+import { ensureSigningKeysInEnv } from '../../modules/circle/signingKeys.js';
 import { runMigrations } from './migrations.js';
 import { createStateStore } from './store.js';
+import { buildActivityPubIndexSnapshot } from '../../modules/social/posts.js';
 
 export async function initState() {
   const store = createStateStore({ adapter: DATA.adapter, sqliteFile: DATA.sqliteFile, kvFile: DATA.kvFile });
@@ -20,7 +22,12 @@ export async function initState() {
   state.store = store;
   state.dataConfig = deriveDataConfig(state.settings);
   state.settings = { ...(state.settings || {}), data: state.dataConfig };
+  ensureSigningKeysInEnv(state);
   state.issuer = state.settings?.issuer || process.env.CIRCLE_ISSUER || state.issuer || 'local-circle';
+  if (shouldRefreshActivityPubIndex(state)) {
+    const snapshot = buildActivityPubIndexSnapshot(state);
+    await state.store.saveActivityPubIndex(snapshot);
+  }
   return state;
 }
 
@@ -70,6 +77,12 @@ export async function persistSocialFollows(state) {
 
 export async function persistSocialPosts(state) {
   await state.store.saveSocialPosts(state.socialPosts);
+  await persistActivityPubIndex(state);
+}
+
+export async function persistActivityPubIndex(state) {
+  const snapshot = buildActivityPubIndexSnapshot(state);
+  await state.store.saveActivityPubIndex(snapshot);
 }
 
 export async function persistSocialMedia(state) {
@@ -132,12 +145,27 @@ function hydrateState(data) {
     socialFollows: data.socialFollows || [],
     socialPosts: data.socialPosts || [],
     socialMedia: data.socialMedia || [],
+    activityPubIndex: data.activityPubIndex || null,
     transactions: data.transactions || [],
     transactionSummaries: data.transactionSummaries || [],
     profileStructures: data.profileStructures || [],
     profileAttributes: data.profileAttributes || [],
     settings,
   };
+}
+
+function shouldRefreshActivityPubIndex(state) {
+  const posts = state?.socialPosts || [];
+  if (!posts.length) return false;
+  const snapshot = state?.activityPubIndex;
+  if (!snapshot || typeof snapshot !== 'object') return true;
+  if (!Array.isArray(snapshot.objectIds) || !Array.isArray(snapshot.activityIds)) return true;
+  const headId = posts[0]?.id || '';
+  const tailId = posts[posts.length - 1]?.id || '';
+  if ((snapshot.size || 0) !== posts.length) return true;
+  if ((snapshot.headId || '') !== headId) return true;
+  if ((snapshot.tailId || '') !== tailId) return true;
+  return false;
 }
 
 function deriveDataConfig(settings = {}) {

@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{title}}</title>
+  <link rel="stylesheet" href="/public/app.css" />
+  <style id="composer-theme">{{themeCss}}</style>
+  <script src="/public/app.js" defer></script>
+</head>
+<body
+  data-verbosity="{{verbosityMode}}"
+  data-page-key="{{pageKey}}"
+  data-verbosity-default="{{verbosityDefault}}"
+  data-verbosity-override="{{verbosityOverride}}"
+  data-verbosity-page-preset="{{verbosityPagePreset}}"
+  data-verbosity-can-save="{{verbosityCanSave}}"
+  data-composer-settings="{{composerSettingsAttr}}"
+  data-composer-allowed="{{composerAllowed}}"
+  data-ui-settings-server="{{uiSettingsServer}}"
+  data-composer-mode="off"
+  style="{{themeVars}}"
+>
+  {{> topbar}}
+  {{> shell}}
+  {{> footer}}
+  {{composerControls}}
+</body>
+</html>

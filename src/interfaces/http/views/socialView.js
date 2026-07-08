@@ -1,9 +1,13 @@
-import { escapeHtml } from '../../../shared/utils/text.js';
-import { renderIssuerPill } from './shared.js';
+import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
+import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
 
-export function renderSocialPosts(posts, { enableReplies = false, followTypeByHash, mediaById } = {}) {
+export function renderSocialPosts(
+  posts,
+  { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId, state } = {},
+) {
   if (!posts || posts.length === 0) {
-    return '<p class="muted">No posts yet. Follow someone and start the conversation.</p>';
+    return renderSocialOnboarding();
   }
 
   return posts
@@ -16,8 +20,9 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           : '<span class="pill ghost">Public</span>';
       const replyPill = post.replyTo ? `<span class="pill ghost">Reply</span>` : '';
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
-      const previewPill = post.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : '';
+      const previewPill = renderPreviewPill(post);
       const inboundPill = post.activityPub?.inbound ? '<span class="pill ghost">ActivityPub</span>' : '';
+      const createdAt = formatTimestamp(post.createdAt);
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
       const reshareBlock = renderReshare(post, mediaById);
       const mediaBlock = renderMediaAttachments(post.mediaIds || [], mediaById);
@@ -28,7 +33,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
       return `
         <article class="discussion">
           <div class="discussion__meta">
-            <span class="pill">${escapeHtml(post.authorHandle || 'anon')}</span>
+            <span class="pill">${escapeHtml(post.authorHandle || 'anonymous')}</span>
             ${visibilityPill}
             ${replyPill}
             ${resharePill}
@@ -36,7 +41,7 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
             ${inboundPill}
             ${followTypePill}
             ${renderIssuerPill(post)}
-            <span class="muted small">${new Date(post.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
           </div>
           ${contentBlock}
           ${mediaBlock}
@@ -49,22 +54,41 @@ export function renderSocialPosts(posts, { enableReplies = false, followTypeByHa
           ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
           ${mentionsLine}
           ${tagsLine}
-          <p class="muted small">Author hash: ${escapeHtml(post.authorHash)}</p>
-          ${enableReplies ? renderReplyForm(post) : ''}
-          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post) : ''}
+          ${renderAuthorHashLine(post.authorHash, { state })}
+          ${enableReplies ? renderReplyForm(post, { open: openReplyId === post.id }) : ''}
+          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
         </article>
       `;
     })
     .join('\n');
 }
 
+function renderSocialOnboarding() {
+  return `
+    <div class="onboarding-card">
+      <p class="eyebrow">Social feed</p>
+      <h3>No posts visible yet</h3>
+      <ul class="plain small">
+        <li>Follow handles to populate this feed.</li>
+        <li>Publish short updates for quick coordination.</li>
+        <li>Use direct visibility for private exchanges.</li>
+      </ul>
+      <div class="onboarding-actions">
+        <a class="cta" href="#social-compose">Share an update</a>
+        <a class="ghost" href="#social-follows">Follow a handle</a>
+      </div>
+    </div>
+  `;
+}
+
 export function renderFollowList(follows) {
   if (!follows || follows.length === 0) {
-    return '<p class="muted">You are not following anyone yet.</p>';
+    return renderEmptyState('You are not following anyone yet. Add a handle to tailor your wall.');
   }
 
   return follows
     .map((edge) => {
+      const createdAt = formatTimestamp(edge.createdAt);
       return `
         <div class="list-row">
           <div>
@@ -73,7 +97,7 @@ export function renderFollowList(follows) {
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(edge.type)}</span>
-            <span class="muted tiny">${new Date(edge.createdAt).toLocaleString()}</span>
+            ${createdAt ? `<span class="muted tiny">${createdAt}</span>` : ''}
           </div>
         </div>
       `;
@@ -81,30 +105,34 @@ export function renderFollowList(follows) {
     .join('\n');
 }
 
-function renderReplyForm(post) {
+function renderReplyForm(post, { open = false } = {}) {
   const targetValue = post.authorHandle ? escapeHtml(post.authorHandle) : '';
+  const openAttr = open ? 'open' : '';
   return `
-    <form class="stack bordered" method="post" action="/social/reply" data-enhance="social-reply">
-      <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
-      <label class="field">
-        <span class="muted small">Reply</span>
-        <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
-      </label>
-      <div class="form-grid">
+    <details class="form-toggle form-toggle--inline" ${openAttr}>
+      <summary>Reply</summary>
+      <form class="stack" method="post" action="/social/reply" data-enhance="social-reply">
+        <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
         <label class="field">
-          <span>Visibility</span>
-          <select name="visibility">
-            <option value="public" selected>Public</option>
-            <option value="direct">Direct</option>
-          </select>
+          <span class="muted small">Reply</span>
+          <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
         </label>
-        <label class="field">
-          <span>Direct to (handle, optional)</span>
-          <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
-        </label>
-      </div>
-      <button class="ghost" type="submit">Send reply</button>
-    </form>
+        <div class="form-grid">
+          <label class="field">
+            <span>Visibility</span>
+            <select name="visibility">
+              <option value="public" selected>Public</option>
+              <option value="direct">Direct</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Direct to (handle, optional)</span>
+            <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
+          </label>
+        </div>
+        <button class="ghost" type="submit">Send reply</button>
+      </form>
+    </details>
   `;
 }
 
@@ -112,7 +140,7 @@ function renderReshare(post, mediaById) {
   if (!post.reshare) return '';
   const author = escapeHtml(post.reshare.authorHandle || post.reshare.authorHash || 'unknown');
   const content = escapeHtml(post.reshare.content || '');
-  const created = post.reshare.createdAt ? new Date(post.reshare.createdAt).toLocaleString() : '';
+  const created = formatTimestamp(post.reshare.createdAt);
   const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], mediaById);
   return `
     <div class="callout">
@@ -134,17 +162,21 @@ function renderMentions(mentions) {
   return `<p class="muted small">Mentions: ${mentions.map((m) => `@${escapeHtml(m)}`).join(', ')}</p>`;
 }
 
-function renderReshareForm(post) {
+function renderReshareForm(post, { open = false } = {}) {
   if (post.visibility === 'direct') return '';
+  const openAttr = open ? 'open' : '';
   return `
-    <form class="stack bordered" method="post" action="/social/post" data-enhance="social-reshare">
-      <input type="hidden" name="reshareOf" value="${escapeHtml(post.id)}" />
-      <label class="field">
-        <span class="muted small">Add a comment (optional)</span>
-        <textarea name="content" rows="2" placeholder="Optional comment"></textarea>
-      </label>
-      <button class="ghost" type="submit">Reshare</button>
-    </form>
+    <details class="form-toggle form-toggle--inline" ${openAttr}>
+      <summary>Reshare</summary>
+      <form class="stack" method="post" action="/social/post" data-enhance="social-reshare">
+        <input type="hidden" name="reshareOf" value="${escapeHtml(post.id)}" />
+        <label class="field">
+          <span class="muted small">Add a comment (optional)</span>
+          <textarea name="content" rows="2" placeholder="Optional comment"></textarea>
+        </label>
+        <button class="ghost" type="submit">Reshare</button>
+      </form>
+    </details>
   `;
 }
 
@@ -213,13 +245,4 @@ function renderMediaReportForm(media) {
 function hasBlockedMediaIds(mediaIds = [], mediaById) {
   if (!mediaIds.length || !mediaById) return false;
   return mediaIds.some((mediaId) => mediaById.get(mediaId)?.status === 'blocked');
-}
-
-function formatBytes(bytes) {
-  if (!bytes || Number.isNaN(bytes)) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
 }

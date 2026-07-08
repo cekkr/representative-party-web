@@ -1,8 +1,9 @@
-import { sendJson } from '../../../shared/utils/http.js';
+import { sendJson, sendJsonWithEncoding } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { buildLedgerEnvelope } from '../../../modules/circle/federation.js';
 import { ingestLedgerGossip } from '../../../modules/federation/ingest.js';
 import { getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
+import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -26,28 +27,33 @@ export async function handleGossip({ req, res, state }) {
     ledgerHash: body.ledgerHash,
     peerHint: body.peer,
     statusHint: body.status,
+    providerBlind: body.providerBlind,
   });
   return sendJson(res, result.statusCode, result.payload);
 }
 
-export function exportLedger({ res, state }) {
+export function exportLedger({ req, res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
   const envelope = buildLedgerEnvelope(state);
-  return sendJson(res, 200, {
+  return sendJsonWithEncoding(req, res, 200, {
     entries: envelope.entries,
     envelope,
     ledgerHash: envelope.ledgerHash,
     replication: getReplicationProfile(state),
-  });
+  }, { allowGzip: true });
 }
 
 export function listPeers({ res, state }) {
   if (!isModuleEnabled(state, 'federation')) {
     return sendModuleDisabledJson({ res, moduleKey: 'federation', state });
   }
-  return sendJson(res, 200, { peers: [...state.peers], replication: getReplicationProfile(state) });
+  return sendJson(res, 200, {
+    peers: [...state.peers],
+    replication: getReplicationProfile(state),
+    peerCapabilities: listPeerCapabilities(state),
+  });
 }
 
 export async function registerPeer({ req, res, state }) {

@@ -100,6 +100,10 @@ class MemoryStateStore {
     this._data.socialMedia = clone(entries || []);
   }
 
+  async saveActivityPubIndex(index) {
+    this._data.activityPubIndex = clone(index ?? null);
+  }
+
   async saveTransactions(entries) {
     this._data.transactions = clone(entries || []);
   }
@@ -144,6 +148,7 @@ function getEmptyData() {
     socialFollows: [],
     socialPosts: [],
     socialMedia: [],
+    activityPubIndex: null,
     transactions: [],
     transactionSummaries: [],
     profileStructures: [],

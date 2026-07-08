@@ -2,22 +2,68 @@ import { persistDelegations } from '../../infra/persistence/storage.js';
 import { logTransaction } from '../transactions/registry.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { recommendDelegationForPerson } from '../groups/groups.js';
+import { findSessionByHash } from '../identity/sessions.js';
+import { getGovernanceSettings } from '../governance/constitution.js';
 
-// Resolve delegation choice for a topic using stored delegations or extension hooks.
-export function resolveDelegation(person, topic, state, { notify } = {}) {
-  if (!person || !person.pidHash) return null;
-  const topicKey = normalizeTopic(topic);
-  const delegations = filterVisibleEntries(state.delegations || [], state);
+// Cap how far a liquid-delegation chain is followed to bound work and guard runaway chains.
+export const MAX_DELEGATION_CHAIN_DEPTH = 8;
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+// Decay window (days) after which an un-renewed delegation lapses. 0 disables decay.
+export function getDelegationDecayDays(state) {
+  const governance = getGovernanceSettings(state);
+  const days = Number(governance?.delegationDecayDays) || 0;
+  return days > 0 ? days : 0;
+}
+
+// Classify a delegation's freshness relative to the decay window so the UI can prompt renewal
+// and resolution can ignore lapsed edges. "expiring" warns within the final quarter of the window.
+export function describeDelegationFreshness(entry, decayDays, now = Date.now()) {
+  if (!decayDays) {
+    return { status: 'active', decayDays: 0, ageDays: ageInDays(entry, now), expiresInDays: null };
+  }
+  const ageDays = ageInDays(entry, now);
+  const expiresInDays = decayDays - ageDays;
+  let status = 'active';
+  if (expiresInDays <= 0) status = 'expired';
+  else if (expiresInDays <= Math.max(1, decayDays * 0.25)) status = 'expiring';
+  return { status, decayDays, ageDays, expiresInDays };
+}
+
+function ageInDays(entry, now) {
+  const stamp = Date.parse(entry?.renewedAt || entry?.createdAt || '');
+  if (!Number.isFinite(stamp)) return 0;
+  return Math.max(0, (now - stamp) / DAY_MS);
+}
+
+function isDelegationExpired(entry, decayDays, now) {
+  if (!decayDays) return false;
+  return describeDelegationFreshness(entry, decayDays, now).status === 'expired';
+}
+
+// Visible delegations with lapsed (decayed) edges removed, for resolution paths.
+function activeDelegations(state) {
+  const decayDays = getDelegationDecayDays(state);
+  const visible = filterVisibleEntries(state.delegations || [], state);
+  if (!decayDays) return visible;
+  const now = Date.now();
+  return visible.filter((entry) => !isDelegationExpired(entry, decayDays, now));
+}
+
+// Resolve the first delegation hop for a topic using stored delegations, extensions, or group recs.
+function resolveFirstHop(person, topicKey, state, { notify } = {}) {
+  const delegations = activeDelegations(state);
   const direct = delegations.find(
     (entry) => entry.ownerHash === person.pidHash && entry.topic === topicKey,
   );
-  if (direct) return direct;
+  if (direct) return { ...direct, via: direct.via || 'direct' };
 
   const extensions = state?.extensions?.active || [];
   for (const extension of extensions) {
     if (typeof extension.resolveDelegation === 'function') {
       const result = extension.resolveDelegation({ person, topic: topicKey, delegations: state.delegations }, state);
-      if (result) return result;
+      if (result) return { ...result, via: result.via || 'extension' };
     }
   }
 
@@ -44,6 +90,111 @@ export function resolveDelegation(person, topic, state, { notify } = {}) {
   return null;
 }
 
+// Follow direct (manual) delegations transitively from a starting delegate (liquid democracy).
+// Group/extension recommendations resolve the first hop only; subsequent hops follow explicit
+// per-topic delegations so the chain reflects choices delegates made for themselves.
+function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topicKey }) {
+  const delegations = activeDelegations(state);
+  const byOwner = new Map();
+  for (const entry of delegations) {
+    if (entry.topic !== topicKey || !entry.ownerHash || !entry.delegateHash) continue;
+    if (!byOwner.has(entry.ownerHash)) byOwner.set(entry.ownerHash, entry);
+  }
+
+  const visited = new Set([startOwnerHash, firstDelegateHash]);
+  const hops = [];
+  let current = firstDelegateHash;
+  let truncated = false;
+  let cycle = false;
+  let blockedBanned = false;
+
+  while (true) {
+    const next = byOwner.get(current);
+    if (!next) break;
+    const target = next.delegateHash;
+    if (visited.has(target)) {
+      cycle = true;
+      break;
+    }
+    const session = findSessionByHash(state, target);
+    if (session?.banned) {
+      blockedBanned = true;
+      break;
+    }
+    if (hops.length >= MAX_DELEGATION_CHAIN_DEPTH) {
+      truncated = true;
+      break;
+    }
+    hops.push({ from: current, to: target, via: next.via || 'direct', provider: next.provider || 'manual' });
+    visited.add(target);
+    current = target;
+  }
+
+  return { terminal: current, hops, truncated, cycle, blockedBanned };
+}
+
+// Resolve delegation for a topic, following the liquid chain to its terminal delegate.
+export function resolveDelegation(person, topic, state, { notify } = {}) {
+  if (!person || !person.pidHash) return null;
+  const topicKey = normalizeTopic(topic);
+  const first = resolveFirstHop(person, topicKey, state, { notify });
+  if (!first || !first.delegateHash) return first;
+
+  const chain = followDelegationChain({
+    state,
+    startOwnerHash: person.pidHash,
+    firstDelegateHash: first.delegateHash,
+    topicKey,
+  });
+
+  return {
+    ...first,
+    immediateDelegateHash: first.delegateHash,
+    delegateHash: chain.terminal,
+    transitive: chain.hops.length > 0,
+    hops: chain.hops,
+    chainTruncated: chain.truncated,
+    chainCycle: chain.cycle,
+    chainBlockedBanned: chain.blockedBanned,
+  };
+}
+
+// Build a human-readable resolution path (owner → … → terminal) for chain visualization.
+export function buildDelegationChain(state, ownerHash, topic) {
+  if (!ownerHash) return null;
+  const topicKey = normalizeTopic(topic);
+  const resolved = resolveDelegation({ pidHash: ownerHash }, topicKey, state);
+  if (!resolved || !resolved.delegateHash) return null;
+  const path = [ownerHash, resolved.immediateDelegateHash || resolved.delegateHash];
+  for (const hop of resolved.hops || []) {
+    path.push(hop.to);
+  }
+  return {
+    topic: topicKey,
+    ownerHash,
+    via: resolved.via || 'direct',
+    terminal: resolved.delegateHash,
+    immediateDelegateHash: resolved.immediateDelegateHash || resolved.delegateHash,
+    transitive: Boolean(resolved.transitive),
+    hops: resolved.hops || [],
+    path: dedupePath(path),
+    truncated: Boolean(resolved.chainTruncated),
+    cycle: Boolean(resolved.chainCycle),
+    blockedBanned: Boolean(resolved.chainBlockedBanned),
+    conflict: Boolean(resolved.conflict),
+  };
+}
+
+function dedupePath(path = []) {
+  const output = [];
+  for (const hash of path) {
+    if (!hash) continue;
+    if (output[output.length - 1] === hash) continue;
+    output.push(hash);
+  }
+  return output;
+}
+
 export async function chooseDelegation({ person, topic, delegateHash, state }) {
   if (!person?.pidHash) return;
   await setDelegation({ person, topic, delegateHash, provider: 'manual', state });
@@ -55,12 +206,14 @@ export async function setDelegation({ person, topic, delegateHash, provider, sta
   const filtered = (state.delegations || []).filter(
     (entry) => !(entry.ownerHash === person.pidHash && entry.topic === topicKey),
   );
+  const now = new Date().toISOString();
   const entry = stampLocalEntry(state, {
     ownerHash: person.pidHash,
     delegateHash,
     provider: provider || 'local',
     topic: topicKey,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    renewedAt: now,
   });
   filtered.unshift(entry);
   state.delegations = filtered;
@@ -70,6 +223,26 @@ export async function setDelegation({ person, topic, delegateHash, provider, sta
     actorHash: person.pidHash,
     payload: { topic: topicKey, delegateHash, provider },
   });
+}
+
+// Refresh a delegation's renewal timestamp so it survives the decay window without re-picking.
+export async function renewDelegation({ person, topic, state }) {
+  if (!person?.pidHash) return { renewed: false };
+  const topicKey = normalizeTopic(topic);
+  const entry = (state.delegations || []).find(
+    (item) => item.ownerHash === person.pidHash && item.topic === topicKey,
+  );
+  if (!entry) return { renewed: false };
+  entry.renewedAt = new Date().toISOString();
+  const stamped = stampLocalEntry(state, entry);
+  Object.assign(entry, stamped);
+  await persistDelegations(state);
+  await logTransaction(state, {
+    type: 'delegation_renew',
+    actorHash: person.pidHash,
+    payload: { topic: topicKey, delegateHash: entry.delegateHash },
+  });
+  return { renewed: true, delegateHash: entry.delegateHash };
 }
 
 export async function clearDelegation({ person, topic, state }) {

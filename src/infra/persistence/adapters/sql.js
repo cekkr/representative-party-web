@@ -21,6 +21,7 @@ const KEYS = [
   'socialFollows',
   'socialPosts',
   'socialMedia',
+  'activityPubIndex',
   'transactions',
   'transactionSummaries',
   'profileStructures',
@@ -138,6 +139,10 @@ class SqlStateStore {
     await this.writeJson('socialMedia', entries);
   }
 
+  async saveActivityPubIndex(index) {
+    await this.writeJson('activityPubIndex', index ?? null);
+  }
+
   async saveTransactions(entries) {
     await this.writeJson('transactions', entries);
   }
@@ -181,6 +186,7 @@ class SqlStateStore {
 function defaultForKey(key) {
   if (key === 'meta') return { schemaVersion: 0, migrations: [] };
   if (key === 'settings') return { initialized: false };
+  if (key === 'activityPubIndex') return null;
   if (key === 'ledger' || key === 'sessions' || key === 'peers' || key === 'actors') return [];
   return [];
 }

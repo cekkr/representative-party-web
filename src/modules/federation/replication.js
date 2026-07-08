@@ -11,21 +11,22 @@ export function getReplicationProfile(state) {
 }
 
 export function shouldAcceptPreviews(profile) {
-  if (!profile) return true;
-  if (profile.validationLevel === 'strict') return Boolean(profile.allowPreviews);
-  return true;
+  if (!profile) return DATA.allowPreviews;
+  if (typeof profile.allowPreviews === 'boolean') return profile.allowPreviews;
+  return DATA.allowPreviews;
 }
 
 export function decideStatus(profile, hintedStatus = 'validated') {
   const normalizedHint = hintedStatus === 'preview' ? 'preview' : 'validated';
   const allowPreview = shouldAcceptPreviews(profile);
+  const validationLevel = profile?.validationLevel || DATA.validationLevel;
   if (normalizedHint === 'preview' && !allowPreview) {
     return { status: 'rejected', reason: 'preview_blocked', allowPreview };
   }
-  if (profile.validationLevel === 'off') {
+  if (validationLevel === 'off') {
     return { status: 'validated', allowPreview };
   }
-  if (profile.validationLevel === 'observe' && normalizedHint === 'preview') {
+  if (validationLevel === 'observe' && normalizedHint === 'preview') {
     return { status: 'preview', allowPreview };
   }
   return { status: normalizedHint, allowPreview };
@@ -65,21 +66,59 @@ export function stampLocalEntry(state, entry = {}) {
   };
 }
 
-export function filterVisibleEntries(list, state) {
-  const profile = getReplicationProfile(state);
-  if (profile.allowPreviews) return list || [];
-  return (list || []).filter((item) => (item?.validationStatus || 'validated') !== 'preview');
-}
-
-export function countVisibleEntries(list, state) {
+export function filterVisibleEntries(list, state, predicate) {
   const profile = getReplicationProfile(state);
   const entries = list || [];
-  if (profile.allowPreviews) return entries.length || 0;
+  const hasPredicate = typeof predicate === 'function';
+  if (profile.allowPreviews) {
+    return hasPredicate ? entries.filter(predicate) : entries;
+  }
+  if (!hasPredicate) {
+    return entries.filter((item) => (item?.validationStatus || 'validated') !== 'preview');
+  }
+  const filtered = [];
+  for (const item of entries) {
+    if ((item?.validationStatus || 'validated') === 'preview') continue;
+    if (!predicate(item)) continue;
+    filtered.push(item);
+  }
+  return filtered;
+}
+
+export function countVisibleEntries(list, state, predicate) {
+  const profile = getReplicationProfile(state);
+  const entries = list || [];
+  const hasPredicate = typeof predicate === 'function';
+  if (profile.allowPreviews && !hasPredicate) return entries.length || 0;
   let count = 0;
   for (const item of entries) {
-    if ((item?.validationStatus || 'validated') !== 'preview') {
-      count += 1;
-    }
+    if (!profile.allowPreviews && (item?.validationStatus || 'validated') === 'preview') continue;
+    if (hasPredicate && !predicate(item)) continue;
+    count += 1;
   }
   return count;
+}
+
+export function someVisibleEntries(list, state, predicate) {
+  const profile = getReplicationProfile(state);
+  const entries = list || [];
+  const hasPredicate = typeof predicate === 'function';
+  for (const item of entries) {
+    if (!profile.allowPreviews && (item?.validationStatus || 'validated') === 'preview') continue;
+    if (hasPredicate && !predicate(item)) continue;
+    return true;
+  }
+  return false;
+}
+
+export function findVisibleEntry(list, state, predicate) {
+  const profile = getReplicationProfile(state);
+  const entries = list || [];
+  const hasPredicate = typeof predicate === 'function';
+  for (const item of entries) {
+    if (!profile.allowPreviews && (item?.validationStatus || 'validated') === 'preview') continue;
+    if (hasPredicate && !predicate(item)) continue;
+    return item;
+  }
+  return undefined;
 }

@@ -34,6 +34,7 @@ class JsonStateStore {
       socialFollows: await this.readJson(FILES.socialFollows, []),
       socialPosts: await this.readJson(FILES.socialPosts, []),
       socialMedia: await this.readJson(FILES.socialMedia, []),
+      activityPubIndex: await this.readJson(FILES.activityPubIndex, null),
       transactions: await this.readJson(FILES.transactions, []),
       transactionSummaries: await this.readJson(FILES.transactionSummaries, []),
       profileStructures: await this.readJson(FILES.profileStructures, []),
@@ -64,6 +65,7 @@ class JsonStateStore {
     await this.writeJson(FILES.socialFollows, data.socialFollows || []);
     await this.writeJson(FILES.socialPosts, data.socialPosts || []);
     await this.writeJson(FILES.socialMedia, data.socialMedia || []);
+    await this.writeJson(FILES.activityPubIndex, data.activityPubIndex ?? null);
     await this.writeJson(FILES.transactions, data.transactions || []);
     await this.writeJson(FILES.transactionSummaries, data.transactionSummaries || []);
     await this.writeJson(FILES.profileStructures, data.profileStructures || []);
@@ -141,6 +143,10 @@ class JsonStateStore {
 
   async saveSocialMedia(entries) {
     await this.writeJson(FILES.socialMedia, entries);
+  }
+
+  async saveActivityPubIndex(index) {
+    await this.writeJson(FILES.activityPubIndex, index ?? null);
   }
 
   async saveTransactions(entries) {

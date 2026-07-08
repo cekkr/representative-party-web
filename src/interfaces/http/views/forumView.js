@@ -1,82 +1,142 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { formatTimestamp } from '../../../shared/utils/time.js';
 import { resolvePersonHandle } from './actorLabel.js';
-import { renderIssuerPill, resolveTopicBreadcrumb } from './shared.js';
+import {
+  renderAuthorHashLine,
+  renderEmptyState,
+  renderEvidenceLinks,
+  renderIssuerPill,
+  renderPager,
+  renderPreviewPill,
+  resolveTopicBreadcrumb,
+} from './shared.js';
+import { paginate } from '../../../shared/utils/pagination.js';
 
-export function renderForum(entries, person, state) {
-  const threads = entries.filter((e) => !e.parentId);
-  const comments = entries.filter((e) => e.parentId);
-  const commentsByThread = groupCommentsByParent(comments);
+export function renderForum(entries, person, state, options = {}) {
+  const { threads, commentsByThread } = splitForumEntries(entries);
+  const pageInfo = paginate(threads, { page: options.page || 1 });
   return {
-    threads: renderThreads(threads, commentsByThread, state),
+    threads: renderThreads(pageInfo.items, commentsByThread, state, options),
+    threadsPager: renderPager(pageInfo, { baseHref: '/forum', label: 'threads' }),
     personHandle: resolvePersonHandle(person),
     roleLabel: person?.role || 'guest',
+    composeOpen: options.composeOpen || '',
   };
 }
 
-function renderThreads(threads, commentsByThread, state) {
+function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
   if (!threads.length) {
-    return '<p class="muted">No threads yet. Start a discussion.</p>';
+    return renderEmptyState('No forum threads yet. Publish an article or analysis.');
   }
+  const topicCache = new Map();
   return threads
     .map((thread) => {
-      const topicLabel = resolveTopicBreadcrumb(thread, state);
+      const topicLabel = resolveTopicBreadcrumb(thread, state, topicCache);
+      const createdAt = formatTimestamp(thread.createdAt);
       const threadComments = commentsByThread.get(thread.id) || [];
+      const replyOpen = replyOpenId && replyOpenId === thread.id ? 'open' : '';
+      const safeThreadId = escapeHtml(thread.id);
+      const threadAnchor = `thread-${safeThreadId}`;
+      const replySummary = `Reply (${threadComments.length})`;
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(topicLabel)}</span>
-            <span class="pill ghost">Article</span>
-            ${thread.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
-            ${renderIssuerPill(thread)}
-            <span class="muted small">${new Date(thread.createdAt).toLocaleString()}</span>
+        <article class="topic-card" id="${threadAnchor}">
+          <div class="topic-head">
+            <div class="topic-avatar" aria-hidden="true"></div>
+            <div class="topic-info">
+              <div class="topic-breadcrumbs">Forum / ${escapeHtml(topicLabel)}</div>
+              <h3 class="topic-title">${escapeHtml(thread.title || 'Untitled')}</h3>
+              <div class="topic-meta">
+                <span class="pill ghost">Article</span>
+                <span class="pill ghost">Replies: ${threadComments.length}</span>
+                ${renderPreviewPill(thread)}
+                ${renderIssuerPill(thread)}
+                ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+              </div>
+            </div>
           </div>
-          <h3>${escapeHtml(thread.title || 'Untitled')}</h3>
-          <p>${escapeHtml(thread.content)}</p>
-          <p class="muted small">Author hash: ${escapeHtml(thread.authorHash || 'anonymous')}</p>
-          <form class="stack" method="post" action="/forum/comment" data-enhance="forum">
-            <input type="hidden" name="parentId" value="${escapeHtml(thread.id)}" />
-            <label class="field">
-              <span>Comment</span>
-              <textarea name="content" rows="2" placeholder="Add your view" required></textarea>
-            </label>
-            <button class="ghost" type="submit">Comment</button>
-          </form>
-          <div class="discussion-list">
-            ${renderComments(threadComments)}
+          <div class="topic-body">
+            <p>${escapeHtml(thread.content)}</p>
           </div>
+          <div class="topic-footer">
+            ${renderAuthorHashLine(thread.authorHash || 'anonymous', { state })}
+          </div>
+          <div class="reply-list">
+            ${renderComments(threadComments, state)}
+          </div>
+          <details class="reply-composer" ${replyOpen}>
+            <summary>
+              <div class="reply-hint">
+                <div class="reply-hint__meta">
+                  <div class="reply-hint__avatar" aria-hidden="true"></div>
+                  <div>
+                    <div class="reply-hint__title">${replySummary}</div>
+                    <div class="reply-hint__subtitle">Share your view and add evidence when needed.</div>
+                  </div>
+                </div>
+                <span class="reply-hint__cta">Reply</span>
+              </div>
+            </summary>
+            <form class="stack reply-composer__form" method="post" action="/forum/comment" data-enhance="forum">
+              <input type="hidden" name="parentId" value="${safeThreadId}" />
+              <label class="field">
+                <span>Comment</span>
+                <textarea name="content" rows="3" placeholder="Add your view" required></textarea>
+              </label>
+              <label class="field">
+                <span>Evidence / citations (optional)</span>
+                <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
+              </label>
+              <p class="muted small">One URL per line.</p>
+              <button class="ghost" type="submit">Comment</button>
+            </form>
+          </details>
         </article>
       `;
     })
     .join('\n');
 }
 
-function groupCommentsByParent(comments = []) {
-  const map = new Map();
-  for (const comment of comments) {
-    if (!comment?.parentId) continue;
-    const list = map.get(comment.parentId) || [];
-    list.push(comment);
-    map.set(comment.parentId, list);
+function splitForumEntries(entries = []) {
+  const threads = [];
+  const commentsByThread = new Map();
+  for (const entry of entries || []) {
+    if (!entry) continue;
+    if (entry.parentId) {
+      const list = commentsByThread.get(entry.parentId) || [];
+      list.push(entry);
+      commentsByThread.set(entry.parentId, list);
+    } else {
+      threads.push(entry);
+    }
   }
-  return map;
+  return { threads, commentsByThread };
 }
 
-function renderComments(comments) {
+function renderComments(comments, state) {
   if (!comments.length) {
-    return '<p class="muted small">No comments yet.</p>';
+    return renderEmptyState('No comments yet.', { size: 'small' });
   }
   return comments
     .map((comment) => {
+      const createdAt = formatTimestamp(comment.createdAt);
+      const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
+      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
+      const evidenceBlock = renderEvidenceLinks(evidenceLinks);
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill ghost">Comment</span>
-            ${comment.validationStatus === 'preview' ? '<span class="pill warning">Preview</span>' : ''}
-            ${renderIssuerPill(comment)}
-            <span class="muted small">${new Date(comment.createdAt).toLocaleString()}</span>
+        <article class="reply-card">
+          <div class="reply-card__avatar" aria-hidden="true"></div>
+          <div class="reply-card__content">
+            <div class="reply-card__meta">
+              <span class="pill ghost">Comment</span>
+              ${evidencePill}
+              ${renderPreviewPill(comment)}
+              ${renderIssuerPill(comment)}
+              ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+            </div>
+            <p class="reply-card__text">${escapeHtml(comment.content)}</p>
+            ${evidenceBlock}
+            ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state })}
           </div>
-          <p>${escapeHtml(comment.content)}</p>
-          <p class="muted small">Author hash: ${escapeHtml(comment.authorHash || 'anonymous')}</p>
         </article>
       `;
     })

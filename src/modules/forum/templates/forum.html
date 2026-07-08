@@ -1,0 +1,41 @@
+<div class="page-grid page-grid--forum">
+  <div class="page-main">
+    <section class="panel" id="forum-threads">
+      <p class="eyebrow">Threads</p>
+      <div class="discussion-list">
+        {{threads}}
+      </div>
+      {{threadsPager}}
+    </section>
+  </div>
+  <aside class="page-aside">
+    <section class="panel sticky-panel" id="forum-compose">
+      <p class="eyebrow">Forum</p>
+      <h2>Long-form analysis</h2>
+      <div class="callout is-verbose">
+        <p class="muted small">Handle: {{personHandle}}</p>
+        <p class="muted small">Role: {{roleLabel}}</p>
+        <p class="muted small">Use the forum for deeper context and evidence-backed analysis.</p>
+      </div>
+      <details class="form-toggle" {{composeOpen}}>
+        <summary>Write a new article</summary>
+        <form class="stack" method="post" action="/forum" data-enhance="forum">
+          <div class="form-grid">
+            <label class="field">
+              <span>Title</span>
+              <input name="title" placeholder="Write a headline" required />
+            </label>
+          </div>
+          <label class="field">
+            <span>Body</span>
+            <textarea name="content" rows="4" placeholder="Share analysis, facts, or opinion" required></textarea>
+          </label>
+          <div class="cta-row">
+            <button class="cta" type="submit">Publish article</button>
+            <a class="ghost" href="/petitions" data-partial>Link to proposals</a>
+          </div>
+        </form>
+      </details>
+    </section>
+  </aside>
+</div>

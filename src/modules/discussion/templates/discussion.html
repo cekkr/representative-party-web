@@ -1,0 +1,96 @@
+<section class="panel" id="discussion-compose">
+  <p class="eyebrow">Discussion</p>
+  <h2>Topic discussions</h2>
+  <p class="is-verbose">Topic-based conversations tied to verified sessions. Posts inherit the blinded PID hash of the {{actorLabel}} for accountability.</p>
+  <div class="callout is-verbose">
+    <p class="muted">Your handle</p>
+    <code>{{personHandle}}</code>
+    <p class="muted small">{{personStatus}}</p>
+    <p class="muted small">{{verificationPolicy}}</p>
+    <p class="muted small">{{circlePolicy}}</p>
+    <p class="muted small">Role: {{roleLabel}}</p>
+    <p class="muted small">{{postingStatus}}</p>
+    {{postingReasonLine}}
+    <p class="muted small">Policy {{policyId}} v{{policyVersion}}</p>
+    <p class="muted small">Circle: {{circleName}}</p>
+    <p class="muted small">Ledger size: {{ledgerSize}}</p>
+    <p class="muted small">{{hashOnlyMessage}}</p>
+    <p class="muted small">Use discussion for exploration; move decisions to proposals/votes when needed.</p>
+  </div>
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Start a discussion post</summary>
+    <form class="stack" method="post" action="/discussion" data-enhance="discussion">
+      <div class="form-grid">
+        <label class="field">
+          <span>Topic</span>
+          <input name="topic" list="topics-list" placeholder="Energy transition" required />
+        </label>
+        <label class="field">
+          <span>Stance</span>
+          <select name="stance">
+            <option value="proposal">Proposal</option>
+            <option value="support">Support</option>
+            <option value="concern">Concern</option>
+            <option value="neutral" selected>Neutral</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>Contribution</span>
+        <textarea name="content" rows="4" placeholder="Share a concise, accountable update or idea." required></textarea>
+      </label>
+      <label class="field">
+        <span>Evidence / citations (optional)</span>
+        <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
+      </label>
+      <p class="muted small">One URL per line.</p>
+      <div class="cta-row">
+        <button class="cta" type="submit">Post to discussion</button>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
+      </div>
+    </form>
+  </details>
+  <datalist id="topics-list">
+    {{topicDatalist}}
+  </datalist>
+</section>
+
+<section class="panel" id="discussion-topics">
+  <p class="eyebrow">Topics</p>
+  <h3>Pick your top categories</h3>
+  <p class="muted small">Your list stays local to this provider and helps tune suggested topics.</p>
+  <form class="stack" method="post" action="/discussion" data-enhance="discussion-preferences">
+    <input type="hidden" name="intent" value="topic-preferences" />
+    <label class="field">
+      <span>Top categories (comma separated)</span>
+      <input name="topics" list="topics-list" value="{{topicPreferencesValue}}" placeholder="general, economy, health" />
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Save topics</button>
+    </div>
+  </form>
+  <div class="is-verbose">
+    <p class="muted small">Anchors: {{topicAnchors}}</p>
+    <p class="muted small">Pinned: {{topicPinned}}</p>
+  </div>
+</section>
+
+<section class="panel" id="discussion-feed">
+  <p class="eyebrow">Latest contributions</p>
+  <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
+    <label class="field">
+      <span>Filter by topic</span>
+      <select name="topic">
+        <option value="" {{topicFilterSelectedAll}}>All topics</option>
+        {{topicFilterOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
+  <div class="discussion-list">
+    {{discussionList}}
+  </div>
+  {{discussionPager}}
+</section>

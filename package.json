@@ -22,10 +22,12 @@
     "start": "node src/index.js",
     "test": "node --test",
     "test:ui": "node --test tests/ui.test.js",
-    "db:check": "node scripts/db-check.js"
+    "db:check": "node scripts/db-check.js",
+    "keys:circle": "node scripts/circle-keygen.js"
   },
   "dependencies": {
     "dotenv": "^16.6.1",
+    "libp2p": "^3.1.2",
     "mongodb": "^7.0.0",
     "mysql2": "^3.16.0",
     "sqlite3": "^5.1.7"

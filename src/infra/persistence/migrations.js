@@ -2,8 +2,9 @@ import { randomUUID } from 'node:crypto';
 
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
+import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 
-export const LATEST_SCHEMA_VERSION = 19;
+export const LATEST_SCHEMA_VERSION = 21;
 
 const MIGRATIONS = [
   {
@@ -460,6 +461,72 @@ const MIGRATIONS = [
         ...data,
         petitions,
         discussions,
+      };
+    },
+  },
+  {
+    version: 20,
+    description: 'Add structured proposal outline fields and argument-map metadata.',
+    up: (data) => {
+      const petitions = (data.petitions || []).map((petition) => {
+        const problem = stringOrEmpty(petition.problem);
+        const proposedAction = stringOrEmpty(petition.proposedAction);
+        const impact = stringOrEmpty(petition.impact);
+        const risks = stringOrEmpty(petition.risks);
+        const implementationPlan = stringOrEmpty(petition.implementationPlan);
+        const versions = (Array.isArray(petition.versions) ? petition.versions : []).map((revision) => ({
+          ...revision,
+          problem: stringOrEmpty(revision.problem) || problem,
+          proposedAction: stringOrEmpty(revision.proposedAction) || proposedAction,
+          impact: stringOrEmpty(revision.impact) || impact,
+          risks: stringOrEmpty(revision.risks) || risks,
+          implementationPlan: stringOrEmpty(revision.implementationPlan) || implementationPlan,
+        }));
+        const freeze = petition.freeze
+          ? {
+              ...petition.freeze,
+              problem: stringOrEmpty(petition.freeze.problem) || problem,
+              proposedAction: stringOrEmpty(petition.freeze.proposedAction) || proposedAction,
+              impact: stringOrEmpty(petition.freeze.impact) || impact,
+              risks: stringOrEmpty(petition.freeze.risks) || risks,
+              implementationPlan: stringOrEmpty(petition.freeze.implementationPlan) || implementationPlan,
+            }
+          : petition.freeze;
+        return {
+          ...petition,
+          problem,
+          proposedAction,
+          impact,
+          risks,
+          implementationPlan,
+          versions,
+          freeze,
+        };
+      });
+      const discussions = (data.discussions || []).map((entry) => ({
+        ...entry,
+        argumentTitle: stringOrEmpty(entry.argumentTitle),
+        argumentParentId: stringOrEmpty(entry.argumentParentId),
+      }));
+      return {
+        ...data,
+        petitions,
+        discussions,
+      };
+    },
+  },
+  {
+    version: 21,
+    description: 'Add provider-blind settings scaffold.',
+    up: (data) => {
+      const settings = data.settings || {};
+      const providerBlind = normalizeProviderBlindSettings(settings.providerBlind || {});
+      return {
+        ...data,
+        settings: {
+          ...settings,
+          providerBlind,
+        },
       };
     },
   },

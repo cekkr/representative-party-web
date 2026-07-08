@@ -5,13 +5,13 @@
 
 Go-ahead pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
-Continue with other roadmap implementations (and improvements/fixes where needed) in source code in various contexts (UX, features, data management and P2P protocol etc...). Remember to update README.md
+Continue with other roadmap implementations (and improvements/fixes/optimizations where needed, look also [ROADMAP.md](ROADMAP.md) and [OPTIMIZATIONS.md](OPTIMIZATIONS.md) ) in source code in various contexts (UX, features, data management and P2P protocol etc...). Then implement better unit tests and run them. remember to update markdowns
 
 Check-back pre-cooked prompt:
 [AGENTS.md](AGENTS.md) 
-Check current project and source code status and apply performances and redundancies optimizations on code and UX consistency. Then execute unit tests. Collect all possible future optimizations in file [OPTIMIZATIONS.md](OPTIMIZATIONS.md)
+Analyze current project and source code status and apply performances and redundancies optimizations on code and UX consistency. Then execute unit tests. Collect all possible future optimizations in file [OPTIMIZATIONS.md](OPTIMIZATIONS.md)
 
 
 REMEMBER TODOs:
-- Add to the roadmap the optional "invisible user provider" option: seen that user ID are unique for an entire circle indipendently by their provider, can be possible allowing to hide the user's provider even for the provider through certain P2P protocols.
-- Is important, at least conceptually, the possibility that a circle borns without people with particular privileges (excluded providers' admins), they would be able to create a complex organic structure through evolution of think groups, member votings and voted contextual (and dynamic) organic structures.
+- Provider-blind scaffolding landed (admin policy + ring registry gossip + ringSignature placeholder); keep roadmap aligned for real ring signatures, issuer escrow, audit-reveal workflow, and mixnet transport.
+- Privilege-free Circle bootstrap: ensure governance bootstrapping details are documented and aligned with group elections and dynamic structures.

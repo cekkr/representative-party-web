@@ -1,7 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { normalizeModuleSettings, resolveModuleSettings } from '../src/modules/circle/modules.js';
+import {
+  listModuleDefinitions,
+  listModuleFamilyDefinitions,
+  normalizeModuleSettings,
+  resolveModuleSettings,
+} from '../src/modules/circle/modules.js';
 
 test('module defaults enable optional modules', () => {
   const resolved = resolveModuleSettings({ settings: {} });
@@ -17,4 +22,16 @@ test('module dependencies disable dependent modules', () => {
   assert.equal(normalized.votes, false);
   assert.equal(normalized.delegation, false);
   assert.equal(normalized.groups, false);
+});
+
+test('module definitions expose family lanes for social, governance, and federation separation', () => {
+  const families = listModuleFamilyDefinitions();
+  assert.ok(families.find((entry) => entry.key === 'socialP2P'));
+  assert.ok(families.find((entry) => entry.key === 'partyGovernance'));
+  assert.ok(families.find((entry) => entry.key === 'federationResilience'));
+
+  const byKey = new Map(listModuleDefinitions().map((entry) => [entry.key, entry.family]));
+  assert.equal(byKey.get('social'), 'socialP2P');
+  assert.equal(byKey.get('petitions'), 'partyGovernance');
+  assert.equal(byKey.get('federation'), 'federationResilience');
 });

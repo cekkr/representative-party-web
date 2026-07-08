@@ -1,0 +1,17 @@
+<section class="panel" data-composer-section="delegate-directory">
+  <p class="eyebrow">Delegation</p>
+  <h2>{{directoryActorPlural}} &amp; delegates</h2>
+  <p class="muted small">Browse verified members to find a delegate or follow target — no need to know anyone's hash. {{directoryCount}} shown.</p>
+  <form class="form-inline" method="get" action="/delegates" data-enhance="delegate-search">
+    <label class="field">
+      <span>Search</span>
+      <input name="q" value="{{directoryQuery}}" placeholder="handle, role, or hash" />
+    </label>
+    <button class="ghost" type="submit">Search</button>
+  </form>
+</section>
+
+<section class="panel" data-composer-section="delegate-directory-list">
+  <p class="eyebrow">Directory</p>
+  {{directoryList}}
+</section>

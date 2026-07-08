@@ -2,11 +2,13 @@ import { sendJson, sendNotFound } from '../../../shared/utils/http.js';
 import { deriveBaseUrl, readRequestBody } from '../../../shared/utils/request.js';
 import { isModuleEnabled } from '../../../modules/circle/modules.js';
 import { getEffectivePolicy } from '../../../modules/circle/policy.js';
-import { persistSocialPosts } from '../../../infra/persistence/storage.js';
+import { persistSettings, persistSocialPosts } from '../../../infra/persistence/storage.js';
 import { createSocialNote, wrapCreateActivity, buildInboundSocialPost } from '../../../modules/federation/activitypub.js';
-import { filterVisibleEntries } from '../../../modules/federation/replication.js';
+import { filterVisibleEntries, findVisibleEntry } from '../../../modules/federation/replication.js';
+import { recordPeerFailure, recordPeerSuccess } from '../../../modules/federation/quarantine.js';
 import { findSessionByHash } from '../../../modules/identity/sessions.js';
 import { logTransaction } from '../../../modules/transactions/registry.js';
+import { invalidatePostIndex, isDuplicateActivityPub } from '../../../modules/social/posts.js';
 import { notifySocialParticipants } from '../../../modules/social/notifications.js';
 import { sendModuleDisabledJson } from '../views/moduleGate.js';
 
@@ -25,6 +27,11 @@ export async function inbox({ req, res, state }) {
   const policy = getEffectivePolicy(state);
   const result = buildInboundSocialPost({ state, payload: body, baseUrl, policy });
   if (result.error) {
+    const peerKey = result.peerHint && result.peerHint !== 'remote' ? result.peerHint : null;
+    if (peerKey && (result.error === 'policy_mismatch' || result.error === 'policy_version_mismatch')) {
+      const updated = recordPeerFailure(state, peerKey, { reason: `activitypub_${result.error}` }).updated;
+      if (updated) await persistSettings(state);
+    }
     return sendJson(res, result.statusCode || 400, {
       error: result.error,
       message: result.detail || 'Inbound ActivityPub payload rejected.',
@@ -35,11 +42,17 @@ export async function inbox({ req, res, state }) {
   if (!entry) {
     return sendJson(res, 400, { error: 'invalid_payload', message: 'Inbound ActivityPub payload missing content.' });
   }
-  if (isDuplicateInbound(state, entry.activityPub)) {
+  const peerKey = result.peerHint && result.peerHint !== 'remote' ? result.peerHint : null;
+  if (peerKey) {
+    const updated = recordPeerSuccess(state, peerKey).updated;
+    if (updated) await persistSettings(state);
+  }
+  if (isDuplicateActivityPub(state, entry.activityPub)) {
     return sendJson(res, 202, { status: 'duplicate', objectId: entry.activityPub?.objectId || null });
   }
 
   state.socialPosts = [entry, ...(state.socialPosts || [])];
+  invalidatePostIndex(state);
   await persistSocialPosts(state);
   await logTransaction(state, {
     type: 'activitypub_inbox',
@@ -75,7 +88,7 @@ export async function inbox({ req, res, state }) {
 export function serveOutboxCollection({ req, res, state }) {
   if (!ensureActivityPubModules(state, res)) return;
   const baseUrl = deriveBaseUrl(req);
-  const posts = filterVisibleEntries(state.socialPosts || [], state).filter((post) => post.visibility !== 'direct');
+  const posts = filterVisibleEntries(state.socialPosts || [], state, (post) => post.visibility !== 'direct');
   const orderedItems = buildOutboxItems(posts, baseUrl);
   return sendJson(res, 200, {
     '@context': 'https://www.w3.org/ns/activitystreams',
@@ -91,7 +104,9 @@ export function serveOutbox({ req, res, state, hash }) {
   const actor = state.actors.get(hash);
   if (!actor) return sendNotFound(res);
   const baseUrl = deriveBaseUrl(req);
-  const posts = filterVisibleEntries(state.socialPosts || [], state).filter(
+  const posts = filterVisibleEntries(
+    state.socialPosts || [],
+    state,
     (post) => post.authorHash === hash && post.visibility !== 'direct',
   );
   const orderedItems = buildOutboxItems(posts, baseUrl);
@@ -108,7 +123,7 @@ export function serveOutbox({ req, res, state, hash }) {
 export function serveObject({ req, res, state, id }) {
   if (!ensureActivityPubModules(state, res)) return;
   if (!id) return sendNotFound(res);
-  const post = filterVisibleEntries(state.socialPosts || [], state).find((entry) => entry.id === id);
+  const post = findVisibleEntry(state.socialPosts || [], state, (entry) => entry.id === id);
   if (!post || post.visibility === 'direct' || post.activityPub?.inbound) {
     return sendNotFound(res);
   }
@@ -140,18 +155,6 @@ function normalizeBody(body) {
     }
   }
   return {};
-}
-
-function isDuplicateInbound(state, activityPub = {}) {
-  const objectId = activityPub?.objectId;
-  const activityId = activityPub?.activityId;
-  if (!objectId && !activityId) return false;
-  return (state.socialPosts || []).some((post) => {
-    const meta = post.activityPub || {};
-    if (objectId && meta.objectId === objectId) return true;
-    if (activityId && meta.activityId === activityId) return true;
-    return false;
-  });
 }
 
 function ensureActivityPubModules(state, res) {

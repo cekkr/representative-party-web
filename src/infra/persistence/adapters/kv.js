@@ -21,6 +21,7 @@ const KEYS = [
   'socialFollows',
   'socialPosts',
   'socialMedia',
+  'activityPubIndex',
   'transactions',
   'transactionSummaries',
   'profileStructures',
@@ -142,6 +143,10 @@ class KeyValueStateStore {
     await this.saveKey('socialMedia', entries);
   }
 
+  async saveActivityPubIndex(index) {
+    await this.saveKey('activityPubIndex', index ?? null);
+  }
+
   async saveTransactions(entries) {
     await this.saveKey('transactions', entries);
   }
@@ -189,5 +194,6 @@ class KeyValueStateStore {
 function defaultForKey(key) {
   if (key === 'meta') return { schemaVersion: 0, migrations: [] };
   if (key === 'settings') return { initialized: false };
+  if (key === 'activityPubIndex') return null;
   return [];
 }

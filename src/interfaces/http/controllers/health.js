@@ -1,7 +1,9 @@
-import { POLICIES } from '../../../config.js';
+import { MEDIA, POLICIES } from '../../../config.js';
 import { computeLedgerHash } from '../../../modules/circle/federation.js';
+import { summarizeOptionalEndpointSkips, summarizePushEndpointSkips } from '../../../modules/federation/gossip.js';
 import { filterVisibleEntries, getReplicationProfile, isGossipEnabled } from '../../../modules/federation/replication.js';
 import { listPeerHealth, summarizePeerHealth } from '../../../modules/federation/quarantine.js';
+import { listPeerCapabilities } from '../../../modules/federation/capabilities.js';
 import { buildPolicyGates, getCirclePolicyState } from '../../../modules/circle/policy.js';
 import { summarizeOutboundDeliveries } from '../../../modules/messaging/outbound.js';
 import { getMetricsSnapshot } from '../../../modules/ops/metrics.js';
@@ -11,7 +13,16 @@ export function renderHealth({ res, state }) {
   const replication = getReplicationProfile(state);
   const outboundSummary = formatGossipState(state.gossipState);
   const pullSummary = formatGossipState(state.gossipPullState);
+  const optionalEndpointSkips = summarizeOptionalEndpointSkips(state, { includeEntries: false });
+  const pushEndpointSkips = summarizePushEndpointSkips(state, { includeEntries: false });
   const peerHealthSummary = summarizePeerHealth(listPeerHealth(state), { limit: 20 });
+  const peerCapabilities = listPeerCapabilities(state);
+  const uploadCleanup = state.uploadCleanup || {};
+  const retentionHours = MEDIA.uploadRetentionHours;
+  const intervalMinutes = MEDIA.uploadCleanupIntervalMinutes;
+  const uploadsCleanupEnabled = Number.isFinite(retentionHours) && retentionHours > 0;
+  const uploadsCleanupScheduled =
+    uploadsCleanupEnabled && Number.isFinite(intervalMinutes) && intervalMinutes > 0;
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -45,7 +56,12 @@ export function renderHealth({ res, state }) {
       ingestEnabled: isGossipEnabled(replication),
       outbound: outboundSummary,
       pull: pullSummary,
+      optionalEndpointSkips,
+      pushEndpointSkips,
       peerHealth: peerHealthSummary,
+      peerCapabilities: {
+        count: Object.keys(peerCapabilities || {}).length,
+      },
     },
     extensions: (state.extensions?.active || []).map((ext) => ({ id: ext.id, meta: ext.meta || {} })),
     policies: POLICIES,
@@ -64,6 +80,21 @@ export function renderHealth({ res, state }) {
     },
     outbound: {
       deliveries: summarizeOutboundDeliveries(state),
+    },
+    uploads: {
+      cleanup: {
+        enabled: uploadsCleanupEnabled,
+        scheduled: uploadsCleanupScheduled,
+        retentionHours,
+        intervalMinutes,
+        lastRunAt: uploadCleanup.lastRunAt || null,
+        lastSuccessAt: uploadCleanup.lastSuccessAt || null,
+        lastErrorAt: uploadCleanup.lastErrorAt || null,
+        lastError: uploadCleanup.lastError || null,
+        lastResult: uploadCleanup.lastResult || null,
+        lastSkippedAt: uploadCleanup.lastSkippedAt || null,
+        lastSkipReason: uploadCleanup.lastSkipReason || null,
+      },
     },
     metrics: getMetricsSnapshot(state),
   });
@@ -84,6 +115,7 @@ function formatGossipState(gossipState = {}) {
       transactions: gossipState.lastSummary.transactions,
       skipped: gossipState.lastSummary.skipped || null,
       reason: gossipState.lastSummary.reason,
+      durationMs: gossipState.lastSummary.durationMs ?? null,
     },
   };
 }

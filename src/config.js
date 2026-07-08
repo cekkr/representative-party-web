@@ -1,4 +1,4 @@
-import { dirname, join } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +23,11 @@ export const POLICIES = {
   requireVerification: true,
   enforceCircle: process.env.ENFORCE_CIRCLE === 'true',
   gossipIntervalSeconds: Number(process.env.GOSSIP_INTERVAL_SECONDS || 300),
+  gossipPeerCapabilitiesMaxAgeHours: parseNumberEnv(
+    process.env.GOSSIP_PEER_CAPABILITIES_MAX_AGE_HOURS,
+    168,
+  ),
+  gossipOptionalSkipSeconds: parseNumberEnv(process.env.GOSSIP_OPTIONAL_SKIP_SECONDS, 3600),
 };
 
 export const TOPIC_GARDENER_SYNC_SECONDS = Number(process.env.TOPIC_GARDENER_SYNC_SECONDS || 120);
@@ -37,6 +42,19 @@ export const DATA_DEFAULTS = {
 export const MEDIA_DEFAULTS = {
   maxBytes: 10 * 1024 * 1024,
   reportThreshold: 3,
+  maxFieldBytes: 64 * 1024,
+  maxFieldBytesTotal: 128 * 1024,
+  maxFieldCount: 40,
+  maxFieldNameBytes: 128,
+  maxHeaderBytes: 8 * 1024,
+  maxFilenameBytes: 256,
+  uploadRetentionHours: 24,
+  uploadCleanupIntervalMinutes: 30,
+};
+
+export const REQUEST_BODY_DEFAULTS = {
+  maxBytes: 1024 * 1024,
+  rejectMultipart: true,
 };
 
 export const PATHS = {
@@ -44,6 +62,10 @@ export const PATHS = {
   PUBLIC_ROOT: join(ROOT_DIR, 'public'),
   TEMPLATE_ROOT: join(ROOT_DIR, 'public', 'templates'),
   DATA_ROOT: join(ROOT_DIR, 'data'),
+  UPLOADS_ROOT: resolvePathEnv(
+    process.env.SOCIAL_MEDIA_UPLOADS_ROOT || process.env.SOCIAL_MEDIA_UPLOAD_ROOT || process.env.UPLOADS_ROOT,
+    join(ROOT_DIR, 'data', 'uploads'),
+  ),
   MEDIA_ROOT: join(ROOT_DIR, 'data', 'media'),
   EXTENSIONS_ROOT: join(ROOT_DIR, 'modules', 'extensions'),
   DATA_SQLITE: join(ROOT_DIR, 'data', 'state.sqlite'),
@@ -68,6 +90,7 @@ export const FILES = {
   socialFollows: join(PATHS.DATA_ROOT, 'social-follows.json'),
   socialPosts: join(PATHS.DATA_ROOT, 'social-posts.json'),
   socialMedia: join(PATHS.DATA_ROOT, 'social-media.json'),
+  activityPubIndex: join(PATHS.DATA_ROOT, 'activitypub-index.json'),
   transactions: join(PATHS.DATA_ROOT, 'transactions.json'),
   transactionSummaries: join(PATHS.DATA_ROOT, 'transaction-summaries.json'),
   profileStructures: join(PATHS.DATA_ROOT, 'profile-structures.json'),
@@ -98,6 +121,34 @@ export const DATA = {
 export const MEDIA = {
   maxBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_MAX_BYTES, MEDIA_DEFAULTS.maxBytes),
   reportThreshold: parseNumberEnv(process.env.SOCIAL_MEDIA_REPORT_THRESHOLD, MEDIA_DEFAULTS.reportThreshold),
+  maxFieldBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_BYTES, MEDIA_DEFAULTS.maxFieldBytes),
+  maxFieldBytesTotal: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_FIELD_TOTAL_MAX_BYTES,
+    MEDIA_DEFAULTS.maxFieldBytesTotal,
+  ),
+  maxFieldCount: parseNumberEnv(process.env.SOCIAL_MEDIA_FIELD_MAX_COUNT, MEDIA_DEFAULTS.maxFieldCount),
+  maxFieldNameBytes: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_FIELD_NAME_MAX_BYTES,
+    MEDIA_DEFAULTS.maxFieldNameBytes,
+  ),
+  maxHeaderBytes: parseNumberEnv(process.env.SOCIAL_MEDIA_HEADER_MAX_BYTES, MEDIA_DEFAULTS.maxHeaderBytes),
+  maxFilenameBytes: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_FILENAME_MAX_BYTES,
+    MEDIA_DEFAULTS.maxFilenameBytes,
+  ),
+  uploadRetentionHours: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_UPLOAD_RETENTION_HOURS,
+    MEDIA_DEFAULTS.uploadRetentionHours,
+  ),
+  uploadCleanupIntervalMinutes: parseNumberEnv(
+    process.env.SOCIAL_MEDIA_UPLOAD_CLEANUP_MINUTES,
+    MEDIA_DEFAULTS.uploadCleanupIntervalMinutes,
+  ),
+};
+
+export const REQUEST_BODY = {
+  maxBytes: parseNumberEnv(process.env.REQUEST_BODY_MAX_BYTES, REQUEST_BODY_DEFAULTS.maxBytes),
+  rejectMultipart: parseBooleanEnv(process.env.REQUEST_BODY_REJECT_MULTIPART, REQUEST_BODY_DEFAULTS.rejectMultipart),
 };
 
 export const DEFAULT_PAGE_TITLE = 'Representative Party';
@@ -130,6 +181,13 @@ export function normalizeDataAdapter(value) {
     key_value: 'kv',
   };
   return aliases[normalized] || normalized;
+}
+
+function resolvePathEnv(value, fallback) {
+  if (value === undefined || value === null) return fallback;
+  const trimmed = String(value).trim();
+  if (!trimmed) return fallback;
+  return isAbsolute(trimmed) ? trimmed : resolve(ROOT_DIR, trimmed);
 }
 
 function parseBooleanEnv(value, fallback = false) {
