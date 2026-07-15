@@ -702,14 +702,14 @@
 
 <section class="panel" id="extensions">
   <p class="eyebrow">Extensions</p>
-  <h2>Toggle extensions</h2>
-  <p class="muted small">Enable/disable extensions at runtime (persists to settings).</p>
+  <h2>Extension lifecycle</h2>
+  <p class="muted small">Discover provider-local extensions, record installed versions, then enable or disable their runtime hooks. Uninstalling deregisters an extension without deleting its source file.</p>
   <form class="stack" method="post" action="/extensions" data-enhance="extensions">
-    <div class="form-grid">{{extensionsList}}</div>
+    <div class="stack">{{extensionsList}}</div>
     <div class="cta-row">
-      <button class="cta" type="submit">Apply extensions</button>
+      <button class="cta" type="submit">Apply enabled extensions</button>
     </div>
-    <p class="muted small">POSTs to /extensions; reload applies hooks immediately.</p>
+    <p class="muted small">Install/update/uninstall state and enabled hooks persist in provider settings; hook changes apply immediately.</p>
   </form>
 </section>
 

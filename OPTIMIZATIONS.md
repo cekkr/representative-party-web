@@ -37,6 +37,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache module-family grouping summaries (home/admin module lanes) and refresh only when module settings change to avoid repeated per-request regrouping.
 - Cache home workspace summaries (conversation/governance/audit lists plus access counts) and invalidate on social/discussion/petition/notification/transaction writes so `GET /` avoids repeated multi-collection scans.
 - Cache rendered governance proposal/history summaries or precompute small decision counters if community constitution workflows grow beyond the capped settings-backed lists.
+- Cache extension catalog metadata by file mtime (or use sidecar manifests) so `/admin` and `/extensions` do not import every discovered module on each catalog read; use the same mtime/version key to cache-bust ESM imports after provider-local upgrades.
 
 ## Redundancy
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.

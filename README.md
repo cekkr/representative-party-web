@@ -73,7 +73,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Practical interface controls**: top bar includes a persistent Interface panel (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle), inline save-to-session-defaults, plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
-- **Extensions**: tighten policy without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
+- **Extension lifecycle**: discover provider-local extensions, record installed versions, install/update/uninstall safely, and enable runtime hooks without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
 
 ---
 
@@ -181,7 +181,7 @@ npm run db:check
 - `/delegates/{hash}` (delegate profile summary)
 - `/petitions` and `/petitions/*` (when enabled), `/votes/*` (when enabled)
 - `/social/*` micro‑posts, follows, and media uploads (`/social/media/{id}`, `/social/media/report`)
-- `/admin` settings, first-run installation wizard, policy toggles, rate-limit overrides, and audit summaries; `/extensions` extension toggles
+- `/admin` settings, first-run installation wizard, policy toggles, rate-limit overrides, and audit summaries; `/extensions` extension catalog, lifecycle, and runtime toggles
 - `/transactions`, `/transactions/export`, `/transactions/ledger`, `/transactions/gossip` for local audit + cross‑provider reconciliation
 - `/circle/*` gossip/ledger/peers (federation scaffolding + peer capability hints), `/ap/*` ActivityPub endpoints (`/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` ingesting preview social notes for local recipients)
 
@@ -305,7 +305,7 @@ Ledger exports (`/circle/ledger`, `/votes/ledger`, `/transactions/ledger`) respe
 - Server: `HOST`, `PORT`
 - Circle/policy: `ENFORCE_CIRCLE`, `CIRCLE_POLICY_ID`, `CIRCLE_ISSUER`, `GOSSIP_INTERVAL_SECONDS`, `GOSSIP_OPTIONAL_SKIP_SECONDS` (issuer labels gossip envelopes; `/admin` can override it in settings)
 - Topic gardener: `TOPIC_GARDENER_SYNC_SECONDS` (poll `/operations` for rename/merge/split suggestions)
-- Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`)
+- Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`; initial migrations register these as installed and enabled)
 - Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM). Use `npm run keys:circle` for PEM + .env‑ready output (optional libp2p ring ID included). Set `CIRCLE_RING_ID` to prefill the provider-blind ring ID in `/admin`. `/admin` can generate and persist keys into `settings.json`; env vars still override on restart.
 - Outbound delivery: `OUTBOUND_EMAIL_WEBHOOK`, `OUTBOUND_SMS_WEBHOOK`, `OUTBOUND_WEBHOOK_HEADERS`, `OUTBOUND_TRANSPORT_MODULE`
 - Ops metrics: `METRICS_SNAPSHOT_INTERVAL_SECONDS` (rolling bucket size), `METRICS_SNAPSHOT_RETENTION_HOURS` (retention window)
@@ -331,7 +331,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - **Verified Circle, single provider**  
   `DATA_MODE=centralized DATA_ADAPTER=json ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=party-circle CIRCLE_PUBLIC_KEY="$(cat /path/pub.pem)" CIRCLE_PRIVATE_KEY="$(cat /path/priv.pem)"` — strict gates + signed vote envelopes and ledger exports.
 - **Hardened policy via extension**  
-  Add `CIRCLE_EXTENSIONS=sample-policy-tighten` (or a custom module under `src/modules/extensions/`) to layer org‑specific checks without forking core code; toggles are also exposed in `/extensions` and `/admin`.
+  Add `CIRCLE_EXTENSIONS=sample-policy-tighten` (or a custom module under `src/modules/extensions/`) to layer org‑specific checks without forking core code; `/admin` and `/extensions` expose discovered version metadata, non-destructive install/update/uninstall registration, and separate runtime enable/disable controls.
 - **Hybrid redundancy (canonical + gossip)**  
   `DATA_MODE=hybrid DATA_ADAPTER=sql DATA_SQLITE_FILE=./data/party.db DATA_VALIDATION_LEVEL=observe GOSSIP_INTERVAL_SECONDS=30` — keep a SQL canonical store while ingesting gossip as preview data until validated.
 - **P2P‑first ring**  
@@ -365,7 +365,8 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 
 ### Extensions
 - Registry: `src/modules/extensions/registry.js`
-- Sample: `sample-policy-tighten.js` (enable via `CIRCLE_EXTENSIONS`)
+- Sample: `sample-policy-tighten.js` (versioned as `1.0.0`; bootstrap via `CIRCLE_EXTENSIONS` or install and enable from `/admin`)
+- Lifecycle state: `settings.extensionInstallations` records provider-local source, installed version, and install/update timestamps; uninstall disables hooks and deregisters the extension without deleting its source file.
 
 ### Tests
 - `npm test` runs the `node:test` suite in `tests/` (hashing, migrations, policy gates, classification, extensions, Puppeteer UI flows, ring gossip).
@@ -460,7 +461,7 @@ Adapter notes:
 
 ### Migrations
 
-- `src/infra/persistence/migrations.js` normalizes schema versions (handles/roles, petition lifecycle, delegation/notifications, extensions, group elections, data topology, validationStatus on content/groups/delegations/notifications).
+- `src/infra/persistence/migrations.js` normalizes schema versions (handles/roles, petition lifecycle, delegation/notifications, versioned extension installations, group elections, data topology, validationStatus on content/groups/delegations/notifications).
 - Metadata lives in `meta.json`; running `npm start` or `npm test` applies upgrades.
 
 ---

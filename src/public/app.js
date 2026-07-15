@@ -171,18 +171,20 @@ function scrollToHash(url) {
   window.scrollTo({ top: 0, behavior });
 }
 
-async function submitExtensionsForm(form) {
+async function submitExtensionsForm(form, submitter) {
   const checkboxes = Array.from(form.querySelectorAll('input[name="extensions"]'));
   const enabled = checkboxes.filter((box) => box.checked).map((box) => box.value);
+  const lifecycle = submitter?.name === 'lifecycle' ? submitter.value : '';
+  const payload = lifecycle ? { lifecycle } : { extensions: enabled };
   setAppBusy(true);
   try {
     const response = await fetch(form.action, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ extensions: enabled }),
+      body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error('Extensions update failed');
-    showToast('Extensions updated. Reloading…', { tone: 'success' });
+    showToast(lifecycle ? 'Extension lifecycle updated. Reloading…' : 'Extensions updated. Reloading…', { tone: 'success' });
     window.setTimeout(() => {
       window.location.reload();
     }, 180);
@@ -3026,7 +3028,7 @@ function initStickyComposerAutoCollapse() {
     if (!isPartialNavigationEnabled() && !requiresEnhancedSubmit) return;
     event.preventDefault();
     if (form.dataset.enhance === 'extensions') {
-      await submitExtensionsForm(form);
+      await submitExtensionsForm(form, event.submitter);
       return;
     }
     if (form.dataset.enhance === 'delegation-conflict') {

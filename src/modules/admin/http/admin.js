@@ -3402,12 +3402,41 @@ function renderExtensions(list) {
   return list
     .map((ext) => {
       const meta = ext.meta || {};
-      const description = meta.description || '';
+      const description = meta.description || meta.error || 'Provider-local extension.';
+      const version = ext.version || ext.installedVersion || 'unknown';
+      const installedVersion = ext.installedVersion || 'unknown';
+      const statusPill = ext.installed
+        ? '<span class="pill">Installed</span>'
+        : '<span class="pill ghost">Not installed</span>';
+      const activePill = ext.active
+        ? '<span class="pill">Active</span>'
+        : ext.enabled
+          ? '<span class="pill warning">Enabled, not active</span>'
+          : '';
+      const updatePill = ext.updateAvailable
+        ? `<span class="pill warning">Update ${escapeHtml(String(installedVersion))} → ${escapeHtml(String(version))}</span>`
+        : '';
+      const lifecycleAction = ext.updateAvailable ? 'install' : ext.installed ? 'uninstall' : 'install';
+      const lifecycleLabel = ext.updateAvailable ? 'Update' : ext.installed ? 'Uninstall' : 'Install';
+      const lifecycleDisabled = meta.error && !ext.installed ? 'disabled' : '';
       return `
-        <label class="field checkbox">
-          <input type="checkbox" name="extensions" value="${ext.id}" ${ext.enabled ? 'checked' : ''} />
-          <span>${ext.id} — ${description}</span>
-        </label>
+        <article class="callout stack">
+          <div class="discussion__meta">
+            <label class="field checkbox">
+              <input type="checkbox" name="extensions" value="${escapeHtml(String(ext.id))}" ${ext.enabled ? 'checked' : ''} ${ext.installed && !meta.error ? '' : 'disabled'} />
+              <span>${escapeHtml(String(ext.id))}</span>
+            </label>
+            ${statusPill}
+            ${activePill}
+            ${updatePill}
+            <span class="pill ghost">v${escapeHtml(String(version))}</span>
+            <span class="pill ghost">${escapeHtml(String(ext.source || 'provider-local'))}</span>
+          </div>
+          <p class="muted small">${escapeHtml(String(description))}</p>
+          <div class="cta-row">
+            <button class="ghost" type="submit" name="lifecycle" value="${lifecycleAction}:${escapeHtml(String(ext.id))}" ${lifecycleDisabled}>${lifecycleLabel}</button>
+          </div>
+        </article>
       `;
     })
     .join('\n');
