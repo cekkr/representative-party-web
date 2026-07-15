@@ -14,7 +14,10 @@ export async function startServer() {
   const state = await initState();
   const extensionList = state.settings?.extensions;
   state.uploadCleanup = state.settings?.uploadCleanup || state.uploadCleanup || {};
-  state.extensions = await loadExtensions({ list: extensionList });
+  state.extensions = await loadExtensions({
+    list: extensionList,
+    installations: state.settings?.extensionInstallations || [],
+  });
   // wire outbound transports (email/SMS/webhook); defaults log-only if not configured
   state.outbound = await loadOutboundTransports();
   const uploadRetentionMs = MEDIA.uploadRetentionHours * 60 * 60 * 1000;
@@ -109,6 +112,6 @@ export async function startServer() {
   });
 
   server.listen(PORT, HOST, () => {
-    console.log(`Representative Party server running at http://${HOST}:${PORT}`);
+    console.log(`Organization Web server running at http://${HOST}:${PORT}`);
   });
 }

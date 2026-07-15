@@ -659,7 +659,7 @@ test('UI interface settings and nav filter improve practical navigation', { time
   await navPromise;
   assert.match(page.url(), /\/discussion$/);
 
-  const persisted = await page.evaluate(() => JSON.parse(window.localStorage.getItem('party-web-ui-settings') || '{}'));
+  const persisted = await page.evaluate(() => JSON.parse(window.localStorage.getItem('organization-web-ui-settings') || '{}'));
   assert.equal(persisted.keepComposerOpen, true);
   assert.equal(persisted.partialNavigation, false);
 });
@@ -783,12 +783,12 @@ test('UI profile interface defaults hydrate runtime settings when local override
   assert.ok(partialToggle);
   await partialToggle.click();
   await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'on');
-  const localAfterToggle = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  const localAfterToggle = await page.evaluate(() => window.localStorage.getItem('organization-web-ui-settings'));
   assert.ok(localAfterToggle, 'expected local UI settings after local toggle');
 
   await page.click('[data-ui-settings-reset]');
   await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
-  const localAfterReset = await page.evaluate(() => window.localStorage.getItem('party-web-ui-settings'));
+  const localAfterReset = await page.evaluate(() => window.localStorage.getItem('organization-web-ui-settings'));
   assert.equal(localAfterReset, null);
 });
 

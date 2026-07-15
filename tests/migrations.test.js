@@ -46,7 +46,7 @@ test('migrations normalize sessions and settings', () => {
   assert.equal(session.role, 'person');
   assert.equal(session.banned, false);
   assert.ok(session.handle.startsWith('person-'));
-  assert.equal(data.settings.circleName, 'Party Circle');
+  assert.equal(data.settings.circleName, 'Organization');
   assert.ok(data.settings.modules);
   assert.equal(data.settings.modules.petitions, true);
   assert.ok(Array.isArray(data.petitions));
@@ -68,4 +68,26 @@ test('migrations normalize sessions and settings', () => {
   assert.ok(Array.isArray(data.profileStructures));
   assert.ok(Array.isArray(data.profileAttributes));
   assert.deepEqual(data.settings.extensions, []);
+  assert.deepEqual(data.settings.extensionInstallations, []);
+});
+
+test('extension lifecycle migration registers previously enabled extensions', () => {
+  const { data, meta } = runMigrations({
+    data: {
+      settings: { extensions: ['sample-policy-tighten.js'] },
+    },
+    meta: { schemaVersion: 21, migrations: [] },
+  });
+
+  assert.equal(meta.schemaVersion, 22);
+  assert.deepEqual(data.settings.extensionInstallations, [
+    {
+      id: 'sample-policy-tighten',
+      file: 'sample-policy-tighten.js',
+      version: null,
+      source: 'legacy',
+      installedAt: null,
+      updatedAt: null,
+    },
+  ]);
 });

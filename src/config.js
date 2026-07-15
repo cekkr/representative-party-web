@@ -151,7 +151,7 @@ export const REQUEST_BODY = {
   rejectMultipart: parseBooleanEnv(process.env.REQUEST_BODY_REJECT_MULTIPART, REQUEST_BODY_DEFAULTS.rejectMultipart),
 };
 
-export const DEFAULT_PAGE_TITLE = 'Representative Party';
+export const DEFAULT_PAGE_TITLE = 'Organization Web';
 
 export function normalizeDataMode(value) {
   const normalized = String(value || '').trim().toLowerCase();

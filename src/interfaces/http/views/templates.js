@@ -30,6 +30,7 @@ const TEMPLATE_MODULES = {
   profile: 'profile',
   social: 'social',
   admin: 'admin',
+  coordination: 'organization',
 };
 
 export async function renderPage(templateName, data = {}, { wantsPartial = false, title = DEFAULT_PAGE_TITLE, state } = {}) {
@@ -118,10 +119,10 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.themeVars = asideWidth ? `--page-aside-width: ${asideWidth}px;` : '';
   }
   const brandDefaults = {
-    eyebrow: 'Operational workspace',
-    title: state?.settings?.circleName || 'Party Circle',
-    tagline: 'Messaging, deliberation, and accountability in one place.',
-    footer: 'SSR-first workspace with modular Circle lanes',
+    eyebrow: 'Organization Web',
+    title: state?.settings?.circleName || 'Organization',
+    tagline: 'Communication first. Add structure only when it earns its place.',
+    footer: 'SSR-first workspace with independently deployable organization and civic modules',
   };
   layoutData.brandEyebrow = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandEyebrow', brandDefaults.eyebrow);
   layoutData.brandTitle = resolveComposerTextEscaped(composerTextOverrides, 'layout.brandTitle', brandDefaults.title);

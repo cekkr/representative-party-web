@@ -3,8 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
+import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 21;
+export const LATEST_SCHEMA_VERSION = 22;
 
 const MIGRATIONS = [
   {
@@ -41,7 +42,7 @@ const MIGRATIONS = [
         ...data,
         settings: {
           initialized: Boolean(data.settings?.initialized),
-          circleName: data.settings?.circleName || 'Party Circle',
+          circleName: data.settings?.circleName || 'Organization',
           policyId: data.settings?.policyId || 'party-circle-alpha',
           enforceCircle: data.settings?.enforceCircle ?? null,
           requireVerification: data.settings?.requireVerification ?? null,
@@ -526,6 +527,23 @@ const MIGRATIONS = [
         settings: {
           ...settings,
           providerBlind,
+        },
+      };
+    },
+  },
+  {
+    version: 22,
+    description: 'Add extension installation and version tracking.',
+    up: (data) => {
+      const settings = data.settings || {};
+      return {
+        ...data,
+        settings: {
+          ...settings,
+          extensionInstallations: normalizeExtensionInstallations(
+            settings.extensionInstallations,
+            settings.extensions,
+          ),
         },
       };
     },

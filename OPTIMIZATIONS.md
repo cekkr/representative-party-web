@@ -3,6 +3,9 @@
 This file tracks follow-up ideas that are out of scope for the current patch but would further improve performance, reduce redundancy, or tighten UX consistency.
 
 ## Performance
+- Lazy-render organization layer detail after the active tab (especially hierarchy maps and pressure analytics) so email-only deployments do not pay the HTML/DOM cost of disabled preview panels on every `/organization` request.
+- Cache permission-safe organization-pressure aggregates by scope + time window and invalidate them from case/commitment/sector writes instead of rescanning all cases for every organizational-mirror render.
+- Maintain incremental volume/velocity/persistence/spread counters per sector and reporting window once live pressure analytics land; retain raw component access for explainability rather than caching only a composite score.
 - Consider cursor-based windows for very large datasets (discussion, petitions, forum threads, and the social feed now use offset pagination via the shared `paginate`/`renderPager` helpers).
 - Cache rendered navigation links keyed by module settings to avoid rebuilding nav HTML on every request.
 - Lazy-load heavyweight admin panels (transactions, media review, topic gardener) via partial renders to shrink initial HTML payloads.
@@ -37,8 +40,11 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cache module-family grouping summaries (home/admin module lanes) and refresh only when module settings change to avoid repeated per-request regrouping.
 - Cache home workspace summaries (conversation/governance/audit lists plus access counts) and invalidate on social/discussion/petition/notification/transaction writes so `GET /` avoids repeated multi-collection scans.
 - Cache rendered governance proposal/history summaries or precompute small decision counters if community constitution workflows grow beyond the capped settings-backed lists.
+- Cache extension catalog metadata by file mtime (or use sidecar manifests) so `/admin` and `/extensions` do not import every discovered module on each catalog read; use the same mtime/version key to cache-bust ESM imports after provider-local upgrades.
 
 ## Redundancy
+- Generate the organization layer rail, admin module cards, readiness list, canonical case extensions, and empty states from one capability manifest so layer ordering/dependencies/copy cannot drift across UI and persistence.
+- Reuse one formal/actual-flow edge representation for hierarchy views, pressure propagation, escalation paths, and Composer visualization rather than creating separate graph shapes per screen.
 - Centralize module-disabled and permission-denied responses to avoid duplicated JSON/HTML payload shaping across controllers.
 - Extract common gate callout rendering (role/handle/gate status) into a shared view helper to keep callouts consistent.
 - Introduce shared helpers for follow-type select/datalist rendering to avoid cross-file duplication.
@@ -46,9 +52,13 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Deduplicate topic/stage filter option builders across discussion/petitions to keep filters aligned.
 - Share MySQL test env/bootstrap helpers between `tests/ui.test.js` and `tests/external-adapters.test.js` to reduce drift in connection/availability checks.
 - Evaluate libp2p (gossipsub + peer discovery) as a resilient transport/ring-identity scaffold alongside HTTP gossip.
-- Centralize module-lane definitions (social/community vs e-party governance vs federation) so admin, nav, and home summaries cannot drift.
+- Centralize module-lane definitions (organization operations vs social/community vs civic governance vs federation) so admin, nav, and home summaries cannot drift.
 
 ## UX Consistency
+- Replace the mobile side-navigation height cap with an accessible disclosure or compact horizontal section switcher, preserving keyboard search while putting page content above the fold.
+- Add a shared “illustrative data / template preview / persisted workflow” treatment so prototype organization layers can never be mistaken for live delivery, protected intake, financial execution, or pressure analysis.
+- Define one cross-module vocabulary for acknowledgement, commitment, consultation, accountable decision, execution, protection, escalation, closure, impact, and recurrence; avoid ambiguous generic “assignee” states.
+- Add small-cohort suppression and uncertainty labels to every aggregate pressure visualization before enabling drill-down, preventing protected contributors from being inferred from thin sector/shift slices.
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
@@ -61,8 +71,11 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Observability
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
+- Track organization response-boundary misses, acknowledgement latency, unowned commitments, pressure persistence, recurrence after closure, and relief displacement by sector—without actor-level performance ranking.
 
 ## Storage & IO
+- Store organization case extensions in module-owned collections created lazily (`commitments`, `flowEdges`, `authorityGrants`, `funds`, `sectorLinks`, `mediation`, `pressureObservations`, `impactReviews`) while keeping the source message and minimal case envelope canonical.
+- Separate protected identity/relay mappings and mediation evidence from general case storage with stricter retention, access logging, export, and deletion policies; never include them in ordinary gossip snapshots.
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
 - Add compaction or rotation for transactions and notifications to avoid unbounded JSON growth.
 - Centralize schema/table definitions across adapters and create module-owned tables/collections (defined inside modules) lazily only when modules are enabled.

@@ -1,18 +1,18 @@
 {
-  "name": "representative-party-web",
+  "name": "organization-web-framework",
   "version": "0.1.0",
-  "description": "Representative Party web framework implementation",
+  "description": "Communication-first modular Web Organization Framework",
   "keywords": [
     "digital",
     "democracy"
   ],
-  "homepage": "https://github.com/cekkr/representative-party-web#readme",
+  "homepage": "https://codeberg.org/eparty/web-org#readme",
   "bugs": {
-    "url": "https://github.com/cekkr/representative-party-web/issues"
+    "url": "https://codeberg.org/eparty/web-org/issues"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/cekkr/representative-party-web.git"
+    "url": "git+https://codeberg.org/eparty/web-org.git"
   },
   "license": "GPL-3.0-or-later",
   "author": "Riccardo Cecchini",

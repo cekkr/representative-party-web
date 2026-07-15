@@ -1,0 +1,93 @@
+<section class="panel pressure-workspace" id="pressure-inbox" data-composer-section="pressure-inbox">
+  <header class="pressure-workspace__header">
+    <div>
+      <p class="eyebrow">Organization pressure inbox</p>
+      <h2>{{organizationName}}</h2>
+    </div>
+    <div class="discussion__meta">
+      <span class="pill">Email is the core</span>
+      <span class="pill ghost">Case promotion is optional</span>
+    </div>
+  </header>
+
+  <div class="pressure-board">
+    <aside class="pressure-board__inbox" aria-label="Illustrative pressure inbox">
+      <div class="pressure-section-heading">
+        <div>
+          <p class="eyebrow">Inbox</p>
+          <h3>Needs a response</h3>
+        </div>
+        <span class="pressure-count">4</span>
+      </div>
+      <label class="pressure-search">
+        <span class="sr-only">Search illustrative pressure cases</span>
+        <input type="search" placeholder="Search messages" disabled />
+      </label>
+      <div class="pressure-case-list">
+        {{pressureInbox}}
+      </div>
+      <div class="pressure-inbox-footnote">
+        <span class="pressure-channel-mark">@</span>
+        <p><strong>Start without migration.</strong><small>Inbound email can remain the entry point while richer layers are introduced gradually.</small></p>
+      </div>
+    </aside>
+
+    <section class="pressure-board__focus" id="pressure-focus">
+      <header class="pressure-focus-header">
+        <div>
+          <div class="discussion__meta">
+            <span class="pressure-intensity pressure-intensity--{{selectedIntensityTone}}">{{selectedIntensity}} pressure</span>
+            <span class="pill ghost">{{selectedStatus}}</span>
+            <span class="pill ghost">Due {{selectedDue}}</span>
+          </div>
+          <h2>{{selectedTitle}}</h2>
+          <p class="muted small">Dependency: {{selectedDependency}}</p>
+        </div>
+        <div class="pressure-gauge" aria-label="Illustrative pressure level {{selectedIntensityValue}} out of 100">
+          <span style="--pressure-level: {{selectedIntensityValue}}%"></span>
+          <small>{{selectedIntensityValue}} / 100</small>
+        </div>
+      </header>
+
+      <nav class="pressure-layer-tabs" id="pressure-layers" role="tablist" aria-label="Organization layers">
+        {{layerTabs}}
+      </nav>
+
+      <div class="pressure-layer-panels">
+        {{layerPanels}}
+      </div>
+    </section>
+
+    <aside class="pressure-board__context" aria-label="Case context">
+      <section>
+        <p class="eyebrow">Case lens</p>
+        <h3>Why this needs attention</h3>
+        <ul class="pressure-lens">
+          <li><span>Voice</span><strong>{{selectedVoiceType}}</strong></li>
+          <li><span>Visibility</span><strong>{{selectedVisibility}}</strong></li>
+          <li><span>Scope</span><strong>{{selectedScope}}</strong></li>
+          <li><span>Time</span><strong>{{selectedDue}}</strong></li>
+          <li><span>Dynamics</span><strong>{{selectedPressureType}} · {{selectedPressureState}}</strong></li>
+          <li><span>Trend</span><strong>{{selectedTrend}}</strong></li>
+        </ul>
+      </section>
+      <section>
+        <p class="eyebrow">Layer readiness</p>
+        <ul class="pressure-readiness">
+          {{layerReadiness}}
+        </ul>
+        <div class="cta-row">{{configureAction}}</div>
+      </section>
+      <section class="pressure-boundaries">
+        <p class="eyebrow">Non-negotiable boundaries</p>
+        <ul>
+          <li>No power inferred from a title.</li>
+          <li>No responsibility without a visible commitment.</li>
+          <li>No spend without scope, evidence, and reconciliation.</li>
+          <li>No duplicate case per sector.</li>
+          <li>No automated sanction from a pressure score.</li>
+        </ul>
+      </section>
+    </aside>
+  </div>
+</section>

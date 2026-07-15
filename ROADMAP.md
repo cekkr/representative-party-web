@@ -1,6 +1,11 @@
-This roadmap aligns the build with the Representative Parties thesis (see principle-docs/RepresentativeParties.md) while framing the base as a messaging-first social network that existing orgs can adopt without heavy restructuring. Default actor is a user; “person” is a civic/party Circle label that signals a verified natural person (exclusion principle: org/bot/service accounts cannot hold handles). Near-term priority is an operable messaging layer with durable data and policy gates; deep protocol polish follows once users can actually interact.
+This roadmap defines the general-purpose **Web Organization Framework**. Its communication-first organization model is specified in `principle-docs/OrganizationPressureManagement.md`; the Representative Parties thesis remains an optional civic bundle (`principle-docs/RepresentativeParties.md`). Default actor is a user; “person” is a civic/party Circle label that signals a verified natural person (exclusion principle: org/bot/service accounts cannot hold handles). Near-term priority is familiar communication plus independently adoptable organization layers; deep civic and federation protocol polish follows once users can actually interact.
 
-## Anchoring Principles (from Representative Parties)
+## Anchoring Principles
+- **Communication-first organization**: email/thread intake and notifications work alone. Messages become structured cases only when protected voice, ownership, authority, funds, sectors, mediation, aggregate pressure, or impact learning adds value.
+- **Pressure without punishment**: needs, constructive concerns, advice, consultations, and disputes make organizational strain visible. Analytics explain volume, velocity, persistence, spread, consequence, and capacity at aggregate level; they never score personal worth or automatically sanction staff.
+- **Permeable hierarchy**: preserve expertise, accountable decisions, and emergency speed while showing formal and actual working flows, direct feedback paths, and contextual escalation.
+- **Explicit powers and money**: responsibility, commitments, consultation, decision rights, execution, protection, budget constraints, and reconciliation stay inspectable and distinct. Financial visibility informs participation but does not turn every expense into a vote.
+- **Honest protection**: email is attributed; protected voice requires a separate audited path, minimized metadata, explicit reveal policy, and human moderation.
 - **One person/person, One Voice** backed by blinded identity; federation guards against double representation and toxic providers. “Person” is a Circle-specific label layered on top of the user role when civic proof is enabled.
 - **Exclusion principle**: only natural persons can hold handles or act; org/bot/service accounts are blocked via verification policy and banned flagging.
 - **Provider-blind option (optional)**: user ids are Circle-unique independent of provider; explore P2P protocols to obscure provider attribution in gossip/UX where feasible without breaking auditability.
@@ -19,7 +24,9 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - **Gossip identity**: set a stable issuer URL/identifier (`CIRCLE_ISSUER` or `/admin`) so peers can track envelope provenance.
 - **Frontend shell**: SSR templates + vanilla router interceptor (partial HTML) with wallet handoff UI and discussion sandbox.
 - **Messaging surface first**: discussion/forum + notifications operate even when petitions/votes/delegation/federation are disabled; policy + extensions decide when to light up advanced modules.
-- **Module families**: optional modules are grouped as `P2P social/community`, `E-party governance`, and `Federation/resilience` so providers can reuse the framework for non-party communities without carrying civic flows by default.
+- **Organization workspace**: `/organization` provides a composable SSR reference for email intake, voice types, visibility, commitments, formal-vs-actual hierarchy, authority, funds, sectors, mediation, pressure dynamics, and impact learning. Illustrative data and disabled workflows are labeled as previews.
+- **Organization case contract**: the source message stays canonical; optional module-owned records attach by case id and are created lazily. Protected identity mappings, contact metadata, and mediation detail remain provider-local.
+- **Module families**: optional modules are grouped as `Organization operations`, `P2P social/community`, `Civic governance`, and `Federation/resilience` so providers can reuse the framework without carrying civic flows by default.
 - **Parallel social feed**: typed follows (circle/interest/info/alerts) power a Twitter-like micro-post lane with replies/mentions/tags/reshares and optional provider-local media uploads (locked by default, view-on-request with author notifications, blockable after reports); kept distinct from petitions/votes/forum flows so authority never derives from follows.
 - **Helper services**: external AI/ML workers (e.g., the topic gardener) live under `src/infra/workers/` as Python projects, exposed via cohesive APIs so Node callers avoid conflicting classification results and redundant calls.
 - **UI coherence**: status strip in layout surfaces Circle enforcement + validation/preview state, ledger/actor/discussion counts, and gossip ingest state; templates stay extension-aware so toggled modules show/hide nav items and reuse shared badges for preview/provenance across discussion/social/petitions.
@@ -38,15 +45,17 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Actor labels: UI copy switches between “user” and “person” based on Circle enforcement (person only when civic/party mode is strict).
 - Delegation UI: show election-winner metadata next to group recommendations so users understand why a suggestion was picked.
 - Accessibility: keyboard-friendly forms, high-contrast defaults, and no client-side blocking for SSR-first paths.
+- Progressive organization UX: familiar inbox first, source message always visible, disabled layer previews clearly marked, formal and actual flow compared, pressure components explained, and no personal pressure leaderboard or opaque staff score.
 
 ## Adoption & Extension stance
-- Start from messaging + notifications as the default value; petitions, votes, delegation, federation, and topic gardener are opt-in via policy/extension toggles so existing organizations can extend without being forced into the full Party Circle vision on day one. Core module toggles live in `/admin` and gate nav + endpoints.
+- Start from messaging + notifications as the default value. Organization layers (`protectedVoice`, responsibilities, hierarchies, authority, funds, sectors, mediation, pressure analytics, impact tracking) and civic/federation modules are opt-in so existing organizations can extend without being forced into one operating model. Core module toggles live in `/admin` and gate nav + endpoints.
 - Providers can stay standalone or join a social/party Circle; policy gates and extensions keep behavior cohesive inside a provider and across a Circle when shared norms are desired.
 
 ## Implementation Roadmap
 
 ## Current status snapshot (Phase 1 largely shipped)
 - Messaging kernel is live (discussion/forum/notifications) with SSR + partial HTML navigation; discussion notes and forum comments accept optional evidence/citation links.
+- The `/organization` reference template is live with a familiar pressure inbox, need/concern/advice/consultation/dispute examples, visibility ladder, progressive layer tabs, responsibility/authority/funds/sector views, mediation, formal-vs-actual organizational mirror, aggregate pressure cues, and impact learning. Persistence behind those illustrative organization layers is the next implementation step.
 - Social feed ships typed follows plus replies/mentions/tags/reshare and provider-local media uploads (locked by default with view-request notifications, blockable after reports), gated by the same role/ban checks.
 - Media uploads now stream to temp files with field-size/field-count guards, field-name/header caps, and startup/periodic cleanup for stale uploads; cleanup stats surface in `/health` and `/admin` and persist in settings for restart-safe ops cues.
 - Media uploads enforce filename length caps to prevent oversized multipart metadata.
@@ -57,7 +66,7 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Governance defaults (quorum, timing windows, vote method, delegation decay window) are editable in `/admin` and published at `/governance`.
 - `/admin` now includes a first-run installation wizard for Circle basics, data mode, peer alignment, and optional defaults.
 - `/admin` includes a module control center with toggles plus a settings map and wizard step anchors to keep activation and configuration aligned (links live with module metadata).
-- Module control center now groups optional modules by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) and surfaces per-lane enabled summaries for faster non-party deployments.
+- Module control center now groups optional modules by lane (`Organization operations`, `P2P social/community`, `Civic governance`, `Federation/resilience`) and surfaces per-lane enabled summaries for faster non-party deployments.
 - Delegate profile views surface delegation counts, vote history, and group endorsements (optional public bio).
 - Governance defaults now accept verified-user change proposals from `/governance`; admins approve/reject them in `/admin`, accepted proposals update the constitution defaults, and decisions append governance history plus transaction/audit entries.
 - Liquid delegation now resolves transitively: `resolveDelegation` follows a delegate's own per-topic choices to the terminal delegate with cycle detection, a depth cap, and banned-delegate stops; `/delegation` shows an "explain my influence" chain view and delegate profiles expose an advisory deliberation score (trust/participation/deliberation/endorsement with a recency factor) plus a "rising star" cue.
@@ -84,9 +93,14 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Identity is now legible and discoverable (real-life-readiness pass): members set a validated, unique handle on `/profile`; a shared `resolveHandleForHash`/`renderActorLabel` helper renders `@handle` (with a short hash cue) across delegation, delegate profiles, petitions (including the discussion-feed widget, argument-map nodes, and updated/freeze meta), discussion, forum, social, and the home audit lane instead of raw pid hashes; a browsable People directory at `/delegates` (with search) plus handle pickers (datalists) on the delegation and follow forms replace free-text hash entry, and delegation resolves a typed handle/hash to a known verified person.
 - Notification labels are humanized (`humanizeNotificationType`) so `/notifications` shows readable titles (e.g. "Proposal created", "You were mentioned") instead of raw event types like `petition_created`.
 - Long lists paginate: shared `paginate`/`renderPager` helpers add SSR pagination (page size 20, query-preserving prev/next that respects topic/stage/follow-type filters and partial navigation) across all four high-traffic lists — discussion, petitions, forum threads, and the social feed.
+- Provider-local extension lifecycle is live: `/admin` and `/extensions` discover catalog files, distinguish installed/enabled/active state, persist installed versions and timestamps, flag version drift for updates, and uninstall non-destructively while disabling active hooks.
 
 ## Near-term next steps (Phase 2 focus)
-- Admin module lifecycle: add install/uninstall flows for external modules/extensions (catalog discovery, install state, versioning) beyond simple enable/disable toggles.
+- Organization case kernel: persist source-message promotion, voice type, acknowledgement, visibility policy, scope, state, and review boundary without requiring any richer organization layer.
+- Protected voice: design the separate audited intake/relay and identity-reveal policy before claiming anonymity; keep raw relay mappings and mediation detail provider-local.
+- Organization layer stores: add versioned commitments, hierarchy/flow edges, authority grants, funds/reconciliation, sector links, mediation, pressure observations, and impact reviews lazily behind their module toggles.
+- Pressure analytics guardrails: start with human-readable aggregate volume/velocity/persistence/spread components and cohort suppression; defer prediction and automated relief until baselines, uncertainty, and accountable authorization are tested.
+- Admin module lifecycle: provider-local catalog discovery, install/update/uninstall state, and version tracking are live; next hardening is signed remote catalog acquisition, compatibility constraints, and rollback bundles for externally downloaded extensions.
 - Admin Composer: extend the layout builder with component palette + insert/delete/wrap operations and richer component-level property editing beyond panels + nav (multi-select, reusable blocks, richer property groups).
 - Template hygiene: split remaining module templates into `templates/partials/` for composable subcomponents (admin, groups, discussion, delegation, notifications, profile, forum, governance).
 - Deliberative workbench upgrades: structured proposal templates and argument-map linking landed in petitions; evidence/citation prompts now live on discussion notes, with richer pro/con trees and community fact-check workflows still pending.
@@ -95,13 +109,14 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Delegation safeguards: transitive delegation resolution (cycle/depth/banned guards), decay/renewal cycles (admin-configurable `delegationDecayDays`), and a "rising star" discovery cue are live; transitive power-weight computation ("explain my influence" weighting) remains.
 - UI preferences: browser-local controls plus inline session-default saves are live; next step is optional provider-profile sync across sessions/devices.
 - Harden federation: ActivityPub inbox/outbox processing, cross-provider petition/vote visibility, and scaffolding for Claim & Seize migrations.
-- Module boundary hardening: continue separating reusable `social/community` kernel code from `e-party governance` modules (clear namespaces/contracts) so deployments can compose only what they need.
+- Module boundary hardening: keep `organization operations`, reusable `social/community`, and `civic governance` behind clear namespaces/contracts so a hospital, company, cooperative, association, or civic Circle can compose only what it needs.
 - Evaluate libp2p gossipsub channels for social-lane transport while keeping civic vote/transactions envelopes on signed audit paths.
 - Extend replication tests for hybrid/p2p modes (preview gating, policy mismatch quarantine, skipped optional endpoints).
 - Provider-blind hardening: replace placeholder ringSignature with real ring signatures, add issuer escrow + audit reveal workflow, enforce ring registry validation against Circle key registry, and ship provider-blind gossip tests (observe vs strict).
 - Next-next steps: expand multipart integration tests with malformed-boundary/fuzzed header cases to harden parser edge behavior.
 
 ### Phase 1 — Messaging Kernel & Circle Policy (Months 1-4)
+- Deliver the general communication kernel and organization reference UI before persistent advanced workflow: shared inbox/thread intake, bounded reply, manual case promotion contract, and independent organization module toggles.
 - Deliver the messaging layer (discussion/forum/notifications) with handles and roles; OIDC4VP marks a session as “person” to enforce the natural-person exclusion principle where required, while allowing messaging to run in a lighter user-only mode.
 - Add the follow graph + micro-post lane: typed follows (circle/interest/info/alerts) drive `/social/feed` with short posts + replies/mentions/reshares plus optional provider-local media uploads (view requests notify authors); keep UX copy explicit that this lane is for small talk/info and gated by the same role/ban checks as discussions.
 - Add core module toggles in `/admin` so petitions/votes/delegation/groups/federation/topic gardener/social can be disabled for messaging-only deployments; nav and endpoints respect disabled modules.
@@ -122,6 +137,8 @@ This roadmap aligns the build with the Representative Parties thesis (see princi
 - Federation stays stubbed (ActivityPub actor/outbox + inbox ingestion preview plus ledger gossip placeholders) to avoid blocking local UX or messaging-only deployments; hardening is a later phase.
 
 ### Phase 2 — Deliberation & Structure (Months 5-7)
+- **Organization pressure cases**: persist needs, constructive concerns, advice, resource consultations, and disputes with acknowledgement, chosen visibility, source message, evidence, scope, and review boundary.
+- **Organization structure layers**: commitments/responsibilities, contextual hierarchy and observed-flow edges, explicit authority grants, financial context, sector relationships, protected mediation, explainable pressure components, and impact review remain separate module-owned records.
 - **Petitions module**: collaborative drafting with signature thresholds; signatures tied to verified sessions.
 - **Topics/Taxonomy**: nested topics with usage-based promotion/pruning; users (people when civic proof is on) select top categories while admins/policy voters can pin mandatory/legal/departmental anchors; identity-rate-limiting instead of CAPTCHA.
 - **Personalizable structure manager**: admin schema/data-table editor for provider-local optional fields/tables while locking canonical account fields (handle + credential/wallet binding, role/banned flag, blinded hash). Optional contact data (email/notifications) remains local and fuels provider-owned delivery/consent flows; example: handle + password stays required even when email is optional.
