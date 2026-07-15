@@ -1,4 +1,4 @@
-# Organization Web Framework
+# Web Organization Framework
 
 A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
 
