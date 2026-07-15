@@ -1,5 +1,7 @@
 # Web Organization Framework
 
+![The Web Organization Framework logo](md-assets/weborg-logo.png)
+
 A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
 
 This repository is a Node.js SSR application that starts as a usable email/discussion + notification workspace, then lets an organization progressively enable higher‑stakes modules without adopting one fixed operating model. The former party-centric product name is retired; **Party Circle** remains an optional civic policy bundle. Its identity layer can enforce **one natural person = one voice** **without storing raw PII** when that bundle is enabled.
