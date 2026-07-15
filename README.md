@@ -1,10 +1,8 @@
-# Representative Party Web Framework
+# Organization Web Framework
 
-A **messaging‑first “Party Circle” kernel** for civic and political organizations that want deliberation and representation *without* turning identity into a surveillance problem.
+A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
 
-<img src="https://codeberg.org/eparty/party-web/raw/branch/main/md-assets/partyweb-logo.png" style="max-height: 300px;">
-
-This repository is a Node.js SSR application that starts as a usable discussion + notification network, then lets you progressively enable higher‑stakes modules (petitions, votes, delegation, federation) as your policy and governance mature. The identity layer is designed around **blinded uniqueness**: the server can enforce **one natural person = one voice** **without storing raw PII**.
+This repository is a Node.js SSR application that starts as a usable email/discussion + notification workspace, then lets an organization progressively enable higher‑stakes modules without adopting one fixed operating model. The former party-centric product name is retired; **Party Circle** remains an optional civic policy bundle. Its identity layer can enforce **one natural person = one voice** **without storing raw PII** when that bundle is enabled.
 
 > **Status / intent**
 > Practical scaffold for pilots, internal deployments, and research‑grade iteration. Some protocols (OIDC4VP, ActivityPub, federation hardening) are present as scaffolding and will evolve — see `ROADMAP.md`.
@@ -13,14 +11,16 @@ This repository is a Node.js SSR application that starts as a usable discussion 
 
 ## Why this exists
 
-Most “civic platforms” fail in one of two ways:
+Many organization and civic platforms fail in one of three ways:
 
 1. **They ship “voting” before shipping “conversation.”** People need a place to learn, argue, and revise ideas before any decision has legitimacy.
 2. **They bind trust to centralized identity.** That creates pressure to collect personal data, which becomes a liability and a power imbalance.
+3. **They impose a complete organization model before earning adoption.** People are asked to replace familiar communication with forms, taxonomies, and dashboards all at once.
 
 This project takes the opposite stance:
 
-- Start with **messaging and accountability cues**.
+- Start with **familiar communication and accountability cues**.
+- Promote a message into a structured case only when ownership, protection, authority, resources, mediation, or learning adds value.
 - Add **formal decision tools** only when you can defend them socially and operationally.
 - Keep identity **privacy‑first** by storing only **blinded hashes** (not names, not documents).
 
@@ -28,7 +28,7 @@ This project takes the opposite stance:
 
 ## Who it’s for
 
-- Parties, civic committees, associations, unions, NGOs, and community groups
+- Care providers, companies, cooperatives, associations, unions, NGOs, civic committees, and community groups
 - Researchers prototyping representation models (liquid delegation, topic‑scoped voting, federation)
 - Teams that need a *deployable* baseline today, not a perfect protocol paper
 
@@ -48,6 +48,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 ## Highlights
 
 - **Messaging‑first kernel**: discussion + forum + notifications work alone, with evidence/citation links supported on discussion notes and forum comments.
+- **Organization pressure workspace**: `/organization` demonstrates email-first intake, needs/concerns/advice, protected visibility, responsibilities, formal-vs-actual structure, explicit powers, funds, sectors, mediation, aggregate pressure dynamics, and impact learning as independent layers.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Provider-blind option (scaffold)**: `/admin` policy fields for observe/strict, ring registry gossip, and ringSignature placeholders for votes/transactions; issuer escrow + mixnet transport planned.
@@ -55,7 +56,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Petitions → votes pipeline**: proposals with evidence summaries + source links, structured outline fields (problem/action/impact/risks/plan), collaborative revisions + version history, revision diffs + pre‑vote freeze, signatures/quorum, deliberation feed with stance tags (support/concern/question) + fact‑check flags + evidence/citation prompts, and argument‑map linking for pro/con trees.
 - **Governance defaults**: admin-managed constitution defaults (quorum, discussion/vote windows, vote method) with verified-user change proposals, admin decisions, and public decision history.
 - **Module control center**: admin toggles plus a settings map with jump links so module activation and configuration stay in one place (links are defined alongside module metadata).
-- **Module lanes**: optional modules are grouped by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`) to keep non-party community deployments clean.
+- **Module lanes**: optional modules are grouped by lane (`Organization operations`, `P2P social/community`, `Civic governance`, `Federation/resilience`) so deployments can compose only the operating model they need.
 - **Operational home workspace**: `/` stays useful for guests and signed-in members, showing access gates, recent lane activity, and operator cues instead of acting like a brochure or a forced redirect.
 - **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions with history diff previews.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
@@ -83,11 +84,15 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - Handles, roles, moderation flags, notifications
 - SSR pages + partial‑HTML navigation (fast, indexable, minimal JS)
 
-### 2) Add civic “Circle” guarantees when ready
+### 2) Add organization layers when they earn their place
+- Protected voice modes for needs, constructive concerns, advice, resource consultations, and disputes
+- Responsibilities, contextual hierarchies, explicit authority, financial context, sectors, mediation, pressure dynamics, and impact review
+
+### 3) Add civic “Circle” guarantees when ready
 - OIDC4VP verification scaffold (EUDI wallet flow)
 - Store only **blinded** identity hashes for uniqueness + session roles
 
-### 3) Turn on proposals, votes, delegation, federation incrementally
+### 4) Turn on proposals, votes, delegation, federation incrementally
 - Petitions, collaborative drafts, and signatures (quorum gates)
 - Signed vote envelopes and exports
 - Topic‑scoped delegation and group‑level recommendations
@@ -166,7 +171,7 @@ npm run db:check
 
 ### Interface preferences
 
-- Interface preferences are stored in browser localStorage (`party-web-ui-settings`) and applied across partial/full navigations.
+- Interface preferences are stored in browser localStorage (`organization-web-ui-settings`) and applied across partial/full navigations. The app reads the former `party-web-ui-settings` key once for a lossless upgrade.
 - The top-bar Interface panel can persist the current toggles into session defaults without leaving the active page (`Save as session defaults`), and `Use session defaults` clears local overrides.
 - Current toggles: large text, reduced motion, compact nav, keep social composer open while scrolling, and fast partial navigation (off switches links/forms back to full-page loads).
 - Side navigation includes a jump filter with keyboard shortcuts: `Ctrl/Cmd+K` focuses search, `/` focuses search when not typing, `Esc` clears.
@@ -174,6 +179,7 @@ npm run db:check
 ### Useful endpoints
 
 - `/` landing, `/health` metrics
+- `/organization` communication-first organization pressure template and organizational mirror
 - `/auth/eudi` start verification, `/auth/callback` return
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
 - `/profile` (provider‑local profile attributes editor)
@@ -194,6 +200,7 @@ npm run db:check
 - **Liquid representation**: topic‑scoped delegation with revocable overrides.
 - **Personalizable structure manager**: canonical profile fields (handle + credential/wallet binding, role/banned flag, blinded identity) are fixed across a party ring; provider‑local optional fields (contact email, personal details, notification preferences) live in a versioned schema/data‑table editor with a per‑session profile page and never gossip.
 - **Messaging‑first adoption**: discussion and notifications work alone; petitions/votes/delegation/federation are opt‑in.
+- **Organization-pressure adoption**: email stays useful by itself; protected voice, responsibility, hierarchy, authority, funds, sectors, mediation, aggregate pressure, and impact attach to the same source record only when enabled. See `principle-docs/OrganizationPressureManagement.md`.
 - **Federation resilience**: peers gossip ledger/vote hashes, reject policy id/version mismatches, and can quarantine toxic providers (peer health visible in `/admin`); ActivityPub actors expose public presence.
 - **Human‑ready maintenance**: small modules, plain SSR templates, env‑driven knobs, documented flows.
 
@@ -201,7 +208,15 @@ npm run db:check
 
 ## Modules at a glance
 
-Optional modules are organized in three lanes so you can deploy only the layer you need: `P2P social/community`, `E-party governance`, and `Federation/resilience`.
+Optional modules are organized in four lanes so you can deploy only the layer you need: `Organization operations`, `P2P social/community`, `Civic governance`, and `Federation/resilience`.
+
+### Organization operations
+- **Coordination workspace**: familiar message intake, bounded replies, manual case promotion, and searchable history.
+- **Protected voice**: permission-aware attributed, role-visible, department-visible, and protected intake modes.
+- **Responsibilities and hierarchy**: outcome owners, action commitments, contextual escalation, and formal-vs-actual working flow.
+- **Authority and funds**: explicit decision rights plus visible resource constraints, accountable decisions, execution, and reconciliation.
+- **Sectors**: multiple views over one canonical case rather than duplicated queues.
+- **Mediation, pressure dynamics, and impact**: protected pacification, aggregate system signals, recurrence, and observed learning.
 
 ### Always‑on value (messaging kernel)
 - **Discussion + forum**: threaded posts/comments with SSR UI, plus optional evidence links on discussion notes and forum comments.
@@ -386,7 +401,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - **Groups UI**: closed elections surface the winner, method, and round count directly in the group panel, and closing an election auto-updates the delegate cachet for that topic.
 - **Topics & classification:** `src/modules/topics/classification.js` routes to extensions and the topic gardener helper (see `principle-docs/DynamicTopicCategorization.md`) to keep categories coherent, merge/split, and avoid conflicting provider labels. A topic registry persists ids/path metadata so SSR views can render breadcrumbs. Configure anchors/pins + optional helper URL via `/admin`; the helper runs from `src/infra/workers/topic-gardener/server.py` with scheduled refactor operations, and `/admin` surfaces pending rename/merge/split suggestions plus topic history diffs for review.
 - **Notifications:** `/notifications` lists unread; `/notifications/read` marks them; `/notifications/preferences` stores per-user proposal comment alert preferences; backing store handled by `src/modules/messaging/notifications.js`.
-- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, issuer (public URL for gossip envelopes), peers, extensions, and optional modules grouped by lane (`P2P social/community`, `E-party governance`, `Federation/resilience`), plus default group policy, topic gardener, gossip sync controls, media moderation (reports + view requests), persisted upload cleanup status, outbound delivery summaries, runtime ops metrics (module-disabled + rate-limit counters) plus retention/interval settings, and session overrides without editing JSON. Topic gardener review includes preview panels with confirmation for merge/split, pending rename/merge/split suggestions, a topic history diff view, and a manual sync button. Gossip push/pull controls disable when federation is off or data mode is centralized. Signing key status + keygen hints surface here; admin can generate signing keys into `settings.json` (env overrides on restart); provider-blind ring keys accept PEM blocks separated by blank lines (or one-line PEM with `\n` escapes).
+- **Admin & settings:** `/admin` toggles Circle policy, verification requirement, issuer (public URL for gossip envelopes), peers, extensions, and optional modules grouped by lane (`Organization operations`, `P2P social/community`, `Civic governance`, `Federation/resilience`), plus default group policy, topic gardener, gossip sync controls, media moderation (reports + view requests), persisted upload cleanup status, outbound delivery summaries, runtime ops metrics (module-disabled + rate-limit counters) plus retention/interval settings, and session overrides without editing JSON. Topic gardener review includes preview panels with confirmation for merge/split, pending rename/merge/split suggestions, a topic history diff view, and a manual sync button. Gossip push/pull controls disable when federation is off or data mode is centralized. Signing key status + keygen hints surface here; admin can generate signing keys into `settings.json` (env overrides on restart); provider-blind ring keys accept PEM blocks separated by blank lines (or one-line PEM with `\n` escapes).
 - **ActivityPub stubs:** `/ap/actors/{hash}` exposes actor descriptors and `/ap/actors/{hash}/outbox` serves per-actor posts via `src/modules/federation/activitypub.js`; `/ap/outbox` serves a global collection; `/ap/objects/{id}` serves local note objects; `/ap/inbox` ingests preview social notes (ignores direct payloads not addressed to a local actor) and triggers mention/direct notifications. ActivityPub endpoints require federation + social modules to be enabled.
 - **Transactions registry:** `/transactions` lists local, stamped entries for sensitive actions (petition drafts/status changes, votes, delegation overrides); `/transactions/export` emits a signed digest envelope, `/transactions/ledger` serves the envelope to peers, and `/transactions/gossip` ingests summaries for cross-provider reconciliation.
 

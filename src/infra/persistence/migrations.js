@@ -42,7 +42,7 @@ const MIGRATIONS = [
         ...data,
         settings: {
           initialized: Boolean(data.settings?.initialized),
-          circleName: data.settings?.circleName || 'Party Circle',
+          circleName: data.settings?.circleName || 'Organization',
           policyId: data.settings?.policyId || 'party-circle-alpha',
           enforceCircle: data.settings?.enforceCircle ?? null,
           requireVerification: data.settings?.requireVerification ?? null,

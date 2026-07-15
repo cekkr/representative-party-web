@@ -11,7 +11,8 @@ function triggerDeepLink() {
 
 triggerDeepLink();
 
-const UI_SETTINGS_KEY = 'party-web-ui-settings';
+const UI_SETTINGS_KEY = 'organization-web-ui-settings';
+const LEGACY_UI_SETTINGS_KEY = 'party-web-ui-settings';
 const DEFAULT_UI_SETTINGS = {
   largeText: false,
   reducedMotion: false,
@@ -34,7 +35,10 @@ function normalizeUiSettings(raw = {}) {
 
 function hasStoredUiSettings() {
   try {
-    return window.localStorage?.getItem(UI_SETTINGS_KEY) !== null;
+    return (
+      window.localStorage?.getItem(UI_SETTINGS_KEY) !== null ||
+      window.localStorage?.getItem(LEGACY_UI_SETTINGS_KEY) !== null
+    );
   } catch (_error) {
     return false;
   }
@@ -43,6 +47,7 @@ function hasStoredUiSettings() {
 function clearStoredUiSettings() {
   try {
     window.localStorage?.removeItem(UI_SETTINGS_KEY);
+    window.localStorage?.removeItem(LEGACY_UI_SETTINGS_KEY);
   } catch (_error) {
     // Ignore private mode/storage failures.
   }
@@ -65,7 +70,9 @@ function readUiSettings() {
     return readServerUiSettings();
   }
   try {
-    const raw = window.localStorage?.getItem(UI_SETTINGS_KEY);
+    const raw =
+      window.localStorage?.getItem(UI_SETTINGS_KEY) ||
+      window.localStorage?.getItem(LEGACY_UI_SETTINGS_KEY);
     if (!raw) return readServerUiSettings();
     const parsed = JSON.parse(raw);
     return { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(parsed) };
@@ -78,6 +85,7 @@ function writeUiSettings(next) {
   const normalized = { ...DEFAULT_UI_SETTINGS, ...normalizeUiSettings(next) };
   try {
     window.localStorage?.setItem(UI_SETTINGS_KEY, JSON.stringify(normalized));
+    window.localStorage?.removeItem(LEGACY_UI_SETTINGS_KEY);
   } catch (_error) {
     // Ignore private mode/storage failures.
   }
@@ -2949,6 +2957,42 @@ function initStickyComposerAutoCollapse() {
   window.__composeAutoCleanup = () => window.removeEventListener('scroll', onScroll);
 }
 
+function activatePressureLayer(layerKey, { focus = false } = {}) {
+  const key = String(layerKey || '').trim();
+  if (!key) return;
+  const tabs = Array.from(document.querySelectorAll('[data-pressure-layer-target]'));
+  const panels = Array.from(document.querySelectorAll('[data-pressure-layer-panel]'));
+  const activeTab = tabs.find((tab) => tab.dataset.pressureLayerTarget === key);
+  const activePanel = panels.find((panel) => panel.dataset.pressureLayerPanel === key);
+  if (!activeTab || !activePanel) return;
+
+  tabs.forEach((tab) => {
+    const active = tab === activeTab;
+    tab.classList.toggle('is-active', active);
+    tab.setAttribute('aria-selected', String(active));
+    tab.tabIndex = active ? 0 : -1;
+  });
+  panels.forEach((panel) => {
+    panel.hidden = panel !== activePanel;
+  });
+  if (focus) {
+    activeTab.focus();
+  }
+}
+
+function initPressureWorkspace() {
+  const hash = window.location.hash || '';
+  const prefix = '#pressure-layer-';
+  if (hash.startsWith(prefix)) {
+    activatePressureLayer(hash.slice(prefix.length));
+    return;
+  }
+  const active = document.querySelector('[data-pressure-layer-target].is-active');
+  if (active) {
+    activatePressureLayer(active.dataset.pressureLayerTarget);
+  }
+}
+
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
@@ -2962,6 +3006,7 @@ function initStickyComposerAutoCollapse() {
   initVerbosityToggle();
   initComposerTool();
   initStickyComposerAutoCollapse();
+  initPressureWorkspace();
   syncBusyIndicator();
 
   document.addEventListener('click', async (event) => {
@@ -2988,6 +3033,7 @@ function initStickyComposerAutoCollapse() {
       initVerbosityToggle();
       initComposerTool();
       initStickyComposerAutoCollapse();
+      initPressureWorkspace();
       syncBusyIndicator();
       scrollToHash(url);
       triggerDeepLink();
@@ -3000,6 +3046,14 @@ function initStickyComposerAutoCollapse() {
   });
 
   document.addEventListener('click', (event) => {
+    const pressureLayer = event.target.closest('[data-pressure-layer-target]');
+    if (pressureLayer) {
+      event.preventDefault();
+      const key = pressureLayer.dataset.pressureLayerTarget || '';
+      activatePressureLayer(key, { focus: true });
+      window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#pressure-layer-${key}`);
+      return;
+    }
     const toggle = event.target.closest('[data-compose-toggle]');
     if (!toggle) return;
     event.preventDefault();
@@ -3078,6 +3132,7 @@ function initStickyComposerAutoCollapse() {
       initVerbosityToggle();
       initComposerTool();
       initStickyComposerAutoCollapse();
+      initPressureWorkspace();
       syncBusyIndicator();
       scrollToHash(url);
       triggerDeepLink();

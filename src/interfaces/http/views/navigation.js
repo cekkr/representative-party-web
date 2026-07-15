@@ -6,6 +6,14 @@ import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', partial: true, match: { path: '/', exact: true } },
   {
+    key: 'coordination',
+    label: 'Coordination',
+    href: '/organization',
+    module: 'coordination',
+    partial: true,
+    match: { prefix: '/organization' },
+  },
+  {
     key: 'auth',
     label: 'Wallet Login',
     href: '/auth/eudi',
@@ -57,14 +65,15 @@ const NAV_ITEMS = [
 ];
 
 const NAV_GROUPS = [
-  { key: 'start', label: 'Workspace', keys: ['home', 'auth', 'profile', 'notifications'] },
+  { key: 'start', label: 'Workspace', keys: ['home', 'coordination', 'auth', 'profile', 'notifications'] },
   { key: 'conversation', label: 'Social/community', keys: ['social', 'discussion', 'forum'] },
-  { key: 'governance', label: 'E-party governance', keys: ['petitions', 'delegation', 'delegates', 'groups', 'governance'] },
+  { key: 'governance', label: 'Civic governance', keys: ['petitions', 'delegation', 'delegates', 'groups', 'governance'] },
   { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
 ];
 
 const QUICK_ACTIONS = [
   { key: 'home', label: 'Home', href: '/', partial: true },
+  { key: 'coordination', label: 'Coordination', href: '/organization', module: 'coordination', partial: true },
   { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, hideWhenVerified: true },
   { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true, requiresVerified: true },
   { key: 'forum', label: 'Forum', href: '/forum', partial: true },
@@ -107,6 +116,13 @@ const CHILD_SECTIONS = {
     { label: 'Access', href: '/#home-access', partial: true },
     { label: 'Lane activity', href: '/#home-lanes', partial: true },
     { label: 'Operations', href: '/#home-ops', partial: true },
+  ],
+  coordination: [
+    { label: 'Pressure inbox', href: '/organization#pressure-inbox', partial: true },
+    { label: 'Focused case', href: '/organization#pressure-focus', partial: true },
+    { label: 'Module layers', href: '/organization#pressure-layers', partial: true },
+    { label: 'Pressure map', href: '/organization#pressure-map', partial: true },
+    { label: 'Operating map', href: '/organization#operating-map', partial: true },
   ],
   social: [
     { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },

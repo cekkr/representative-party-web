@@ -112,6 +112,6 @@ export async function startServer() {
   });
 
   server.listen(PORT, HOST, () => {
-    console.log(`Representative Party server running at http://${HOST}:${PORT}`);
+    console.log(`Organization Web server running at http://${HOST}:${PORT}`);
   });
 }

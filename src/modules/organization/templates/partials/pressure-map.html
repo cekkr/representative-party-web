@@ -1,0 +1,82 @@
+<section class="panel organization-mirror" id="pressure-map" data-composer-section="pressure-map">
+  <header class="organization-mirror__header">
+    <div>
+      <p class="eyebrow">Organizational mirror</p>
+      <h2>See formal structure and actual working flow together</h2>
+      <p class="muted small">
+        Aggregate needs, concerns, advice, and disputes into system-level signals. Drill down only within the viewer’s permission boundary.
+      </p>
+    </div>
+    <div class="discussion__meta">
+      <span class="pill {{pressureMapStatusClass}}">{{pressureMapStatus}}</span>
+      <span class="pill ghost">Illustrative baseline</span>
+    </div>
+  </header>
+
+  <div class="organization-mirror__toolbar" aria-label="Illustrative map controls">
+    <div class="mirror-segmented" aria-label="Map view">
+      <button class="is-active" type="button" disabled>Pressure overlay</button>
+      <button type="button" disabled>Formal chart</button>
+      <button type="button" disabled>Actual flow</button>
+    </div>
+    <label>
+      <span class="muted tiny">Time window</span>
+      <input type="range" min="1" max="12" value="6" disabled />
+    </label>
+  </div>
+
+  <div class="organization-mirror__body">
+    <div class="pressure-topology" aria-label="Illustrative organization pressure topology">
+      <article class="pressure-node pressure-node--root">
+        <span class="pressure-node__level pressure-node__level--medium"></span>
+        <small>Care network</small>
+        <strong>Manageable pressure</strong>
+        <em>Stable overall · local fractures visible</em>
+      </article>
+      <div class="pressure-topology__branches">
+        <article class="pressure-node">
+          <span class="pressure-node__level pressure-node__level--high"></span>
+          <small>Night nursing</small>
+          <strong>High · rising</strong>
+          <em>Medication flow 42% · handover 31%</em>
+        </article>
+        <article class="pressure-node">
+          <span class="pressure-node__level pressure-node__level--medium"></span>
+          <small>Pharmacy operations</small>
+          <strong>Moderate · oscillating</strong>
+          <em>Release timing 54% · staffing 22%</em>
+        </article>
+        <article class="pressure-node">
+          <span class="pressure-node__level pressure-node__level--low"></span>
+          <small>Outpatient</small>
+          <strong>Low · chronic signal</strong>
+          <em>Rural access cluster emerging</em>
+        </article>
+        <article class="pressure-node">
+          <span class="pressure-node__level pressure-node__level--medium"></span>
+          <small>Technical services</small>
+          <strong>Moderate · stable</strong>
+          <em>Equipment decisions 47%</em>
+        </article>
+      </div>
+      <div class="pressure-flow-note">
+        <span>Observed flow</span>
+        <strong>Night nursing ↔ pharmacy coordinator ↔ logistics</strong>
+        <small>This working path crosses the formal reporting tree and explains where feedback must travel.</small>
+      </div>
+    </div>
+
+    <aside class="pressure-system-signals">
+      <p class="eyebrow">Pressure composition</p>
+      <div class="pressure-signal-meter"><span>Needs</span><i style="--signal-size: 72%"></i><strong>42%</strong></div>
+      <div class="pressure-signal-meter"><span>Concerns</span><i style="--signal-size: 51%"></i><strong>29%</strong></div>
+      <div class="pressure-signal-meter"><span>Advice</span><i style="--signal-size: 33%"></i><strong>19%</strong></div>
+      <div class="pressure-signal-meter"><span>Disputes</span><i style="--signal-size: 18%"></i><strong>10%</strong></div>
+      <div class="pressure-map-warning">
+        <strong>Crystallization cue</strong>
+        <p>One recurring night-shift issue has persisted across four reporting windows.</p>
+      </div>
+      <p class="muted tiny">{{pressureMapNote}}</p>
+    </aside>
+  </div>
+</section>

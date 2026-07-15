@@ -19,6 +19,7 @@ import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPoli
 import { proposeGovernanceChange, renderGovernance } from '../modules/governance/http/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
 import { renderHome } from '../modules/home/http/home.js';
+import { renderCoordination } from '../modules/organization/http/organization.js';
 import { servePublic } from '../interfaces/http/controllers/static.js';
 import { getExtensions, toggleExtension } from '../interfaces/http/controllers/extensions.js';
 import { renderNotifications, markNotificationsRead, updateNotificationPreferences } from '../modules/notifications/http/notifications.js';
@@ -40,6 +41,7 @@ import { sendNotFound } from '../shared/utils/http.js';
 
 const routes = [
   { method: 'GET', path: '/', action: renderHome },
+  { method: 'GET', path: '/organization', action: renderCoordination },
   { method: 'GET', path: '/health', action: renderHealth },
   { method: 'GET', path: '/auth/eudi', action: startAuth },
   { method: 'GET', path: '/auth/callback', action: completeAuth },

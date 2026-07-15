@@ -1,7 +1,7 @@
 {
-  "name": "representative-party-web",
+  "name": "organization-web-framework",
   "version": "0.1.0",
-  "description": "Representative Party web framework implementation",
+  "description": "Communication-first modular organization web framework",
   "keywords": [
     "digital",
     "democracy"

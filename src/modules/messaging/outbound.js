@@ -50,7 +50,7 @@ export async function deliverOutbound(state, { contact, notification, transport 
     await logDelivery(state, contact, notification, suppressed);
     return suppressed;
   }
-  const circleName = sanitizeText(state?.settings?.circleName || 'Party Circle', 80) || 'Party Circle';
+  const circleName = sanitizeText(state?.settings?.circleName || 'Organization', 80) || 'Organization';
   const typeLabel = sanitizeText(notification?.type || 'Notification', 48) || 'Notification';
   const subject = sanitizeText(`${circleName} \u00b7 ${typeLabel}`, 120);
   const body = notification.message || '';
