@@ -1,22 +1,10 @@
+{{adminBootstrapNotice}}
 <section class="panel" id="circle-settings">
   <p class="eyebrow">Admin</p>
   <h2>Circle settings and policy</h2>
   <p>Configure how this node enforces wallet verification, circle alignment, and peer aggregation.</p>
-  <div class="callout is-verbose">
-    <p class="muted small">Circle name: {{circleName}}</p>
-    <p class="muted small">Policy ID: {{policyId}} v{{policyVersion}}</p>
-    <p class="muted small">Issuer: {{issuer}}</p>
-    <p class="muted small">Posting gate: {{postingGate}}</p>
-    <p class="muted small">Ledger entries: {{ledgerEntries}} - Peers: {{peersKnown}}</p>
-    <p class="muted small">Ledger hash: {{ledgerHash}}</p>
-    <p class="muted small">Data: {{dataProfile}}</p>
-    <p class="muted small">Gossip ingest: {{gossipIngest}}</p>
-    <p class="muted small">Extensions: {{extensionsSummary}}</p>
-    <p class="muted small">{{modulesSummary}}</p>
-    <p class="muted small">Initialized: {{initialized}}</p>
-    <p class="muted small">{{notes}}</p>
-    <p class="muted small">{{firstRunNote}}</p>
-  </div>
+  {{circleContext}}
+  <p class="muted tiny is-verbose">Ledger hash: <code>{{ledgerHash}}</code></p>
   {{circleKeyCallout}}
   <p class="muted small">{{flash}}</p>
   <form class="stack" method="post" action="/admin" data-enhance="admin">

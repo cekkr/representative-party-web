@@ -3,6 +3,7 @@ import { createSign, createVerify } from 'node:crypto';
 import { ISSUER, POLICIES } from '../../config.js';
 import { canonicalizeEnvelope } from '../federation/canonical.js';
 import { normalizeProviderBlindSettings, resolveRingKeys } from '../circle/ringRegistry.js';
+import { getSigningPrivateKey, getSigningPublicKey } from '../circle/signingKeys.js';
 
 export function buildVoteEnvelope(vote, { policy, issuer, providerBlind } = {}) {
   const status = vote.validationStatus === 'preview' ? 'preview' : 'validated';
@@ -73,7 +74,7 @@ export function verifyVoteEnvelope(envelope, { providerBlind } = {}) {
   }
 
   const signature = envelope?.signature;
-  const publicKey = process.env.CIRCLE_PUBLIC_KEY;
+  const publicKey = getSigningPublicKey();
   if (signature && publicKey) {
     const verifier = createVerify('sha256');
     verifier.update(JSON.stringify(payload));
@@ -85,7 +86,7 @@ export function verifyVoteEnvelope(envelope, { providerBlind } = {}) {
 }
 
 function signPayload(payload) {
-  const privateKey = process.env.CIRCLE_PRIVATE_KEY;
+  const privateKey = getSigningPrivateKey();
   if (!privateKey) return null;
   const signer = createSign('sha256');
   signer.update(JSON.stringify(payload));
@@ -94,7 +95,7 @@ function signPayload(payload) {
 }
 
 function signRingPayload(payload) {
-  const privateKey = process.env.CIRCLE_PRIVATE_KEY;
+  const privateKey = getSigningPrivateKey();
   if (!privateKey) return null;
   const signer = createSign('sha256');
   signer.update(canonicalizeEnvelope(payload, { omitKeys: ['ringSignature', 'issuerEscrow', 'signature', 'issuer'] }));

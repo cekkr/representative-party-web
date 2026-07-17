@@ -15,6 +15,7 @@ const TEMPLATE_MODULES = {
   layout: 'core',
   error: 'core',
   'module-disabled': 'core',
+  'admin-required': 'core',
   home: 'home',
   'auth-eudi': 'auth',
   'verification-complete': 'auth',

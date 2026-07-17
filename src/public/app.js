@@ -2993,6 +2993,11 @@ function initPressureWorkspace() {
   }
 }
 
+function isHtmlResponse(response) {
+  const type = response.headers.get('content-type') || '';
+  return type.includes('text/html');
+}
+
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
@@ -3020,6 +3025,9 @@ function initPressureWorkspace() {
     try {
       const response = await fetch(url, { headers: { 'X-Requested-With': 'partial' } });
       if (!response.ok) throw new Error('Navigation failed');
+      // A route that answers with JSON (an export or API endpoint) must not be
+      // injected as markup; hand it to the browser as a full navigation instead.
+      if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
       window.history.pushState({}, '', url);
@@ -3119,6 +3127,7 @@ function initPressureWorkspace() {
         }
         throw new Error('Submit failed');
       }
+      if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
       window.history.pushState({}, '', url);

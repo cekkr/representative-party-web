@@ -11,6 +11,48 @@ This repository is a Node.js SSR application that starts as a usable email/discu
 
 ---
 
+## Screenshots
+
+Captured from `./run-standalone.sh` with the demo scenario from `scripts/seed-demo.js` (a care cooperative that started as a shared inbox). Regenerate any time with `node scripts/ui-screenshots.js`.
+
+### Organization pressure workspace (`/organization`)
+
+Email-first intake on the left, the focused case in the middle, and the case lens on the right. Layers that are not enabled stay visible as labeled previews so the adoption path is legible before you turn anything on.
+
+![The organization pressure workspace: pressure inbox, focused case, and case lens](md-assets/screens/organization.png)
+
+### Home workspace (`/`)
+
+Access gates, lane activity, and operator cues — for guests and members alike, rather than a brochure or a forced redirect into a feed.
+
+![The home workspace showing current access, lane counts, and operator cues](md-assets/screens/home.png)
+
+### Social lane (`/social/feed`)
+
+Typed follows (circle/interest/info/alerts) drive a micro-post lane kept deliberately separate from the decision track.
+
+![The social feed with typed follows and the sticky composer](md-assets/screens/social.png)
+
+### Proposals (`/petitions`)
+
+Gates, context, and guidance are shown as distinct things: what you may do, the facts that apply, and what the lane is for.
+
+![The proposals lane showing gate cards, context facts, and the draft form](md-assets/screens/petitions.png)
+
+### Delegation (`/delegation`)
+
+Topic-scoped, revocable delegation with an "explain my influence" chain view.
+
+![The delegation lane with per-topic delegates and freshness cues](md-assets/screens/delegation.png)
+
+### Module control center (`/admin`)
+
+Provider settings, policy, signing keys, and module toggles grouped by lane.
+
+![The admin module control center](md-assets/screens/admin.png)
+
+---
+
 ## Why this exists
 
 Many organization and civic platforms fail in one of three ways:
@@ -121,9 +163,20 @@ npm start
 ./run-standalone.sh
 ```
 
-The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`).
+The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`). Signing keys are exported as PEM **text** — passing a file path leaves envelopes unsigned and `/admin` reports the key as ignored rather than loaded.
+
+```bash
+# Fill a running deployment with a plausible demo organization
+BASE_URL=http://127.0.0.1:3000 node scripts/seed-demo.js
+
+# Capture one screenshot per route + a layout audit (clipping, blocked clicks)
+BASE_URL=http://127.0.0.1:3000 node scripts/ui-screenshots.js
+```
 
 On first run, visit `/admin` to complete the installation wizard (Circle basics, data mode, peer alignment, optional defaults). Saving persists settings to the configured adapter (JSON/KV under `src/data/` by default). The module control center in `/admin` keeps toggles and related settings linked with jump anchors.
+
+> **Claim an admin session before exposing the provider.**
+> A deployment with no admin session is *unowned*: `/admin` has to stay reachable for the wizard to run at all, and the page says so in a warning. **Assign the `admin` role to a verified session as the last setup step** (`/admin` → Session overrides). Access latches to admin sessions the moment one exists, and never reopens. Until then, treat the deployment as reachable only from a trusted network.
 
 ### Common recipes
 

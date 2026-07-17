@@ -55,6 +55,12 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Centralize module-lane definitions (organization operations vs social/community vs civic governance vs federation) so admin, nav, and home summaries cannot drift.
 
 ## UX Consistency
+- Finish migrating the remaining `callout is-verbose` label/value dumps to the shared context panel (`interfaces/http/views/contextPanel.js`). `/petitions`, `/social`, and the `/admin` circle-settings block are converted; `discussion.html` (14 lines), `forum.html`, and `auth-eudi.html` still flatten gates, facts, and guidance into one muted list.
+- `/organization` opens with a full-width marketing hero ("Turn incoming pressure into accountable action") before the inbox, which contradicts the AGENTS UX contract that the route "starts with a familiar inbox and source message". Consider demoting the hero to a compact strip (or `is-verbose`) so the workspace is above the fold.
+- The topbar brand block (orb + eyebrow + H1 + tagline + session line) consumes ~200px of vertical space on every page before any content. A compact variant would put the workspace above the fold on laptop viewports.
+- `/transactions` and `/extensions` return JSON to browsers even for `Accept: text/html`, so they are API endpoints with page-shaped URLs. Either give them SSR views (docs describe both as catalogs/audit views) or move them under an explicit `/api/` prefix; in-app links now route to `/admin#admin-transactions` and `/admin#extensions` instead.
+- `.pressure-case__classification` and the pressure inbox `<article>` cards clip their own text (`overflow-x: hidden`, content wider than the box) on `/organization`; the labels need wrapping or truncation with a title attribute rather than a hard cut.
+- Ship a favicon: every page load logs a 404 for `/favicon.ico` in the browser console.
 - Replace the mobile side-navigation height cap with an accessible disclosure or compact horizontal section switcher, preserving keyboard search while putting page content above the fold.
 - Add a shared “illustrative data / template preview / persisted workflow” treatment so prototype organization layers can never be mistaken for live delivery, protected intake, financial execution, or pressure analysis.
 - Define one cross-module vocabulary for acknowledgement, commitment, consultation, accountable decision, execution, protection, escalation, closure, impact, and recurrence; avoid ambiguous generic “assignee” states.
@@ -68,7 +74,15 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Optionally sync browser-local interface settings (large text, reduced motion, compact nav, partial navigation mode) to provider-local profile/session preferences for cross-device consistency.
 - Debounce inline Interface-panel session-default saves and skip no-op `/profile` writes when values have not changed.
 
+## Security follow-ups
+- `POST /circle/peers` (`registerPeer`) accepts anonymous requests, so anyone reachable can add peers to the gossip set. Peers are "hints, not trust anchors" by design, but unauthenticated writes to the peer list still deserve an explicit policy decision (admin-only, or signed peer announcements).
+- `/transactions` and `/transactions/ledger` are world-readable and expose `actorHash`, digests, and payload topics. Blinded hashes are the intended pseudonym, so this is arguably the transparency goal — but it should be a documented decision with a per-provider toggle rather than an implicit default.
+- Internal errors leak raw exception text to clients (`{"error":"internal_error","detail":"error:1E08010C:DECODER routines::unsupported"}`). Log the detail server-side and return an opaque reference id instead.
+- Extension install/uninstall dynamically imports modules from `src/modules/extensions/`; now admin-gated, but it deserves an allowlist or signature check before any remote/registry install path is added.
+- Consider CSRF protection for the state-changing form posts now that `/admin` is authenticated by a cookie session.
+
 ## Observability
+- Surface signing-key health beyond "loaded/missing": a key that parses but cannot sign (wrong type, bad curve) should be reported in `/admin` and `/health` rather than failing at first use.
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
 - Track organization response-boundary misses, acknowledgement latency, unowned commitments, pressure persistence, recurrence after closure, and relief displacement by sector—without actor-level performance ranking.

@@ -8,6 +8,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../federation/replication
 import { getReplicationProfile } from '../federation/replication.js';
 import { getEffectivePolicy } from '../circle/policy.js';
 import { getProviderBlindSettings, normalizeProviderBlindSettings, resolveRingKeys } from '../circle/ringRegistry.js';
+import { getSigningPrivateKey, getSigningPublicKey } from '../circle/signingKeys.js';
 
 export function hashPayload(payload) {
   const serialized = JSON.stringify(payload || {});
@@ -117,7 +118,7 @@ export function verifyTransactionsEnvelope(envelope, { providerBlind } = {}) {
   }
 
   const signature = envelope?.signature;
-  const publicKey = process.env.CIRCLE_PUBLIC_KEY;
+  const publicKey = getSigningPublicKey();
   if (signature && publicKey) {
     const verifier = createVerify('sha256');
     verifier.update(JSON.stringify(payload));
@@ -130,7 +131,7 @@ export function verifyTransactionsEnvelope(envelope, { providerBlind } = {}) {
 }
 
 function signPayload(payload) {
-  const privateKey = process.env.CIRCLE_PRIVATE_KEY;
+  const privateKey = getSigningPrivateKey();
   if (!privateKey) return null;
   const signer = createSign('sha256');
   signer.update(JSON.stringify(payload));
@@ -139,7 +140,7 @@ function signPayload(payload) {
 }
 
 function signRingPayload(payload) {
-  const privateKey = process.env.CIRCLE_PRIVATE_KEY;
+  const privateKey = getSigningPrivateKey();
   if (!privateKey) return null;
   const signer = createSign('sha256');
   signer.update(canonicalizeEnvelope(payload, { omitKeys: ['ringSignature', 'issuerEscrow', 'signature', 'issuer'] }));

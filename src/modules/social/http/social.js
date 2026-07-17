@@ -30,6 +30,7 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
+import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { renderFollowList, renderSocialPosts } from '../../../interfaces/http/views/socialView.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
@@ -75,6 +76,23 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       roleLabel: person?.role || 'guest',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
       postingReasonLine,
+      socialContext: renderContextPanel({
+        gates: [
+          {
+            label: 'Posting',
+            status: permission.allowed ? 'Allowed' : 'Blocked',
+            allowed: permission.allowed,
+            reason: postingReason,
+          },
+        ],
+        facts: [
+          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
+          { term: 'Role', value: person?.role || 'guest' },
+          { term: 'Following', value: allFollows.length },
+          { term: 'Followers', value: followStats.followerCount },
+        ],
+        guidance: ['This lane stays conversational; proposals and votes remain the formal decision track.'],
+      }),
       followCount: allFollows.length,
       followerCount: followStats.followerCount,
       followList: renderFollowList(allFollows),
