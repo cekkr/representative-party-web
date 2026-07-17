@@ -1,22 +1,11 @@
 <section class="panel" id="petitions-compose">
   <p class="eyebrow">Proposals</p>
   <h2>Decision proposals</h2>
-  <div class="callout is-verbose">
-    <p class="muted small">Role: {{roleLabel}}</p>
-    <p class="muted small">Petition gate: {{petitionStatus}}</p>
-    <p class="muted small">Vote gate: {{voteStatus}}</p>
-    {{petitionGateReasonLine}}
-    {{voteGateReasonLine}}
-    <p class="muted small">Handle: {{personHandle}}</p>
-    <p class="muted small">Use proposals when you need a decision; discussion and social lanes stay exploratory.</p>
-    <p class="muted small">Party Circle policy governs quorum/votes; group cachets inform delegation only.</p>
-    <p class="muted small">Delegation conflicts: {{conflictList}}</p>
-    <p class="muted small">Quorum advance stage: {{quorumAdvanceLabel}}</p>
-    <div class="muted small">
-      <p>Suggested delegates (from your groups):</p>
-      {{delegationSuggestions}}
-    </div>
-  </div>
+  {{petitionsContext}}
+  <details class="note is-verbose" id="petitions-delegation-suggestions">
+    <summary>Suggested delegates (from your groups)</summary>
+    <div class="muted small">{{delegationSuggestions}}</div>
+  </details>
   <details class="form-toggle" {{composeOpen}}>
     <summary>Draft a new proposal</summary>
     <form class="stack" method="post" action="/petitions" data-enhance="petitions">

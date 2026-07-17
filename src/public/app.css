@@ -31,6 +31,15 @@ body {
   padding: 0 1.1rem 1.75rem;
 }
 
+/* Form controls do not inherit the document font: without this every button
+   falls back to the UA default (Arial) and every textarea to monospace. */
+input,
+textarea,
+select,
+button {
+  font-family: inherit;
+}
+
 body[data-app-busy="true"] {
   cursor: progress;
 }
@@ -364,6 +373,14 @@ main {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.75rem;
+  /* Only a positioning frame: it stays as tall as the collapsed panel, so
+     letting it take pointer events made it swallow clicks on whatever sits
+     underneath (the social composer, feed filters). Children opt back in. */
+  pointer-events: none;
+}
+
+.composer-tool__bar {
+  pointer-events: auto;
 }
 
 .composer-tool__bar {
@@ -1340,13 +1357,22 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
 
 .field input,
 .field select,
-.field textarea {
+.field textarea,
+.pressure-search input {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 0.65rem;
   padding: 0.65rem 0.75rem;
   font-size: 1rem;
+}
+
+.field input:disabled,
+.field select:disabled,
+.field textarea:disabled,
+.pressure-search input:disabled {
+  color: var(--muted);
+  cursor: not-allowed;
 }
 
 .field.checkbox input[type="checkbox"] {
@@ -1614,12 +1640,109 @@ code {
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 
+/* Shared context panel: gates, facts, and guidance kept visually distinct
+   instead of flattened into one list of muted `label: value` lines. */
+.context-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin: 0.6rem 0 1rem;
+}
+
+.context-panel__gates {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 0.5rem;
+}
+
+.context-gate {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.context-gate.is-ok {
+  border-left-color: var(--accent, #7ef2d0);
+}
+
+.context-gate.is-blocked,
+.context-gate.is-warning {
+  border-left-color: var(--warning, #ffb05c);
+}
+
+.context-gate__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.context-gate__label {
+  font-weight: 600;
+}
+
+.context-gate__reason {
+  margin: 0;
+}
+
+.context-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.35rem 1.25rem;
+  margin: 0;
+}
+
+.context-facts__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.3rem 0;
+  border-bottom: 1px dashed rgba(154, 177, 211, 0.18);
+}
+
+.context-facts__term {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.context-facts__value {
+  margin: 0;
+  text-align: right;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.context-panel__guidance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.context-panel__guidance p {
+  margin: 0;
+}
+
 .callout {
   background: rgba(126, 242, 208, 0.06);
   border: 1px solid rgba(126, 242, 208, 0.3);
   padding: 0.8rem 1rem;
   border-radius: 0.9rem;
   margin: 0.6rem 0;
+}
+
+.callout.is-warning {
+  background: rgba(255, 176, 92, 0.08);
+  border-color: rgba(255, 176, 92, 0.45);
+}
+
+.callout.is-warning strong {
+  color: var(--warning, #ffb05c);
 }
 
 .onboarding-card {
@@ -1844,7 +1967,6 @@ code {
 
 .pressure-search input {
   width: 100%;
-  opacity: 0.7;
 }
 
 .pressure-case-list {
@@ -2013,12 +2135,15 @@ code {
 
 .pressure-layer-tabs {
   display: flex;
+  /* These tabs are the primary control for the focused case, so they wrap onto
+     as many rows as they need. A horizontal scroll strip hid most of the
+     adoption path behind an invisible scroll affordance. */
+  flex-wrap: wrap;
   gap: 0.4rem;
   padding: 0.35rem;
   border: 1px solid rgba(154, 177, 211, 0.2);
   border-radius: 0.85rem;
   background: rgba(4, 6, 15, 0.3);
-  overflow-x: auto;
 }
 
 .pressure-layer-tab {

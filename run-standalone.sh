@@ -107,8 +107,9 @@ writeFileSync(privatePath, privateKey.export({ type: 'pkcs1', format: 'pem' }));
 writeFileSync(publicPath, publicKey.export({ type: 'pkcs1', format: 'pem' }));
 NODE
   fi
-  export CIRCLE_PRIVATE_KEY="$STANDALONE_PRIVATE_KEY"
-  export CIRCLE_PUBLIC_KEY="$STANDALONE_PUBLIC_KEY"
+  # The app reads these as PEM text, not as paths.
+  export CIRCLE_PRIVATE_KEY="$(cat "$STANDALONE_PRIVATE_KEY")"
+  export CIRCLE_PUBLIC_KEY="$(cat "$STANDALONE_PUBLIC_KEY")"
 else
   if [ -z "${CIRCLE_PRIVATE_KEY:-}" ] || [ -z "${CIRCLE_PUBLIC_KEY:-}" ]; then
     echo "Warning: set both CIRCLE_PRIVATE_KEY and CIRCLE_PUBLIC_KEY for vote envelope signing."

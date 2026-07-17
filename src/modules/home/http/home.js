@@ -1,4 +1,5 @@
 import { getPerson } from '../../identity/person.js';
+import { canAdministerProvider } from '../../identity/privileges.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../circle/policy.js';
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
 import {
@@ -15,6 +16,7 @@ import { listTransactions } from '../../transactions/registry.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
+import { describeVerificationPolicy } from '../../../interfaces/http/views/status.js';
 import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import {
   renderHomeAccessList,
@@ -55,7 +57,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
     ? evaluateAction(state, person, 'petition')
     : { allowed: false, message: 'Petitions module disabled.' };
   const voteGate = votesEnabled ? evaluateAction(state, person, 'vote') : { allowed: false, message: 'Votes module disabled.' };
-  const isAdmin = person?.role === 'admin' || person?.role === 'moderator';
+  const canAdminister = canAdministerProvider(person, state);
 
   const voteStageCount = petitionEntries.filter((entry) => normalizePetitionStage(entry?.status) === 'vote').length;
   const activePetitionCount = petitionEntries.filter((entry) => normalizePetitionStage(entry?.status) !== 'closed').length;
@@ -66,7 +68,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
     [
       { label: `Role: ${person?.role || 'guest'}`, tone: 'plain' },
       { label: policy.enforcement === 'strict' ? 'Circle: strict' : 'Circle: observing' },
-      { label: policy.requireVerification ? 'Verification required' : 'Verification optional' },
+      { label: describeVerificationPolicy(policy) },
       person ? { label: `${unreadNotifications.length} unread alerts` } : null,
       !effective.initialized ? { label: 'Installation wizard pending', tone: 'warning' } : null,
     ].filter(Boolean),
@@ -153,14 +155,15 @@ export async function renderHome({ req, res, state, wantsPartial }) {
         : 'Governance modules are disabled for this provider.',
     },
   );
-  const federationList = renderHomeList(transactionEntries.map((entry) => formatFederationItem(entry, state)), {
-    emptyMessage: 'No recent audit events recorded yet.',
-  });
+  const federationList = renderHomeList(
+    transactionEntries.map((entry) => formatFederationItem(entry, state, { canAdminister })),
+    { emptyMessage: 'No recent audit events recorded yet.' },
+  );
 
   const opsItems = buildOpsItems({
     effective,
     federationEnabled,
-    isAdmin,
+    canAdminister,
     transactionEntries,
     policy,
     moduleSettings,
@@ -177,7 +180,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       circleName: effective.circleName,
       summaryText,
       overviewPills,
-      overviewActions: buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, isAdmin }),
+      overviewActions: buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, canAdminister }),
       overviewNote: buildOverviewNote({ effective, actorLabels, person, postGate }),
       accessList,
       homeStats,
@@ -186,7 +189,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       federationSummary,
       conversationActions: buildConversationActions({ socialEnabled }),
       governanceActions: buildGovernanceActions({ petitionsEnabled, delegationEnabled, groupsEnabled }),
-      federationActions: buildFederationActions({ federationEnabled, isAdmin }),
+      federationActions: buildFederationActions({ federationEnabled, canAdminister }),
       conversationList,
       governanceList,
       federationList,
@@ -226,7 +229,7 @@ function buildOverviewNote({ effective, actorLabels, person, postGate }) {
   return notes.join(' ');
 }
 
-function buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, isAdmin }) {
+function buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, canAdminister }) {
   const links = [];
   if (!person) {
     links.push('<a class="cta" href="/auth/eudi" data-partial>Verify with wallet</a>');
@@ -245,7 +248,7 @@ function buildOverviewActions({ person, socialEnabled, petitionsEnabled, federat
   if (person) {
     links.push('<a class="ghost" href="/notifications" data-partial>Alerts</a>');
   }
-  if (isAdmin) {
+  if (canAdminister) {
     links.push('<a class="ghost" href="/admin" data-partial>Admin</a>');
   } else if (federationEnabled) {
     links.push('<a class="ghost" href="/circle/ledger" target="_blank" rel="noreferrer">Ledger</a>');
@@ -277,12 +280,12 @@ function buildGovernanceActions({ petitionsEnabled, delegationEnabled, groupsEna
   return links.join('\n');
 }
 
-function buildFederationActions({ federationEnabled, isAdmin }) {
+function buildFederationActions({ federationEnabled, canAdminister }) {
   const links = ['<a class="ghost" href="/health" target="_blank" rel="noreferrer">Health</a>'];
   if (federationEnabled) {
     links.unshift('<a class="ghost" href="/circle/ledger" target="_blank" rel="noreferrer">Ledger export</a>');
   }
-  if (isAdmin) {
+  if (canAdminister) {
     links.push('<a class="ghost" href="/admin#federation-gossip" data-partial>Gossip controls</a>');
   }
   return links.join('\n');
@@ -438,20 +441,22 @@ function formatGovernanceItem(entry = {}) {
   };
 }
 
-function formatFederationItem(entry = {}, state) {
+function formatFederationItem(entry = {}, state, { canAdminister = false } = {}) {
   const createdAt = formatTimestamp(entry.createdAt, 'Unknown date');
   const actorLabel = entry.actorHash ? `@${resolveHandleForHash(state, entry.actorHash)}` : '';
   return {
     title: humanizeTransactionType(entry.type),
     summary: summarizeTransaction(entry),
     meta: `${createdAt}${actorLabel ? ` · ${actorLabel}` : ''}`,
-    href: '/transactions',
-    partial: true,
+    // /transactions serves the raw JSON log; the readable view lives in admin.
+    // Non-admins get an unlinked entry rather than a dead end.
+    href: canAdminister ? '/admin#admin-transactions' : null,
+    partial: canAdminister,
     pills: [entry.validationStatus === 'preview' ? { label: 'Preview', tone: 'warning' } : { label: 'Validated' }],
   };
 }
 
-function buildOpsItems({ effective, federationEnabled, isAdmin, transactionEntries, policy, moduleSettings }) {
+function buildOpsItems({ effective, federationEnabled, canAdminister, transactionEntries, policy, moduleSettings }) {
   const items = [];
   if (!effective.initialized) {
     items.push({
@@ -463,7 +468,7 @@ function buildOpsItems({ effective, federationEnabled, isAdmin, transactionEntri
       pills: [{ label: 'Setup', tone: 'warning' }],
     });
   }
-  if (isAdmin) {
+  if (canAdminister) {
     items.push({
       title: 'Review module control center',
       summary: summarizeEnabledModules(moduleSettings),

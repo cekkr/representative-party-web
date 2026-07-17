@@ -73,6 +73,8 @@ import {
   isGossipEnabled,
 } from '../../federation/replication.js';
 import { getPerson } from '../../identity/person.js';
+import { canAdministerProvider, isAdminBootstrapOpen } from '../../identity/privileges.js';
+import { renderAdminRequired, sendAdminRequiredJson } from '../../../interfaces/http/views/adminGate.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../identity/rateLimit.js';
 import { invalidateSessionIndex } from '../../identity/sessions.js';
 import { summarizeOutboundDeliveries } from '../../messaging/outbound.js';
@@ -93,6 +95,7 @@ import { escapeHtml, formatBytes, sanitizeText } from '../../../shared/utils/tex
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
+import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPreviewPill } from '../../../interfaces/http/views/shared.js';
 
@@ -100,10 +103,17 @@ const OUTBOUND_SUMMARY_LIMIT = 200;
 
 export async function renderAdmin({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
+  if (!canAdministerProvider(person, state)) {
+    return renderAdminRequired({ res, state, wantsPartial, person });
+  }
   return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null, person } });
 }
 
-export function exportAuditLog({ res, state }) {
+export function exportAuditLog({ req, res, state }) {
+  const person = getPerson(req, state);
+  if (!canAdministerProvider(person, state)) {
+    return sendAdminRequiredJson({ res, person });
+  }
   const entries = (state.settings?.auditLog || []).slice(-50);
   return sendJson(res, 200, { auditLog: entries });
 }
@@ -112,6 +122,11 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   const body = await readRequestBody(req);
   const intent = body.intent || 'settings';
   const person = getPerson(req, state);
+  if (!canAdministerProvider(person, state)) {
+    return wantsPartial
+      ? sendAdminRequiredJson({ res, person })
+      : renderAdminRequired({ res, state, wantsPartial, person });
+  }
   const renderWithPerson = (viewModel) =>
     renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person } });
   if (intent === 'session') {
@@ -316,10 +331,22 @@ async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const adminView = buildAdminViewModel(state, { ...viewModel, availableExtensions });
   const html = await renderPage(
     'admin',
-    { ...adminView, person, personHandle, roleLabel },
+    { ...adminView, person, personHandle, roleLabel, adminBootstrapNotice: buildAdminBootstrapNotice(state) },
     { wantsPartial, title: 'Admin - Circle Settings', state },
   );
   return sendHtml(res, html);
+}
+
+/**
+ * While no admin session exists the provider is unowned and this page is
+ * reachable without authentication. Say so rather than letting it look secured.
+ */
+function buildAdminBootstrapNotice(state) {
+  if (!isAdminBootstrapOpen(state)) return '';
+  return `<div class="callout is-warning" data-admin-bootstrap>
+    <p class="muted small"><strong>This provider has no admin yet, so /admin is open to anyone who can reach it.</strong></p>
+    <p class="muted small">Finish setup, then assign the <code>admin</code> role to a verified session under <a href="#session-overrides" data-partial>Session overrides</a>. Access locks to admin sessions as soon as one exists.</p>
+  </div>`;
 }
 
 function parseList(value, fallback = []) {
@@ -734,6 +761,11 @@ function buildCircleKeyCallout(state) {
   }
   if (settingsPresent && envPresent) {
     lines.push('<p class="muted small">Settings keys exist but env will override after restart.</p>');
+  }
+  if (info.malformed.length) {
+    lines.push(
+      `<p class="muted small">Ignored (not PEM text): ${escapeHtml(info.malformed.join(', '))}. Pass the key contents, not a file path — for example <code>CIRCLE_PRIVATE_KEY="$(cat ./priv.pem)"</code>.</p>`,
+    );
   }
   if (!hasPrivate || !hasPublic) {
     lines.push('<p class="muted small">Unsigned envelopes until both keys are set.</p>');
@@ -1756,6 +1788,10 @@ function buildAdminViewModel(
     ? '<p class="muted small">Installation hint: toggle enforcement and add a peer to align with a Circle. Settings persist to <code>src/data/settings.json</code>.</p>'
     : '';
 
+  const firstRunNote = effective.initialized
+    ? ''
+    : 'First installation mode: use the admin wizard to configure and persist Circle settings.';
+
   return {
     circleName: effective.circleName,
     policyId: effective.id,
@@ -1769,10 +1805,35 @@ function buildAdminViewModel(
     peersKnown: policy.peersKnown,
     ledgerEntries: policy.ledgerEntries,
     notes: effective.notes,
-    firstRunNote: effective.initialized ? '' : 'First installation mode: use the admin wizard to configure and persist Circle settings.',
+    firstRunNote,
     circleKeyCallout,
     flash,
-    postingGate: postingGate.allowed ? 'Open posting allowed.' : postingGate.message || 'Verification required before posting.',
+    circleContext: renderContextPanel({
+      gates: [
+        {
+          // Evaluated for an anonymous visitor, not for the signed-in admin:
+          // this panel describes provider policy, so name whose gate it is.
+          label: 'Posting for unverified visitors',
+          status: postingGate.allowed ? 'Open' : 'Blocked',
+          allowed: postingGate.allowed,
+          reason: postingGate.allowed
+            ? 'Anyone who can reach this provider may post without verifying.'
+            : postingGate.message || 'Verification required before posting.',
+        },
+      ],
+      facts: [
+        { term: 'Circle name', value: effective.circleName },
+        { term: 'Policy', value: `${effective.id} v${effective.version || POLICIES.version}` },
+        { term: 'Issuer', value: issuer || 'Not set' },
+        { term: 'Data', value: describeProfile(replicationProfile) },
+        { term: 'Gossip ingest', value: isGossipEnabled(replicationProfile) ? 'on' : 'off' },
+        { term: 'Ledger entries', value: policy.ledgerEntries },
+        { term: 'Peers known', value: policy.peersKnown },
+        { term: 'Extensions', value: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None' },
+        { term: 'Initialized', value: effective.initialized ? 'Yes' : 'No' },
+      ],
+      guidance: [modulesSummary ? `Modules: ${modulesSummary}` : '', effective.notes, firstRunNote].filter(Boolean),
+    }),
     extensionsSummary: extensions.length ? extensions.map((ext) => ext.id).join(', ') : 'None',
     modulesSummary: `Modules: ${modulesSummary}`,
     moduleFamilySummary,
