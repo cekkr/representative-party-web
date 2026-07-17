@@ -17,7 +17,8 @@
         <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
         <a class="ghost is-verbose inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Developer shortcut: simulate callback</a>
       </div>
-      <p class="muted small">If your browser blocks the deep link, copy and paste it: <span data-deep-link-fallback>{{deepLink}}</span></p>
+      <p class="muted small">If your browser blocks the deep link, copy and paste it:</p>
+      <code class="deep-link-fallback" data-deep-link-fallback>{{deepLink}}</code>
     </div>
     <div class="qr">
       <p class="eyebrow">Desktop QR</p>

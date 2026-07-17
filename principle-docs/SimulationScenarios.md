@@ -1023,30 +1023,30 @@ be written:
   funds records, mediation, impact reviews. Module-owned records, created lazily
   when a layer is enabled, per the canonical case contract. Not built.
 
-### A vocabulary drift to fix first
+### A vocabulary drift (physics metaphor retired)
 
-The cases above use the pressure states this principle doc defines. The code
-does not: `organizationTemplate.js` still ships the **physics metaphor** the doc
-moved away from, and has no `Critical` state at all.
+The cases above use the pressure states this principle doc defines, and
+`organizationTemplate.js` now matches them: the **physics metaphor** the doc
+moved away from has been renamed. `Critical` remains the one unmodelled state.
 
-| Code today | This doc | Note |
-| --- | --- | --- |
-| `Gas` | `Diffuse` | many vague or disconnected signals |
-| `Liquid` | `Flowing` | issues move and get responses |
-| `Solid` | `Crystallized` | persists, hardens into workaround and distrust |
-| *(absent)* | `Critical` | fast, high-consequence, near operating limits |
+| Was in code | Now in code | This doc | Note |
+| --- | --- | --- | --- |
+| `Gas` | `Diffuse` | `Diffuse` | many vague or disconnected signals |
+| `Liquid` | `Flowing` | `Flowing` | issues move and get responses |
+| `Solid` | `Crystallized` | `Crystallized` | persists, hardens into workaround and distrust |
+| *(absent)* | *(absent)* | `Critical` | fast, high-consequence, near operating limits |
 
-This is not cosmetic. §*Non-goals* names "treating metaphorical pressure physics
-as scientific proof" as a thing to avoid, and `Gas`/`Liquid`/`Solid` is that
+This was not cosmetic. §*Non-goals* names "treating metaphorical pressure physics
+as scientific proof" as a thing to avoid, and `Gas`/`Liquid`/`Solid` was that
 metaphor presented as a state machine. `Crystallized` says something a reader
 can act on — *this recurs and people have stopped expecting a fix* — where
-`Solid` says only that the metaphor continues. The missing `Critical` state is
-worse than a naming gap: it is the state that should route to **B5.1**,
-emergency command with recorded bypass and later review.
+`Solid` said only that the metaphor continues. The still-missing `Critical` state
+is worse than a naming gap: it is the state that should route to **B5.1**,
+emergency command with recorded bypass and later review. Add it when the
+template cases are replaced with the Scenario B content.
 
-Rename when replacing the template cases, and the `pressureType` values
-(`Acute`, `Chronic`, `Oscillating`, `Cascade`) can stay — the doc keeps those as
-case descriptors.
+The `pressureType` values (`Acute`, `Chronic`, `Oscillating`, `Cascade`) stay —
+the doc keeps those as case descriptors.
 
 ---
 

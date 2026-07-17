@@ -12,11 +12,7 @@
     <section class="panel sticky-panel" id="forum-compose">
       <p class="eyebrow">Forum</p>
       <h2>Long-form analysis</h2>
-      <div class="callout is-verbose">
-        <p class="muted small">Handle: {{personHandle}}</p>
-        <p class="muted small">Role: {{roleLabel}}</p>
-        <p class="muted small">Use the forum for deeper context and evidence-backed analysis.</p>
-      </div>
+      {{forumContext}}
       <details class="form-toggle" {{composeOpen}}>
         <summary>Write a new article</summary>
         <form class="stack" method="post" action="/forum" data-enhance="forum">

@@ -11,16 +11,34 @@ import {
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { paginate } from '../../../shared/utils/pagination.js';
+import { renderContextPanel } from './contextPanel.js';
 
 export function renderForum(entries, person, state, options = {}) {
   const { threads, commentsByThread } = splitForumEntries(entries);
   const pageInfo = paginate(threads, { page: options.page || 1 });
+  const postGate = options.postGate;
   return {
     threads: renderThreads(pageInfo.items, commentsByThread, state, options),
     threadsPager: renderPager(pageInfo, { baseHref: '/forum', label: 'threads' }),
     personHandle: resolvePersonHandle(person),
-    roleLabel: person?.role || 'guest',
     composeOpen: options.composeOpen || '',
+    forumContext: renderContextPanel({
+      gates: postGate
+        ? [
+            {
+              label: 'Publish an article',
+              status: postGate.allowed ? 'Allowed' : 'Blocked',
+              allowed: postGate.allowed,
+              reason: postGate.allowed ? '' : postGate.message || postGate.reason || '',
+            },
+          ]
+        : [],
+      facts: [
+        { term: 'Role', value: person?.role || 'guest' },
+        { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
+      ],
+      guidance: ['Use the forum for deeper context and evidence-backed analysis; keep quick takes in the social lane.'],
+    }),
   };
 }
 

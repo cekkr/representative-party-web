@@ -152,7 +152,8 @@ async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
   const replyOpenId = resolvedUrl.searchParams.get('reply') || '';
   const page = parsePage(resolvedUrl.searchParams.get('page'));
   const forumEntries = filterForumEntries(state);
-  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId, page });
+  const postGate = evaluateAction(state, activePerson, 'post');
+  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId, page, postGate });
   forumData.person = activePerson;
   const html = await renderPage('forum', forumData, { wantsPartial, title: 'Forum', state });
   return sendHtml(res, html);
