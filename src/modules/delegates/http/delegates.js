@@ -5,7 +5,7 @@ import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { getActorLabels, renderActorLabel, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { getActorLabels, renderActorAvatar, renderActorLabel, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderModuleDisabled } from '../../../interfaces/http/views/moduleGate.js';
 
 export async function renderDelegateDirectory({ req, res, state, wantsPartial, url }) {
@@ -47,12 +47,15 @@ function renderDirectoryList(state, people = [], actorLabels = {}) {
         ? `Receives ${entry.incomingTotal} delegation${entry.incomingTotal === 1 ? '' : 's'} from ${entry.incomingUniqueOwners} ${entry.incomingUniqueOwners === 1 ? actorLabel : (actorLabels.actorLabelPlural || 'users')}`
         : 'No delegations received yet';
       return `
-        <div class="list-row">
-          <div>
-            <p class="small">${label}</p>
-            <p class="muted tiny">${escapeHtml(roleLabel)} · ${escapeHtml(received)}</p>
+        <div class="list-row person-row">
+          <div class="person-row__id">
+            ${renderActorAvatar(state, entry.hash, { size: 'sm' })}
+            <div>
+              <p class="small">${label}</p>
+              <p class="muted tiny">${escapeHtml(roleLabel)} · ${escapeHtml(received)}</p>
+            </div>
           </div>
-          <div>
+          <div class="person-row__actions">
             ${delegateBadge}
             <a class="ghost" href="/delegates/${escapeHtml(entry.hash)}" data-partial>View profile</a>
           </div>
