@@ -1,6 +1,6 @@
 # Web Organization Framework
 
-![The Web Organization Framework logo](md-assets/weborg-logo.png)
+<img src="md-assets/weborg-logo.png" alt="The Web Organization Framework logo" style="max-width: 640px; width: 100%;" />
 
 A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
 
