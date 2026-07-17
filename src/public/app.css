@@ -1355,10 +1355,14 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
   gap: 0.6rem;
 }
 
-.field input,
-.field select,
-.field textarea,
-.pressure-search input {
+/*
+ * Theme controls by element, not by wrapper class. Keying this on `.field` left
+ * every control outside one (vote choice, moderation status, group policy) with
+ * the browser's opaque white default in a dark UI.
+ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+select,
+textarea {
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
   color: var(--text);
@@ -1367,12 +1371,23 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
   font-size: 1rem;
 }
 
-.field input:disabled,
-.field select:disabled,
-.field textarea:disabled,
-.pressure-search input:disabled {
+input:disabled,
+select:disabled,
+textarea:disabled {
   color: var(--muted);
   cursor: not-allowed;
+}
+
+/* Inline controls sit on one line with their label, so they stay compact. */
+.form-inline input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+.form-inline select {
+  padding: 0.4rem 0.55rem;
+  font-size: 0.95rem;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
 }
 
 .field.checkbox input[type="checkbox"] {
@@ -1383,7 +1398,7 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
   background: transparent;
 }
 
-.field textarea {
+textarea {
   resize: vertical;
 }
 

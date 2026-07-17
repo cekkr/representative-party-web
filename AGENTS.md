@@ -2,6 +2,7 @@ This file captures the essential implementation directives. Keep it in sync with
 
 ## High priority directives
 - Always update `OPTIMIZATIONS.md` whenever a new possible optimization (performance, redundancy, UX consistency, observability, storage/IO) is identified during any development task, even if not implemented yet.
+- Reference scenarios live in `principle-docs/SimulationScenarios.md`: Scenario A (a fictional Italian party) exercises the civic bundle, Scenario B (a fictional ASL) exercises organization pressure. Use them to seed deployments, write tests, and take screenshots instead of inventing placeholder content — an empty deployment hides the defects that matter. Keep the two in separate stores; each action carries a `[drive]`/`[fixture]`/`[design]` label saying what the code can do with it today, and those labels are the backlog.
 - Evaluate libp2p usage where useful for P2P transport, ring identity, or resilience scaffolding.
 
 ## Concept anchors
