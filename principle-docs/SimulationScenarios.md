@@ -47,11 +47,12 @@ della Comunità and COT), `D.lgs. 24/2023` (whistleblowing) appear as themselves
 Quantities are realistic orders of magnitude tied to their source year — update
 them when reseeding; never present them as live statistics.
 
-**In-app content is in Italian.** A real Italian deployment holds Italian text,
-and Italian exposes things English hides: longer words that break pill layouts,
-accented characters in handles, `€` amounts, `dd/mm/yyyy` dates. English glosses
-follow in brackets where the meaning is not obvious. Tests should assert on the
-Italian strings. Evidence links use the fictional domain `esempio.rcn.it` /
+**These scenarios' in-app conversation and case copy is in English.** The deployments remain
+Italian: names, handles, topic IDs, institutions, legal terms, `€` amounts, and
+`dd/mm/yyyy` dates retain their Italian context. This makes the scenarios usable
+for English-language product review without pretending that the laws or
+institutions are generic. Tests should assert on the English fixture strings.
+Evidence links use the fictional domain `esempio.rcn.it` /
 `esempio.aslvalsereno.it` — real norms are cited by name in the text instead of
 by URL, so nothing rots.
 
@@ -251,26 +252,24 @@ failure mode the README names: shipping voting before conversation.
 
 **A2.1** `@giulia.ferrero` — `POST /discussion` — **[drive]**
 `topic=liste-attesa`, `stance=concern`,
-`content=Nel mio reparto la prima disponibilità per una visita cardiologica non urgente è a 14 mesi. I pazienti che possono permetterselo vanno in intramoenia e sono visitati in due settimane. Stessa struttura, stessi medici, stesso giorno.`
-[*14-month wait for a non-urgent cardiology visit; those who can pay go private and are seen in two weeks. Same building, same doctors, same day.*]
+`content=In my department, the first available non-urgent cardiology appointment is 14 months away. Patients who can afford it use intramoenia and are seen within two weeks. Same building, same doctors, same day.`
 `evidenceLinks=https://esempio.rcn.it/liste-attesa/rilevazione-2026`
 → a concrete, checkable claim from someone with standing to make it.
 
 **A2.2** `@marco.deluca` — `POST /discussion` — `topic=liste-attesa`, `stance=support` — **[drive]**
-`content=I dati CUP che ho aggregato su tre regioni confermano: per le classi D e P lo sforamento dei tempi PNGLA è la norma, non l'eccezione. E dove l'istituzionale sfora, l'intramoenia della stessa branca è puntuale. Non è un'anomalia locale: è un equilibrio economico.`
+`content=The CUP data I aggregated across three regions confirm it: for priority classes D and P, exceeding PNGLA waiting times is the rule, not the exception. And where the public service runs late, intramoenia in the same specialty runs on time. This is not a local anomaly; it is an economic equilibrium.`
 → expertise *corroborating* lived experience, not overriding it.
 
 **A2.6** `@valentina.sanna` — `POST /discussion` — `topic=liste-attesa`, `stance=neutral` — **[drive]**
-`content=Il dato dei 14 mesi è una mediana o un caso peggiore? Cambia tutto: la mediana descrive il sistema, il caso peggiore descrive una coda. Prima di costruirci sopra una proposta serve la distribuzione, non un aneddoto.`
+`content=Is the 14-month figure a median or a worst case? That changes everything: a median describes the system, while a worst case describes a queue. Before we build a proposal on it, we need the distribution, not an anecdote.`
 → the fixture must contain someone checking, not only asserting.
 
 **A2.11** `@nadia.hamdi` — `POST /discussion` — `topic=liste-attesa`, `stance=concern` — **[drive]**
-`content=Dal lato della medicina generale: prescrivo in classe di priorità B, che per il PNGLA significa 10 giorni. Il CUP mi propone 96 giorni, oppure il percorso a pagamento della stessa struttura. La classe di priorità è diventata una dichiarazione di intenti.`
-[*I prescribe priority class B — 10 days under the national plan. The CUP offers 96, or the paid track in the same building.*]
+`content=From general practice: I prescribe priority class B, which means 10 days under the PNGLA. The CUP offers me 96 days, or the paid pathway in the same building. The priority class has become a statement of intent.`
 → the same failure seen from the territory. Two professions, one mechanism.
 
 **A2.12** `@giulia.ferrero` — `POST /discussion` — `topic=liste-attesa`, `stance=neutral` — **[drive]**
-`content=@valentina.sanna mediana, non caso peggiore: rilevazione interna su 14 aziende, marzo 2026, metodo in allegato. I casi peggiori sono molto oltre.`
+`content=@valentina.sanna Median, not worst case: an internal survey of 14 health authorities, March 2026, with the method attached. The worst cases are far beyond that.`
 `evidenceLinks=https://esempio.rcn.it/liste-attesa/metodo-rilevazione`
 → the fact-check loop **closes**: question asked, method published, thread
 moves on. A deliberation culture is exactly this exchange being normal.
@@ -283,30 +282,30 @@ assertion.
 ### The minimum-wage thread (`salario-minimo`)
 
 **A2.3** `@luca.esposito` — `POST /discussion` — `topic=salario-minimo`, `stance=concern` — **[drive]**
-`content=Nove euro l'ora lordi per un locale con quattro dipendenti stagionali significa o alzare i prezzi del 12% o chiudere a novembre. Non sono contrario al salario minimo: sono contrario a farlo senza guardare i margini reali della ristorazione.`
+`content=Nine euros gross per hour for a restaurant with four seasonal employees means either raising prices by 12% or closing in November. I am not against a minimum wage; I am against doing it without looking at hospitality's real margins.`
 → **the dissent must be reasonable.** A fixture whose opposition is a strawman
 proves nothing about deliberation.
 
 **A2.4** `@ahmed.ben.salah` — `POST /discussion` — `topic=salario-minimo`, `stance=support` — **[drive]**
-`content=Nel mio magazzino il contratto pirata paga 6,40 €/ora. Non è concorrenza sui margini, è concorrenza su chi accetta meno. Il salario minimo non chiude le imprese oneste: chiude quelle che campano così.`
+`content=At my warehouse, the pirate contract pays €6.40 an hour. That is not competition on margins; it is competition over who will accept less. The minimum wage does not close honest businesses; it closes the ones that survive like this.`
 → the reply that makes the disagreement real. Both are true at once. This is
 the pair the interface has to hold without flattening.
 
 **A2.9** `@valentina.sanna` — `POST /discussion` — `topic=salario-minimo`, `stance=neutral` — **[drive]**
-`content=Numeri CNEL, istruttoria 2023: oltre 900 CCNL depositati, ma i 20 più applicati coprono la stragrande maggioranza dei dipendenti. Il problema non è il numero dei contratti: sono i rinnovi scaduti da anni e i tabellari sotto i 7 euro in vigilanza, multiservizi e parte del terziario. Qualunque proposta deve dire cosa fa su QUESTO.`
+`content=CNEL figures, 2023 review: more than 900 CCNL agreements are filed, but the 20 most used cover the vast majority of employees. The problem is not the number of contracts; it is renewals expired for years and pay scales below €7 in security, multiservices, and parts of the tertiary sector. Any proposal must say what it does about THIS.`
 → the researcher reframes the fight with the actual CNEL finding. Evidence
 changes what the proposal will have to address.
 
 **A2.10** `@marco.deluca` — `POST /discussion` — `topic=salario-minimo`, `stance=neutral` — **[drive]**
-`content=Contesto UE: la direttiva 2022/2041 non impone un minimo legale dove la copertura contrattuale è alta. La domanda vera è se la nostra copertura EFFETTIVA — pesata sui rinnovi scaduti — regge il criterio. Se no, il minimo legale non è ideologia: è l'adempimento.`
+`content=EU context: Directive 2022/2041 does not require a statutory minimum where collective-agreement coverage is high. The real question is whether our EFFECTIVE coverage — weighted for expired renewals — meets that standard. If it does not, a statutory minimum is not ideology; it is compliance.`
 → the economist supplies the frame the debate actually happens in.
 
 ### The split that isn't left-right (`autonomia-differenziata`)
 
 **A2.5** `@tommaso.ricci` and `@nadia.hamdi` — `POST /discussion` ×3 — **[drive]**
-- Tommaso, `stance=support`: `La gestione sanitaria delle autonomie speciali e delle regioni benchmark dimostra che la responsabilità fiscale locale può funzionare. Il problema non è l'autonomia: è farla senza LEP.`
-- Nadia, `stance=concern`: `Senza LEP finanziati, l'autonomia cristallizza la spesa storica: chi ha sempre avuto meno continua ad avere meno, ma stavolta per contratto. La Consulta lo ha detto chiaramente (sent. 192/2024) — non è un dettaglio tecnico.`
-- Tommaso, `stance=neutral`: `Sui LEP hai ragione, e lo ammetto: senza quelli finanziati la mia posizione non sta in piedi. Ma allora la battaglia è sui LEP, non contro l'autonomia in sé.`
+- Tommaso, `stance=support`: `Healthcare administration in the special-autonomy and benchmark regions shows that local fiscal responsibility can work. The problem is not autonomy; it is doing it without LEP.`
+- Nadia, `stance=concern`: `Without funded LEP, autonomy locks in historic spending: those who have always had less continue to have less, only this time by contract. The Constitutional Court said this clearly in judgment 192/2024 — it is not a technical detail.`
+- Tommaso, `stance=neutral`: `You are right about LEP, and I admit it: without funding, my position does not stand up. But that means the fight is for LEP, not against autonomy itself.`
 → a member **concedes a point in public and survives**. The most load-bearing
 post in the fixture: deliberation that never changes anyone's position is
 theatre, and screenshots should be able to show the opposite happening.
@@ -314,11 +313,11 @@ theatre, and screenshots should be able to show the opposite happening.
 ### The rest of the map
 
 **A2.16** `@anna.conti` — `POST /discussion` — `topic=ius-scholae`, `stance=proposal` — **[drive]**
-`content=Il referendum del giugno 2025 (residenza 10→5 anni) è mancato per quorum, con circa il 30% di affluenza — ma tra chi ha votato, i sì erano circa il 65%. E lo ius scholae non era nemmeno in discussione: cinque anni di scuola in Italia oggi non valgono nulla per la legge 91/1992. Propongo di portare il tema in assemblea.`
+`content=The June 2025 referendum on reducing the residency requirement from 10 to 5 years missed quorum with about 30% turnout — but about 65% of those who voted said yes. And ius scholae was not even on the ballot: under Law 91/1992, five years of schooling in Italy count for nothing. I propose that we take this to the assembly.`
 → the topic that resists delegation: values, not parameters. Watch **A6.8**.
 
 **A2.17** `@davide.villa` — `POST /discussion` — `topic=consumo-suolo`, `stance=concern` — **[drive]**
-`content=ISPRA dice ~20 ettari al giorno di suolo consumato, 2,3 metri quadri al secondo. La legge nazionale è ferma da più di dieci anni. Nel mio comune intanto si impermeabilizza l'ennesima area agricola per logistica. Qualcuno oltre a me ci lavora?`
+`content=ISPRA reports about 20 hectares of land consumed per day, 2.3 square metres per second. The national law has been stalled for more than ten years. Meanwhile, my municipality is sealing yet another agricultural area for logistics. Does anyone besides me work on this?`
 → **the long tail**: one member, one post, a real stake. The principle docs
 promise the small topic is not buried by volume; the fixture needs one to check.
 
@@ -336,7 +335,7 @@ Luca's view request notifies Anna (`/notifications`); the media never leaves the
 provider. Provider-local media with view-on-request is a *policy* claim — this
 is its fixture.
 
-**A2.14** `@luca.esposito` — `POST /social/post` — `reshareOf=<id of Sofia's article post>`, `content=Da leggere prima di parlare di "vincolo di mandato" al bar.` — **[drive]**
+**A2.14** `@luca.esposito` — `POST /social/post` — `reshareOf=<id of Sofia's article post>`, `content=Read this before talking about an "imperative mandate" at the bar.` — **[drive]**
 → a reshare with commentary. Note the code's own rule: reply and reshare are
 mutually exclusive (`conflicting_intent`) — a test should assert the 400, not
 just the happy path.
@@ -347,8 +346,7 @@ the anti-spam story (`AGENTS.md`); the fixture must include one member actually
 hitting it on referendum night, because that is when it will happen for real.
 
 **A2.8** `@sofia.bianchi` — `POST /forum` — **[drive]**
-`title=Perché il vincolo di mandato non si aggira con il software`
-[*Why the free-mandate rule cannot be engineered around*]
+`title=Why software cannot engineer around the free-mandate rule`
 `content=` art. 67 Cost.; the M5S/Rousseau experience as the cautionary tale the
 platform is built against; soft power as the only constitutional path.
 → plus a `POST /forum/comment` (`parentId=...`) from `@tommaso.ricci` asking
@@ -368,28 +366,27 @@ pagination all render as empty chrome.
 
 **A3.1** `@giulia.ferrero` — `POST /petitions` — **[drive]**
 ```
-title=Intramoenia condizionata: tetto ALPI dove saltano i tempi PNGLA
-       [Conditional intramoenia: an ALPI cap wherever PNGLA windows are missed]
+title=Conditional intramoenia: an ALPI cap wherever PNGLA windows are missed
 quorum=250
-summary=Nelle branche in cui i tempi istituzionali sforano le classi di priorità
-        PNGLA, l'attività intramoenia della stessa branca scende al 15% dei
-        volumi istituzionali, finché i tempi non rientrano.
-problem=La legge 120/2007 già vieta che l'ALPI superi i volumi istituzionali,
-        ma il vincolo è aggregato e verificato debolmente. Risultato: la stessa
-        struttura eroga in due settimane a pagamento ciò che eroga in
-        quattordici mesi gratuitamente. Non è una lista d'attesa: è un
-        meccanismo di prezzo.
-proposedAction=Tetto del 15% per branca, agganciato al monitoraggio della
-        piattaforma nazionale (L. 107/2024), con sospensione automatica del
-        tetto quando i tempi rientrano nelle classi U/B/D/P.
-impact=I pazienti senza disponibilità economica recuperano l'accesso nei tempi
-        di legge; il vincolo già esistente diventa verificabile per branca.
-risks=Fuga di specialisti verso il privato puro; il tetto va accompagnato da
-        incentivi sull'attività istituzionale, non da sole sanzioni.
-implementationPlan=Rilevazione a 3 mesi sulla piattaforma nazionale; tetto
-        sperimentale in 2 aziende pilota a 6 mesi; revisione a 12.
-evidenceSummary=Rilevazione RCN su 14 aziende (marzo 2026); istruttoria su
-        monitoraggi AGENAS; quadro normativo L. 120/2007 e L. 107/2024.
+summary=In specialties where public-service waiting times exceed PNGLA priority
+        classes, intramoenia activity in the same specialty falls to 15% of
+        public-service volumes until those times return to compliance.
+problem=Law 120/2007 already prohibits ALPI from exceeding public-service
+        volumes, but the constraint is aggregated and weakly checked. The
+        result: the same facility delivers in two weeks, for payment, what it
+        delivers free of charge in fourteen months. This is not a waiting list;
+        it is a pricing mechanism.
+proposedAction=A 15% cap per specialty, tied to the national platform's
+        monitoring (Law 107/2024), with automatic suspension once waiting times
+        return to the U/B/D/P priority classes.
+impact=Patients without the means to pay regain access within statutory time
+        limits; the existing constraint becomes verifiable by specialty.
+risks=Specialists may leave for the fully private sector; the cap must be paired
+        with incentives for public-service activity, not sanctions alone.
+implementationPlan=Measure at three months on the national platform; trial the
+        cap in two pilot health authorities at six months; review at twelve.
+evidenceSummary=RCN survey of 14 health authorities (March 2026); review of
+        AGENAS monitoring; legal framework: Laws 120/2007 and 107/2024.
 evidenceLinks=https://esempio.rcn.it/liste-attesa/rilevazione-2026
 ```
 → The `problem` field now does the honest thing: it names the law that already
@@ -407,18 +404,18 @@ and a diff must be inspectable.
 touches it. If quorum were discretionary the signatures would be theatre.
 
 **A3.4** `@luca.esposito` — `POST /petitions/comment` — `stance=concern` — **[drive]**
-`content=Se il tetto morde, gli specialisti migrano al privato accreditato e l'attesa istituzionale peggiora. Il rischio è scritto nella proposta stessa: cosa lo compensa, concretamente?`
+`content=If the cap bites, specialists will move to accredited private providers and public-service waits will worsen. The risk is written into the proposal itself: what concretely offsets it?`
 
 **A3.5** `@valentina.sanna` — `POST /petitions/comment` — `stance=question`, `factCheck=yes` — **[drive]**
-`content=La rilevazione copre 14 aziende su oltre 100: campione sufficiente per un tetto nazionale? Chiedo verifica sul metodo di campionamento.`
+`content=The survey covers 14 health authorities out of more than 100: is that a sufficient sample for a national cap? I request a review of the sampling method.`
 → a fact-check request on a specific claim, not a vibe.
 
-**A3.6** `@sofia.bianchi` — `POST /petitions/comment` — `stance=concern`, `argumentTitle=Competenza regionale` — **[drive]**
-`content=L'organizzazione sanitaria è competenza regionale (Titolo V): un tetto nazionale per branca rischia il conflitto di attribuzione. La leva realistica è il monitoraggio nazionale più i piani di rientro, non un vincolo uniforme.`
+**A3.6** `@sofia.bianchi` — `POST /petitions/comment` — `stance=concern`, `argumentTitle=Regional competence` — **[drive]**
+`content=Healthcare organization is a regional competence under Title V: a national cap by specialty risks a conflict of competences. The realistic lever is national monitoring plus recovery plans, not a uniform constraint.`
 → the argument-map node a constitutional lawyer would actually write.
 
 **A3.9** `@marco.deluca` — `POST /petitions/comment` — `stance=support`, `argumentParentId=<A3.6's node>` — **[drive]**
-`content=Per questo la proposta si aggancia alla piattaforma nazionale L. 107/2024, che già esiste: nessuna competenza nuova, solo condizionalità su un monitoraggio in essere.`
+`content=That is why the proposal attaches to the existing national platform under Law 107/2024: no new competence, only conditions tied to monitoring already in place.`
 → a **rebuttal in the tree, not a new thread**. The argument map is only worth
 its code if the fixture contains an actual pro/con exchange under one node.
 
@@ -453,18 +450,18 @@ case: 41 signatures of 250 — visible, pending, *not* buried).
 
 ## A.6 Act 4 — A conflict that delegation cannot resolve by itself
 
-**A4.1** `@chiara.moretti` — `POST /petitions` — `title=Rigassificatore costiero: posizione nazionale` — **[drive]**
-`summary=` sicurezza energetica nazionale, poteri commissariali e compensazioni
-territoriali previsti dalla normativa vigente; la nave rigassificatrice va
-accettata con contropartite negoziate, non subita.
+**A4.1** `@chiara.moretti` — `POST /petitions` — `title=Coastal regasification terminal: national position` — **[drive]**
+`summary=` national energy security, the extraordinary-commissioner powers, and
+territorial compensation provided by current law; the floating regasification
+terminal should be accepted with negotiated conditions, not simply endured.
 
 **A4.2** `@stefano.lombardi` — `POST /petitions/comment` — `stance=concern` — **[drive]**
-`content=I miei iscritti vivono a due chilometri dalla banchina. Il beneficio è nazionale, il costo è loro: vista, pesca, percezione del rischio. Le compensazioni non si negoziano DOPO la posizione nazionale: si negoziano dentro.`
+`content=My members live two kilometres from the quay. The benefit is national; the cost is theirs: the view, fishing, and perceived risk. Compensation must not be negotiated AFTER the national position; it must be negotiated into it.`
 → **Both are right.** `transizione-energetica` exists in the fixture to hold a
 conflict with no correct answer, only an accountable one.
 
-**A4.3** `@chiara.moretti` — `POST /groups` — `action=create`, `name=Circolo Energia e Territorio`, `topics=transizione-energetica,consumo-suolo` — **[drive]**
-`description=CER, aree idonee, impianti strategici: il punto dove il nazionale incontra il locale.`
+**A4.3** `@chiara.moretti` — `POST /groups` — `action=create`, `name=Energy and Territory Circle`, `topics=transizione-energetica,consumo-suolo` — **[drive]**
+`description=CER, suitable areas, strategic plants: where the national meets the local.`
 → the second group. One group cannot show a group *list*, and the two groups
 run **opposite election policies** (see A4.4 vs A5.3) — the contrast is the
 fixture.
@@ -478,7 +475,7 @@ the group-policy separation is untested.
 
 ## A.7 Act 5 — Groups, and choosing people
 
-**A5.1** `@irene.fabbri` — `POST /groups` — `action=create`, `name=Circolo Sanità Pubblica`, `topics=liste-attesa,salario-minimo` — **[drive]**
+**A5.1** `@irene.fabbri` — `POST /groups` — `action=create`, `name=Public Healthcare Circle`, `topics=liste-attesa,salario-minimo` — **[drive]**
 **A5.2** eight members — `POST /groups` — `action=join` — **[drive]**
 **A5.3** `@irene.fabbri` — `POST /groups/policy` — `electionMode=vote`, `conflictRule=prompt_user` — **[drive]**
 → `prompt_user` is the honest setting: when recommendations clash the member
@@ -601,9 +598,9 @@ is the design.
 ## A.11 Act 9 — Governance changes itself
 
 **A9.1** `@tommaso.ricci` — `POST /governance/proposals` — **[drive]**
-`governanceProposalTitle=Quorum ridotto per proposte a impatto regionale`
+`governanceProposalTitle=Reduced quorum for proposals with regional impact`
 `governanceProposalQuorumDefault=120`
-`governanceProposalReason=Una proposta sul consumo di suolo in un solo comune non può ragionevolmente raccogliere 250 firme nazionali: il quorum uniforme uccide il long tail.`
+`governanceProposalReason=A land-consumption proposal in one municipality cannot reasonably collect 250 national signatures: a uniform quorum kills the long tail.`
 → a member proposes changing the constitution's defaults — motivated by
 Davide's stalled `consumo-suolo` draft, which is the fixture proving his point.
 
@@ -749,30 +746,28 @@ its realtà di riferimento.
 ### B-1 `boarding-pronto-soccorso` — Fundamental need — Role-visible
 
 ```
-title:        Pazienti in barella in PS oltre 24 ore per mancanza di posti letto
-sender:       Pronto Soccorso — turno notte
-subject:      Boarding prolungato: 11 pazienti in attesa di ricovero alle 03:40
+title:        Patients on trolleys in the ED for more than 24 hours because no beds are available
+sender:       Emergency Department — night shift
+subject:      Prolonged boarding: 11 patients waiting for admission at 03:40
 voiceType:    Fundamental need
 visibility:   Role-visible
 sourceChannel: Email
 pressureType: Chronic
 pressureState: Crystallized
-trend:        In aumento nei fine settimana
-scope:        Pronto Soccorso · Medicina d'Urgenza · Direzione medica di presidio
-request:      Rivedere il flusso di ricovero e la disponibilità di posti letto
-              nel fine settimana.
-consequence:  Pazienti anziani in barella oltre 24 ore; il triage rivaluta
-              codici che non può ricoverare; il rischio si sposta sul turno.
-dependency:   Dimissioni protette, posti letto di Medicina, COT e ADI di
-              distretto, disponibilità RSA: vanno visti insieme.
-emailBody:    Alle 03:40 abbiamo 11 pazienti in attesa di posto letto, 4 da oltre
-              24 ore, di cui 2 ultraottantenni. Non è un picco: è il quarto
-              fine settimana consecutivo. Il triage continua a rivalutare
-              pazienti che non possiamo ricoverare.
-impactBaseline: 4 weekend consecutivi · mediana attesa ricovero 19h · picco 27h
-impactTarget:   Mediana sotto 8h senza spostare l'attesa sul territorio
-impactMeasure:  Tempo triage→ricovero, rivalutazioni per paziente, ore di
-                straordinario infermieristico
+trend:        Increasing at weekends
+scope:        Emergency Department · Emergency Medicine · Hospital Medical Directorate
+request:      Review admission flow and bed availability at weekends.
+consequence:  Older patients remain on trolleys for more than 24 hours; triage
+              reassesses patients it cannot admit; the risk shifts onto the shift.
+dependency:   Supported discharge, Medicine beds, district COT and ADI capacity,
+              and RSA availability must be considered together.
+emailBody:    At 03:40 we have 11 patients waiting for a bed, four for more than
+              24 hours, including two people over eighty. This is not a spike:
+              it is the fourth consecutive weekend. Triage keeps reassessing
+              patients we cannot admit.
+impactBaseline: 4 consecutive weekends · median admission wait 19h · peak 27h
+impactTarget:   Median below 8h without shifting the wait onto community services
+impactMeasure:  Triage→admission time, reassessments per patient, nursing overtime
 ```
 
 *Realtà:* boarding is the documented chronic failure of Italian PS — SIMEU has
@@ -790,16 +785,16 @@ is not success (§*Impact tracking*).
 ### B-2 `liste-attesa-cup` — Advice & innovation — Fully attributed
 
 ```
-title:        Recupero disdette CUP: agenda di richiamo rapido
-sender:       @g.lombardo — MMG Distretto 2
+title:        CUP cancellation recovery: rapid recall list
+sender:       @g.lombardo — GP, District 2
 voiceType:    Advice & innovation
 visibility:   Fully attributed
 pressureType: Acute
 pressureState: Flowing
-request:      Richiamo automatico su disdette entro 48h per la classe di
-              priorità B.
-consequence:  Circa il 9% degli slot specialistici resta inutilizzato mentre
-              l'attesa dichiarata supera i limiti PNGLA.
+request:      Automatically recall patients after cancellations within 48 hours
+              for priority class B.
+consequence:  About 9% of specialist slots remain unused while stated waiting
+              times exceed PNGLA limits.
 ```
 
 *Realtà:* the mechanics are those of L. 107/2024 — CUP unici, mandatory disdetta
@@ -812,14 +807,14 @@ default.
 ### B-3 `farmaci-alto-costo` — Resource consultation — Department-visible
 
 ```
-title:        Consultazione sul tetto di spesa per farmaci oncologici ad alto costo
-sender:       Direzione amministrativa
+title:        Consultation on the spending ceiling for high-cost oncology drugs
+sender:       Administrative Directorate
 voiceType:    Resource consultation
 visibility:   Department-visible
-amount:       €2.400.000 residuo di budget annuo
-ceiling:      €150.000 senza delibera del Direttore Generale
-fundsState:   Opzioni visibili · nessuna allocazione
-consequence:  La scelta cambia i tempi di accesso alla terapia, non solo il costo.
+amount:       €2,400,000 remaining annual budget
+ceiling:      €150,000 without a resolution by the Director General
+fundsState:   Options visible · no allocation
+consequence:  The choice changes time to treatment access, not only cost.
 ```
 
 *Realtà:* the frame is the fondo nazionale farmaci innovativi (~€1,2 mld/anno),
@@ -834,14 +829,14 @@ interface makes the constraint legible without democratising it.
 ### B-4 `conflitto-turni-rsa` — Dispute — Protected
 
 ```
-title:        Conflitto ricorrente sulla copertura notturna in RSA
-sender:       @caso-4471 (identità di caso protetta)
+title:        Recurring dispute over night coverage in the RSA
+sender:       @caso-4471 (protected case identity)
 voiceType:    Dispute
 visibility:   Protected relay
 pressureType: Oscillating
 pressureState: Crystallized
-consequence:  Una sola OSS copre 42 ospiti in notturna; il conflitto sul turno
-              ha sostituito la discussione sull'organico.
+consequence:  One care assistant covers 42 residents at night; the shift dispute
+              has replaced the discussion about staffing levels.
 ```
 
 *Realtà:* regional minutaggio standards (assistance minutes per guest per week)
@@ -865,17 +860,17 @@ The ASL could stop here and have gained something.
 → the messaging kernel is live today even though the case workspace is a
 template, so the four weekends **exist as four real messages** from three
 different shifts:
-- `@n.calabrese` (sab 21/02, `stance=concern`): the 03:40 email above, posted;
-- `@r.ferrara` (sab 28/02): `Confermo dal turno di sabato: 9 in attesa alle 02:00, mediana 17 ore. Ho dovuto spostare una barella nel corridoio visite.`
-- `@n.calabrese` (sab 07/03): `Terzo weekend: 12 in attesa, un ultranovantenne a 26 ore. Le rivalutazioni triage sono diventate la nostra attività principale.`
-- `@l.deangelis` (sab 14/03): `Dal bed management: sabato ho 0 posti in Medicina fino alle dimissioni del lunedì. Il problema non è il PS: è che il fine settimana il presidio non dimette.`
+- `@n.calabrese` (Sat 21/02, `stance=concern`): the 03:40 email above, posted;
+- `@r.ferrara` (Sat 28/02): `Confirmed from Saturday's shift: 9 waiting at 02:00, median 17 hours. I had to move a trolley into the examination corridor.`
+- `@n.calabrese` (Sat 07/03): `Third weekend: 12 waiting, one patient over ninety at 26 hours. Triage reassessments have become our main activity.`
+- `@l.deangelis` (Sat 14/03): `From bed management: on Saturday I have zero Medicine beds until Monday discharges. The problem is not the ED; it is that the hospital does not discharge patients at weekends.`
 → **volume=4 has four entries behind it.** When `pressureAnalytics` renders
 "4 corroborating signals", these are them. The bed manager's post is the pivot:
 the person the actual-flow mirror will later expose as the bottleneck is
 already, visibly, the one explaining it.
 
 **B1.4** `@r.ferrara` — `POST /discussion`, topic `pronto-soccorso`, `stance=neutral` — **[drive]**
-`content=Ricevuto e tracciato. Porto il tema al gruppo flusso ricoveri con la direzione medica: risposta entro lunedì 12:00 con un owner e un perimetro. Nel frattempo: segnalate OGNI weekend, anche se sembra ripetitivo — la ricorrenza È il dato.`
+`content=Received and logged. I am taking this to the admissions-flow group with the medical directorate: a response by Monday 12:00, with an owner and scope. In the meantime, report EVERY weekend, even if it feels repetitive — recurrence IS the data.`
 → acknowledgement with a stated boundary, as a message anyone can read. The
 *tracked* response boundary (a field with a clock on it) stays **[design]**;
 the social fact of the promise is seedable today.
@@ -918,8 +913,8 @@ distinct relationships that must **not** collapse into one "assignee".
 
 **B4.2** `intent=modules`, `hierarchies=true` — **[drive]**
 ```
-formalFlow: Infermiere → coordinatore → direttore U.O.C. → direzione medica di presidio
-actualFlow: Infermiere notte ↔ coordinatore ↔ bed manager (@l.deangelis)
+formalFlow: Nurse → nursing coordinator → Emergency Medicine director → Hospital Medical Directorate
+actualFlow: Night-shift nurse ↔ nursing coordinator ↔ bed manager (@l.deangelis)
 ```
 → The gap **is the finding.** The formal chart is not a lie and the actual flow
 is not automatically legitimate; the mirror exists to reveal that
@@ -930,11 +925,11 @@ org chart.
 
 **B4.3** `intent=modules`, `authority=true` — **[drive]**
 ```
-Raise    · qualunque operatore           · senza autorizzazione
-Propose  · gruppo flusso ricoveri        · modifica limitata del percorso
-Approve  · direzione medica di presidio  · pilota 30 giorni entro policy esistente
-Stop     · risk manager                  · se emerge rischio clinico
-Escalate · direzione generale            · se il pilota supera il tetto
+Raise    · any staff member              · no authorization required
+Propose  · admissions-flow group         · limited pathway change
+Approve  · Hospital Medical Directorate  · 30-day pilot within existing policy
+Stop     · risk manager                  · if a clinical risk emerges
+Escalate · General Directorate           · if the pilot exceeds the ceiling
 ```
 → Invariant 5: **titles do not imply unlimited power.** Every grant carries
 source, scope, condition, expiry, review. `@dott.marino` keeps the clinical
@@ -957,9 +952,9 @@ minutaggio in 3 of 31 sites — without exposing `@caso-4471`.
 **B4.5** `intent=modules`, `pressureAnalytics=true` — **[drive]**
 → B-1 shows its **components**, never a bare score:
 ```
-volume 4 weekend (le voci di B1.3) · velocity +30% vs baseline 90gg
-persistence 4 ricorrenze · spread PS→Medicina→COT/RSA
-consequence alta (sicurezza) · capacity satura · flow bloccato al bed management
+volume 4 weekends (the B1.3 signals) · velocity +30% vs 90-day baseline
+persistence 4 recurrences · spread ED→Medicine→COT/RSA
+high consequence (safety) · saturated capacity · flow blocked at bed management
 ```
 *Realtà:* Italian PS already use a single-number overcrowding index — NEDOCS —
 and its opacity is the cautionary tale: a score that says 142/200 tells the
@@ -980,16 +975,17 @@ discharges onto ADI slots the district does not have.
 
 ### B5 — Emergency, and the record
 
-**B5.1** a Saturday night reaches Critical; `@dott.marino` activates the piano di gestione del sovraffollamento, opening an overflow area without consultation — **[design]**
+**B5.1** a Saturday night reaches Critical; `@dott.marino` activates the overcrowding-management plan, opening an overflow area without consultation — **[design]**
 → Invariant 11: **urgent command stays fast.** *Realtà:* the piano di gestione
 del sovraffollamento is what national guidance (linee di indirizzo 2019) already
 requires every PS to have; the platform's only job is to record who activated
 it, why consultation was bypassed, and when review happens. It does not slow him
 down — a framework that makes this harder has failed at the exact moment it
 matters. His announcement (`POST /discussion`, topic `pronto-soccorso`) is
-seedable today: `Attivato il piano sovraffollamento alle 23:50: area di
-appoggio aperta con 6 barelle, personale richiamato secondo pronta
-disponibilità. Revisione lunedì con direzione medica e risk management.`
+seedable today: `The overcrowding-management plan was activated at 23:50: an
+overflow area with six trolleys is open, and staff have been called in under
+the on-call arrangement. Review on Monday with the medical directorate and risk
+management.`
 
 **B5.2** the 48-hour review — **[design]**
 → the recorded bypass gets its scheduled look-back: was the trigger right, did
