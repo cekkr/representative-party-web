@@ -19,7 +19,7 @@ import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../../../interfaces/http/views/topicHelpers.js';
-import { renderCalloutRow } from '../../../interfaces/http/views/shared.js';
+import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
@@ -113,9 +113,6 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const policy = getCirclePolicyState(state);
   const permission = evaluateAction(state, person, 'post');
   const actorLabels = getActorLabels(state);
-  const postingStatus = permission.allowed ? 'Posting allowed.' : 'Posting blocked.';
-  const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
-  const postingReasonLine = renderCalloutRow(postingReason);
   const composeOpen = url?.searchParams?.get('compose') ? 'open' : '';
 
   const baseEntries = filterVisibleEntries(state.discussions, state, (entry) => {
@@ -148,27 +145,38 @@ async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   return renderPage(
     'discussion',
     {
-      ledgerSize: state.uniquenessLedger.size,
       person,
       personHandle: resolvePersonHandle(person),
-      personStatus: person
-        ? `Posting as verified ${actorLabels.actorLabel} with a blinded PID hash for accountability.`
-        : 'Verify your wallet to post with accountability.',
+      discussionContext: renderContextPanel({
+        gates: [
+          {
+            label: 'Post to discussion',
+            status: permission.allowed ? 'Allowed' : 'Blocked',
+            allowed: permission.allowed,
+            reason: permission.allowed ? '' : permission.message || permission.reason || '',
+          },
+        ],
+        facts: [
+          { term: 'Role', value: person?.role || 'guest' },
+          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
+          {
+            term: 'Circle',
+            value: policy.enforcement === 'strict'
+              ? 'Strict — verified only'
+              : 'Observing — verification recommended',
+          },
+          { term: 'Ledger', value: `${state.uniquenessLedger.size} verified` },
+          { term: 'Policy', value: `${policy.id} v${policy.version}` },
+        ],
+        guidance: [
+          person
+            ? `Posts inherit your blinded PID hash for accountability; only salted hashes link posts to ${actorLabels.actorLabelPlural}.`
+            : 'Verify your wallet to post with accountability.',
+          'Use discussion for exploration; move decisions to proposals and votes when they are needed.',
+        ],
+      }),
       discussionList: renderDiscussionList(pageInfo.items, state),
       discussionPager,
-      verificationPolicy: policy.requireVerification
-        ? 'Wallet verification required to post.'
-        : 'Wallet verification optional; posting is still tied to your session.',
-      circlePolicy: policy.enforcement === 'strict'
-        ? 'Circle enforcement active: only verified people can post.'
-        : 'Circle enforcement observing: verified and unverified posting allowed.',
-      policyId: policy.id,
-      policyVersion: policy.version,
-      circleName: policy.circleName,
-      hashOnlyMessage: `Hash-only ledger: only salted PID hashes are stored to link posts to ${actorLabels.actorLabelPlural} for accountability.`,
-      postingStatus,
-      postingReasonLine,
-      roleLabel: person?.role || 'guest',
       topicFilterOptions: renderTopicFilterOptions(topicOptions, topicFilterKey),
       topicFilterSelectedAll: topicFilterKey === 'all' ? 'selected' : '',
       topicDatalist: renderTopicDatalist(topicOptions),

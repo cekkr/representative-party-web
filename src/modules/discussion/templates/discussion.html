@@ -2,21 +2,7 @@
   <p class="eyebrow">Discussion</p>
   <h2>Topic discussions</h2>
   <p class="is-verbose">Topic-based conversations tied to verified sessions. Posts inherit the blinded PID hash of the {{actorLabel}} for accountability.</p>
-  <div class="callout is-verbose">
-    <p class="muted">Your handle</p>
-    <code>{{personHandle}}</code>
-    <p class="muted small">{{personStatus}}</p>
-    <p class="muted small">{{verificationPolicy}}</p>
-    <p class="muted small">{{circlePolicy}}</p>
-    <p class="muted small">Role: {{roleLabel}}</p>
-    <p class="muted small">{{postingStatus}}</p>
-    {{postingReasonLine}}
-    <p class="muted small">Policy {{policyId}} v{{policyVersion}}</p>
-    <p class="muted small">Circle: {{circleName}}</p>
-    <p class="muted small">Ledger size: {{ledgerSize}}</p>
-    <p class="muted small">{{hashOnlyMessage}}</p>
-    <p class="muted small">Use discussion for exploration; move decisions to proposals/votes when needed.</p>
-  </div>
+  {{discussionContext}}
   <details class="form-toggle" {{composeOpen}}>
     <summary>Start a discussion post</summary>
     <form class="stack" method="post" action="/discussion" data-enhance="discussion">

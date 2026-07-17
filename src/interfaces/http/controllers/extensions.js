@@ -9,8 +9,15 @@ import { sendJson } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { sendAdminRequiredJson } from '../views/adminGate.js';
+import { canAdministerProvider } from '../../../modules/identity/privileges.js';
 
-export async function getExtensions({ res, state }) {
+export async function getExtensions({ req, res, state }) {
+  const person = getPerson(req, state);
+  if (!canAdministerProvider(person, state)) {
+    return sendAdminRequiredJson({ res, person });
+  }
   const available = await listAvailableExtensions(state);
   const active = (state.extensions?.active || []).map((ext) => ext.id);
   const enabled = state.settings?.extensions || [];
@@ -18,6 +25,10 @@ export async function getExtensions({ res, state }) {
 }
 
 export async function toggleExtension({ req, res, state }) {
+  const person = getPerson(req, state);
+  if (!canAdministerProvider(person, state)) {
+    return sendAdminRequiredJson({ res, person });
+  }
   const body = await readRequestBody(req);
   const lifecycle = normalizeLifecycle(body);
   if (lifecycle) {

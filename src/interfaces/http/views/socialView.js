@@ -1,6 +1,7 @@
 import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderAuthorHashLine, renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
+import { renderActorAvatar, renderActorLabel } from './actorLabel.js';
+import { renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
 
 export function renderSocialPosts(
   posts,
@@ -30,18 +31,28 @@ export function renderSocialPosts(
         hasBlockedMediaIds(post.mediaIds || [], mediaById) || hasBlockedMediaIds(post.reshare?.mediaIds || [], mediaById);
       const tagsLine = renderTags(post.tags || []);
       const mentionsLine = renderMentions(post.mentions || []);
+      const authorLabel = post.authorHash
+        ? renderActorLabel(state, post.authorHash)
+        : `<span class="actor">@${escapeHtml(post.authorHandle || 'anonymous')}</span>`;
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(post.authorHandle || 'anonymous')}</span>
-            ${visibilityPill}
-            ${replyPill}
-            ${resharePill}
-            ${previewPill}
-            ${inboundPill}
-            ${followTypePill}
-            ${renderIssuerPill(post)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+        <article class="discussion social-post">
+          <div class="topic-head">
+            ${renderActorAvatar(state, post.authorHash || post.authorHandle || 'anonymous', { size: 'sm' })}
+            <div class="topic-info">
+              <div class="topic-byline">
+                <span class="topic-author">${authorLabel}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
+              <div class="topic-meta">
+                ${visibilityPill}
+                ${replyPill}
+                ${resharePill}
+                ${previewPill}
+                ${inboundPill}
+                ${followTypePill}
+                ${renderIssuerPill(post)}
+              </div>
+            </div>
           </div>
           ${contentBlock}
           ${mediaBlock}
@@ -54,7 +65,6 @@ export function renderSocialPosts(
           ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
           ${mentionsLine}
           ${tagsLine}
-          ${renderAuthorHashLine(post.authorHash, { state })}
           ${enableReplies ? renderReplyForm(post, { open: openReplyId === post.id }) : ''}
           ${enableReplies && !mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
         </article>

@@ -6,16 +6,25 @@ import {
 } from '../../../modules/federation/replication.js';
 import { getCirclePolicyState } from '../../../modules/circle/policy.js';
 
+/**
+ * Verification wording for a Circle policy. Verification is only "required"
+ * when enforcement is strict; under observing enforcement it is a
+ * recommendation, and saying "required" there contradicts what the gates
+ * actually do. Shared so every surface uses the same word for the same setting.
+ */
+export function describeVerificationPolicy(policy = {}) {
+  if (!policy.requireVerification) return 'Verification optional';
+  return policy.enforcement === 'strict' ? 'Verification required' : 'Verification recommended';
+}
+
 export function deriveStatusMeta(state) {
   const policy = getCirclePolicyState(state);
   const profile = getReplicationProfile(state);
   const ledgerCount = state?.uniquenessLedger?.size || 0;
   const actorCount = state?.actors?.size || 0;
   const discussionCount = countVisibleEntries(state?.discussions || [], state);
-  const policyStatus =
-    policy.enforcement === 'strict'
-      ? `Circle enforcement: strict - Verification ${policy.requireVerification ? 'required' : 'optional'}`
-      : `Circle enforcement: observing - Verification ${policy.requireVerification ? 'recommended' : 'optional'}`;
+  const enforcementLabel = policy.enforcement === 'strict' ? 'strict' : 'observing';
+  const policyStatus = `Circle enforcement: ${enforcementLabel} - ${describeVerificationPolicy(policy)}`;
   const accountabilityStatus = `Ledger ${ledgerCount} - Actors ${actorCount} - Discussions ${discussionCount}`;
   const gossipStatus = `Gossip ingest: ${isGossipEnabled(profile) ? 'on' : 'off'}`;
   const validationStatus = `Validation: ${profile.validationLevel} (${profile.allowPreviews ? 'previews allowed' : 'previews hidden'})`;

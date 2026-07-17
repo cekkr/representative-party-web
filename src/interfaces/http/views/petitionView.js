@@ -13,7 +13,7 @@ import {
   renderPreviewPill,
   resolveTopicBreadcrumb,
 } from './shared.js';
-import { resolveHandleForHash } from './actorLabel.js';
+import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -73,39 +73,50 @@ export function renderPetitionList(
       const freezeNotice = renderFreezeNotice(petition, state);
       const reviewPrompt = renderReviewPrompt(petition, revisions);
       const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
-      const evidencePill = evidenceBlock ? '<span class="pill ghost">Evidence</span>' : '';
-      const structuredPill = structuredOutline ? '<span class="pill ghost">Structured</span>' : '';
-      const argumentPill = argumentCount ? `<span class="pill ghost">Arguments: ${argumentCount}</span>` : '';
       const createdAt = formatTimestamp(petition.createdAt);
+      const stageKey = normalizeStage(petition.status);
+      // Secondary counts live in one quiet sub-line instead of a wall of pills; the
+      // detail disclosures below already carry Discussion/Version-history/Evidence, so
+      // the head only keeps the state a reader acts on (stage, quorum, signatures).
+      const subMeta = [
+        renderUpdatedMeta(petition, state),
+        `<span>Revisions: ${revisions.length}</span>`,
+        `<span>Discussion: ${comments.length}</span>`,
+        argumentCount ? `<span>Arguments: ${argumentCount}</span>` : '',
+        lastCommentAt ? `<span>Last comment ${escapeHtml(lastCommentAt)}</span>` : '',
+        `<a href="/petitions#${escapeHtml(anchorId)}">Permalink</a>`,
+      ]
+        .filter(Boolean)
+        .join('');
       return `
-        <article class="discussion" id="${escapeHtml(anchorId)}">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(statusLabel)}</span>
-            ${renderPreviewPill(petition)}
-            ${renderIssuerPill(petition)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-            ${renderUpdatedMeta(petition, state)}
-            <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
-            <span class="pill">Quorum: ${petition.quorum || 0}</span>
-            <span class="pill ghost">Signatures: ${signatureCount}</span>
-            <span class="pill ghost">Discussion: ${comments.length}</span>
-            <span class="pill ghost">Revisions: ${revisions.length}</span>
-            ${argumentPill}
-            ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
-            ${evidencePill}
-            ${structuredPill}
-            ${lastCommentAt ? `<span class="muted small">Last comment ${lastCommentAt}</span>` : ''}
-            <a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Permalink</a>
+        <article class="discussion proposal-card" id="${escapeHtml(anchorId)}">
+          <div class="topic-head">
+            ${renderActorAvatar(state, petition.authorHash || 'anonymous')}
+            <div class="topic-info">
+              <div class="topic-byline">
+                <span class="topic-author">${renderActorLabel(state, petition.authorHash || 'anonymous')}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
+              <h3 class="topic-title">${escapeHtml(petition.title)}</h3>
+              <div class="topic-meta">
+                <span class="pill stage stage--${escapeHtml(stageKey)}">${escapeHtml(statusLabel)}</span>
+                <span class="pill">Quorum: ${petition.quorum || 0}</span>
+                <span class="pill ghost">Signatures: ${signatureCount}</span>
+                ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
+                <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
+                ${renderPreviewPill(petition)}
+                ${renderIssuerPill(petition)}
+              </div>
+              <div class="proposal-submeta muted tiny">${subMeta}</div>
+            </div>
           </div>
           ${renderStageTimeline(petition)}
           ${reviewPrompt}
           ${freezeNotice}
-          <h3>${escapeHtml(petition.title)}</h3>
           <p>${escapeHtml(petition.summary)}</p>
           ${structuredOutline}
           ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
-          ${renderAuthorHashLine(petition.authorHash || 'anonymous', { state })}
           <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
           ${
             hasSigned
@@ -424,7 +435,6 @@ function renderPetitionComments(comments, state) {
     .map((comment) => {
       const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
       const stanceLabel = getCommentStanceLabel(comment.stance);
-      const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       const argumentPill =
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
@@ -440,23 +450,32 @@ function renderPetitionComments(comments, state) {
         comment.argumentTitle || comment.argumentParentId
           ? `<p class="muted tiny">Argument id: ${escapeHtml(comment.id)}</p>`
           : '';
+      const stanceKey = normalizeCommentStance(comment.stance);
+      const coloredStance = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            ${stancePill}
-            ${factCheckPill}
-            ${argumentPill}
-            ${evidencePill}
-            ${renderPreviewPill(comment)}
-            ${renderIssuerPill(comment)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
+        <article class="discussion comment-card">
+          <div class="topic-head">
+            ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
+            <div class="topic-info">
+              <div class="topic-byline">
+                <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
+              <div class="topic-meta">
+                ${coloredStance}
+                ${factCheckPill}
+                ${argumentPill}
+                ${evidencePill}
+                ${renderPreviewPill(comment)}
+                ${renderIssuerPill(comment)}
+              </div>
+            </div>
           </div>
           ${argumentTitle}
           ${argumentParent}
           <p>${escapeHtml(comment.content)}</p>
           ${renderEvidenceLinks(evidenceLinks)}
           ${argumentId}
-          ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state })}
         </article>
       `;
     })
@@ -470,12 +489,12 @@ export function renderProposalDiscussionFeed(items, state) {
   return items
     .map(({ comment, petition }) => {
       const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
-      const statusLabel = displayStatus(petition?.status || 'draft');
       const snippet = (comment.content || '').slice(0, 180);
       const anchorId = petition?.id ? `petition-${petition.id}` : null;
       const permalink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
       const stanceLabel = getCommentStanceLabel(comment.stance);
-      const stancePill = `<span class="pill ghost">${escapeHtml(stanceLabel)}</span>`;
+      const stanceKey = normalizeCommentStance(comment.stance);
+      const stancePill = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;
       const factCheckPill = comment.factCheck ? '<span class="pill warning">Fact check</span>' : '';
       const argumentPill =
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
@@ -485,23 +504,29 @@ export function renderProposalDiscussionFeed(items, state) {
         : '';
       const createdAt = formatTimestamp(comment.createdAt);
       return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill">${escapeHtml(statusLabel)}</span>
-            <span class="pill ghost">Proposal</span>
-            ${stancePill}
-            ${factCheckPill}
-            ${argumentPill}
-            ${evidencePill}
-            ${renderPreviewPill(comment)}
-            ${renderIssuerPill(comment)}
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-            ${permalink}
+        <article class="discussion comment-card">
+          <div class="topic-head">
+            ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
+            <div class="topic-info">
+              <div class="topic-byline">
+                <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
+              <div class="topic-breadcrumbs">On proposal · ${escapeHtml(displayStatus(petition?.status || 'draft'))}</div>
+              <div class="topic-meta">
+                ${stancePill}
+                ${factCheckPill}
+                ${argumentPill}
+                ${evidencePill}
+                ${renderPreviewPill(comment)}
+                ${renderIssuerPill(comment)}
+                ${permalink}
+              </div>
+            </div>
           </div>
           <p class="muted small">${escapeHtml(petition?.title || 'Proposal')}</p>
           ${argumentLine}
           <p>${escapeHtml(snippet)}</p>
-          ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state, label: 'Comment by' })}
         </article>
       `;
     })

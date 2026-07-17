@@ -23,10 +23,17 @@ export function resolveTopicBreadcrumb(entry, state, cache) {
   return resolved;
 }
 
-export function renderIssuerPill(entry) {
+// Provenance is only worth surfacing when content came from *another* provider.
+// Locally-authored content carries the built-in 'local-circle' issuer (or the
+// provider's own issuer); tagging every home post "from local-circle" is pure noise,
+// so the pill only renders for a genuinely foreign issuer.
+export function renderIssuerPill(entry, { localIssuer } = {}) {
   const issuer = entry?.issuer || entry?.provenance?.issuer;
   if (!issuer) return '';
-  return `<span class="pill ghost">from ${escapeHtml(String(issuer))}</span>`;
+  const normalized = String(issuer).trim();
+  if (!normalized || normalized === 'local-circle') return '';
+  if (localIssuer && normalized === String(localIssuer).trim()) return '';
+  return `<span class="pill ghost">from ${escapeHtml(normalized)}</span>`;
 }
 
 export function renderPreviewPill(entry) {

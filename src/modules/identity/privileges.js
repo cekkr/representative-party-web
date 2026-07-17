@@ -31,3 +31,35 @@ export function getPrivilegesForPerson(person, _state) {
     canVote,
   };
 }
+
+/**
+ * First-run window for provider administration.
+ *
+ * A fresh deployment has nobody who can run the install wizard, so /admin stays
+ * open exactly while no admin session exists, and latches shut once one does.
+ *
+ * The condition is deliberately "an admin exists" rather than "settings are
+ * initialized": an operator can finish the wizard without ever creating an admin
+ * session, and keying off initialization would lock that deployment out for good.
+ * Providers should create an admin session as the last setup step — until they
+ * do, the provider is unowned and /admin says so.
+ */
+export function isAdminBootstrapOpen(state) {
+  const sessions = state?.sessions;
+  const values = typeof sessions?.values === 'function' ? sessions.values() : [];
+  for (const session of values) {
+    if (session?.role === 'admin' && !session?.banned) return false;
+  }
+  return true;
+}
+
+/**
+ * Provider administration: settings, policy, signing keys, module toggles, and
+ * session overrides. Moderators are deliberately excluded — moderation covers
+ * content, not the provider's identity and policy configuration.
+ */
+export function canAdministerProvider(person, state) {
+  if (person?.banned) return false;
+  if (person?.role === 'admin') return true;
+  return isAdminBootstrapOpen(state);
+}

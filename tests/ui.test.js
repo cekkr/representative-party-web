@@ -277,8 +277,19 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const guestPage = await guestContext.newPage();
   await configurePage(guestPage, server.baseUrl);
   await guestPage.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });
-  const background = await guestPage.evaluate(() => window.getComputedStyle(document.body).backgroundImage || '');
-  assert.ok(background.includes('gradient') || background.includes('radial-gradient'));
+  // The themed dark surface must be applied to the body (the shared app theme loaded),
+  // whether that is a flat colour or a gradient. Assert the background renders dark
+  // rather than the UA default, without pinning an exact palette value.
+  const bodyBg = await guestPage.evaluate(() => {
+    const style = window.getComputedStyle(document.body);
+    return { image: style.backgroundImage || '', color: style.backgroundColor || '' };
+  });
+  const rgb = (bodyBg.color.match(/\d+/g) || []).map(Number);
+  const isDarkColor = rgb.length >= 3 && (rgb[0] + rgb[1] + rgb[2]) / 3 < 60;
+  assert.ok(
+    bodyBg.image.includes('gradient') || isDarkColor,
+    `expected a themed dark background, got image="${bodyBg.image}" color="${bodyBg.color}"`,
+  );
 
   await guestPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await guestPage.type('input[name="topic"]', 'Access');

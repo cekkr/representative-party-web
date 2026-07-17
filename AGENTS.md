@@ -1,121 +1,347 @@
-This file captures the essential implementation directives. Keep it in sync with README.md and ROADMAP.md. The product is the general-purpose **Web Organization Framework**; Party Circle is an optional civic bundle rather than the product identity. The organization-pressure model lives in `principle-docs/OrganizationPressureManagement.md`, while the civic philosophy lives in `principle-docs/RepresentativeParties.md` (One Person = One Voice, soft-power accountability, liquid delegation, phygital inclusion). Use **user** as the default actor for general-purpose deployments; **person** is a contextual label for civic/party Circles and implies a verified natural person (the exclusion principle: no org/bot/service accounts can hold handles or act in flows).
+# AI Agent Reference
 
-## High priority directives
-- Always update `OPTIMIZATIONS.md` whenever a new possible optimization (performance, redundancy, UX consistency, observability, storage/IO) is identified during any development task, even if not implemented yet.
-- Evaluate libp2p usage where useful for P2P transport, ring identity, or resilience scaffolding.
+This is the fast-access handbook for agents working on the **Web Organization Framework**. Read it before changing code. Keep it synchronized with [README.md](README.md) and [ROADMAP.md](ROADMAP.md) whenever behavior, architecture, commands, or priorities change.
 
-## Concept anchors
-- User vocabulary & exclusion principle: base treats participants as users; when a Circle opts into civic/party mode, “person” means a verified natural person. Org/bot/service accounts are excluded through policy gates, verification, and the banned flag.
-- Messaging-first kernel: start as a simple email/threaded messaging surface (coordination inbox + discussion/forum + notifications). Messages can be promoted into organization-pressure cases only when a richer layer adds value. Law proposals (petitions), votes, delegation, federation, and topic gardener stay modular toggles/extensions so existing orgs can adopt incrementally without reshaping their structure.
-- Organization-pressure workspace: `/organization` is the reference UI for communication-first adoption. It models needs, constructive concerns, advice/resource consultation, and disputes; protected visibility; responsibilities; formal-vs-actual structure; explicit powers; financial context; sectors; mediation; aggregate pressure dynamics; and impact learning. Pressure describes systems/flows, not personal worth, and may never trigger automatic sanctions.
-- Module lane separation: keep optional modules grouped as `Organization operations`, `P2P social/community`, `Civic governance`, and `Federation/resilience` so organizations can reuse the framework without carrying civic workflows by default.
-- Organization layer independence: `coordination` works alone; `protectedVoice`, `responsibilities`, `hierarchies`, `authority`, `funds`, `sectors`, `mediation`, `pressureAnalytics`, and `impactTracking` require only coordination and remain independently toggleable. Disabled layers may render clearly labeled template previews but must not pretend to persist or execute workflow.
-- Hierarchy/power boundary: preserve expertise, accountable leadership, and emergency speed while making feedback paths permeable. Never infer authority from a title; model propose/validate/decide/veto/execute/observe/protect/escalate rights with source, scope, conditions, and expiry. Responsibility, action commitment, consultation, information, approval, and execution remain distinct.
-- Protected voice honesty: ordinary email is attributed. Protected or anonymous intake requires a separate audited path, minimized metadata, explicit reveal policy, and human moderation. Never promise anonymous email or federate protected identity mappings.
-- Parallel social feed & follows: add a Twitter-like follow graph with typed edges (circle/interest/info/alerts) to drive a “small talk + info” micro-post lane. Short posts support replies, mentions/tags, lightweight reshares, and optional photo/video uploads that stay provider-local and are locked by default (view-on-request with author notifications, blockable after reports); defaults keep it conversational and non-binding so petitions/votes stay distinct.
-- Privacy-first identity: store only blinded hashes from EUDI/OIDC4VP flows; never retain raw PID.
-- Provider-blind option (optional): user ids are Circle-unique independent of provider; scaffolding includes observe/strict policy, ring registry gossip, and ringSignature placeholders; `CIRCLE_RING_ID` can prefill provider-blind ring IDs; issuer escrow and mixnet transport remain future work.
-- Circle policy: verification is required by default; enforcement can be toggled per Circle but must be observable (providers can run solo messaging networks or join a Circle).
-- Circle issuer: set a public URL/identifier via `CIRCLE_ISSUER` or `/admin` so gossip envelopes carry a stable peer hint for audits.
-- Federation resilience: peers exchange ledger hashes and audit each other to quarantine toxic providers; peer capability hints (module toggles + data mode) ride alongside ledger gossip so `/admin` can surface remote capabilities and sync skips disabled endpoints, with capability fingerprints + provider-blind announcement caching (`updatedAt`) to reduce gossip overhead; pull sync runs peers in parallel and caches optional endpoint skips (`/votes/ledger`, `/transactions/ledger`) for a bounded TTL (`GOSSIP_OPTIONAL_SKIP_SECONDS`) after module-disabled/not-found responses, while push sync caches outbound endpoint skips (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) after module-disabled/gossip-disabled responses; peer health retains last ledger hash snapshots; gossip ingest rejects policy id/version mismatches and tracks peer health/quarantine; gossip sync treats module-disabled/gossip-disabled or missing optional endpoints as skipped (no peer-health penalty); when multiple providers belong to the same social-party ring, they should also prefer a shared client (or compatible clients) to keep UX and enforcement aligned across that ring.
-- Session handles/roles: verified sessions persist a handle + role (user/person/moderator/delegate) and a banned flag so policy gates can block actions transparently and keep non-people out. Members choose a validated, unique handle on `/profile` (`validateHandleChoice`); when unset, a synthesized `role-hash8` fallback is shown. Use the shared `resolveHandleForHash`/`renderActorLabel` helpers (in `views/actorLabel.js`) to render `@handle` with a short hash cue anywhere an actor hash appears — never surface a raw pid hash as identity. The People directory (`/delegates`) and handle-datalist pickers on the delegation/follow forms make people discoverable without knowing a hash.
-- Privilege-free Circle genesis (optional): Circles can start with no special roles beyond provider admins; governance and structure can emerge via groups, member votes, and contextual dynamic structures over time.
-- Personalizable structure manager: keep a minimal canonical profile (handle, required credential/wallet binding, role/banned flag, blinded hash) consistent across a party ring while letting providers attach dynamic fields (contact email, personal details, notification preferences, etc.) through a versioned schema/data-table editor and per-session profile page; surface schema drift warnings after updates. Required fields stay enforced globally; provider-only fields remain local (no gossip) and the provider is responsible for consent and delivery (e.g., notification emails/SMS).
-- Human-ready baseline: keep modules small, env-driven, and documented so teams can ship/maintain without AI assistance if needed.
-- Extensions: optional modules under `src/modules/extensions/` can extend policy/action gates and decorate decisions without changing core code; `CIRCLE_EXTENSIONS` bootstraps them, while `/admin` separates provider-local install/update/uninstall registration from runtime enable/disable state and records installed versions.
-- Module toggles: organization layers (`coordination`, `protectedVoice`, `responsibilities`, `hierarchies`, `authority`, `funds`, `sectors`, `mediation`, `pressureAnalytics`, `impactTracking`) plus civic/social/federation modules (petitions/votes/delegation/groups/federation/topic gardener/social) are admin-configurable; navigation/endpoints must respect disabled modules, returning a module-disabled page or 403 JSON where applicable.
-- Dynamic topics & delegation scaffolds: topic classification hooks via extensions; delegation preferences persisted per topic with auto vote resolution + override.
-- Topic stewardship & gardening: users (people in civic Circles) pick top categories; admins/policy voters can pin mandatory anchors (legal/departmental). An automatic gardener (see principle-docs/DynamicTopicCategorization.md) merges/splits/renames to surface trends, pull isolated clusters toward main topics, and keep discussions aggregated.
-- Topic registry: persist topic ids/path metadata for discussions, forum threads, and petitions so SSR views can render breadcrumbs and future renames can be tracked.
-- Topic gardener review: sync gardener operations into topic history and surface pending rename/merge/split plus anchor promotion/archival suggestions in `/admin` with previews, confirmations, and a lightweight history diff view.
-- Collaborative petitions: drafts support revision history, revision diffs, stage-aware editing (draft/discussion only), structured outline fields (problem/action/impact/risks/plan), evidence summaries + sources, stance-tagged discussion notes (support/concern/question) + fact-check flags + evidence/citation prompts, argument-map linking, and pre-vote freeze/review cues.
-- Notification registry: internal notifications persisted to JSON with basic read/unread handling; provider-local preferences can opt in/out of proposal comment alerts; outbound delivery attempts are logged to the transactions registry.
-- Forum & groups: forum threads/articles with comments tied to topics; groups offer delegation cachets with per-topic priorities and conflict surfacing.
-- Group roles & elections: groups persist member roles and can set delegate election/conflict policies separate from Party Circle policy (priority vs vote, conflict prompt vs auto).
-- Group delegate elections: ballots per topic with votes/tally; winners auto-set as delegates per group policy; ballots store optional second/third-choice picks with multi-round transfers for person elections (Alaska-style). When electionMode=vote, delegation recommendations should prefer the latest closed election winner.
-- Recommendations are advisory: group cachets and any delegation recommendations must stay non-binding; users/people can always override with their own choice per topic.
-- Vote envelopes & anti-injection: votes are signed envelopes (issuer + policy + petitionId + authorHash + choice); `/votes/ledger` exports them; `/votes/gossip` ingests signed envelopes to prevent injected/replayed votes across providers.
+The product is a general-purpose, communication-first organization framework. **Party Circle is an optional civic policy bundle, not the product identity.**
 
-## Data topology & adapters (central + p2p)
-- Central vs p2p is not feature creep: the codebase must stay storage-agnostic so providers and Circles can choose centralized storage, p2p-first, or hybrid redundancy/validation without forking domain logic.
-- Data management priorities: provider-local contact/profile fields never gossip; previews are gated by `DATA_PREVIEW` + validation level; redundancy is selected via `DATA_MODE` (centralized/hybrid/p2p) + adapter; signatures/validation status decide what can render or replicate.
-- Main transactions registry: append-only log of sensitive operations (votes, petition drafts/status changes/signatures/comments, delegation overrides) with digest + issuer/mode/adapter, stored locally per provider (`transactions` store) for audit and cross-provider validation against signed envelopes; signed summary envelopes can be exported and gossiped (`/transactions/ledger`, `/transactions/gossip`) for reconciliation.
-- Organization-pressure records: keep the source message canonical and attach optional versioned records by case id (visibility, commitments, hierarchy/flow edges, authority grants, funds, sectors, mediation, pressure observations, and impact reviews). Module-owned stores are created lazily. Permission-safe aggregates may be shared; protected identities, contact metadata, and mediation details stay provider-local.
-- Transactions coverage: discussion/forum/social/group actions emit transactions so audit trails match user-facing activity feeds; admin UI surfaces recent entries plus export links.
-- Structure manager + schema editor: canonical tables/fields (sessions, handles, roles/banned, blinded PID or credential binding) stay fixed; provider-defined optional fields/tables are registered through a structure manager with an admin UI data-table editor, persisted via adapters with versioned metadata. Provider-only fields (contact email/personal info) never gossip; providers own notification delivery/consent that relies on those fields.
-- Split persistence/transport into adapters: `src/infra/persistence/storage.js` remains the interface; adapter drivers live under `src/infra/persistence/adapters/` and replication/validation helpers under `src/modules/federation/replication.js` (gossip fetch + signature/ban checks) so domain modules call a single abstraction. SQL uses SQLite (optional `sqlite3`, file path via `DATA_SQLITE_URL|FILE`), KV is file-backed; JSON/memory are defaults. MySQL (`mysql2`) and MongoDB (`mongodb`) adapters are optional advanced drivers.
-- Future adapter optimization: keep table/collection definitions shared in a common schema map across adapters, and note that some tables/collections are defined directly inside modules; create those lazily only when a module is enabled so unused modules do not create storage artifacts.
-- Keep preview vs certified states explicit: adapters return `status: preview|validated` with provenance; UI and shared clients (especially within the same social/party ring) must avoid rendering uncertified data where policy forbids it, and clearly label previews when allowed.
-- `DATA_PREVIEW` blocks preview ingestion even when validation is `observe`/`off`; allow previews explicitly before accepting or rendering them.
-- Settings drive combinations instead of code forks: `DATA_MODE=centralized` (single adapter, no gossip), `DATA_MODE=hybrid` (central canonical + p2p replicas/merkle audit), `DATA_MODE=p2p` (gossip-ledger primary with optional local cache); `DATA_VALIDATION_LEVEL` and `DATA_PREVIEW` toggles gate when previews are stored/surfaced.
-- Gossip gating: when `DATA_MODE=centralized`, gossip ingest is disabled (403) to prevent unintended replication and `/admin` gossip controls are disabled; `hybrid` and `p2p` keep gossip enabled.
-- Roadmap alignment: Phase 1 delivers adapterized interfaces + JSON driver and stub gossip validator; Phase 2 adds SQL/kv drivers and hybrid mode wiring; MySQL/MongoDB adapters are available as optional advanced drivers; Phase 4 hardens replication (quarantine, redundancy targets, cross-ring audits).
+## Read This First
 
-## Code map (Phase 1 kernel)
-- **Entry & server**: `src/index.js` (bootstrap), `src/app/server.js` (HTTP), `src/app/router.js` (table-driven routes).
-- **Interfaces (HTTP)**: module controllers under `src/modules/<module>/http/`, non-UI endpoints in `src/interfaces/http/controllers/`, and view helpers in `src/interfaces/http/views/`.
-- **Domain modules**: `src/modules/identity/*` (auth scaffold + blinded hash, person session lookup, privileges), `src/modules/circle/*` (policy gates, ledger envelope signing/verification), `src/modules/messaging/notifications.js`, `src/modules/topics/*` (classification hook + topic gardener client), `src/modules/petitions/signatures.js`, `src/modules/votes/voteEnvelope.js`, `src/modules/delegation/delegation.js`, `src/modules/groups/*` (delegation cachets, per-group rules, elections), `src/modules/social/*` (follow graph + micro-posts + mentions/tags/reshares), `src/modules/federation/{activitypub.js,gossip.js,ingest.js,peers.js,quarantine.js}`, `src/modules/extensions/registry.js` + `sample-policy-tighten.js`.
-- **Organization template**: `src/modules/organization/*` contains the pressure-workspace reference view model, SSR controller, and composable templates. Its illustrative records document interface contracts only; enabled persistence workflows land as independent module-owned records rather than one coupled organization schema.
-- **State/persistence**: `src/infra/persistence/storage.js` (interface), adapter drivers under `src/infra/persistence/adapters/` (json/memory/sql/kv/mysql/mongodb), replication/validation helpers in `src/modules/federation/replication.js`, migrations in `src/infra/persistence/migrations.js`, and the store entry in `src/infra/persistence/store.js` (social follows + micro-posts + media metadata persist through the same adapters; media binaries stay provider-local).
-- **Helper services**: AI/ML workers live in `src/infra/workers/` (Python projects, e.g., topic gardener). Node code should call them via `src/modules/topics/topicGardenerClient.js` to avoid conflicting provider outputs and duplicated computation across classification providers.
-- **Shared utilities**: `src/shared/utils/` (http helpers, request parsing, text sanitization/escaping).
-- **Assets**: static CSS/JS in `src/public/`; SSR templates live under `src/modules/<module>/templates/` with layout in `src/modules/core/templates/layout.html` and sub-components under `src/modules/<module>/templates/partials/` (included via `{{> name}}`). Static served from `/public/*`.
+Use these sources in this order:
 
-## UX contract (Phase 1)
-- SSR-first with partial HTML responses when `X-Requested-With: partial` is set by the vanilla router.
-- Auth flow must always surface: QR + deep link, hash-only guarantee, and session recovery/error states.
-- Layout must show Circle policy flag, verified handle when present, ledger/actor/discussion counts for accountability cues, and gossip ingest state.
-- Home route should remain a practical workspace for guests and signed-in sessions, surfacing access gates, recent lane activity, and operator cues instead of redirecting straight into a feed.
-- Organization route starts with a familiar inbox and source message, reveals progressive layer tabs, exposes formal and actual flow together, and labels all illustrative data and disabled workflow previews honestly. Aggregate pressure components (volume, velocity, persistence, spread, consequence/capacity) stay explainable; no opaque staff scoring or pressure leaderboards.
-- UI copy should use “user” vs “person” labels based on Circle enforcement (person only when civic/party mode is strict).
-- Discussion sandbox: identity-aware posting, no CAPTCHA; copy explains accountability via blinded PID hash; optional evidence/citation links are supported on discussion notes and forum comments.
-- Proposal hub: proposal list includes discussion counts and a discussion feed with stage filters to surface active deliberations.
-- Delegation UI: group recommendations show election-winner metadata so users can see why a suggestion was picked.
+1. This file defines day-to-day implementation rules, invariants, ownership, and where code lives.
+2. [README.md](README.md) defines the public product description, operator workflow, configuration, and current capabilities.
+3. [ROADMAP.md](ROADMAP.md) distinguishes shipped behavior from planned work and sets implementation priorities.
+4. [OPTIMIZATIONS.md](OPTIMIZATIONS.md) records performance, redundancy, UX-consistency, observability, security, and storage/IO work.
+5. The linked principle documents below define the product philosophy and domain constraints. Do not silently reinterpret them in code.
 
-## Endpoints
-- `/` landing, `/organization` communication-first organization-pressure template, `/health` metrics, `/auth/eudi` start, `/auth/callback` verifier return, `/discussion` (GET/POST), `/circle/gossip`, `/circle/ledger`, `/circle/peers`, `/ap/actors/{hash}`, `/ap/actors/{hash}/outbox`, `/ap/outbox`, `/ap/objects/{id}`, `/ap/inbox` (ingests preview social notes), `/public/*`.
-- `/social/feed` (GET) renders the micro-post timeline for the signed-in user based on typed follows; `/social/post` (POST) publishes a short post; `/social/reply` (POST) replies inline; `/social/follow` + `/social/unfollow` set typed follow edges; `/social/relationships` lists follow edges for a handle; `/social/media/{id}` serves provider-gated media and `/social/media/report` records reports.
-- `/petitions` (GET/POST) drafts proposals with summary + optional full text; `/petitions/update` records collaborative revisions; quorum moves proposals into discussion, `/petitions/status` advances to vote/closed; `/petitions/comment` posts stance-tagged discussion notes; `/petitions/vote` casts votes; `/petitions/sign` handles signatures/quorum; gates enforce per-role policy.
-- `/extensions` (GET/POST) to list the provider-local extension catalog, install/update/uninstall registration, and toggle installed runtime hooks without env changes.
-- `/notifications` (GET) list internal notifications; `/notifications/read` marks all read; `/notifications/preferences` stores per-user alert toggles (proposal comments).
-- `/forum` (GET/POST) publish articles; `/forum/comment` post comments.
-- `/governance` (GET) shows constitution defaults, open community change proposals, and decision history; `/governance/proposals` (POST) lets verified users submit governance default changes for admin review; `/delegates` (GET) is the browsable People directory (handle/role/delegation counts + search); `/delegates/{hash}` (GET) shows delegate profiles.
-- `/groups` (GET/POST) list/create/join groups; `/groups/delegate` set group-level preferred delegates.
-- `/delegation` (GET/POST) manage manual delegation preferences; `/delegation/conflict` resolve delegation conflicts by user choice.
-- `/groups` actions also start/close/vote delegate elections per topic.
-- `/transactions` (GET) list recent local transactions; `/transactions/export` emits a signed summary envelope; `/transactions/ledger` serves summaries for peers; `/transactions/gossip` ingests summaries for reconciliation.
+When documents disagree with running code, verify the behavior with tests, then update the stale document as part of the same task. Never describe a scaffold, template preview, or protocol placeholder as production-complete.
 
-## Near-term implementation focus
-- Ship the messaging-first social network first: bind verified user sessions to handles/profiles (person is a Circle-specific, natural-person guarantee), model privileges (author/mod/delegate) and Circle policy enforcement for posting/petition/vote.
-- Ship organization coordination from the familiar edge inward: email/thread intake and acknowledgement first; then case promotion, protected voice, commitments, hierarchy/actual-flow edges, authority, funds, sectors, mediation, pressure aggregates, and impact review as separate increments. Healthcare is the safety stress test, not a hard-coded schema.
-- Parallel social feed: deliver typed follow edges (circle/interest/info/alerts) and a micro-post lane (short text + optional link/attachments) with replies/mentions/reshares. Media uploads are provider-local and locked by default with explicit view requests; mass reports or moderators can block viewing/resharing. Keep UX copy explicit that this lane is for small talk/info; petitions/votes/forum stay the authoritative tracks. The sticky composer should stay easy to access but auto-collapse while scrolling so the wall remains readable.
-- Composer upgrades: add a DOM tree/layers sidebar, a movable/collapsible floating inspector, and persist DOM mutation operations (reorder/wrap/insert/delete) alongside CSS/text overrides; align module templates into module directories with composable sub-templates.
-- Adoption path: keep messaging + notifications usable alone; petitions/votes/delegation/federation/topic gardener stay optional so orgs can layer capabilities as staff and policy mature.
-- Personalizable structure manager: lock the canonical fields (handle, blinded identity/credential binding, role/banned flag) and expose a provider-local schema/data-table editor plus per-session profile page for optional fields (contact email, personal info, notification preferences). Schema changes are versioned; provider-only fields never leave the provider; the provider owns consent flows and outbound notifications that rely on them.
-- Model and validate data exchanges end-to-end: persisted discussions/petitions/votes with author-session binding, rate limits, quorum/ban checks, delegation edges, and audit trails that surface in the UI.
-- Identity-based rate limiting (per handle/session with IP fallback) is configurable via `/admin` to keep posting flows CAPTCHA-free.
-- Harden persistence via a pluggable store abstraction (JSON now, DB later) with basic migrations so user/discussion/vote data is durable.
-- Keep identity foundations minimal but real: OIDC4VP/OpenID hash validation, key management, and QR/deep-link UX; deeper protocol polish waits until user/data flows work.
-- Federation kept to stubs while local UX ships: lightweight inbox/outbox + ledger gossip placeholders to avoid blocking; spec-level details follow once the network is usable (see ROADMAP.md).
-- Testing: run `npm test` for the node:test suite (hashing, migrations, module toggles, Circle policy gates, Puppeteer UI role flows, ring gossip consistency, and optional MySQL-backed UI restart persistence when `TEST_MYSQL_*` is configured, including module-toggle/disabled-endpoint UX checks after restart); `npm run test:ui` is the stable UI-only entry point.
-- Ops knobs: `/admin` now includes session overrides (role/ban/handle) to exercise gates without editing JSON; extensions can be bootstrapped via `CIRCLE_EXTENSIONS` or lifecycle-managed and toggled in the admin catalog.
-- Module control center: `/admin` groups module toggles across organization operations, social/community, civic governance, and federation with a settings map and wizard step anchors so activation and configuration stay aligned; module definitions carry their own admin links so forks/extensions can plug into the map.
-- Module lanes UX: `/admin`, home, and navigation should keep the social/community lane clearly distinct from the optional civic-governance lane to avoid demo-like mixed messaging and ease reuse by general social communities.
-- Theme verbosity controls: `/admin` sets the default UI verbosity (full vs compact); `/profile` and the top-bar toggle let users override per session, and Composer can set per-page presets.
-- Interface controls: top-bar Interface settings should stay practical for daily use (large text, reduced motion, compact nav, composer auto-collapse preference, partial-navigation mode), include inline save/reset session defaults, and keep side-nav jump filtering (`Ctrl/Cmd+K` and `/`) for fast section access.
-- Ops cues: `/admin` surfaces ledger hash, gossip ingest state, outbound/inbound gossip sync status + durations, peer health reset actions, optional pull-endpoint and outbound push skip-cache summaries, recent transactions, inbound transaction summaries, outbound delivery summaries, and persisted upload cleanup stats; `/health` includes peer health summaries plus vote/transactions gossip added/updated counts, gossip durations, optional pull-endpoint and outbound push skip-cache stats, outbound delivery stats, persisted upload cleanup stats, and ops metrics for dashboards.
-- Petition/vote scaffold: proposals persisted to JSON with per-role gating, structured outline fields, collaborative revisions + version history, revision diffs, evidence summaries + sources, stance-tagged discussion notes + fact-check flags, argument-map linking, quorum → discussion (or admin-configured vote), pre-vote freeze, and vote tallies; UI surfaces gate errors per role and stage cues.
-- Governance defaults: admin-managed constitution baseline (quorum, discussion/vote windows, vote method, `delegationDecayDays`) surfaced at `/governance`; verified users can submit change proposals and admins approve/reject them in `/admin`, with accepted proposals updating defaults and recording decision history plus transactions/audit entries.
-- Delegation trust UX: delegate profile views show delegation counts, vote history, and group endorsements; optional public bios live in provider-local `publicBio` profile fields. Delegate profiles also show an advisory deliberation score (trust/participation/deliberation/endorsement components × recency factor, capped at 100) with a "rising star" cue; scores are non-binding signals only.
-- Liquid/transitive delegation: `resolveDelegation` resolves the first hop (direct/extension/group) then follows the delegate's own explicit per-topic delegations to the terminal delegate, with cycle detection, a depth cap (`MAX_DELEGATION_CHAIN_DEPTH`), and a stop before forwarding into a banned delegate. `buildDelegationChain` powers the `/delegation` "explain my influence" chain view; auto-votes resolve through the terminal delegate. Group/extension recommendations resolve only the first hop and stay advisory/overridable. Delegation decay/renewal: the `delegationDecayDays` governance setting (0 = off) lapses un-renewed delegations so they drop out of resolution (`describeDelegationFreshness`/`getDelegationDecayDays`); `/delegation` shows freshness pills + a per-topic Renew action (`renewDelegation`, `intent=renew`).
-- Extension manifest: `/extensions` surfaces discovered modules + source/version metadata, persisted installed/update state, and active hooks; uninstall is non-destructive and disables the extension before deregistration.
-- Module toggles: `/admin` lets operators keep an email/messaging-only deployment or enable organization, civic, social, and federation layers independently; navigation and endpoints honor the settings to avoid dead ends.
-- Topic/delegation prep: classification hook + delegation store support dynamic topic models and cross-provider delegation logic; votes support auto delegation with manual override.
-- Notification base: notifications persisted to JSON, scoped to verified users (people in civic Circles), exposed via `/notifications` with per-user preferences for proposal comment alerts.
-- Topic gardener helper: build DynamicTopicCategorization as a Python helper in `src/infra/workers/topic-gardener/` (online ingestion + scheduled refactor) with a stable API consumed by `src/modules/topics/classification.js`. Respect user/person-picked top categories and admin/policy anchors; reconcile provider outputs to avoid conflicting labels and redundant processing. The helper lives in `src/infra/workers/topic-gardener/server.py`; anchors/pins + optional URL are configurable via `/admin`, which also surfaces sync status + rename/merge/split review.
-- Forum/groups: long-form articles + comments per topic; groups can publish delegation cachets with per-topic priorities and conflict notification; membership drives recommendations for auto-delegation.
-- Group policy separation: Party Circle policy governs quorum/voting; groups manage internal delegate election/conflict rules (defaults inherit admin settings); provider policy remains about data/validation.
-- Group elections: ballots per topic; group policy decides priority vs vote; conflict UI lets users/people pick delegates when suggestions clash.
+## Collaboration Rules
 
-## Possible next steps:
-- Extend MySQL-backed UI tests to cover module toggles + disabled endpoint UX under persisted settings.
+- Preserve unrelated work in a dirty tree. Make focused, incremental changes and add regression coverage for behavior changes.
+- Keep [README.md](README.md), [ROADMAP.md](ROADMAP.md), and this file aligned with real commands, routes, modules, data boundaries, and status.
+- Add every newly identified optimization to [OPTIMIZATIONS.md](OPTIMIZATIONS.md), even when it is not implemented in the current task. This includes performance, redundant computation, UX consistency, observability, security, and storage/IO opportunities.
+- Use the two canonical deployments in [principle-docs/SimulationScenarios.md](principle-docs/SimulationScenarios.md) for seeds, fixtures, screenshots, and journeys. Scenario A is the fictional Italian civic party; Scenario B is the fictional ASL organization-pressure deployment. Keep them in separate stores and preserve each action's `[drive]`, `[fixture]`, or `[design]` status.
+- When you touch presentation (templates, [`app.css`](src/public/app.css), or view helpers), run the standing UI review in [principle-docs/UIReview.md](principle-docs/UIReview.md): drive Scenario A, walk the member-facing feed surfaces, and hold them to the "real forum/social product, not a demo" bar before committing. Scenario A is the default screenshot and UX lens; Scenario B is only for `/organization`.
+- Do not invent empty or generic demo content where a reference scenario applies. Empty deployments hide identity, pressure, workflow, and module-boundary defects.
+- Prefer small, env-driven, documented modules that a human team can operate without AI assistance.
+- Evaluate libp2p where it materially helps P2P transport, ring identity, or resilience. Keep civic votes and audit transactions on signed, validation-aware paths.
+- Run the narrowest relevant tests while iterating and the appropriate full suite before handing off risky or cross-cutting changes.
+
+## Essential Product Principles
+
+### 1. Communication before structure
+
+- The framework must be useful as messaging, threaded discussion/forum, and notifications alone.
+- A message remains the canonical source. Promote it to an organization case only when acknowledgement, ownership, protection, authority, resources, mediation, pressure analysis, or impact learning adds value.
+- Petitions, votes, delegation, topic gardening, social networking, organization layers, and federation are independently adoptable modules. An existing organization must not be forced to adopt the framework's entire operating model.
+- Keep module families visibly separate: **Organization operations**, **P2P social/community**, **Civic governance**, and **Federation/resilience**. Social popularity or follows never imply governance authority.
+
+The normative organization model is [principle-docs/OrganizationPressureManagement.md](principle-docs/OrganizationPressureManagement.md).
+
+### 2. Pressure describes systems, never personal worth
+
+- Model fundamental needs, constructive concerns, advice/innovation, resource consultation, and disputes.
+- Explain aggregate pressure through volume, velocity, persistence, spread, consequence, and organizational capacity. Do not create opaque staff scores, personal pressure leaderboards, or automatic sanctions.
+- Preserve expertise, accountable leadership, and emergency speed while making formal and actual working flows inspectable and feedback paths permeable.
+- Never infer authority from a title. Model propose, validate, decide, veto, execute, observe, protect, and escalate rights with source, scope, conditions, and expiry.
+- Keep responsibility, commitment, consultation, information, approval, execution, and financial reconciliation distinct.
+
+### 3. Protection must be honest
+
+- Ordinary email and discussion are attributed.
+- Protected or anonymous intake requires a separate audited path, minimized metadata, an explicit reveal policy, retention/access controls, and human moderation.
+- Never promise anonymous email. Never gossip protected identity mappings, contact metadata, mediation evidence, or reveal mappings.
+- Disabled organization layers may show clearly labeled templates, but must not imply that they persist or execute workflows.
+
+### 4. User by default; person only with a natural-person guarantee
+
+- **user** is the default actor in general deployments.
+- **person** is a civic/party Circle label meaning a verified natural person. Under strict Circle enforcement, the exclusion principle blocks organization, bot, and service accounts from holding handles or acting in flows.
+- Store only blinded hashes from EUDI/OIDC4VP verification. Never retain raw PID or identity documents.
+- A Circle may begin without special roles beyond provider administrators; groups, member votes, and contextual structures may evolve later.
+- Render `@handle` plus a short hash cue through shared helpers. Never expose a raw PID hash as a person's primary identity.
+
+The civic philosophy—One Person = One Voice, soft-power accountability, liquid delegation, and phygital inclusion—is defined in [principle-docs/RepresentativeParties.md](principle-docs/RepresentativeParties.md).
+
+### 5. Recommendations and delegation stay non-binding
+
+- Delegation is topic-scoped, revocable, visible, decay-aware, and always overridable by the user/person.
+- Group cachets, election winners, extension suggestions, reputation cues, and deliberation scores are advisory. They must explain why a recommendation exists without silently exercising power.
+- Transitive delegation must retain cycle detection, a depth cap, banned-delegate stops, and an understandable “explain my influence” chain.
+- Accountability is soft power: auditable decisions and divergence explanations, not hard imperative mandates.
+
+### 6. Centralized and P2P deployments share one domain model
+
+- Centralized, hybrid, and P2P are data profiles, not code forks. Domain modules use the persistence abstraction and validation helpers.
+- Settings select combinations: `DATA_MODE`, `DATA_ADAPTER`, `DATA_VALIDATION_LEVEL`, and `DATA_PREVIEW` determine storage, replication, and visibility.
+- `centralized` disables gossip ingest; `hybrid` keeps a central canonical store with replicas/audits; `p2p` treats gossip ledgers as primary with an optional local cache.
+- Preview and validated states remain explicit. `DATA_PREVIEW=false` blocks preview ingestion even when validation is `observe` or `off`.
+- Provider-local profile/contact fields, protected mappings, media binaries, and mediation details never gossip.
+- Providers in one social/party ring should prefer a shared or compatible client so UX, validation, and enforcement semantics remain aligned.
+
+The provider-obscuring threat model and incomplete protocol design live in [principle-docs/Provider-Blind-Mode.md](principle-docs/Provider-Blind-Mode.md). Current `ringSignature` fields are placeholders; issuer escrow and mixnet transport remain future work. The scaffold does not provide finished anonymity.
+
+## Critical Implementation Contracts
+
+These rules protect behavior that is easy to break while working in adjacent code.
+
+- **Provider administration:** `/admin`, `/admin/audit`, and `/extensions` use [`canAdministerProvider`](src/modules/identity/privileges.js). Moderators do not administer provider policy. The first-run exception is open only while no non-banned admin session exists; it keys off “an admin exists,” never `settings.initialized`. Every admin link must use the same gate so the UI does not advertise a route that returns 403.
+- **Signing keys:** `CIRCLE_PRIVATE_KEY` and `CIRCLE_PUBLIC_KEY` contain PEM text, never filesystem paths. Read them through [`getSigningPrivateKey()` and `getSigningPublicKey()`](src/modules/circle/signingKeys.js), so malformed values degrade to unsigned envelopes instead of becoming OpenSSL 500 errors; `/admin` must report malformed keys as ignored rather than loaded.
+- **Module gates:** definitions, families, dependencies, defaults, and admin links live in [`src/modules/circle/modules.js`](src/modules/circle/modules.js). Navigation and endpoints must honor disabled modules. HTML routes render the shared disabled page; JSON routes return a structured 403 through [`moduleGate.js`](src/interfaces/http/views/moduleGate.js).
+- **Circle provenance:** verification is required by default but Circle enforcement is configurable and must remain visible. Set a stable public issuer with `CIRCLE_ISSUER` or `/admin` so gossip envelopes carry an auditable peer hint. `CIRCLE_RING_ID` only pre-fills provider-blind ring identity; it is not itself an anonymity or trust guarantee.
+- **Organization-layer independence:** `coordination` works alone. `protectedVoice`, `responsibilities`, `hierarchies`, `authority`, `funds`, `sectors`, `mediation`, `pressureAnalytics`, and `impactTracking` require only coordination and otherwise remain independently toggleable.
+- **Policy gates:** posting, petition, vote, delegation, and moderation decisions go through [`src/modules/circle/policy.js`](src/modules/circle/policy.js) and [`src/modules/identity/privileges.js`](src/modules/identity/privileges.js). Do not duplicate role or ban logic in controllers.
+- **Authentication UX:** the wallet flow must always expose QR and deep-link handoff, the hash-only privacy guarantee, and explicit session recovery/error states. Use identity-based rate limits with IP fallback to keep ordinary posting CAPTCHA-free.
+- **Actor labels:** handle validation/indexing belongs in [`sessions.js`](src/modules/identity/sessions.js); UI labels belong in [`actorLabel.js`](src/interfaces/http/views/actorLabel.js). Use `resolveHandleForHash`/`renderActorLabel` anywhere an actor hash is shown. Handles allow letters, numbers, dashes, underscores, and dots, but never a leading/trailing or consecutive dot, so a civic Circle can use natural `@firstname.lastname` handles (`@giulia.ferrero`) without them becoming URL- or label-unsafe. Any control that takes a delegate/candidate/target must accept a `@handle` (or raw hash) and resolve it to the canonical blinded hash via the session index — never require the operator to paste a hash.
+- **Partial navigation:** `data-partial` links and enhanced forms may target only HTML routes. [`src/public/app.js`](src/public/app.js) checks content type and falls back to full navigation; never point a partial link at JSON/ledger exports.
+- **Context panels:** render “what applies to me here” through [`renderContextPanel`](src/interfaces/http/views/contextPanel.js), keeping gates, facts, and guidance distinct. Do not recreate verbose label/value debug dumps with ad hoc callouts.
+- **Shell accountability:** retain visible Circle enforcement, validation/preview state, verified handle where present, ledger/actor/discussion counts, and gossip-ingest status in the shared shell/status surfaces.
+- **SSR ownership:** route controllers live with their module under `src/modules/<module>/http/`; templates live under `src/modules/<module>/templates/`; reusable non-page controllers and view helpers live under `src/interfaces/http/`. Keep full and partial responses consistent.
+- **Persistence:** mutate hydrated state through domain logic, then call the relevant function in [`storage.js`](src/infra/persistence/storage.js). Domain modules must not import a concrete JSON/SQL/KV/MySQL/MongoDB adapter.
+- **Canonical organization cases:** keep the source message plus minimal case envelope canonical. Richer records attach by case id in versioned, module-owned stores created lazily. Permission-safe aggregates may be shared; protected details remain local.
+- **Audit coverage:** sensitive and user-visible actions should append through [`transactions/registry.js`](src/modules/transactions/registry.js). Discussion, forum, social, groups, petition lifecycle/signatures/comments, votes, delegation overrides, governance decisions, and outbound delivery should remain consistent with user-facing activity.
+- **Topic stewardship:** discussions, forum threads, and petitions retain topic ids/paths so breadcrumbs and renames survive. Users/people select top categories; admins or policy voters may pin mandatory legal/departmental anchors. Gardener rename/merge/split and anchor promotion/archive suggestions remain reviewable, previewed, confirmed operations with history.
+- **Social media:** uploaded binaries remain provider-local and locked by default; view requests notify authors; reports/moderators may block viewing and resharing. Preserve streaming limits and temp-file cleanup in [`request.js`](src/shared/utils/request.js) and media policy in [`media.js`](src/modules/social/media.js).
+- **Federation honesty:** module-disabled, gossip-disabled, and missing optional endpoints are skips, not peer-health failures. Policy/version/signature failures affect validation and quarantine. Centralized mode never ingests gossip.
+- **Extensions:** [`registry.js`](src/modules/extensions/registry.js) separates discovered, installed, enabled, and active state. Uninstall is non-destructive and disables runtime hooks before deregistration. Do not add remote install paths without signatures/allowlists, compatibility constraints, and rollback design.
+
+## Runtime and Data Flow
+
+The main request path is:
+
+`src/index.js` → `src/app/server.js` → `src/app/router.js` → module HTTP controller → domain module → `src/infra/persistence/storage.js` → selected adapter.
+
+The main rendering path is:
+
+module HTTP controller → shared view helpers → `src/interfaces/http/views/templates.js` → module template → core layout/partials → full or partial HTML.
+
+The main federation path is:
+
+Circle/vote/transaction controller → envelope verification and replication policy → ingest/gossip module → persistence + peer health/quarantine + ops metrics.
+
+## Linked Source Tree
+
+### Application entry and configuration
+
+- [`src/index.js`](src/index.js) loads `.env` and starts the application.
+- [`src/config.js`](src/config.js) owns environment parsing, data/media/request defaults, MIME types, and runtime paths. Add new operational knobs here and mirror them in [.env.example](.env.example) and [README.md](README.md).
+- [`src/app/server.js`](src/app/server.js) initializes state, extensions, outbound transports, upload cleanup, gossip/topic schedulers, the HTTP server, and top-level request errors.
+- [`src/app/router.js`](src/app/router.js) is the authoritative route table and method/path index. Add a route here only after choosing the owning module controller and its HTML/JSON gate behavior.
+
+### HTTP interface layer
+
+- [`src/interfaces/http/controllers/`](src/interfaces/http/controllers/) contains reusable non-page endpoints:
+  - [`activitypub.js`](src/interfaces/http/controllers/activitypub.js): actor/object/outbox serving and preview-gated inbox ingestion.
+  - [`circle.js`](src/interfaces/http/controllers/circle.js): ledger gossip, export, peer list, and peer registration.
+  - [`extensions.js`](src/interfaces/http/controllers/extensions.js): admin-gated extension catalog and lifecycle actions.
+  - [`health.js`](src/interfaces/http/controllers/health.js): health, policy, peer, gossip, upload, and ops metrics.
+  - [`static.js`](src/interfaces/http/controllers/static.js): safe `/public/*` asset serving.
+  - [`transactions.js`](src/interfaces/http/controllers/transactions.js): local audit list, signed export/ledger, and gossip ingest.
+  - [`votes.js`](src/interfaces/http/controllers/votes.js): vote ledger export and signed-envelope gossip ingest.
+- [`src/interfaces/http/views/`](src/interfaces/http/views/) contains shared SSR presentation logic:
+  - [`templates.js`](src/interfaces/http/views/templates.js) loads module templates, partials, the shell, and verbosity modes.
+  - [`navigation.js`](src/interfaces/http/views/navigation.js), [`status.js`](src/interfaces/http/views/status.js), [`adminGate.js`](src/interfaces/http/views/adminGate.js), and [`moduleGate.js`](src/interfaces/http/views/moduleGate.js) own global navigation/status and access-denied surfaces.
+  - [`actorLabel.js`](src/interfaces/http/views/actorLabel.js), [`contextPanel.js`](src/interfaces/http/views/contextPanel.js), [`shared.js`](src/interfaces/http/views/shared.js), [`topicHelpers.js`](src/interfaces/http/views/topicHelpers.js), and [`composerView.js`](src/interfaces/http/views/composerView.js) are the reusable identity, context, list, topic, and customization primitives.
+  - [`homeView.js`](src/interfaces/http/views/homeView.js), [`discussionView.js`](src/interfaces/http/views/discussionView.js), [`forumView.js`](src/interfaces/http/views/forumView.js), [`petitionView.js`](src/interfaces/http/views/petitionView.js), [`profileView.js`](src/interfaces/http/views/profileView.js), and [`socialView.js`](src/interfaces/http/views/socialView.js) render module-specific fragments reused by controllers/templates.
+
+### Identity, Circle policy, and provider control
+
+- [`src/modules/identity/`](src/modules/identity/) owns authentication-derived identity and privileges:
+  - [`auth.js`](src/modules/identity/auth.js) builds wallet offers, blinds PID values, and creates session cookies.
+  - [`citizen.js`](src/modules/identity/citizen.js) resolves a verified request session into the contextual user/person; [`person.js`](src/modules/identity/person.js) is the compatibility export.
+  - [`sessions.js`](src/modules/identity/sessions.js) indexes sessions and validates unique handles.
+  - [`privileges.js`](src/modules/identity/privileges.js) centralizes role capabilities and provider-admin bootstrap rules.
+  - [`rateLimit.js`](src/modules/identity/rateLimit.js) applies per-handle/session limits with IP fallback.
+- [`src/modules/auth/http/auth.js`](src/modules/auth/http/auth.js) and [`src/modules/auth/templates/`](src/modules/auth/templates/) own the EUDI/OIDC4VP offer, QR/deep link, callback, recovery, and verification-result UI.
+- [`src/modules/circle/`](src/modules/circle/) owns provider/Circle rules:
+  - [`policy.js`](src/modules/circle/policy.js) computes effective policy and action decisions, including extension hooks.
+  - [`modules.js`](src/modules/circle/modules.js) is the single registry for module families, toggles, dependencies, and settings links.
+  - [`federation.js`](src/modules/circle/federation.js) builds/verifies uniqueness-ledger envelopes and hashes.
+  - [`signingKeys.js`](src/modules/circle/signingKeys.js) validates, generates, hydrates, fingerprints, and exposes PEM signing keys.
+  - [`ringRegistry.js`](src/modules/circle/ringRegistry.js) normalizes provider-blind settings, ring epochs/keys, audit roles, and cached gossip announcements.
+- [`src/modules/admin/http/admin.js`](src/modules/admin/http/admin.js) and [`src/modules/admin/templates/admin.html`](src/modules/admin/templates/admin.html) own the install wizard, policy/settings, module control center, session overrides, governance decisions, topic review, federation operations, audit export, and ops summaries.
+
+### Messaging, social, and notification kernel
+
+- [`src/modules/home/`](src/modules/home/) owns `/` as an operational workspace, not a brochure or feed redirect.
+- [`src/modules/discussion/`](src/modules/discussion/) owns attributed short discussion intake with evidence links and topic classification.
+- [`src/modules/forum/`](src/modules/forum/) owns long-form topic threads and comments with evidence links.
+- [`src/modules/messaging/`](src/modules/messaging/) contains internal notification persistence in [`notifications.js`](src/modules/messaging/notifications.js), contact/preference resolution and delivery logging in [`outbound.js`](src/modules/messaging/outbound.js), and pluggable delivery loading in [`transports.js`](src/modules/messaging/transports.js).
+- [`src/modules/notifications/`](src/modules/notifications/) owns notification list/read/preferences routes and human-readable event labels.
+- [`src/modules/social/`](src/modules/social/) owns the non-binding “small talk + info” lane:
+  - [`posts.js`](src/modules/social/posts.js) creates/indexes posts, replies, mentions, tags, reshares, feeds, and ActivityPub ids.
+  - [`followGraph.js`](src/modules/social/followGraph.js) manages typed `circle`/`interest`/`info`/`alerts` edges.
+  - [`media.js`](src/modules/social/media.js) owns provider-local upload metadata, locks, view requests, reports, and moderation status.
+  - [`notifications.js`](src/modules/social/notifications.js) notifies mentions, replies, direct recipients, and media authors.
+  - [`http/social.js`](src/modules/social/http/social.js) and [`templates/`](src/modules/social/templates/) own `/social/*` request handling and SSR.
+
+### Organization operations and personalizable structure
+
+- [`src/modules/organization/organizationTemplate.js`](src/modules/organization/organizationTemplate.js) is the current illustrative organization-pressure view model. Its cases document UI contracts; they are not persisted workflow records.
+- [`src/modules/organization/http/organization.js`](src/modules/organization/http/organization.js) and [`src/modules/organization/templates/`](src/modules/organization/templates/) render the inbox-first `/organization` workspace, source message, layer tabs, operating map, and pressure views.
+- [`src/modules/structure/structureManager.js`](src/modules/structure/structureManager.js) fixes canonical profile fields and validates versioned provider-local schema/attribute extensions.
+- [`src/modules/profile/`](src/modules/profile/) owns handle, optional provider fields, schema-drift cues, topic preferences, and per-session UI defaults.
+- Persistent organization cases and module-owned records are a Phase 2 gap; add them as separate lazy stores rather than expanding `organizationTemplate.js` into one coupled schema.
+
+### Civic governance and deliberation
+
+- [`src/modules/petitions/`](src/modules/petitions/) owns proposals, structured outlines, evidence, collaborative revisions/diffs, signatures/quorum, stance-tagged comments, fact-check flags, argument maps, freeze/status transitions, and vote submission. [`signatures.js`](src/modules/petitions/signatures.js) owns quorum transitions; [`commentStance.js`](src/modules/petitions/commentStance.js) owns stance vocabulary.
+- [`src/modules/votes/voteEnvelope.js`](src/modules/votes/voteEnvelope.js) builds and verifies signed vote envelopes, including provider-blind placeholders.
+- [`src/modules/governance/constitution.js`](src/modules/governance/constitution.js) owns constitution defaults, community change proposals, admin decisions, history, and diffs; [`src/modules/governance/http/`](src/modules/governance/http/) and [`templates/`](src/modules/governance/templates/) own `/governance`.
+- [`src/modules/delegation/delegation.js`](src/modules/delegation/delegation.js) owns direct/advisory resolution, transitive chains, cycle/depth/ban guards, decay, renewal, and overrides. [`delegateProfiles.js`](src/modules/delegation/delegateProfiles.js) builds advisory trust/profile summaries.
+- [`src/modules/delegation/http/`](src/modules/delegation/http/) and [`templates/`](src/modules/delegation/templates/) own the preference/conflict/chain UI; [`src/modules/delegates/`](src/modules/delegates/) owns the searchable People directory and delegate profiles.
+- [`src/modules/groups/`](src/modules/groups/) owns membership/roles in [`groups.js`](src/modules/groups/groups.js), independent group rules in [`groupPolicy.js`](src/modules/groups/groupPolicy.js), ranked delegate elections in [`groupElections.js`](src/modules/groups/groupElections.js), and the `/groups` controller/templates. The controller resolves preferred-delegate and election-candidate inputs from `@handle` (or raw hash) to the canonical blinded hash, and renders delegates/candidates/winners as `@handle` — never as raw hashes.
+
+### Topics and gardener worker
+
+- [`src/modules/topics/classification.js`](src/modules/topics/classification.js) is the single classification entry point for extension and gardener providers.
+- [`registry.js`](src/modules/topics/registry.js) persists topic ids/paths/history and applies rename/merge/split operations.
+- [`preferences.js`](src/modules/topics/preferences.js) stores user/person-picked top categories.
+- [`topicGardenerClient.js`](src/modules/topics/topicGardenerClient.js) owns anchors/pins, helper requests, and operation retrieval; [`gardenerSync.js`](src/modules/topics/gardenerSync.js) schedules reviewed synchronization.
+- [`src/infra/workers/topic-gardener/server.py`](src/infra/workers/topic-gardener/server.py) is the Python helper boundary. Node code calls the client instead of embedding ML logic or asking multiple providers independently. See its [worker README](src/infra/workers/topic-gardener/README.md) and [principle design](principle-docs/DynamicTopicCategorization.md).
+
+### Federation, audit, extensions, and operations
+
+- [`src/modules/federation/`](src/modules/federation/) separates protocol responsibilities:
+  - [`activitypub.js`](src/modules/federation/activitypub.js) maps local social posts to actors/notes/activities and normalizes inbound notes.
+  - [`canonical.js`](src/modules/federation/canonical.js) provides stable envelope canonicalization.
+  - [`capabilities.js`](src/modules/federation/capabilities.js) fingerprints and caches peer module/data-mode snapshots.
+  - [`gossip.js`](src/modules/federation/gossip.js) schedules parallel push/pull sync and maintains bounded optional/push endpoint skip caches.
+  - [`ingest.js`](src/modules/federation/ingest.js) validates and persists ledger/vote gossip.
+  - [`peers.js`](src/modules/federation/peers.js) normalizes and collects peer hints.
+  - [`quarantine.js`](src/modules/federation/quarantine.js) scores peer health, ledger matches/mismatches, quarantine, and reset summaries.
+  - [`replication.js`](src/modules/federation/replication.js) resolves data profiles, preview acceptance, provenance stamping, gossip enablement, and visibility filtering.
+- [`src/modules/transactions/registry.js`](src/modules/transactions/registry.js) is the append-only local audit registry and signed summary verifier; [`gossip.js`](src/modules/transactions/gossip.js) exchanges bounded summaries for reconciliation.
+- [`src/modules/extensions/registry.js`](src/modules/extensions/registry.js) loads and lifecycle-manages provider-local extensions; [`sample-policy-tighten.js`](src/modules/extensions/sample-policy-tighten.js) is the minimal policy-hook example.
+- [`src/modules/ops/metrics.js`](src/modules/ops/metrics.js) records module-disabled/rate-limit counters and bounded operational snapshots.
+
+### Persistence and adapters
+
+- [`src/infra/persistence/storage.js`](src/infra/persistence/storage.js) initializes/hydrates state and exposes per-domain persistence functions. It is the application-facing persistence boundary.
+- [`src/infra/persistence/store.js`](src/infra/persistence/store.js) selects an adapter from configuration.
+- [`src/infra/persistence/migrations.js`](src/infra/persistence/migrations.js) is the ordered schema migration chain. Every persisted-shape change needs an idempotent migration and restart coverage.
+- [`src/infra/persistence/adapters/index.js`](src/infra/persistence/adapters/index.js) is the adapter registry.
+- Adapter implementations: [`json.js`](src/infra/persistence/adapters/json.js) for default file persistence, [`memory.js`](src/infra/persistence/adapters/memory.js) for ephemeral tests/dev, [`kv.js`](src/infra/persistence/adapters/kv.js) for a file-backed key/value store, [`sql.js`](src/infra/persistence/adapters/sql.js) for SQLite, [`mysql.js`](src/infra/persistence/adapters/mysql.js), and [`mongodb.js`](src/infra/persistence/adapters/mongodb.js).
+- [`src/data/`](src/data/) is runtime state, not source. JSON/SQLite data, media, uploads, and `.local/` artifacts are ignored; do not use generated state as a fixture or commit it.
+
+### Templates, browser behavior, and shared utilities
+
+- [`src/modules/core/templates/`](src/modules/core/templates/) contains the layout, shell/topbar/footer partials, error page, module-disabled page, and admin-required page.
+- Module-owned HTML lives below each module's linked `templates/` directory; reusable fragments belong in `templates/partials/` and are included with `{{> name}}`.
+- [`src/public/app.css`](src/public/app.css) is the shared responsive theme and component styling.
+- [`src/public/app.js`](src/public/app.js) owns partial navigation, enhanced forms, interface preferences, nav filtering, composer behavior, and DOM/text/style overrides. Preserve SSR operation when JavaScript is absent.
+- [`src/shared/utils/http.js`](src/shared/utils/http.js) owns HTML/JSON/gzip/redirect/rate-limit responses; [`request.js`](src/shared/utils/request.js) owns bounded bodies, cookies, multipart streaming, and temp cleanup; [`text.js`](src/shared/utils/text.js) owns sanitization, escaping, evidence links, and byte formatting; [`pagination.js`](src/shared/utils/pagination.js), [`parse.js`](src/shared/utils/parse.js), and [`time.js`](src/shared/utils/time.js) own their cross-module primitives.
+
+### Root scripts, samples, and generated documentation assets
+
+- [`run-standalone.sh`](run-standalone.sh) starts a full-feature local KV deployment, seeds an admin session, creates signing keys, and prints a login URL.
+- [`scripts/user-journeys.js`](scripts/user-journeys.js) drives the organization-operations walkthrough (discussion → proposal → quorum → vote → groups → delegation) and regenerates [walkthrough images](md-assets/walkthrough/).
+- [`scripts/party-journeys.js`](scripts/party-journeys.js) drives Scenario A (Rete Civica Nazionale) — verified people, Italian deliberation, structured proposal, attributed freeze with dissent, transitive delegation, a ranked election won on transfers, and the accountability dashboard — regenerating [party images](md-assets/party/). Run against a strict-Circle standalone (`ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh`).
+- [`scripts/seed-demo.js`](scripts/seed-demo.js) seeds a running deployment; prefer evolving it toward the reference scenarios.
+- [`scripts/ui-screenshots.js`](scripts/ui-screenshots.js), [`ui-smoke.js`](scripts/ui-smoke.js), and [`ui-composer-smoke.js`](scripts/ui-composer-smoke.js) exercise route screenshots, layout, interactions, and Composer behavior.
+- [`scripts/agent-viewport.js`](scripts/agent-viewport.js) and its [usage guide](scripts/agent-viewport.md) help agents inspect the live SSR UI.
+- [`scripts/db-check.js`](scripts/db-check.js) reports adapter/storage health; [`scripts/circle-keygen.js`](scripts/circle-keygen.js) generates Circle signing/ring identity material.
+- [`dev-samples/`](dev-samples/) contains Composer and social/forum template references. [`md-assets/`](md-assets/) contains README media, not runtime assets.
+
+## Route Ownership Map
+
+The exact table is [`src/app/router.js`](src/app/router.js). Use this map to find the first controller to inspect:
+
+- `/`, `/organization`, `/discussion`, `/forum`, `/social/*`, `/notifications`, `/profile`: the matching module under [`src/modules/`](src/modules/).
+- `/petitions*`, `/governance*`, `/delegation*`, `/delegates*`, `/groups*`: the matching civic module under [`src/modules/`](src/modules/).
+- `/auth/eudi`, `/auth/callback`: [`src/modules/auth/http/auth.js`](src/modules/auth/http/auth.js).
+- `/admin`, `/admin/audit`: [`src/modules/admin/http/admin.js`](src/modules/admin/http/admin.js).
+- `/extensions`: [`src/interfaces/http/controllers/extensions.js`](src/interfaces/http/controllers/extensions.js).
+- `/circle/gossip`, `/circle/ledger`, `/circle/peers`: [`src/interfaces/http/controllers/circle.js`](src/interfaces/http/controllers/circle.js).
+- `/votes/ledger`, `/votes/gossip`: [`src/interfaces/http/controllers/votes.js`](src/interfaces/http/controllers/votes.js).
+- `/transactions*`: [`src/interfaces/http/controllers/transactions.js`](src/interfaces/http/controllers/transactions.js).
+- `/ap/*`: [`src/interfaces/http/controllers/activitypub.js`](src/interfaces/http/controllers/activitypub.js) plus [`src/modules/federation/activitypub.js`](src/modules/federation/activitypub.js).
+- `/health`: [`src/interfaces/http/controllers/health.js`](src/interfaces/http/controllers/health.js); `/public/*`: [`static.js`](src/interfaces/http/controllers/static.js).
+
+## Build, Run, and Test Checklist
+
+Prerequisite: Node.js 20+ and npm.
+
+```bash
+npm install
+npm start
+./run-standalone.sh
+```
+
+Use an ephemeral messaging deployment when persistent state is irrelevant:
+
+```bash
+DATA_ADAPTER=memory DATA_MODE=centralized npm start
+```
+
+Validation commands:
+
+```bash
+npm test          # full node:test suite, including Puppeteer UI flows
+npm run test:ui   # stable UI-only entry point
+npm run db:check  # adapter report
+npm run keys:circle
+```
+
+Important test ownership:
+
+- Identity/policy/admin: [`tests/auth.test.js`](tests/auth.test.js), [`policy.test.js`](tests/policy.test.js), [`admin-authorization.test.js`](tests/admin-authorization.test.js), [`install-wizard.test.js`](tests/install-wizard.test.js), and handle/person/rate-limit tests.
+- Module and UX contracts: [`tests/modules.test.js`](tests/modules.test.js), [`ui.test.js`](tests/ui.test.js), [`consistency.test.js`](tests/consistency.test.js), [`verbosity.test.js`](tests/verbosity.test.js), [`control-theming.test.js`](tests/control-theming.test.js), and [`agent-viewport.test.js`](tests/agent-viewport.test.js).
+- Organization/civic flows: [`tests/organization-template.test.js`](tests/organization-template.test.js), petition/signature/status/evidence/comment tests, governance tests, delegation tests, delegate-profile tests, and group/election/recommendation tests under [`tests/`](tests/).
+- Social/messaging: discussion/forum evidence tests, notification tests, [`social.test.js`](tests/social.test.js), [`social-media.test.js`](tests/social-media.test.js), [`follow-graph.test.js`](tests/follow-graph.test.js), multipart/upload cleanup tests, and outbound-delivery tests.
+- Persistence: [`tests/migrations.test.js`](tests/migrations.test.js), [`external-adapters.test.js`](tests/external-adapters.test.js), [`structure.test.js`](tests/structure.test.js), and restart coverage inside the UI suite.
+- Federation/audit: ActivityPub, p2p, replication, gossip policy/capability/skip-cache, provider-blind, signing-key, vote-envelope/gossip, transactions, metrics, and gzip tests under [`tests/`](tests/).
+- Shared test server, HTTP, auth, and ActivityPub fixtures live in [`tests/helpers/`](tests/helpers/).
+
+External MySQL/MongoDB tests are opt-in through `TEST_MYSQL_*` and `TEST_MONGO_*`. MySQL-backed UI restart coverage also verifies persisted module settings and disabled-endpoint behavior when configured.
+
+## Principle and Research Map
+
+- [OrganizationPressureManagement.md](principle-docs/OrganizationPressureManagement.md): normative communication-first organization model, invariants, adoption staircase, voice/visibility, pressure dynamics, authority, money, mediation, canonical case contract, rollout, and non-goals.
+- [RepresentativeParties.md](principle-docs/RepresentativeParties.md): optional civic philosophy and long-form rationale for identity, deliberation, delegation, voting, accountability, security, and phygital inclusion.
+- [SimulationScenarios.md](principle-docs/SimulationScenarios.md): executable/design reference for Scenario A (civic) and Scenario B (ASL organization operations), including casts, fixtures, assertions, status labels, and coverage map.
+- [UIReview.md](principle-docs/UIReview.md): standing UI-evaluation procedure and checklist — run Scenario A and hold every member-facing screen to the "real forum/social product" bar whenever presentation changes.
+- [Provider-Blind-Mode.md](principle-docs/Provider-Blind-Mode.md): threat model, candidate protocols, current scaffold, draft envelope shapes, audit quorum, and open questions.
+- [DynamicTopicCategorization.md](principle-docs/DynamicTopicCategorization.md): online classification plus reviewed background gardener design.
+- [Author-Notes.md](principle-docs/Author-Notes.md): product reminders and historical TODOs. Reconcile its notes with the normative documents and roadmap before treating them as requirements.
+
+## Current Status and Roadmap Snapshot
+
+Keep this section aligned with [ROADMAP.md](ROADMAP.md); that document is authoritative for detail.
+
+### Shipped baseline
+
+- The messaging/forum/notification kernel, operational home, typed-follow social feed, provider-local media controls, handles/roles/bans/rate limits, SSR/partial navigation, and UI preference controls are live.
+- Petitions, revisions, evidence, quorum, staged deliberation/freeze/voting, vote envelopes, transactions, governance defaults/proposals, groups/elections, delegate profiles, transitive delegation, and decay/renewal are implemented.
+- Module families/toggles, extension lifecycle, provider-local profile schemas, topic registry/preferences/gardener review, persistence adapters/migrations, data profiles, gossip scheduling, peer capabilities/health/quarantine, and ops cues are present.
+- Provider-blind settings, ring registry announcements, and `ringSignature` fields are scaffolding. They do not provide complete provider anonymity.
+- `/organization` is a rich illustrative template, but persistent case promotion and independent organization-layer records are not yet implemented.
+
+### Near-term priorities
+
+1. Persist the minimal organization case kernel while retaining the source message as canonical.
+2. Design and implement the separate audited protected-voice path before making anonymity claims.
+3. Add lazy, versioned stores for commitments, flow edges, authority, funds, sectors, mediation, pressure observations, and impact reviews.
+4. Introduce explainable aggregate pressure analytics with cohort suppression and no automated sanctions.
+5. Continue Composer component operations and template decomposition into module partials.
+6. Harden federation, cross-provider civic visibility, replication tests, provider-blind signatures/escrow/reveal governance, and eventual Claim & Seize migration.
+7. Evaluate libp2p gossipsub for bounded, signed social-lane replication while preserving audit-grade civic envelopes.
+
+## Task Start Checklist
+
+Before implementing:
+
+1. Identify the owning module/controller/template in the linked tree and inspect its focused tests.
+2. Check the relevant product principle, module toggle/dependencies, policy/admin gate, and user/person vocabulary.
+3. Decide which data is canonical, provider-local, preview/validated, transactional, or safe to gossip.
+4. Preserve SSR without JavaScript and verify full versus partial HTML behavior.
+5. Use shared actor labels, context panels, status/preview pills, pagination, sanitization, and persistence helpers instead of local duplicates.
+6. Add or update migrations and restart tests for persisted-shape changes.
+7. Exercise the relevant canonical simulation rather than inventing placeholder actors/content.
+8. Run focused tests, then the appropriate broader suite; update README/roadmap/AGENTS and record any new optimization.
+
+## Contact and License
+
+- Project owner: Riccardo Cecchini.
+- License: [GPL-3.0-or-later](LICENSE).

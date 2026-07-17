@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-org-standalone",
+      "runtimeExecutable": "./run-standalone.sh",
+      "runtimeArgs": [],
+      "port": 3000
+    }
+  ]
+}

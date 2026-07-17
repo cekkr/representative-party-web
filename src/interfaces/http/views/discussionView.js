@@ -1,7 +1,7 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
+import { renderActorAvatar, renderActorLabel } from './actorLabel.js';
 import {
-  renderAuthorHashLine,
   renderEvidenceLinks,
   renderIssuerPill,
   renderPreviewPill,
@@ -21,27 +21,28 @@ export function renderDiscussionList(entries, state) {
       const evidenceLinks = Array.isArray(entry.evidenceLinks) ? entry.evidenceLinks : [];
       const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
       const evidenceBlock = renderEvidenceLinks(evidenceLinks);
+      const stance = entry.stance ? `<span class="pill stance stance--${escapeHtml(String(entry.stance))}">${escapeHtml(entry.stance)}</span>` : '';
       return `
         <article class="topic-card">
           <div class="topic-head">
-            <div class="topic-avatar" aria-hidden="true"></div>
+            ${renderActorAvatar(state, entry.authorHash)}
             <div class="topic-info">
-              <div class="topic-breadcrumbs">Discussion / ${escapeHtml(topicLabel)}</div>
+              <div class="topic-byline">
+                <span class="topic-author">${renderActorLabel(state, entry.authorHash)}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
               <div class="topic-meta">
-                <span class="pill ghost">${escapeHtml(entry.stance)}</span>
+                <span class="topic-breadcrumbs">Discussion / ${escapeHtml(topicLabel)}</span>
+                ${stance}
                 ${evidencePill}
                 ${renderPreviewPill(entry)}
                 ${renderIssuerPill(entry)}
-                ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
               </div>
             </div>
           </div>
           <div class="topic-body">
             <p>${escapeHtml(entry.content)}</p>
             ${evidenceBlock}
-          </div>
-          <div class="topic-footer">
-            ${renderAuthorHashLine(entry.authorHash, { state })}
           </div>
         </article>
       `;

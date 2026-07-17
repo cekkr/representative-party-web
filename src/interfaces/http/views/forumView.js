@@ -1,8 +1,7 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { resolvePersonHandle } from './actorLabel.js';
+import { renderActorAvatar, renderActorLabel, resolvePersonHandle } from './actorLabel.js';
 import {
-  renderAuthorHashLine,
   renderEmptyState,
   renderEvidenceLinks,
   renderIssuerPill,
@@ -11,16 +10,34 @@ import {
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { paginate } from '../../../shared/utils/pagination.js';
+import { renderContextPanel } from './contextPanel.js';
 
 export function renderForum(entries, person, state, options = {}) {
   const { threads, commentsByThread } = splitForumEntries(entries);
   const pageInfo = paginate(threads, { page: options.page || 1 });
+  const postGate = options.postGate;
   return {
     threads: renderThreads(pageInfo.items, commentsByThread, state, options),
     threadsPager: renderPager(pageInfo, { baseHref: '/forum', label: 'threads' }),
     personHandle: resolvePersonHandle(person),
-    roleLabel: person?.role || 'guest',
     composeOpen: options.composeOpen || '',
+    forumContext: renderContextPanel({
+      gates: postGate
+        ? [
+            {
+              label: 'Publish an article',
+              status: postGate.allowed ? 'Allowed' : 'Blocked',
+              allowed: postGate.allowed,
+              reason: postGate.allowed ? '' : postGate.message || postGate.reason || '',
+            },
+          ]
+        : [],
+      facts: [
+        { term: 'Role', value: person?.role || 'guest' },
+        { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
+      ],
+      guidance: ['Use the forum for deeper context and evidence-backed analysis; keep quick takes in the social lane.'],
+    }),
   };
 }
 
@@ -41,24 +58,23 @@ function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
       return `
         <article class="topic-card" id="${threadAnchor}">
           <div class="topic-head">
-            <div class="topic-avatar" aria-hidden="true"></div>
+            ${renderActorAvatar(state, thread.authorHash || 'anonymous')}
             <div class="topic-info">
-              <div class="topic-breadcrumbs">Forum / ${escapeHtml(topicLabel)}</div>
+              <div class="topic-byline">
+                <span class="topic-author">${renderActorLabel(state, thread.authorHash || 'anonymous')}</span>
+                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+              </div>
               <h3 class="topic-title">${escapeHtml(thread.title || 'Untitled')}</h3>
               <div class="topic-meta">
-                <span class="pill ghost">Article</span>
+                <span class="topic-breadcrumbs">Forum / ${escapeHtml(topicLabel)}</span>
                 <span class="pill ghost">Replies: ${threadComments.length}</span>
                 ${renderPreviewPill(thread)}
                 ${renderIssuerPill(thread)}
-                ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
               </div>
             </div>
           </div>
           <div class="topic-body">
             <p>${escapeHtml(thread.content)}</p>
-          </div>
-          <div class="topic-footer">
-            ${renderAuthorHashLine(thread.authorHash || 'anonymous', { state })}
           </div>
           <div class="reply-list">
             ${renderComments(threadComments, state)}
@@ -124,18 +140,17 @@ function renderComments(comments, state) {
       const evidenceBlock = renderEvidenceLinks(evidenceLinks);
       return `
         <article class="reply-card">
-          <div class="reply-card__avatar" aria-hidden="true"></div>
+          ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
           <div class="reply-card__content">
             <div class="reply-card__meta">
-              <span class="pill ghost">Comment</span>
+              <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
+              ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
               ${evidencePill}
               ${renderPreviewPill(comment)}
               ${renderIssuerPill(comment)}
-              ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
             </div>
             <p class="reply-card__text">${escapeHtml(comment.content)}</p>
             ${evidenceBlock}
-            ${renderAuthorHashLine(comment.authorHash || 'anonymous', { state })}
           </div>
         </article>
       `;

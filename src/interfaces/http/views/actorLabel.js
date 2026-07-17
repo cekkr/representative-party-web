@@ -54,6 +54,22 @@ export function renderActorLabel(state, hash, { tag = true, showHash = true } = 
   return `<span class="actor" title="${fullHash}">${escapeHtml(display)}</span>${hashCue}`;
 }
 
+// A small identity avatar: a coloured disc with the handle's initial. The hue is
+// derived deterministically from the actor hash so a person keeps a stable colour
+// across the feed, giving discussion/forum/social the identity affordance a real
+// social product has, without storing or inventing any avatar image.
+export function renderActorAvatar(state, hash, { size = 'md' } = {}) {
+  const handle = resolveHandleForHash(state, hash) || '';
+  const clean = String(handle).replace(/^@/, '');
+  const initial = (clean.charAt(0) || '?').toUpperCase();
+  const src = String(hash || handle || '');
+  let hue = 0;
+  for (let i = 0; i < src.length; i += 1) {
+    hue = (hue * 31 + src.charCodeAt(i)) % 360;
+  }
+  return `<span class="avatar avatar--${size}" style="--avatar-hue:${hue}" aria-hidden="true">${escapeHtml(initial)}</span>`;
+}
+
 function capitalize(value) {
   if (!value) return '';
   return value.charAt(0).toUpperCase() + value.slice(1);

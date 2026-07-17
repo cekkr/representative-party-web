@@ -23,5 +23,6 @@ test('installation wizard shows on first run and hides after save', async (t) =>
 
   const { text: afterText } = await fetchText(`${server.baseUrl}/admin`);
   assert.match(afterText, /data-install-mode="full"/);
-  assert.match(afterText, /Initialized: true/);
+  // Rendered by the shared context panel as an "Initialized" fact row.
+  assert.match(afterText, /Initialized<\/dt>\s*<dd[^>]*>Yes</);
 });

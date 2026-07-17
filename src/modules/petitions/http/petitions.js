@@ -25,12 +25,12 @@ import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
+import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { recordRateLimit } from '../../ops/metrics.js';
 import { normalizeCommentStance } from '../../petitions/commentStance.js';
 import { getGovernanceSettings } from '../../governance/constitution.js';
-import { renderCalloutRow } from '../../../interfaces/http/views/shared.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -61,8 +61,6 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
   const governance = getGovernanceSettings(state);
-  const petitionGateReasonLine = renderCalloutRow(petitionGate.message || '');
-  const voteGateReasonLine = renderCalloutRow(voteGate.message || '');
   const query = url || new URL(req.url, `http://${req.headers.host}`);
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
   const composeOpen = query.searchParams.get('compose') ? 'open' : '';
@@ -82,11 +80,37 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
     {
       person,
       personHandle: resolvePersonHandle(person),
-      petitionStatus: petitionGate.allowed ? 'You can draft proposals.' : petitionGate.message || petitionGate.reason,
-      voteStatus: voteGate.allowed ? 'You can vote on proposals.' : voteGate.message || voteGate.reason,
-      petitionGateReasonLine,
-      voteGateReasonLine,
-      roleLabel: person?.role || 'guest',
+      petitionsContext: renderContextPanel({
+        gates: [
+          {
+            label: 'Draft proposals',
+            status: petitionGate.allowed ? 'Allowed' : 'Blocked',
+            allowed: petitionGate.allowed,
+            reason: petitionGate.allowed ? '' : petitionGate.message || petitionGate.reason,
+          },
+          {
+            label: 'Vote on proposals',
+            status: voteGate.allowed ? 'Allowed' : 'Blocked',
+            allowed: voteGate.allowed,
+            reason: voteGate.allowed ? '' : voteGate.message || voteGate.reason,
+          },
+        ],
+        facts: [
+          { term: 'Role', value: person?.role || 'guest' },
+          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
+          { term: 'Quorum advances to', value: quorumAdvanceLabel },
+          {
+            term: 'Delegation conflicts',
+            value: delegationEnabled
+              ? conflicts.map((c) => c.topic).join(', ') || 'None detected'
+              : 'Delegation disabled',
+          },
+        ],
+        guidance: [
+          'Use proposals when you need a decision; discussion and social lanes stay exploratory.',
+          'Circle policy governs quorum and votes; group cachets inform delegation only.',
+        ],
+      }),
       petitionsList: renderPetitionList(petitionsPageInfo.items, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
         allowDelegation: delegationEnabled,
         allowVoting: modules.votes,
@@ -96,7 +120,6 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
         state,
       }),
       petitionsPager,
-      conflictList: delegationEnabled ? conflicts.map((c) => c.topic).join(', ') || 'No conflicts detected' : 'Delegation disabled.',
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
       quorumDefault: governance.quorumDefault,
