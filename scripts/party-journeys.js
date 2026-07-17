@@ -332,6 +332,23 @@ async function post(page, { topic, stance, content, evidence }) {
   await submitNear(page, '#discussion-compose textarea[name="content"]');
 }
 
+/** Posts one short update to the social lane (A2.7 — the lane stays conversational). */
+async function socialPost(page, { content, visibility, targetHandle }) {
+  await visit(page, '/social/feed');
+  if (!(await typeInto(page, '#social-compose textarea[name="content"]', content))) return false;
+  if (visibility) await selectOption(page, '#social-compose select[name="visibility"]', visibility);
+  if (targetHandle) await typeInto(page, '#social-compose input[name="targetHandle"]', targetHandle);
+  return submitNear(page, '#social-compose textarea[name="content"]');
+}
+
+/** Adds one typed follow edge (circle/interest/info/alerts). */
+async function follow(page, { handle, type }) {
+  await visit(page, '/social/feed');
+  if (!(await typeInto(page, '#social-follows input[name="handle"]', handle))) return false;
+  if (type) await typeInto(page, '#social-follows input[name="type"]', type);
+  return submitNear(page, '#social-follows input[name="handle"]');
+}
+
 /** Finds the id of the proposal whose card contains `titleFragment`. */
 async function findPetitionId(page, titleFragment) {
   return page.evaluate((frag) => {
@@ -863,6 +880,70 @@ async function journeyAccountability(browser) {
   }
 }
 
+/**
+ * A2.7/A2.13/A2.14 — the social lane stays social. Short attributed updates,
+ * typed follow edges, and a reshare-with-comment, so the "small talk + info"
+ * lane is populated and a screenshot can show at a glance that a social post is
+ * not a vote. The feed is scoped to followed handles, so one member (Anna, the
+ * high-activity student) follows the active posters and we shoot *her* wall.
+ */
+async function journeySocial(browser) {
+  console.log('\n— social: the lane stays social (posts, typed follows, a reshare)');
+  const posts = [
+    ['anna.conti', 'Serata referendum ai banchetti: affluenza bassa ma tanti under-30 che chiedevano dello ius scholae. Il tema c’è, manca la legge.'],
+    ['giulia.ferrero', 'Reparto pieno anche oggi. La proposta sull’intramoenia è però in dirittura: se avete firme da raccogliere in circolo, è il momento.'],
+    ['valentina.sanna', 'Nota per chi mi chiede i numeri liste d’attesa: la fonte è la rilevazione interna su 14 aziende, non i portali regionali. Confronto la settimana prossima.'],
+    ['tommaso.ricci', 'Da Trento: incontro di circolo giovedì sull’autonomia. Porto i dati sui LEP, non gli slogan.'],
+    ['nadia.hamdi', 'Dalla Sicilia: stessi tempi CUP che si raccontano al Nord. Non è un’emergenza locale, è il sistema.'],
+    ['ahmed.ben.salah', 'Turno finito. Grazie a chi è passato al presidio stamattina, eravamo in tanti.'],
+    ['paolo.greco', 'Verificato allo sportello del circolo, con l’aiuto dei ragazzi. Ci sono anch’io.'],
+    ['anna.conti', 'Promemoria: assemblea sullo ius scholae mercoledì, anche da remoto. Portate domande, non bandiere.'],
+    ['valentina.sanna', 'Grafico dei tempi PNGLA per classe di priorità in arrivo. Chi lo vuole in anteprima, mi segua su “interesse”.'],
+    ['luca.esposito', 'Non sono d’accordo su tutto, ma il livello del dibattito qui è un’altra cosa rispetto ai gruppi social. Si discute davvero.'],
+  ];
+  for (const [handle, content] of posts) {
+    const page = await member(browser, handle);
+    await socialPost(page, { content });
+  }
+
+  // Anna follows the active posters, with typed edges, so her wall is populated.
+  const anna = await member(browser, 'anna.conti');
+  const follows = [
+    ['giulia.ferrero', 'circle'],
+    ['valentina.sanna', 'interest'],
+    ['tommaso.ricci', 'info'],
+    ['nadia.hamdi', 'interest'],
+    ['ahmed.ben.salah', 'alerts'],
+    ['paolo.greco', 'circle'],
+  ];
+  for (const [handle, type] of follows) {
+    await follow(anna, { handle, type });
+  }
+
+  // A2.14 — a reshare with commentary (best-effort: the reshare form lives in a
+  // per-post disclosure on the wall; if it is not reachable, the run continues).
+  await visit(anna, '/social/feed');
+  await anna.evaluate(() => {
+    const cards = [...document.querySelectorAll('.social-post')];
+    const card = cards.find((c) => (c.textContent || '').includes('tempi PNGLA per classe'));
+    const details = card && [...card.querySelectorAll('details')].find((d) => /reshare/i.test(d.querySelector('summary')?.textContent || ''));
+    if (!details) return;
+    details.open = true;
+    const form = details.querySelector('form');
+    const ta = form?.querySelector('textarea[name="content"]');
+    if (ta) ta.value = 'Da leggere prima di parlare di “vincolo di mandato” al bar.';
+    const btn = form?.querySelector('button[type="submit"], button:not([type])');
+    if (btn) btn.click();
+  });
+  await settle(anna);
+
+  await visit(anna, '/social/feed');
+  await expectText(anna, 'ius scholae', 'the social lane is populated and scoped to followed people');
+  await shot(anna, 'party-social', 'The social lane stays social: short attributed updates from followed people, typed follows (circle/interest/info/alerts), and a reshare — visibly not a vote.', {
+    focus: '#social-wall',
+  });
+}
+
 /* ------------------------------------------------------------------- main */
 
 async function main() {
@@ -876,6 +957,7 @@ async function main() {
   try {
     if (wanted('arrive')) await journeyArrive(browser);
     if (wanted('discussion')) await journeyDiscussion(browser);
+    if (wanted('social')) await journeySocial(browser);
     // The long-tail draft is seeded first so it sits, below quorum, beneath the
     // proposal that does reach quorum in the signatures shot.
     if (wanted('longtail')) await journeyLongTail(browser);
