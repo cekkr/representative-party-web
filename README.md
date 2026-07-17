@@ -11,45 +11,74 @@ This repository is a Node.js SSR application that starts as a usable email/discu
 
 ---
 
-## Screenshots
+## A walkthrough
 
-Captured from `./run-standalone.sh` with the demo scenario from `scripts/seed-demo.js` (a care cooperative that started as a shared inbox). Regenerate any time with `node scripts/ui-screenshots.js`.
+Six members of a care cooperative — `@nadia` (night nursing), `@tomas` (pharmacy), `@ines` (delegate), `@koen` (logistics), `@mara` (works council), and the provider admin — take one concern from a message to a decision.
 
-### Organization pressure workspace (`/organization`)
+Every screenshot below is produced by `scripts/user-journeys.js`, which drives these flows through the interface itself: clicking the controls, typing into the fields, one browser session per member. It asserts the outcome at each step, so a broken flow fails the run instead of quietly producing a nice picture.
 
-Email-first intake on the left, the focused case in the middle, and the case lens on the right. Layers that are not enabled stay visible as labeled previews so the adoption path is legible before you turn anything on.
+```bash
+./run-standalone.sh                                     # terminal 1
+BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js   # terminal 2
+```
 
-![The organization pressure workspace: pressure inbox, focused case, and case lens](md-assets/screens/organization.png)
+### 1. It starts as a message
 
-### Home workspace (`/`)
+`@nadia` raises a recurring problem in the discussion lane. No case, no form, no taxonomy — a post, attributed to her handle, with the blinded hash beside it as the accountability cue.
 
-Access gates, lane activity, and operator cues — for guests and members alike, rather than a brochure or a forced redirect into a feed.
+![A discussion post by @nadia about late ward deliveries, tagged to the care-quality topic](md-assets/walkthrough/discussion-posted.png)
 
-![The home workspace showing current access, lane counts, and operator cues](md-assets/screens/home.png)
+### 2. The organization can see the pressure
 
-### Social lane (`/social/feed`)
+`/organization` reads the same kind of signal as a case: the source message stays canonical in the middle, the inbox on the left, and the case lens on the right explains *why this needs attention* — voice type, visibility, scope, and the pressure components behind the cue.
 
-Typed follows (circle/interest/info/alerts) drive a micro-post lane kept deliberately separate from the decision track.
+![The organization workspace: pressure inbox, the focused case on its source message, and the case lens](md-assets/walkthrough/organization-case.png)
 
-![The social feed with typed follows and the sticky composer](md-assets/screens/social.png)
+Layers the provider has not enabled do not disappear and do not pretend to work. They render as labeled previews, so the adoption path is legible before anything is switched on.
 
-### Proposals (`/petitions`)
+![The Protection layer shown as a template preview, labeled as off, with the enable path explained](md-assets/walkthrough/organization-layer.png)
 
-Gates, context, and guidance are shown as distinct things: what you may do, the facts that apply, and what the lane is for.
+### 3. It becomes a proposal
 
-![The proposals lane showing gate cards, context facts, and the draft form](md-assets/screens/petitions.png)
+When a decision is actually needed, `@nadia` drafts one. The outline is structured — problem, action, impact, risks, plan — so the argument has to be made explicitly rather than asserted.
 
-### Delegation (`/delegation`)
+![The proposal draft form with structured outline fields](md-assets/walkthrough/proposal-drafted.png)
 
-Topic-scoped, revocable delegation with an "explain my influence" chain view.
+### 4. Signatures carry it to quorum
 
-![The delegation lane with per-topic delegates and freshness cues](md-assets/screens/delegation.png)
+Four distinct members sign. Quorum is what moves a proposal into discussion — not an administrator's opinion.
 
-### Module control center (`/admin`)
+![A proposal card showing quorum 3, four signatures, and the discussion stage](md-assets/walkthrough/proposal-signatures.png)
 
-Provider settings, policy, signing keys, and module toggles grouped by lane.
+Deliberation is stance-tagged (support / concern / question), so a reader can see the shape of the disagreement rather than a flat comment thread.
 
-![The admin module control center](md-assets/screens/admin.png)
+![A stance-tagged deliberation note on the proposal](md-assets/walkthrough/proposal-deliberation.png)
+
+### 5. Opening a vote is a deliberate, attributed act
+
+The author **cannot** open a vote on their own proposal. A moderator confirms a pre-vote freeze, and the freeze is attributed and timestamped: votes are recorded against text that can no longer move under them.
+
+![The frozen proposal, attributed to @admin, open for voting](md-assets/walkthrough/proposal-vote-open.png)
+
+### 6. Members vote, and the tally is auditable
+
+Each vote is a signed envelope. The card carries its own history — quorum, signatures, revisions, the frozen revision id — beside the tally.
+
+![The proposal showing votes yes: 3, no: 0, abstain: 0, with the frozen revision and stage cues](md-assets/walkthrough/vote-cast.png)
+
+### 7. Groups organize the work
+
+`@mara` opens a working group with its own topics; `@koen` joins. Group policy, preferred delegates, and delegate elections live inside the group — separate from Circle policy.
+
+![The group card showing members, delegates, and the group policy, delegate, and election controls](md-assets/walkthrough/group-joined.png)
+
+### 8. Delegation is explained, not assumed
+
+`@koen` delegates `care-quality` to `@ines` — chosen by handle, never by raw hash. The "explain my influence" view states plainly where the vote goes.
+
+![The effective delegation chain: topic care-quality, You → @ines, "Your vote goes directly to this delegate"](md-assets/walkthrough/delegation-set.png)
+
+Delegation stays topic-scoped, advisory, and revocable: cycles, banned delegates, and overlong chains are stopped automatically.
 
 ---
 
@@ -166,12 +195,20 @@ npm start
 The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`). Signing keys are exported as PEM **text** — passing a file path leaves envelopes unsigned and `/admin` reports the key as ignored rather than loaded.
 
 ```bash
+# Drive the real member flows through the UI (discussion, proposal, vote,
+# groups, delegation) and capture the walkthrough screenshots above
+BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js
+
 # Fill a running deployment with a plausible demo organization
 BASE_URL=http://127.0.0.1:3000 node scripts/seed-demo.js
 
 # Capture one screenshot per route + a layout audit (clipping, blocked clicks)
 BASE_URL=http://127.0.0.1:3000 node scripts/ui-screenshots.js
 ```
+
+`user-journeys.js` gives each member their own browser context, so quorum and
+"another member sees it" are checked against genuinely distinct sessions. Use
+`HEADLESS=false` to watch a run, or `ONLY=proposal,vote` to drive one track.
 
 On first run, visit `/admin` to complete the installation wizard (Circle basics, data mode, peer alignment, optional defaults). Saving persists settings to the configured adapter (JSON/KV under `src/data/` by default). The module control center in `/admin` keeps toggles and related settings linked with jump anchors.
 
