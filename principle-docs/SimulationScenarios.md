@@ -1,6 +1,7 @@
 # Simulation Scenarios
 
-Status: reference fixtures for development, testing, and screenshots.
+Status: reference scenarios and causal replay contract for development, testing,
+and screenshots.
 
 ## Why this exists
 
@@ -13,8 +14,11 @@ behind it, a vote whose tally means nothing because one person cast all of it.
 
 This document defines two situations rich enough to break things, and scripts
 them as ordered actions bound to real routes and real field names. Use them to
-seed a deployment, to write tests, and to produce screenshots that show the
-product doing its job.
+replay a deployment from empty state, to write tests, and to produce screenshots
+that show the product doing its job. A final database that happens to contain
+the expected records is not a successful simulation: the interactions that
+caused those records, and what each actor could observe after each one, are the
+test.
 
 The two scenarios are deliberately **kept apart**. They exercise different
 halves of the framework and must not be merged into one deployment:
@@ -69,13 +73,149 @@ Action ids are stable. A test that references **A3.2** should keep referencing
 the same act even if the surrounding prose changes. New actions extend the
 numbering; they never renumber existing acts.
 
+Each scenario declares a canonical phase schedule. Within one scheduled phase,
+document order is causal. The numeric suffix is a stable identifier, not a
+sorting instruction: later additions may therefore appear as **A3.11** before
+**A3.7** when that is where the new interaction belongs in the phase.
+
 Three labels mark what the codebase can do with an action **today**:
 
-- **[drive]** — a test can perform this through the UI and assert the result.
+- **[drive]** — a test can perform this through the real interface and assert
+  the immediate result and resulting state transition.
 - **[fixture]** — the data exists, but only as a hardcoded template; a test can
-  assert what renders, not the workflow that produced it.
+  assert what renders, not the workflow that produced it. It is snapshot
+  coverage, never evidence that the corresponding interaction works.
 - **[design]** — described by the principle doc, not yet built. Listed so the
   scenario stays whole and so the gap is legible. Do not write a test for it.
+
+## Execution contract — one actor, one event, one observable delta
+
+The scenario runner is a deterministic multi-actor simulation. Here, an
+**agent** means one test actor with its own identity, session, observations, and
+local memory. It does not mean an LLM, and it is not allowed privileged access
+to application state. The provider operator, every named user/person, every
+supporting quorum participant, and every peer provider are separate agents.
+`@caso-4471` is a protected relay identity, not a hidden alias for another
+agent.
+
+### Independent actor state
+
+Each agent owns, at minimum:
+
+- a stable actor id and deterministic credential seed;
+- its own wallet/authentication flow and `circle_session` cookie jar;
+- its own browser context or equivalent isolated HTTP client;
+- only the record ids, handles, messages, and facts it has actually observed;
+- its own notification/inbox cursor and last-seen view state.
+
+Contexts may be closed and restored from that same agent's saved session to
+keep a large run affordable, but two agents must never share a cookie, pending
+wallet offer, local storage, or remembered record id. The orchestrator may
+choose whose turn is next; it may not act for them, copy hidden ids into their
+memory, or turn one authenticated session into several apparent people.
+
+### Decisions come from observed state
+
+Each cast entry supplies the agent's stable role and motivation; the current
+surface supplies the facts it can act on. The action text is the expected
+decision, not permission for the orchestrator to post a prepared payload behind
+the agent's back. A deterministic runner can express the turn as:
+
+```text
+observation[t] = observe(agent, world[t])
+interaction[t] = decide(profile, memory[t], observation[t], simulatedTime[t])
+world[t+1]     = applyThroughRealInterface(world[t], interaction[t])
+memory[t+1]    = learn(memory[t], observation[t], response[t])
+```
+
+`decide` may be an ordinary test state machine; no generative model is required.
+It must return at most one interaction and may use only the agent's profile,
+memory, current observation, and clock. If Giulia has not observed the petition
+id, if a signer cannot see the proposal, or if an affected user has not refreshed
+their notifications, the next action is not yet justified and the step fails.
+This is what makes the replay a calculation over real intermediate state rather
+than a script that installs a predetermined final graph.
+
+### Fresh ground
+
+Every conformance replay starts with a fresh store for exactly one scenario.
+Before event 1, setup may create the database schema, signing material, virtual
+clock, provider bootstrap identity, and the deployment configuration in **A.0**
+or **B.0**. It may not insert discussions, cases, signatures, ballots,
+delegations, notifications, audit entries, or end-state aggregates.
+
+`scripts/seed-demo.js`, adapter writes, imported JSON, and domain-helper calls
+may still support previews or focused unit tests, but a run that uses them to
+materialize scenario state is not a scenario conformance run. A **[fixture]**
+may be mounted for render testing in a separate run; it must never be counted as
+a completed **[drive]** event or silently satisfy a later event's precondition.
+
+### The event loop
+
+Run phases in the scenario's declared order, then run actions from top to bottom
+inside each phase. For every **[drive]** action:
+
+1. **Select one agent.** Resolve the named actor and restore only that actor's
+   state. Phrases such as “each member”, “eight members”, or “250+ members”
+   expand into one scheduled event per concrete agent before replay begins.
+   Explicit clock advances and scheduler ticks instead select the named system
+   control; they never impersonate a user.
+2. **Observe the precondition.** The acting agent reaches the real surface and
+   discovers any needed id or state there. Assert that the action is currently
+   possible; do not assume the end-state fixture.
+3. **Perform one interaction.** Submit one form, follow one link, cast one
+   ballot, or make one protocol request through the production boundary named
+   by the action. A batch API call that impersonates several actors is not one
+   interaction.
+4. **Settle deterministically.** Wait for the response and the bounded work it
+   legitimately triggers: persistence, audit append, notification delivery, or
+   gossip. Clock advances and scheduler ticks are explicit trace events, never
+   hidden sleeps or direct edits to timestamps.
+5. **Observe from the ground.** The acting agent checks the returned surface.
+   Every affected agent then independently refreshes its own inbox or relevant
+   view before the test claims that it was notified or can see the change.
+6. **Assert the delta.** Check the immediate effect, the previous state that
+   must remain intact, relevant policy/privacy negatives, and the audit or
+   envelope entry. Aggregate counters must equal the events replayed so far,
+   not merely their final target. A read-only test auditor may inspect the
+   store, logs, or envelopes for these assertions, but its findings never enter
+   an agent's memory or supply a later interaction id.
+7. **Append the trace and continue.** A failed assertion stops the replay at
+   that event and preserves the store, actor id, before/after observations, and
+   trace prefix needed to reproduce it.
+
+System reactions such as “quorum moves the proposal to discussion” are caused
+by the preceding user event. Record and assert them as derived transitions; do
+not call an internal status function to manufacture them. The baseline replay
+is serialized so every consequence has an unambiguous cause. Race and
+concurrency tests are valuable, but they are separate schedules replayed after
+the canonical step-by-step one passes.
+
+### Trace and checkpoint requirements
+
+The runner should emit one machine-readable trace entry per event with at least:
+
+```text
+sequence · scenario action id · concrete child id · simulated time · actor id
+observed precondition · interaction · response · observable delta
+affected agents · assertions · audit/envelope references
+```
+
+Compound actions retain their stable parent id and gain deterministic child ids,
+for example `A3.3/sign-001` … `A3.3/sign-250`. A checkpoint is a replay cache,
+not test truth: a run resumed at a checkpoint must retain the full trace prefix,
+and CI must periodically prove that the same checkpoint can be rebuilt from an
+empty store. Screenshots are captured from the agent who is meant to see the
+state at that exact step, not from an omniscient admin after the scenario ends.
+
+### What counts as passing
+
+A scenario passes only when all of its currently **[drive]** events have been
+replayed, their step-local assertions pass, and the end state can be explained
+as the fold of those recorded deltas. A final-state assertion is still useful
+as a checksum, but it cannot replace the event trace. **[fixture]** render checks
+and **[design]** gaps are reported separately so a green screenshot run cannot
+be mistaken for executable workflow coverage.
 
 ---
 
@@ -111,14 +251,30 @@ problem (`RepresentativeParties.md` §2.4, §6.2.1): delegated power lapses unle
 renewed, so influence has to be re-earned rather than accumulated once and held.
 **A7** exercises it.
 
-The ring: the fixture assumes three providers — `rcn-nord` (the one being
-seeded), `rcn-sud`, and, in **A10**, a rogue node. Everything through **A9**
+The ring: the scenario assumes three providers — `rcn-nord` (the one being
+replayed), `rcn-sud`, and, in **A10**, a rogue node. Everything through **A9**
 works on a single provider; **A10** needs the second one.
+
+Canonical replay order:
+
+```text
+A1 arrival → A2 conversation → A4 conflict/group formation → A5 election
+→ A6 delegation → A7 decay/renewal → A3 proposals/freeze/vote
+→ A8 accountability → A9 governance change → A10 federation
+```
+
+This deliberately runs **A3** after **A7**, even though its specification is
+presented earlier to keep the document's product narrative readable. The main
+vote can then resolve real, already-aged delegation state. A runner that simply
+sorts action ids would cast `choice=auto` before those delegations exist and
+would be testing a different world.
 
 ## A.1 Cast
 
-Sixteen people. Enough that quorum is real, delegation forms chains rather than
-pairs, and a conflict has two credible sides.
+Sixteen named actors carry the narrative: fifteen civic participants and one
+provider operator. They are enough for delegation to form chains rather than
+pairs and for conflicts to have two credible sides, but they are **not** enough
+to fake a quorum of 250.
 
 | Handle | Role | Who they are | Why they are in the fixture |
 | --- | --- | --- | --- |
@@ -138,6 +294,20 @@ pairs, and a conflict has two credible sides.
 | `@stefano.lombardi` | person | Union rep, Taranto | Overlaps and conflicts with `@chiara.moretti` |
 | `@valentina.sanna` | person | Researcher, Cagliari | Fact-checks; files evidence |
 | `@rcn.provider` | admin | Provider operator | Runs the node; never decides policy |
+
+The replay manifest therefore adds a deterministic **supporting quorum cohort**
+of at least 235 fictional natural-person agents. Together with the fifteen
+named civic participants, this yields at least 250 independently authenticated
+potential signers. Supporting agents need stable actor ids and distinct blinded
+identities, sessions, and event choices; they do not need invented biographies
+or public handles merely to decorate a screenshot. The manifest records which
+named people sign and which supporting agents complete the quorum.
+
+The cohort is test infrastructure for scale, not a bulk seed. **A1.1** is
+replayed separately for every cohort member, and **A3.3** emits one signature
+event per signer. A runner may page their contexts out between turns, but may
+not create one session and reuse it 235 times or insert 235 ledger rows through
+the adapter.
 
 Two role facts the fixture must preserve, because they are the whole argument of
 the thesis:
@@ -203,7 +373,8 @@ disagreement is one-dimensional cannot show whether the interface helps.
 
 ## A.3 Act 1 — Members arrive, and are counted once
 
-**A1.1** each member — `GET /auth/eudi` → follow the callback — **[drive]**
+**A1.1** each civic participant, named and supporting — `GET /auth/eudi` →
+follow the callback — **[drive]**
 → a session exists; the store holds a **blinded hash only**, never a codice
 fiscale. This is the "one person = one voice without a PII honeypot" claim, and
 it is checkable: grep the store for raw identifiers and find none.
@@ -212,7 +383,9 @@ December 2024: patente, tessera sanitaria, carta europea della disabilità) and
 the EUDI Wallet (Reg. (UE) 2024/1183) are making ordinary. The scaffold is the
 same handshake with the production wallet swapped in.
 
-**A1.2** each member — `POST /profile` — `intent=handle`, `handle=giulia.ferrero` — **[drive]**
+**A1.2** each named civic participant — `POST /profile` — `intent=handle`,
+`handle=giulia.ferrero` (Giulia's event; use the cast handle for each other
+agent) — **[drive]**
 → `@giulia.ferrero` renders everywhere the hash would. A raw hash surfacing as
 identity is a bug.
 
@@ -362,6 +535,13 @@ Volume target: **≥30 discussion posts across all 6 topics, ≥20 social posts,
 ≥3 forum articles with comments.** Below that, topic filters, the gardener, and
 pagination all render as empty chrome.
 
+These are event counts, not permission to generate a final dataset. The replay
+manifest expands the remaining discussion/social/forum volume into concrete
+child events with stable actor, intent, content, and simulated time. Each is
+submitted and observed separately. If that manifest has only the named examples
+above and bulk-inserts the rest, the volume target is uncovered and the replay
+must report it as such.
+
 ## A.5 Act 3 — A proposal earns its way to a vote
 
 **A3.1** `@giulia.ferrero` — `POST /petitions` — **[drive]**
@@ -399,12 +579,33 @@ revises the cap to 20% after modelling specialist retention; revision history
 and a diff must be inspectable.
 → **the draft changed, and who changed it is on the record.**
 
-**A3.3** 250+ members — `POST /petitions/sign` — `petitionId=...` — **[drive]**
+**A3.3** 250+ concrete signer agents — `POST /petitions/sign` —
+`petitionId=...` — **[drive]**
 → quorum moves the proposal to `discussion` **on its own**. No moderator
 touches it. If quorum were discretionary the signatures would be theatre.
+→ Replay `A3.3/sign-001` through `A3.3/sign-250` in order. After signature
+249, the acting agent and a separate observer must still see the pre-quorum
+state. Signature 250 is the single cause of the transition; only then may the
+proposal render as `discussion`. Every signature must carry a distinct session
+and blinded identity.
+
+**A3.10/preferences** `@giulia.ferrero` —
+`POST /notifications/preferences` — `notifyProposalComments=on` — **[drive]**
+→ preference persistence is asserted before another person comments. This is
+the first child event of stable parent **A3.10**; it is not bundled with the
+later inbox read.
 
 **A3.4** `@luca.esposito` — `POST /petitions/comment` — `stance=concern` — **[drive]**
 `content=If the cap bites, specialists will move to accredited private providers and public-service waits will worsen. The risk is written into the proposal itself: what concretely offsets it?`
+
+**A3.10/observe** `@giulia.ferrero` — `GET /notifications` — **[drive]**
+→ in her own restored context, Giulia observes the alert caused by **A3.4**.
+The orchestrator may not infer delivery from Luca's successful response.
+
+**A3.10/read** `@giulia.ferrero` — `POST /notifications/read` — **[drive]**
+→ the same notification becomes read and remains tied to Giulia's verified
+handle. Parent **A3.10** now proves the full preference → event → observation →
+read loop as three interactions by two agents.
 
 **A3.5** `@valentina.sanna` — `POST /petitions/comment` — `stance=question`, `factCheck=yes` — **[drive]**
 `content=The survey covers 14 health authorities out of more than 100: is that a sufficient sample for a national cap? I request a review of the sampling method.`
@@ -418,11 +619,6 @@ touches it. If quorum were discretionary the signatures would be theatre.
 `content=That is why the proposal attaches to the existing national platform under Law 107/2024: no new competence, only conditions tied to monitoring already in place.`
 → a **rebuttal in the tree, not a new thread**. The argument map is only worth
 its code if the fixture contains an actual pro/con exchange under one node.
-
-**A3.10** `@giulia.ferrero` — `POST /notifications/preferences` — `notifyProposalComments=on`, then `GET /notifications`, `POST /notifications/read` — **[drive]**
-→ the author opted into comment alerts; Luca's concern (**A3.4**) produced one;
-she read it. Alerts are tied to a verified handle — the fixture exercises the
-full loop, not just the toggle.
 
 **A3.11** `@giulia.ferrero` — `POST /petitions/update` — **[drive]**
 `risks` and `implementationPlan` revised to answer **A3.4** (institutional-activity
@@ -443,10 +639,43 @@ that is where **A6** and **A7** land. Luca votes `no` and the tally shows it:
 a unanimous fixture would hide whatever the tally view gets wrong about
 minorities.
 
-Fixture target: **3 proposals in different stages** — this one in `vote`,
-`salario-minimo` in `discussion` (drafted by Ahmed, revised after **A2.9**'s
-CNEL reframing), `consumo-suolo` in `draft` below quorum (Davide's long-tail
-case: 41 signatures of 250 — visible, pending, *not* buried).
+**A3.12** `@ahmed.ben.salah` — `POST /petitions` — **[drive]**
+`title=An effective €9 floor tied to collective-agreement coverage`,
+`quorum=250`
+→ the first draft answers Luca's margin concern in **A2.3** rather than erasing
+it, and its evidence summary cites the effective-coverage question in **A2.10**.
+Populate the remaining structured outline fields through the visible form from
+those observed discussion facts; do not clone **A3.1** through storage.
+
+**A3.13** `@ahmed.ben.salah` — `POST /petitions/update` — **[drive]**
+→ after independently reopening and observing Valentina's **A2.9** evidence,
+Ahmed revises the proposal to distinguish deposited CCNL count, effective
+coverage, and expired sub-threshold contracts. The revision diff names the
+evidence-driven change.
+
+**A3.14** 250 concrete signer agents — `POST /petitions/sign` — **[drive]**
+→ expand to `A3.14/sign-001` … `A3.14/sign-250`. The proposal remains `draft`
+through signature 249 and moves to `discussion` only on 250, under the same
+distinct-agent and step-local counter assertions as **A3.3**.
+
+**A3.15** `@davide.villa` — `POST /petitions` — **[drive]**
+`title=Stop net land consumption around the Cuneo logistics corridor`,
+`quorum=250`
+→ the long-tail concern in **A2.17** becomes a visible draft without pretending
+that local salience has already produced national support.
+Populate its structured outline through the form from **A2.17** and the
+`consumo-suolo` reference facts above.
+
+**A3.16** 41 concrete signer agents — `POST /petitions/sign` — **[drive]**
+→ expand to `A3.16/sign-001` … `A3.16/sign-041`; assert the counter after every
+signature and assert that the proposal remains `draft` after number 41. The
+missing 209 signatures are meaningful state, not setup left for later.
+
+Stage-diversity target: these three proposals finish in different stages — the
+intramoenia proposal in `vote`, `salario-minimo` in `discussion`, and
+`consumo-suolo` in `draft` below quorum. **A4.1** (specified in the next section
+but replayed earlier by the canonical phase schedule) creates a fourth,
+conflict-focused proposal; none may be preloaded to obtain this arrangement.
 
 ## A.6 Act 4 — A conflict that delegation cannot resolve by itself
 
@@ -470,7 +699,7 @@ fixture.
 → **priority-mode cachet**: the group publishes ranked delegate preferences
 without any election (`electionMode=priority`, the default). Chiara outranks
 Stefano on paper; his members now have a reason to look at **A6.5**'s conflict
-prompt. Both mechanisms — priority and vote — must exist in the seeded data or
+prompt. Both mechanisms — priority and vote — must exist in the replayed state or
 the group-policy separation is untested.
 
 ## A.7 Act 5 — Groups, and choosing people
@@ -639,14 +868,18 @@ provider-local; **A1.3** made the promise, this act checks it.
 
 ## A.13 End state
 
-A reviewer opening this deployment should find: 16 members with handles and
-bios, plus one **banned org account** with a visible gate message · 6 live
+A reviewer opening this deployment should find: 15 named civic participants
+with handles, the provider operator, and a supporting cohort yielding at least
+250 independently authenticated potential signers, plus one **banned org
+account** with a visible gate message · 6 live
 topics tended by a reviewed gardener merge · ≥30 discussion posts including a
 closed fact-check loop and a public concession · ≥20 social posts with typed
 follows, one reshare, one locked photo with a view request, one rate-limit hit ·
-3 forum articles with comments · 3 proposals in `draft`/`discussion`/`vote`,
-one below quorum on purpose · 250+ signatures · a frozen text with an attributed
-freeze and a 3-revision history that answers its own deliberation · a ranked
+3 forum articles with comments · at least 4 proposals, including the staged
+`draft`/`discussion`/`vote` trio and the open conflict proposal from **A4.1** ·
+at least 541 independently replayed signatures (250 + 250 + 41), with one
+proposal below quorum on purpose · a frozen text with an attributed freeze and
+a 3-revision history that answers its own deliberation · a ranked
 election **won on transfers against the first-preference leader** · a
 priority-mode cachet coexisting with a vote-mode one · a readable 3-hop
 delegation chain · a conflict prompt resolved against the election winner ·
@@ -681,15 +914,26 @@ DATA_VALIDATION_LEVEL=strict
 DATA_PREVIEW=false
 ```
 
-Modules on: `coordination`, `protectedVoice`, `responsibilities`, `sectors`.
-**Off:** `petitions`, `votes`, `delegation`, `groups`, `federation`.
+Modules on at event 0: `coordination` only. This is intentionally a usable
+shared inbox, not a preassembled organization model.
+
+`protectedVoice`, `responsibilities`, `sectors`, `hierarchies`, `authority`,
+`funds`, `mediation`, `pressureAnalytics`, and `impactTracking` all begin
+**off** and are enabled by the explicit provider-agent events below, one at a
+time. `petitions`, `votes`, `delegation`, `groups`, and `federation` remain off
+for the entire scenario.
 
 That module list is a claim worth stating aloud: **an ASL does not vote on
 clinical decisions.** §*Non-goals* — "voting on every operational or expert
 decision", "replacing emergency command". A deployment that turns on `votes`
-here has misunderstood the product. `hierarchies`, `authority`, `funds`,
-`mediation`, `pressureAnalytics`, and `impactTracking` stay off at first and are
-switched on one at a time in **B4** — the adoption staircase, walked.
+here has misunderstood the product. The organization layers are switched on
+only after an interaction demonstrates why each is needed — the adoption
+staircase, walked rather than installed as final state.
+
+Canonical replay order is the written order: `B1 → B2 → B3 → B4 → B5 → B6`.
+Skipped **[design]** and separately mounted **[fixture]** items remain visible
+as gaps in the trace; they do not disappear and they do not create state for a
+later **[drive]** event.
 
 The actor label is `user`, not `person`. Verifying that Nadia is authorized
 staff is not the same as publishing that a concern came from Nadia.
@@ -873,7 +1117,7 @@ already, visibly, the one explaining it.
 `content=Received and logged. I am taking this to the admissions-flow group with the medical directorate: a response by Monday 12:00, with an owner and scope. In the meantime, report EVERY weekend, even if it feels repetitive — recurrence IS the data.`
 → acknowledgement with a stated boundary, as a message anyone can read. The
 *tracked* response boundary (a field with a clock on it) stays **[design]**;
-the social fact of the promise is seedable today.
+the social fact of the promise is replayable today.
 → note for the kernel's own backlog: `/discussion` is flat — the acknowledgement
 cannot thread under the signal it answers. Scenario B is the deployment that
 makes that gap visible (logged in `OPTIMIZATIONS.md`).
@@ -887,6 +1131,14 @@ makes that gap visible (logged in `OPTIMIZATIONS.md`).
 renders verbatim beside every added layer.
 
 ### B3 — Safe voice
+
+**B3.4** `@asl.provider` — `POST /admin` — `intent=modules`,
+`protectedVoice=true` — **[drive]**
+→ before this event, the protected route is unavailable and the ordinary inbox
+still works. After it, the module registry and navigation report protected
+voice enabled while all other organization layers remain off. This does not
+manufacture a working intake path: **B3.1** stays **[design]**, and the replay
+reports the toggle and workflow statuses separately.
 
 **B3.1** `@caso-4471` arrives through the protected path — **[design]**
 **B3.2** reveal policy is stated: who may reveal, under what condition, with
@@ -904,14 +1156,24 @@ mediation". The honest sentence is one line; its absence is a compliance bug.
 
 ### B4 — Layers, one at a time
 
-**B4.1** `@asl.provider` — `POST /admin` — `intent=modules`, `responsibilities=true` — **[drive]**
+**B4.7** `@asl.provider` — `POST /admin` — `intent=modules`, `sectors=true` —
+toggle **[drive]** / case-source comparison **[fixture]**
+→ enable the first case lens only after the corroborating messages in **B1.3**
+and the case-promotion need in **B2.1** exist. The inbox and source messages
+must be byte-for-byte unchanged; the new sector links are views over them, not
+copies.
+
+**B4.1** `@asl.provider` — `POST /admin` — `intent=modules`,
+`responsibilities=true` — toggle **[drive]** / relationship rendering
+**[fixture]**
 → `@dott.marino` is outcome owner; `@f.gallo` and `@s.pellegrino` hold action
 commitments; `@dott.sa.rizzo` holds the stop condition; `@t.russo` is consulted
 for the territorial exit path; ward and pharmacy leads are informed.
 → Invariant 6: assignment without acknowledgement is not ownership. Six
 distinct relationships that must **not** collapse into one "assignee".
 
-**B4.2** `intent=modules`, `hierarchies=true` — **[drive]**
+**B4.2** `@asl.provider` — `POST /admin` — `intent=modules`,
+`hierarchies=true` — toggle **[drive]** / flow-map rendering **[fixture]**
 ```
 formalFlow: Nurse → nursing coordinator → Emergency Medicine director → Hospital Medical Directorate
 actualFlow: Night-shift nurse ↔ nursing coordinator ↔ bed manager (@l.deangelis)
@@ -923,7 +1185,8 @@ every weekend actually routes through — the same person whose **B1.3** post
 already explained why. Overloaded intermediaries are found here, not in the
 org chart.
 
-**B4.3** `intent=modules`, `authority=true` — **[drive]**
+**B4.3** `@asl.provider` — `POST /admin` — `intent=modules`,
+`authority=true` — toggle **[drive]** / grant rendering **[fixture]**
 ```
 Raise    · any staff member              · no authorization required
 Propose  · admissions-flow group         · limited pathway change
@@ -936,7 +1199,8 @@ source, scope, condition, expiry, review. `@dott.marino` keeps the clinical
 decision right *and* receives frontline evidence directly — Invariant 4:
 consultation does not transfer the accountable decision.
 
-**B4.4** `intent=modules`, `mediation=true` — **[drive]** / workflow **[design]**
+**B4.4** `@asl.provider` — `POST /admin` — `intent=modules`,
+`mediation=true` — toggle **[drive]** / workflow **[design]**
 → B-4 enters the protected path: acknowledge → review → dialogue → agreement →
 escalate → learn. *Realtà:* the neutral figures an Italian ASL actually has are
 the CUG (Comitato Unico di Garanzia, art. 57 d.lgs. 165/2001) and, where
@@ -949,7 +1213,9 @@ about, and Invariant 10 says so plainly: *closing a case is not solving a
 problem.* The learn step publishes a permission-safe finding: night cover below
 minutaggio in 3 of 31 sites — without exposing `@caso-4471`.
 
-**B4.5** `intent=modules`, `pressureAnalytics=true` — **[drive]**
+**B4.5** `@asl.provider` — `POST /admin` — `intent=modules`,
+`pressureAnalytics=true` — toggle **[drive]** / component rendering
+**[fixture]**
 → B-1 shows its **components**, never a bare score:
 ```
 volume 4 weekends (the B1.3 signals) · velocity +30% vs 90-day baseline
@@ -967,7 +1233,8 @@ from this, and no individual "pressure absorber" leaderboard may exist —
 exposes protected participation. A test should assert no per-person ranking
 renders.
 
-**B4.6** `intent=modules`, `impactTracking=true` — **[drive]** / workflow **[design]**
+**B4.6** `@asl.provider` — `POST /admin` — `intent=modules`,
+`impactTracking=true` — toggle **[drive]** / workflow **[design]**
 → baseline, target, boundary, stop condition, **recurrence and displacement
 checks**. The displacement check has a name in this fixture: `@g.lombardo` and
 `@t.russo` watch whether the hospital's median improves by pushing fragile
@@ -981,11 +1248,17 @@ del sovraffollamento is what national guidance (linee di indirizzo 2019) already
 requires every PS to have; the platform's only job is to record who activated
 it, why consultation was bypassed, and when review happens. It does not slow him
 down — a framework that makes this harder has failed at the exact moment it
-matters. His announcement (`POST /discussion`, topic `pronto-soccorso`) is
-seedable today: `The overcrowding-management plan was activated at 23:50: an
-overflow area with six trolleys is open, and staff have been called in under
-the on-call arrangement. Review on Monday with the medical directorate and risk
-management.`
+matters.
+
+**B5.3** `@dott.marino` — `POST /discussion` —
+`topic=pronto-soccorso`, `stance=neutral` — **[drive]**
+`content=The overcrowding-management plan was activated at 23:50: an overflow
+area with six trolleys is open, and staff have been called in under the on-call
+arrangement. Review on Monday with the medical directorate and risk management.`
+→ the messaging kernel can record an off-platform emergency act today even
+though the structured bypass workflow in **B5.1** is not built. Each other
+affected staff agent must discover the announcement through its own refreshed
+view; the runner may not mark them informed merely because the post exists.
 
 **B5.2** the 48-hour review — **[design]**
 → the recorded bypass gets its scheduled look-back: was the trigger right, did
@@ -994,10 +1267,20 @@ speed and later review are one invariant, not two.
 
 ### B6 — Removal
 
-**B6.1** `@asl.provider` — `intent=modules`, `funds=false` — **[drive]**
+**B6.2** `@asl.provider` — `POST /admin` — `intent=modules`, `funds=true` —
+toggle **[drive]** / case rendering **[fixture]**
+→ B-3's source consultation remains visible and unchanged while the funds lens
+moves from a labelled preview to an enabled surface. The allocation workflow is
+still **[fixture]**/**[design]**; this event proves only real module activation
+and preservation of the source, and the trace must say so.
+
+**B6.1** `@asl.provider` — `POST /admin` — `intent=modules`, `funds=false` —
+toggle **[drive]** / source-history preservation **[fixture]**
 → Invariant 12: **every layer can be removed.** B-3's source message and audit
 history survive; the workspace does not break. This is the strongest honesty
-test in the scenario — a lock-in disguised as a layer would fail here.
+test in the scenario — a lock-in disguised as a layer would fail here. The
+preceding **B6.2** event is required: toggling an already-disabled module off is
+not a removal test.
 
 ## B.5 What is drivable today
 
@@ -1007,14 +1290,15 @@ be written:
 - **[drive]** — module toggles (`/admin` `intent=modules`), navigation and gate
   behaviour when a layer is off, the labelled-preview rendering of disabled
   layers, and the messaging kernel (`/discussion`, `/forum`, `/notifications`,
-  `/profile`) — which is where **B1.3**, **B1.4**, and **B5.1**'s announcement
-  live as real, seedable content today.
+  `/profile`) — which is where **B1.3**, **B1.4**, and **B5.3** live as real,
+  replayable content today. Each toggle and message is a separate trace event.
 - **[fixture]** — everything on `/organization`. It renders from the hardcoded
   `ORGANIZATION_TEMPLATE_CASES` constant. There is **no persistence and no
   write path**: the only interactions are `?case=<id>` and layer tab switching.
   Replacing those four cases with **B-1…B-4** is the single highest-value change
   this document enables — the workspace would then show a recognisable ASL
-  instead of a generic care cooperative.
+  instead of a generic care cooperative. Preloading those cases and checking
+  the final page is a render test, not a replay of **B1–B6**.
 - **[design]** — case promotion, protected relay, commitments, authority grants,
   funds records, mediation, impact reviews. Module-owned records, created lazily
   when a layer is enabled, per the canonical case contract. Not built.
@@ -1063,12 +1347,12 @@ the doc keeps those as case descriptors.
 | Identity-based rate limiting | A2.15 | — |
 | Forum long-form + comments | A2.8 | — |
 | Topic gardener review (merge/rename) | A2.18 | — |
-| Petition drafting + structured outline | A3.1 | — (deliberately off) |
+| Petition drafting + structured outline | A3.1, A3.12, A3.15 | — (deliberately off) |
 | Revisions + diffs (deliberation → text) | A3.2, A3.11 | — |
-| Signatures → quorum | A3.3 | — |
+| Signatures → quorum / below-quorum persistence | A3.3, A3.14, A3.16 | — |
 | Stance-tagged deliberation + fact-check | A3.4–A3.6 | — |
 | Argument map (node + rebuttal) | A3.6 + A3.9 | — |
-| Notification preferences + read loop | A3.10 | — |
+| Notification preferences + observed read loop | A3.10/preferences, A3.10/observe, A3.10/read | — |
 | Pre-vote freeze (attributed) | A3.7 | — |
 | Signed vote envelopes + dissent in tally | A3.8 | — |
 | Groups + policy (vote vs priority modes) | A5.1–A5.3, A4.3–A4.4 | — |
@@ -1088,36 +1372,52 @@ the doc keeps those as case descriptors.
 | Federation: peers, capability hints, ledger audit | A10.1–A10.2 | — |
 | Gossip policy rejection + quarantine | A10.3 | — |
 | Provider-local fields never gossip | A1.3 + A10.4 | — |
-| Module toggles / adoption staircase | A.0 | B4.1–B4.6, B6.1 |
+| Module toggles / adoption staircase | A.0 | B3.4, B4.7, B4.1–B4.6, B6.2–B6.1 |
 | Corroborating signals behind volume | — | B1.3 |
 | Acknowledgement with stated boundary | — | B1.4 |
-| Protected voice + reveal policy | — | B3.1–B3.2 |
+| Protected voice + reveal policy | — | B3.4, B3.1–B3.2 |
 | Whistleblowing boundary (D.lgs. 24/2023) | — | B3.3 |
 | Responsibilities vs authority | — | B4.1, B4.3 |
 | Formal vs actual flow (bed manager) | — | B4.2 |
-| Funds constraint | — | B-3 |
+| Funds constraint | — | B-3, B6.2 |
 | Mediation (CUG) without suppression | — | B4.4 |
 | Pressure components (vs NEDOCS opacity) | — | B4.5 |
 | Impact + displacement checks | — | B4.6 |
-| Emergency bypass with review | — | B5.1–B5.2 |
-| Layer removal | — | B6.1 |
+| Emergency bypass with review | — | B5.1, B5.3, B5.2 |
+| Layer removal | — | B6.2–B6.1 |
 
-## Using these fixtures
+## Running these scenarios
 
-- `scripts/seed-demo.js` should build **Scenario A** — it is the one the current
-  code can actually execute end to end. Scenario B's kernel content (**B1.3**,
-  **B1.4**, **B5.1**) seeds through `/discussion` on a separate store.
-- `scripts/user-journeys.js` drives the subset marked **[drive]** and asserts
-  the observable result of each act. Its screenshots are the README walkthrough.
-  **A10** is driven by the node tests (ring/gossip suites), not by the browser.
-- Keep the two scenarios in **separate stores**. Merging them produces a
-  deployment that is neither a party nor an ASL, and that is the "demo-like"
-  failure this document exists to end.
-- One member per browser context. Tabs share a cookie jar, so a fixture built in
-  one context is one person wearing sixteen names — and every quorum, follow,
-  and election in Scenario A would be vacuous.
+- The canonical test starts from an empty scenario store and builds state only
+  by replaying **[drive]** actions through their real boundaries. Never run
+  `scripts/seed-demo.js` first. A seeded store is useful for manual exploration
+  and screenshots, but it cannot pass this execution contract.
+- `scripts/party-journeys.js` is the current Scenario A browser walkthrough;
+  `scripts/user-journeys.js` is the separate organization/care walkthrough.
+  They already isolate browser sessions and make step assertions, but they are
+  partial walkthroughs, not full conformance until they emit the trace, expand
+  every compound action—including the 250-signature cohort—and replay every
+  current **[drive]** item from empty state. **A10** remains driven through the
+  real protocol boundary by the node ring/gossip suites rather than a browser.
+- Keep Scenario A and Scenario B in separate fresh stores and separate trace
+  files. Merging them produces a deployment that is neither a party nor an ASL,
+  and makes causal counts impossible to attribute.
+- Use one isolated browser context or client session per agent. Tabs share a
+  cookie jar, so one context wearing many handles makes quorum, follow,
+  notification, election, and authorization assertions vacuous. Assert session
+  uniqueness when each agent is created and again before any multi-actor act.
+- Do not run a whole act as setup and assert only its final counter. For example,
+  **A5.5** is nine observed ballot events with a tally assertion after each
+  round-relevant vote; **B1.3** is four messages on four simulated dates; and
+  **B4** asserts the workspace after each individual module toggle. The final
+  tally, pressure count, or enabled-module set is only the checksum.
+- Prefer a virtual clock controlled by explicit trace events. Replaying **A7.1**
+  or the four weekends in **B1.3** by rewriting persisted timestamps defeats
+  expiry, audit, and scheduling coverage.
 - Dated figures (CNEL counts, ISPRA rates, FNOPI estimates, referendum turnout)
   are anchored to their source years in the text. Refresh them when reseeding;
   do not present them as live data.
-- When a **[design]** item ships, move its label to **[drive]** and add the
-  assertion. The labels are the backlog.
+- When a **[design]** item ships, give its actor a real interaction, add its
+  before/after assertions, and then move the label to **[drive]**. When a
+  **[fixture]** gains a write path, replace the render-only setup with the events
+  that create it. The labels are the executable backlog.

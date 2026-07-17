@@ -89,6 +89,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Add timing metrics for persistence calls and gossip sync to surface slow paths in `/health`.
 - Track outbound notification delivery stats per channel and show aggregates in `/admin`.
 - Track organization response-boundary misses, acknowledgement latency, unowned commitments, pressure persistence, recurrence after closure, and relief displacement by sector—without actor-level performance ranking.
+- Extend the scenario journey harnesses into the causal replay contract in `principle-docs/SimulationScenarios.md`: fresh store, deterministic per-agent manifests, one isolated session and interaction per child event, virtual-clock events, before/after assertions, and a machine-readable trace. Page inactive agent contexts out to bounded session snapshots so the 250-person quorum cohort remains CI-affordable without sharing identity or bulk-seeding state.
 
 ## Storage & IO
 - Store organization case extensions in module-owned collections created lazily (`commitments`, `flowEdges`, `authorityGrants`, `funds`, `sectorLinks`, `mediation`, `pressureObservations`, `impactReviews`) while keeping the source message and minimal case envelope canonical.
