@@ -608,6 +608,8 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 - `ROADMAP.md` — phased delivery plan and sequencing rationale
 - `AGENTS.md` — implementation directives and vocabulary contract
 - `principle-docs/RepresentativeParties.md` — design principles and thesis
+- `principle-docs/OrganizationPressureManagement.md` — organization-pressure model
+- `principle-docs/SimulationScenarios.md` — the two reference scenarios (a fictional Italian party; a fictional ASL) used to seed deployments, write tests, and take screenshots
 - `principle-docs/DynamicTopicCategorization.md` — topic gardener spec
 
 ---
