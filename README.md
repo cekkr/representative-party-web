@@ -32,59 +32,13 @@ ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
 BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js           # terminal 2
 ```
 
-### 1. Conversation before any vote
-
-Before a proposal exists, the waiting-list problem is argued out: a nurse's lived experience (`@giulia.ferrero`), an economist corroborating it with aggregated CUP data (`@marco.deluca`), a GP seeing the same failure from the territory (`@nadia.hamdi`), and a researcher asking whether the number is a median or a worst case (`@valentina.sanna`). Each note is stance-tagged and attributed to a verified person.
-
-![The waiting-list discussion thread: five Italian notes on liste-attesa, each with a stance tag, evidence links, and an @handle author with a blinded hash cue](md-assets/party/party-discussion.png)
-
-Deliberation is supposed to be able to *change* a position. On differentiated autonomy — a debate that splits the party geographically, not left-versus-right — `@tommaso.ricci` concedes a point in public (top post) and the thread survives it.
-
-![A cross-topic discussion feed where @tommaso.ricci concedes that without funded LEP his position does not stand](md-assets/party/party-discussion-concession.png)
-
-### 2. A proposal earns its way to a vote
-
-Only when a decision is actually needed does `@giulia.ferrero` draft one. The structured outline — problem, action, impact, risks, plan — forces the argument to be made explicitly, and names the law that already exists (`L. 120/2007`) rather than inventing a new right.
-
-![The intramoenia proposal card with its structured outline expanded: problem statement, proposed action, impact, risks, and implementation plan, all in Italian](md-assets/party/party-proposal.png)
-
-### 3. Quorum, not an administrator, moves it forward
-
-Distinct members sign. Quorum — not a moderator's opinion — moves the proposal into discussion. Below it, a single-member land-use proposal sits visible and pending under its own higher quorum: the long tail is not buried by volume.
-
-![Two proposal cards: the intramoenia proposal at 7 signatures over a quorum of 6 in the discussion stage, and a land-use proposal at 2 of 12, still a draft](md-assets/party/party-signatures.png)
-
-### 4. The disagreement has a shape
-
-Deliberation is stance-tagged and mapped: a constitutional-law objection (`@sofia.bianchi`, on regional competence under Titolo V) becomes an argument-map node, and a fact-check request lands on a specific claim rather than a vibe.
-
-![The proposal's deliberation feed: a fact-check question from @valentina.sanna and an argument-map node "Competenza regionale" from @sofia.bianchi](md-assets/party/party-deliberation.png)
-
-### 5. Opening a vote is a deliberate, attributed act
-
-The author cannot open a vote on her own proposal. The party secretary — a **moderator**, not the provider operator — confirms a pre-vote freeze, and the freeze is attributed and timestamped. Votes are recorded against text that can no longer move under them, and the tally shows the dissent (`@luca.esposito` votes no) instead of a rubber stamp.
-
-![The frozen proposal: "Draft frozen for voting by @elena.rossi" with a revision id, and a tally of yes: 5, no: 1, abstain: 0](md-assets/party/party-vote.png)
-
-### 6. Delegation is liquid, and readable
-
-`@paolo.greco` delegates the waiting-list topic to `@giulia.ferrero`, who has delegated it onward to `@marco.deluca`. The "explain my influence" view states plainly where Paolo's vote ends up — chosen by `@handle`, never by raw hash. Delegation stays topic-scoped, revocable, and decay-aware.
-
-![The effective delegation chain: You → @giulia.ferrero → @marco.deluca on the liste-attesa topic, "flows through 1 forwarding step to the terminal delegate"](md-assets/party/party-delegation.png)
-
-### 7. Choosing people, on transfers
-
-A working group runs a ranked delegate election. The economist leads on first preferences, but once the third candidate is eliminated her ballots transfer, and the frontline nurse wins on the second round — the first-preference leader loses, exactly as ranked transfers exist to allow.
-
-![The Circolo Sanità Pubblica group card showing a closed election with 9 votes, "Winner: @giulia.ferrero (method ranked, rounds 2)", and the delegate cachet updated to her](md-assets/party/party-election.png)
-
-### 8. Accountability is soft power, not compulsion
-
-Members find delegates by browsing people, never by pasting a hash. A delegate's public dashboard shows delegations received and set, vote history, and group endorsements, beside an **advisory** deliberation score — never a binding one.
-
-![The People directory listing members by @handle with role and delegation counts, delegates ranked first](md-assets/party/party-delegates.png)
-
-![@marco.deluca's delegate profile: deliberation score 7/100 marked advisory-only, delegations received, vote history, and group endorsements](md-assets/party/party-delegate-profile.png)
+| | |
+|:--|:--|
+| ![Waiting-list discussion thread on liste-attesa](md-assets/party/party-discussion.png)<br>**1 · Conversation before any vote** — five stance-tagged notes on `liste-attesa`, each authored by a verified `@handle` with its blinded-hash cue: lived experience, aggregated CUP data, the territory, and a researcher checking the number. | ![Cross-topic concession on autonomia differenziata](md-assets/party/party-discussion-concession.png)<br>**Deliberation that changes a mind** — on *autonomia differenziata* (a split that is geographic, not left-vs-right), `@tommaso.ricci` concedes a point in public and the thread survives it. |
+| ![Structured intramoenia proposal card](md-assets/party/party-proposal.png)<br>**2 · A proposal earns its way** — the structured outline (problem / action / impact / risks / plan) tightens `L. 120/2007` instead of inventing a new right. | ![Two proposals, one below quorum](md-assets/party/party-signatures.png)<br>**3 · Quorum, not an admin, moves it** — signatures carry the proposal into discussion; a single-member land-use draft stays visible under its own higher quorum, so the long tail is not buried. |
+| ![Deliberation feed with argument map and fact check](md-assets/party/party-deliberation.png)<br>**4 · The disagreement has a shape** — a Titolo V argument-map node from `@sofia.bianchi` and a fact-check request landing on a specific claim, not a vibe. | ![Frozen proposal with dissenting tally](md-assets/party/party-vote.png)<br>**5 · Opening a vote is deliberate** — a moderator's attributed, timestamped pre-vote freeze; votes are cast against text that can no longer move, and the tally records the `no`. |
+| ![Effective delegation chain](md-assets/party/party-delegation.png)<br>**6 · Delegation is liquid and readable** — the "explain my influence" chain `You → @giulia.ferrero → @marco.deluca`, chosen by `@handle`, topic-scoped, revocable, and decay-aware. | ![Ranked group election won on transfers](md-assets/party/party-election.png)<br>**7 · Choosing people, on transfers** — the economist leads first preferences, but the frontline nurse wins on the second round: the first-preference leader loses, as ranked transfers exist to allow. |
+| ![People directory listing members by handle](md-assets/party/party-delegates.png)<br>**8 · Accountability is soft power** — members browse People by `@handle`, never by pasting a hash; delegates rank first. | ![A delegate's public accountability dashboard](md-assets/party/party-delegate-profile.png)<br>**The accountability dashboard** — delegations received and set, vote history, and group endorsements, beside an **advisory** (never binding) deliberation score. |
 
 Nothing here compels a representative: a member could vote against the platform's own outcome and the record would simply show it. The free mandate (art. 67 Cost.) stays intact; the accountability is that no one can quietly rewrite what happened.
 
@@ -101,61 +55,13 @@ Every screenshot below is produced by `scripts/user-journeys.js`, which drives t
 BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js   # terminal 2
 ```
 
-### 1. It starts as a message
-
-`@nadia` raises a recurring problem in the discussion lane. No case, no form, no taxonomy — a post, attributed to her handle, with the blinded hash beside it as the accountability cue.
-
-![A discussion post by @nadia about late ward deliveries, tagged to the care-quality topic](md-assets/walkthrough/discussion-posted.png)
-
-### 2. The organization can see the pressure
-
-`/organization` reads the same kind of signal as a case: the source message stays canonical in the middle, the inbox on the left, and the case lens on the right explains *why this needs attention* — voice type, visibility, scope, and the pressure components behind the cue.
-
-![The organization workspace: pressure inbox, the focused case on its source message, and the case lens](md-assets/walkthrough/organization-case.png)
-
-Layers the provider has not enabled do not disappear and do not pretend to work. They render as labeled previews, so the adoption path is legible before anything is switched on.
-
-![The Protection layer shown as a template preview, labeled as off, with the enable path explained](md-assets/walkthrough/organization-layer.png)
-
-### 3. It becomes a proposal
-
-When a decision is actually needed, `@nadia` drafts one. The outline is structured — problem, action, impact, risks, plan — so the argument has to be made explicitly rather than asserted.
-
-![The proposal draft form with structured outline fields](md-assets/walkthrough/proposal-drafted.png)
-
-### 4. Signatures carry it to quorum
-
-Four distinct members sign. Quorum is what moves a proposal into discussion — not an administrator's opinion.
-
-![A proposal card showing quorum 3, four signatures, and the discussion stage](md-assets/walkthrough/proposal-signatures.png)
-
-Deliberation is stance-tagged (support / concern / question), so a reader can see the shape of the disagreement rather than a flat comment thread.
-
-![A stance-tagged deliberation note on the proposal](md-assets/walkthrough/proposal-deliberation.png)
-
-### 5. Opening a vote is a deliberate, attributed act
-
-The author **cannot** open a vote on their own proposal. A moderator confirms a pre-vote freeze, and the freeze is attributed and timestamped: votes are recorded against text that can no longer move under them.
-
-![The frozen proposal, attributed to @admin, open for voting](md-assets/walkthrough/proposal-vote-open.png)
-
-### 6. Members vote, and the tally is auditable
-
-Each vote is a signed envelope. The card carries its own history — quorum, signatures, revisions, the frozen revision id — beside the tally.
-
-![The proposal showing votes yes: 3, no: 0, abstain: 0, with the frozen revision and stage cues](md-assets/walkthrough/vote-cast.png)
-
-### 7. Groups organize the work
-
-`@mara` opens a working group with its own topics; `@koen` joins. Group policy, preferred delegates, and delegate elections live inside the group — separate from Circle policy.
-
-![The group card showing members, delegates, and the group policy, delegate, and election controls](md-assets/walkthrough/group-joined.png)
-
-### 8. Delegation is explained, not assumed
-
-`@koen` delegates `care-quality` to `@ines` — chosen by handle, never by raw hash. The "explain my influence" view states plainly where the vote goes.
-
-![The effective delegation chain: topic care-quality, You → @ines, "Your vote goes directly to this delegate"](md-assets/walkthrough/delegation-set.png)
+| | |
+|:--|:--|
+| ![Discussion post about late ward deliveries](md-assets/walkthrough/discussion-posted.png)<br>**1 · It starts as a message** — `@nadia` raises a recurring problem in the discussion lane: no case, no form, no taxonomy — a post, attributed to her handle, with the blinded hash as the cue. | ![The organization workspace](md-assets/walkthrough/organization-case.png)<br>**2 · The organization can see the pressure** — the source message stays canonical in the middle, the inbox on the left, and the case lens on the right explains *why this needs attention*. |
+| ![A disabled layer shown as a labeled preview](md-assets/walkthrough/organization-layer.png)<br>**Unenabled layers stay honest** — they render as labeled previews with the enable path explained, never pretending to persist or execute a workflow. | ![The structured proposal draft form](md-assets/walkthrough/proposal-drafted.png)<br>**3 · It becomes a proposal** — when a decision is actually needed, the structured outline (problem / action / impact / risks / plan) forces the argument to be explicit. |
+| ![Proposal card at quorum in the discussion stage](md-assets/walkthrough/proposal-signatures.png)<br>**4 · Signatures carry it to quorum** — four distinct members sign; quorum, not an administrator, moves it into discussion. | ![A stance-tagged deliberation note](md-assets/walkthrough/proposal-deliberation.png)<br>**Deliberation has a shape** — notes are stance-tagged (support / concern / question), so a reader sees the disagreement instead of a flat thread. |
+| ![The frozen proposal open for voting](md-assets/walkthrough/proposal-vote-open.png)<br>**5 · Opening a vote is deliberate** — the author cannot open a vote on their own proposal; a moderator confirms an attributed, timestamped pre-vote freeze. | ![The auditable vote tally](md-assets/walkthrough/vote-cast.png)<br>**6 · The tally is auditable** — each vote is a signed envelope; the card carries quorum, signatures, revisions, and the frozen revision id beside the tally. |
+| ![A working group card with its own controls](md-assets/walkthrough/group-joined.png)<br>**7 · Groups organize the work** — group policy, preferred delegates, and delegate elections live inside the group, separate from Circle policy. | ![Delegation chain explained by handle](md-assets/walkthrough/delegation-set.png)<br>**8 · Delegation is explained** — `@koen` delegates `care-quality` to `@ines` by handle; "explain my influence" states plainly where the vote goes. |
 
 Delegation stays topic-scoped, advisory, and revocable: cycles, banned delegates, and overlong chains are stopped automatically.
 

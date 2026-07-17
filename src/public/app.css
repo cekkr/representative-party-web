@@ -1697,6 +1697,47 @@ details.note pre {
   color: #c3aaff;
 }
 
+/* Proposal cards reuse the feed head; the body flows full-width under it (a proposal
+   is a document, not a one-line post), and secondary counts collapse to a quiet row. */
+.proposal-card .topic-head,
+.comment-card .topic-head {
+  padding: 0 0 0.35rem;
+}
+
+.proposal-submeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem 0.55rem;
+  margin-top: 0.4rem;
+}
+
+.proposal-submeta > * + *::before {
+  content: "·";
+  margin-right: 0.55rem;
+  color: var(--border-strong);
+}
+
+.pill.stage {
+  text-transform: capitalize;
+}
+
+.pill.stage--discussion {
+  border-color: rgba(76, 141, 255, 0.5);
+  background: rgba(76, 141, 255, 0.12);
+  color: var(--highlight);
+}
+
+.pill.stage--vote {
+  border-color: rgba(95, 214, 180, 0.5);
+  background: rgba(95, 214, 180, 0.12);
+  color: var(--accent);
+}
+
+.pill.stage--closed {
+  color: var(--muted);
+}
+
 .reply-list {
   display: grid;
   gap: 0.75rem;
