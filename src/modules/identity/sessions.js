@@ -46,7 +46,10 @@ function normalizeHandle(handle = '') {
   return String(handle).trim().replace(/^@+/, '').toLowerCase();
 }
 
-const HANDLE_PATTERN = /^[A-Za-z0-9_-]+$/;
+// Handles must start and end with an alphanumeric and may carry dots, dashes, and
+// underscores in between. Dots let a civic Circle use natural firstname.lastname handles
+// (e.g. @giulia.ferrero) while the leading/trailing guard keeps them URL- and label-safe.
+const HANDLE_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$/;
 const SYNTHESIZED_HANDLE_PATTERN = /^(user|person)-[0-9a-f]{1,8}$/i;
 export const HANDLE_MIN_LENGTH = 3;
 export const HANDLE_MAX_LENGTH = 30;
@@ -61,8 +64,8 @@ export function validateHandleChoice(state, rawHandle, { sessionId } = {}) {
   if (handle.length < HANDLE_MIN_LENGTH || handle.length > HANDLE_MAX_LENGTH) {
     return { ok: false, error: `Handle must be ${HANDLE_MIN_LENGTH}-${HANDLE_MAX_LENGTH} characters.` };
   }
-  if (!HANDLE_PATTERN.test(handle)) {
-    return { ok: false, error: 'Handle may only contain letters, numbers, dashes, and underscores.' };
+  if (!HANDLE_PATTERN.test(handle) || handle.includes('..')) {
+    return { ok: false, error: 'Handle may only contain letters, numbers, dashes, underscores, and dots (not at the ends).' };
   }
   if (SYNTHESIZED_HANDLE_PATTERN.test(handle)) {
     return { ok: false, error: 'That handle pattern is reserved for auto-generated identifiers.' };

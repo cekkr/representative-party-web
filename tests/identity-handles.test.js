@@ -31,6 +31,16 @@ test('validateHandleChoice enforces charset, length, and reserved patterns', () 
   assert.equal(good.handle, 'Alice_01', 'strips leading @');
 });
 
+test('validateHandleChoice accepts firstname.lastname handles but not stray dots', () => {
+  const state = stateWith();
+  const dotted = validateHandleChoice(state, '@giulia.ferrero');
+  assert.equal(dotted.ok, true, 'a natural person handle with a dot is allowed');
+  assert.equal(dotted.handle, 'giulia.ferrero');
+  assert.equal(validateHandleChoice(state, '.giulia').ok, false, 'no leading dot');
+  assert.equal(validateHandleChoice(state, 'giulia.').ok, false, 'no trailing dot');
+  assert.equal(validateHandleChoice(state, 'a..b').ok, false, 'no consecutive dots');
+});
+
 test('validateHandleChoice rejects a handle taken by another session', () => {
   const state = stateWith([
     { id: 's1', status: 'verified', pidHash: 'h1', handle: 'alice' },

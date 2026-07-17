@@ -73,6 +73,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.
 - Optionally sync browser-local interface settings (large text, reduced motion, compact nav, partial navigation mode) to provider-local profile/session preferences for cross-device consistency.
 - Debounce inline Interface-panel session-default saves and skip no-op `/profile` writes when values have not changed.
+- Petition proposals have no topic field, so every proposal renders `Topic: general` and cannot carry the discussion topic it grew out of (e.g. `liste-attesa`). Add an optional topic on `/petitions` (a datalist from the topic registry) so a proposal keeps the breadcrumb of the thread that produced it — the party walkthrough proposal is drafted straight off a `liste-attesa` discussion but the card shows `general`.
+- The delegate profile surfaces group **election wins** but never **losses**, so a delegate who lost a group election shows nothing there. `RepresentativeParties.md` §9.3.2 (and SimulationScenarios A8.1) want a lost election visible on the accountability dashboard beside accumulated delegations — the point is precisely that a first-preference leader can lose and the record shows it. Add an "elections contested/lost" line to `renderElectionWins`/`delegateProfiles.js`.
 
 ## Security follow-ups
 - `POST /circle/peers` (`registerPeer`) accepts anonymous requests, so anyone reachable can add peers to the gossip set. Peers are "hints, not trust anchors" by design, but unauthenticated writes to the peer list still deserve an explicit policy decision (admin-only, or signed peer announcements).

@@ -22,7 +22,20 @@ import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { renderIssuerPill, renderPreviewPill } from '../../../interfaces/http/views/shared.js';
-import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderActorLabel, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
+
+// Delegates and election candidates may be entered by @handle or by raw hash. Resolve to
+// a canonical pid hash so the stored value is always a hash, and the UI can render @handle.
+function resolveActorHash(state, input) {
+  const value = String(input || '').trim().replace(/^@+/, '');
+  if (!value) return '';
+  const byHandle = findSessionByHandle(state, value);
+  if (byHandle?.pidHash) return byHandle.pidHash;
+  const byHash = findSessionByHash(state, value);
+  if (byHash?.pidHash) return byHash.pidHash;
+  return value;
+}
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
@@ -119,7 +132,11 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
       return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
     }
     const topic = sanitizeText(body.topic || 'general', 64);
-    const candidates = (body.candidates || '').split(',').map((v) => sanitizeText(v, 80)).filter(Boolean);
+    const candidates = (body.candidates || '')
+      .split(',')
+      .map((v) => sanitizeText(v, 80))
+      .filter(Boolean)
+      .map((v) => resolveActorHash(state, v));
     const election = await startElection({ groupId, topic, candidates, state });
     if (election) {
       await logTransaction(state, {
@@ -151,9 +168,9 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
     if (!isGroupMember(group, person.pidHash)) {
       return sendJson(res, 401, { error: 'group_membership_required', message: 'Join the group to vote in its elections.' });
     }
-    const candidateHash = sanitizeText(body.candidateHash || '', 80);
-    const secondChoiceHash = sanitizeText(body.secondChoiceHash || '', 80);
-    const thirdChoiceHash = sanitizeText(body.thirdChoiceHash || '', 80);
+    const candidateHash = resolveActorHash(state, sanitizeText(body.candidateHash || '', 80));
+    const secondChoiceHash = resolveActorHash(state, sanitizeText(body.secondChoiceHash || '', 80));
+    const thirdChoiceHash = resolveActorHash(state, sanitizeText(body.thirdChoiceHash || '', 80));
     const election = await castElectionVote({ electionId, voterHash: person?.pidHash, candidateHash, secondChoiceHash, thirdChoiceHash, state });
     if (election) {
       await logTransaction(state, {
@@ -248,7 +265,7 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
     return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
   }
   const topic = sanitizeText(body.topic || 'general', 64);
-  const delegateHash = sanitizeText(body.delegateHash || '', 80);
+  const delegateHash = resolveActorHash(state, sanitizeText(body.delegateHash || '', 80));
   const priority = Number(body.priority || 0);
   await setGroupDelegate({ groupId, topic, delegateHash, priority, provider: sanitizeText(body.provider || 'local', 64), state });
   await createNotification(state, {
@@ -303,10 +320,9 @@ function renderGroupList(groups, person, state) {
       const delegates = (group.delegates || [])
         .map((d) => {
           const topic = escapeHtml(String(d.topic || 'general'));
-          const delegateHash = escapeHtml(String(d.delegateHash || 'unknown'));
           const delegateLink = d.delegateHash
-            ? `<a href="/delegates/${delegateHash}" data-partial>${delegateHash}</a>`
-            : delegateHash;
+            ? `<a href="/delegates/${escapeHtml(String(d.delegateHash))}" data-partial>${renderActorLabel(state, d.delegateHash, { showHash: false })}</a>`
+            : '<span class="muted">unassigned</span>';
           const priority = Number(d.priority) || 0;
           return `<li>${topic} → ${delegateLink} (prio ${priority})</li>`;
         })
@@ -360,7 +376,7 @@ function renderGroupList(groups, person, state) {
             <form class="form-inline" method="post" action="/groups/delegate" data-enhance="groups">
               <input type="hidden" name="groupId" value="${groupId}" />
               <label>Topic <input name="topic" placeholder="general" /></label>
-              <label>Delegate hash <input name="delegateHash" placeholder="delegate-hash" required /></label>
+              <label>Delegate <input name="delegateHash" placeholder="@handle" required /></label>
               <label>Priority <input name="priority" type="number" value="0" size="4" /></label>
               <button type="submit" class="ghost">Save</button>
             </form>
@@ -375,8 +391,8 @@ function renderGroupList(groups, person, state) {
                 <input name="topic" placeholder="energy" />
               </label>
               <label class="field">
-                <span>Candidate hashes (comma separated)</span>
-                <input name="candidates" placeholder="hash1,hash2" />
+                <span>Candidates (@handles, comma separated)</span>
+                <input name="candidates" placeholder="@giulia.ferrero, @marco.deluca" />
               </label>
               <button class="ghost" type="submit">Start election</button>
             </form>
@@ -398,13 +414,15 @@ function renderElections(elections, person, state) {
       const topicLabel = escapeHtml(election.topic || 'general');
       const statusLabel = escapeHtml(election.status || 'open');
       const electionId = escapeHtml(election.id || '');
-      const candidates = (election.candidates || []).map((c) => escapeHtml(String(c)));
+      const candidates = (election.candidates || []).map((c) => ({
+        value: escapeHtml(String(c)),
+        label: `@${escapeHtml(resolveHandleForHash(state, c))}`,
+      }));
       const winner = election.status === 'closed' ? pickWinner(election, state) : null;
-      const winnerHash = winner?.candidateHash ? escapeHtml(winner.candidateHash) : '';
       const winnerMethod = winner?.method ? escapeHtml(winner.method) : '';
       const winnerRounds = Number.isFinite(winner?.rounds) ? winner.rounds : null;
-      const winnerLabel = winnerHash
-        ? `Winner: ${winnerHash}${winnerMethod ? ` (method ${winnerMethod}${winnerRounds ? `, rounds ${winnerRounds}` : ''})` : ''}`
+      const winnerLabel = winner?.candidateHash
+        ? `Winner: ${renderActorLabel(state, winner.candidateHash, { showHash: false })}${winnerMethod ? ` (method ${winnerMethod}${winnerRounds ? `, rounds ${winnerRounds}` : ''})` : ''}`
         : '';
       const closedAt = formatTimestamp(election.closedAt);
       return `
@@ -424,19 +442,19 @@ function renderElections(elections, person, state) {
               <input type="hidden" name="electionId" value="${electionId}" />
               <select name="candidateHash">
                 ${candidates
-                  .map((c) => `<option value="${c}">${c}</option>`)
+                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
                   .join('')}
               </select>
               <select name="secondChoiceHash">
                 <option value="">Second choice (optional)</option>
                 ${candidates
-                  .map((c) => `<option value="${c}">${c}</option>`)
+                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
                   .join('')}
               </select>
               <select name="thirdChoiceHash">
                 <option value="">Third choice (optional)</option>
                 ${candidates
-                  .map((c) => `<option value="${c}">${c}</option>`)
+                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
                   .join('')}
               </select>
               <button type="submit" class="ghost">Vote</button>

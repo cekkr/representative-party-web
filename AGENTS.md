@@ -235,7 +235,8 @@ Circle/vote/transaction controller → envelope verification and replication pol
 ### Root scripts, samples, and generated documentation assets
 
 - [`run-standalone.sh`](run-standalone.sh) starts a full-feature local KV deployment, seeds an admin session, creates signing keys, and prints a login URL.
-- [`scripts/user-journeys.js`](scripts/user-journeys.js) drives the canonical multi-user discussion → proposal → quorum → vote → groups → delegation walkthrough and regenerates [walkthrough images](md-assets/walkthrough/).
+- [`scripts/user-journeys.js`](scripts/user-journeys.js) drives the organization-operations walkthrough (discussion → proposal → quorum → vote → groups → delegation) and regenerates [walkthrough images](md-assets/walkthrough/).
+- [`scripts/party-journeys.js`](scripts/party-journeys.js) drives Scenario A (Rete Civica Nazionale) — verified people, Italian deliberation, structured proposal, attributed freeze with dissent, transitive delegation, a ranked election won on transfers, and the accountability dashboard — regenerating [party images](md-assets/party/). Run against a strict-Circle standalone (`ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh`).
 - [`scripts/seed-demo.js`](scripts/seed-demo.js) seeds a running deployment; prefer evolving it toward the reference scenarios.
 - [`scripts/ui-screenshots.js`](scripts/ui-screenshots.js), [`ui-smoke.js`](scripts/ui-smoke.js), and [`ui-composer-smoke.js`](scripts/ui-composer-smoke.js) exercise route screenshots, layout, interactions, and Composer behavior.
 - [`scripts/agent-viewport.js`](scripts/agent-viewport.js) and its [usage guide](scripts/agent-viewport.md) help agents inspect the live SSR UI.

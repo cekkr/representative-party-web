@@ -11,7 +11,86 @@ This repository is a Node.js SSR application that starts as a usable email/discu
 
 ---
 
-## A walkthrough
+## Two walkthroughs
+
+The framework has two halves, and each has a walkthrough driven end-to-end through the interface itself — one browser session per member, an assertion at every step, so a broken flow fails the run instead of quietly producing a nice picture.
+
+- **A party decides its own position** exercises the *civic* half: verified people, deliberation before voting, liquid delegation, and soft-power accountability. It follows `principle-docs/RepresentativeParties.md` and Scenario A of `principle-docs/SimulationScenarios.md`.
+- **An organization takes a concern to a decision** exercises the *operations* half: a message becoming a case, pressure the organization can see, and structure earned by use. It follows `principle-docs/OrganizationPressureManagement.md`.
+
+---
+
+## Walkthrough: a party decides its own position
+
+Members of *Rete Civica Nazionale* — a **fictional** Italian civic party — take a real Italian policy question from a message to a decision, under strict Circle enforcement (**one verified person = one voice**). The in-app content is in Italian and the norms are the real ones (`L. 120/2007` and `L. 107/2024` on intramoenia and CUP monitoring, the PNGLA priority classes, `sent. 192/2024` on differentiated autonomy); the people and the institution are invented.
+
+Every screenshot below is produced by `scripts/party-journeys.js`, which drives these flows through the interface — one browser session per member — and asserts the outcome at each step.
+
+```bash
+ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+  DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh    # terminal 1
+BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js           # terminal 2
+```
+
+### 1. Conversation before any vote
+
+Before a proposal exists, the waiting-list problem is argued out: a nurse's lived experience (`@giulia.ferrero`), an economist corroborating it with aggregated CUP data (`@marco.deluca`), a GP seeing the same failure from the territory (`@nadia.hamdi`), and a researcher asking whether the number is a median or a worst case (`@valentina.sanna`). Each note is stance-tagged and attributed to a verified person.
+
+![The waiting-list discussion thread: five Italian notes on liste-attesa, each with a stance tag, evidence links, and an @handle author with a blinded hash cue](md-assets/party/party-discussion.png)
+
+Deliberation is supposed to be able to *change* a position. On differentiated autonomy — a debate that splits the party geographically, not left-versus-right — `@tommaso.ricci` concedes a point in public (top post) and the thread survives it.
+
+![A cross-topic discussion feed where @tommaso.ricci concedes that without funded LEP his position does not stand](md-assets/party/party-discussion-concession.png)
+
+### 2. A proposal earns its way to a vote
+
+Only when a decision is actually needed does `@giulia.ferrero` draft one. The structured outline — problem, action, impact, risks, plan — forces the argument to be made explicitly, and names the law that already exists (`L. 120/2007`) rather than inventing a new right.
+
+![The intramoenia proposal card with its structured outline expanded: problem statement, proposed action, impact, risks, and implementation plan, all in Italian](md-assets/party/party-proposal.png)
+
+### 3. Quorum, not an administrator, moves it forward
+
+Distinct members sign. Quorum — not a moderator's opinion — moves the proposal into discussion. Below it, a single-member land-use proposal sits visible and pending under its own higher quorum: the long tail is not buried by volume.
+
+![Two proposal cards: the intramoenia proposal at 7 signatures over a quorum of 6 in the discussion stage, and a land-use proposal at 2 of 12, still a draft](md-assets/party/party-signatures.png)
+
+### 4. The disagreement has a shape
+
+Deliberation is stance-tagged and mapped: a constitutional-law objection (`@sofia.bianchi`, on regional competence under Titolo V) becomes an argument-map node, and a fact-check request lands on a specific claim rather than a vibe.
+
+![The proposal's deliberation feed: a fact-check question from @valentina.sanna and an argument-map node "Competenza regionale" from @sofia.bianchi](md-assets/party/party-deliberation.png)
+
+### 5. Opening a vote is a deliberate, attributed act
+
+The author cannot open a vote on her own proposal. The party secretary — a **moderator**, not the provider operator — confirms a pre-vote freeze, and the freeze is attributed and timestamped. Votes are recorded against text that can no longer move under them, and the tally shows the dissent (`@luca.esposito` votes no) instead of a rubber stamp.
+
+![The frozen proposal: "Draft frozen for voting by @elena.rossi" with a revision id, and a tally of yes: 5, no: 1, abstain: 0](md-assets/party/party-vote.png)
+
+### 6. Delegation is liquid, and readable
+
+`@paolo.greco` delegates the waiting-list topic to `@giulia.ferrero`, who has delegated it onward to `@marco.deluca`. The "explain my influence" view states plainly where Paolo's vote ends up — chosen by `@handle`, never by raw hash. Delegation stays topic-scoped, revocable, and decay-aware.
+
+![The effective delegation chain: You → @giulia.ferrero → @marco.deluca on the liste-attesa topic, "flows through 1 forwarding step to the terminal delegate"](md-assets/party/party-delegation.png)
+
+### 7. Choosing people, on transfers
+
+A working group runs a ranked delegate election. The economist leads on first preferences, but once the third candidate is eliminated her ballots transfer, and the frontline nurse wins on the second round — the first-preference leader loses, exactly as ranked transfers exist to allow.
+
+![The Circolo Sanità Pubblica group card showing a closed election with 9 votes, "Winner: @giulia.ferrero (method ranked, rounds 2)", and the delegate cachet updated to her](md-assets/party/party-election.png)
+
+### 8. Accountability is soft power, not compulsion
+
+Members find delegates by browsing people, never by pasting a hash. A delegate's public dashboard shows delegations received and set, vote history, and group endorsements, beside an **advisory** deliberation score — never a binding one.
+
+![The People directory listing members by @handle with role and delegation counts, delegates ranked first](md-assets/party/party-delegates.png)
+
+![@marco.deluca's delegate profile: deliberation score 7/100 marked advisory-only, delegations received, vote history, and group endorsements](md-assets/party/party-delegate-profile.png)
+
+Nothing here compels a representative: a member could vote against the platform's own outcome and the record would simply show it. The free mandate (art. 67 Cost.) stays intact; the accountability is that no one can quietly rewrite what happened.
+
+---
+
+## Walkthrough: an organization takes a concern to a decision
 
 Six members of a care cooperative — `@nadia` (night nursing), `@tomas` (pharmacy), `@ines` (delegate), `@koen` (logistics), `@mara` (works council), and the provider admin — take one concern from a message to a decision.
 
@@ -195,9 +274,15 @@ npm start
 The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`). Signing keys are exported as PEM **text** — passing a file path leaves envelopes unsigned and `/admin` reports the key as ignored rather than loaded.
 
 ```bash
-# Drive the real member flows through the UI (discussion, proposal, vote,
-# groups, delegation) and capture the walkthrough screenshots above
+# Drive the organization-operations flows through the UI (discussion, proposal,
+# vote, groups, delegation) and capture that walkthrough's screenshots
 BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js
+
+# Drive the representative-party flows (Scenario A: Rete Civica Nazionale) and
+# capture the party walkthrough. Needs a strict-Circle standalone:
+#   ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+#     DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh
+BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js
 
 # Fill a running deployment with a plausible demo organization
 BASE_URL=http://127.0.0.1:3000 node scripts/seed-demo.js
