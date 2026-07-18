@@ -1,27 +1,67 @@
 :root {
-  /* Calmer, product-grade dark palette. Surfaces step up in lightness instead of
-     relying on glow; the mint accent is kept as a brand cue but used sparingly so
-     the interface reads as a working forum, not a neon dashboard. */
-  --bg: #0b0e14;
+  /* Modern semantic token system, dark-first. Inspired by the ForumLab "modern"
+     and Zisco ERP references: a single indigo/violet primary hue drives the whole
+     accent system, neutral surfaces step up in lightness, and rounding/elevation
+     read as a product, not a neon dashboard. A light palette slots in later via
+     :root[data-theme="light"] without touching component CSS.
+
+     --primary-h is the single knob the member "Appearance" control retunes live;
+     everything accent-colored derives from it, so changing one channel re-tints the
+     entire interface. Existing hex var names are aliased at the bottom so all
+     component CSS keeps resolving with no mass rename. */
+  --primary-h: 248;
+  --primary-s: 84%;
+  --primary-l: 66%;
+  --primary: hsl(var(--primary-h) var(--primary-s) var(--primary-l));
+  --primary-strong: hsl(var(--primary-h) var(--primary-s) 57%);
+  --primary-foreground: hsl(var(--primary-h) 45% 97%);
+  --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.16);
+  /* Companion hue (primary shifted toward periwinkle) keeps brand gradients alive. */
+  --primary-two: hsl(calc(var(--primary-h) + 24) 85% 70%);
+  --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.55);
+
+  /* Neutral surfaces */
+  --background: #0b0e14;
   --surface: #141924;
   --surface-2: #1b2230;
   --surface-3: #232c3d;
   --card: var(--surface);
-  --highlight: #4c8dff;
-  --highlight-strong: #2f6fe0;
-  --accent: #5fd6b4;
-  --accent-soft: rgba(95, 214, 180, 0.14);
-  --text: #e7edf6;
-  --muted: #93a2b7;
+  --foreground: #e7edf6;
+  --muted-foreground: #93a2b7;
   --border: #232c3b;
   --border-strong: #313d52;
+  --nav-surface: #121722;
+
+  /* Semantic status */
+  --success: #5fd6b4;
   --warning: #f0b45c;
   --danger: #f2777a;
-  --success: #5fd6b4;
-  --shadow: 0 10px 30px rgba(0, 0, 0, 0.28);
-  --shadow-soft: 0 2px 10px rgba(0, 0, 0, 0.2);
-  --radius: 0.9rem;
-  --nav-surface: #121722;
+  --info: #4c8dff;
+
+  /* Radius scale */
+  --radius-sm: 0.5rem;
+  --radius: 0.85rem;
+  --radius-lg: 1.15rem;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow: 0 18px 42px -26px rgba(2, 5, 14, 0.8);
+  --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.22);
+
+  /* Density — retuned by body[data-ui-density]; component paddings/gaps scale off it. */
+  --density-scale: 1;
+  --pad-card: calc(1.15rem * var(--density-scale));
+  --gap-stack: calc(0.9rem * var(--density-scale));
+
+  /* Back-compat aliases: legacy component CSS resolves through these onto the
+     new semantic tokens. Do not reintroduce raw hex in components. */
+  --bg: var(--background);
+  --text: var(--foreground);
+  --muted: var(--muted-foreground);
+  --highlight: var(--primary);
+  --highlight-strong: var(--primary-strong);
+  --accent: var(--primary-two);
+  --accent-soft: var(--primary-soft);
 }
 
 *,
@@ -79,6 +119,59 @@ body[data-ui-nav="compact"] .side-nav__group {
   gap: 0.4rem;
 }
 
+/* Density is a member "Appearance" control: it retunes --density-scale, which
+   card paddings and stack gaps derive from, so the whole layout tightens without
+   per-component overrides. Applied on :root (the <html> element) because the derived
+   tokens (--pad-card, --gap-stack) are declared on :root and resolve their nested
+   var() there — a <body>-level override would not reach them. */
+:root[data-ui-density="compact"] {
+  --density-scale: 0.78;
+}
+
+:root[data-ui-density="relaxed"] {
+  --density-scale: 1.14;
+}
+
+/* Accent presets: the member "Appearance" control writes data-ui-accent on the <html>
+   element; each preset retunes only the primary hue/saturation, so every accent-colored
+   token re-tints from the single source. Scoped to :root (not body) so the token layer,
+   which is declared on :root, recomputes with the new hue. "violet" is the default and
+   needs no override. */
+:root[data-ui-accent="blue"] {
+  --primary-h: 214;
+  --primary-s: 90%;
+}
+
+:root[data-ui-accent="teal"] {
+  --primary-h: 178;
+  --primary-s: 70%;
+  --primary-l: 55%;
+}
+
+:root[data-ui-accent="green"] {
+  --primary-h: 150;
+  --primary-s: 62%;
+  --primary-l: 55%;
+}
+
+:root[data-ui-accent="rose"] {
+  --primary-h: 342;
+  --primary-s: 82%;
+  --primary-l: 68%;
+}
+
+:root[data-ui-accent="amber"] {
+  --primary-h: 32;
+  --primary-s: 90%;
+  --primary-l: 60%;
+}
+
+/* Member "Sections" control: a panel the member has hidden for their own view is
+   removed both server-side (SSR omits it) and live via this attribute. */
+[data-member-hidden="true"] {
+  display: none !important;
+}
+
 body[data-ui-motion="reduced"] *,
 body[data-ui-motion="reduced"] *::before,
 body[data-ui-motion="reduced"] *::after {
@@ -100,6 +193,19 @@ a {
 
 a:hover {
   text-decoration: underline;
+}
+
+/* Accessible, token-driven focus ring shared by every interactive control, tinted
+   by the live accent hue. Mouse clicks stay ring-free via :focus-visible. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 header.topbar {
@@ -188,6 +294,144 @@ header.topbar {
   margin-top: 0.2rem;
 }
 
+.ui-settings-panel .eyebrow {
+  margin-top: 0.35rem;
+}
+
+.ui-appearance {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ui-appearance .tiny.muted {
+  margin: 0.15rem 0 0;
+}
+
+/* Accent swatches: each dot previews its own hue by overriding --primary-h locally,
+   so the picker itself demonstrates the choice. */
+.accent-swatches {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.accent-swatch {
+  position: relative;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.accent-swatch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.accent-swatch > span {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: hsl(var(--sw-h) var(--sw-s) var(--sw-l));
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--border);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.accent-swatch:hover > span {
+  transform: scale(1.08);
+}
+
+.accent-swatch input:focus-visible + span {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.accent-swatch input:checked + span {
+  border-color: var(--foreground);
+  box-shadow: 0 0 0 2px hsl(var(--sw-h) var(--sw-s) var(--sw-l) / 0.5);
+}
+
+.accent-swatch--violet > span {
+  --sw-h: 248;
+  --sw-s: 84%;
+  --sw-l: 66%;
+}
+.accent-swatch--blue > span {
+  --sw-h: 214;
+  --sw-s: 90%;
+  --sw-l: 62%;
+}
+.accent-swatch--teal > span {
+  --sw-h: 178;
+  --sw-s: 70%;
+  --sw-l: 55%;
+}
+.accent-swatch--green > span {
+  --sw-h: 150;
+  --sw-s: 62%;
+  --sw-l: 55%;
+}
+.accent-swatch--rose > span {
+  --sw-h: 342;
+  --sw-s: 82%;
+  --sw-l: 68%;
+}
+.accent-swatch--amber > span {
+  --sw-h: 32;
+  --sw-s: 90%;
+  --sw-l: 60%;
+}
+
+/* Segmented control (density) */
+.segmented {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  align-self: flex-start;
+}
+
+.segmented__option {
+  cursor: pointer;
+}
+
+.segmented__option input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.segmented__option > span {
+  display: block;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  color: var(--muted);
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.segmented__option input:checked + span {
+  background: var(--primary);
+  color: var(--primary-foreground);
+}
+
+.segmented__option input:focus-visible + span {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+
+.ui-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  max-height: 8.5rem;
+  overflow-y: auto;
+}
+
 .ui-toast-stack {
   position: fixed;
   right: 1rem;
@@ -263,7 +507,7 @@ header.topbar {
   align-self: start;
   background: var(--nav-surface);
   border: 1px solid var(--border);
-  border-radius: 1rem;
+  border-radius: var(--radius-lg);
   padding: 1rem;
   box-shadow: var(--shadow);
   display: flex;
@@ -327,8 +571,8 @@ header.topbar {
 }
 
 .side-nav__item.is-active {
-  background: rgba(11, 92, 255, 0.1);
-  border: 1px solid rgba(11, 92, 255, 0.3);
+  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.12);
+  border: 1px solid hsl(var(--primary-h) var(--primary-s) 50% / 0.34);
 }
 
 .side-nav__link {
@@ -456,7 +700,7 @@ main {
   border-radius: 999px;
   border: 1px solid var(--border);
   background: rgba(8, 12, 22, 0.92);
-  box-shadow: 0 10px 24px rgba(11, 92, 255, 0.25);
+  box-shadow: 0 10px 24px hsl(var(--primary-h) var(--primary-s) 50% / 0.3);
   cursor: grab;
 }
 
@@ -495,7 +739,7 @@ main {
   background: linear-gradient(135deg, var(--highlight), var(--accent));
   color: #031022;
   cursor: pointer;
-  box-shadow: 0 12px 30px rgba(11, 92, 255, 0.35);
+  box-shadow: 0 12px 30px hsl(var(--primary-h) var(--primary-s) 50% / 0.4);
 }
 
 .composer-tool__panel {
@@ -687,7 +931,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
   border: 2px solid var(--accent);
   border-radius: 0.9rem;
   pointer-events: none;
-  box-shadow: 0 10px 28px rgba(11, 92, 255, 0.2);
+  box-shadow: 0 10px 28px hsl(var(--primary-h) var(--primary-s) 55% / 0.24);
 }
 
 .composer-overlay__bar {
@@ -788,10 +1032,10 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 .panel {
-  background: var(--surface);
+  background: var(--card);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 1.15rem 1.3rem;
+  border-radius: var(--radius-lg);
+  padding: var(--pad-card) calc(var(--pad-card) + 0.15rem);
   box-shadow: var(--shadow-soft);
 }
 
@@ -951,40 +1195,45 @@ a.home-list__title:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.65rem 1.25rem;
-  border-radius: 0.9rem;
+  gap: 0.4rem;
+  padding: 0.6rem 1.15rem;
+  border-radius: var(--radius);
   font-weight: 600;
-  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .cta {
-  background: linear-gradient(135deg, var(--highlight), var(--accent));
-  color: #031025;
-  box-shadow: 0 14px 30px rgba(11, 92, 255, 0.25);
+  background: linear-gradient(135deg, var(--primary), var(--primary-two));
+  color: var(--primary-foreground);
+  border: 1px solid transparent;
+  box-shadow: 0 12px 26px -10px hsl(var(--primary-h) var(--primary-s) 45% / 0.6);
 }
 
 .cta:hover {
   transform: translateY(-1px);
-  box-shadow: 0 18px 35px rgba(11, 92, 255, 0.3);
+  box-shadow: 0 16px 32px -10px hsl(var(--primary-h) var(--primary-s) 45% / 0.7);
   text-decoration: none;
 }
 
 .ghost {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
   color: var(--text);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface-2);
 }
 
 .ghost:hover {
-  border-color: var(--highlight);
+  border-color: var(--primary);
+  background: var(--surface-3);
   text-decoration: none;
 }
 
 .stat {
-  background: rgba(11, 92, 255, 0.08);
+  background: var(--primary-soft);
   border: 1px solid var(--border);
   padding: 1rem 1.25rem;
-  border-radius: 1rem;
+  border-radius: var(--radius);
 }
 
 .stat__value {
@@ -1024,7 +1273,7 @@ ul.plain li:last-child {
 }
 
 .qr {
-  background: rgba(11, 92, 255, 0.08);
+  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.09);
   border: 1px solid var(--border);
   padding: 1rem;
   border-radius: 1rem;
@@ -1273,7 +1522,7 @@ ul.plain li:last-child {
   width: 46px;
   height: 46px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(126, 242, 208, 0.2), rgba(11, 92, 255, 0.25));
+  background: linear-gradient(135deg, rgba(126, 242, 208, 0.2), hsl(var(--primary-h) var(--primary-s) 50% / 0.3));
   border: 1px solid var(--border);
   flex: 0 0 auto;
 }
@@ -1698,8 +1947,8 @@ details.note pre {
 }
 
 .pill.stance--support {
-  border-color: rgba(95, 214, 180, 0.5);
-  background: rgba(95, 214, 180, 0.12);
+  border-color: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.5);
+  background: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.14);
   color: var(--accent);
 }
 
@@ -1711,8 +1960,8 @@ details.note pre {
 
 .pill.stance--question,
 .pill.stance--neutral {
-  border-color: rgba(76, 141, 255, 0.5);
-  background: rgba(76, 141, 255, 0.12);
+  border-color: hsl(var(--primary-h) var(--primary-s) 60% / 0.5);
+  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.14);
   color: var(--highlight);
 }
 
@@ -1748,14 +1997,14 @@ details.note pre {
 }
 
 .pill.stage--discussion {
-  border-color: rgba(76, 141, 255, 0.5);
-  background: rgba(76, 141, 255, 0.12);
+  border-color: hsl(var(--primary-h) var(--primary-s) 60% / 0.5);
+  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.14);
   color: var(--highlight);
 }
 
 .pill.stage--vote {
-  border-color: rgba(95, 214, 180, 0.5);
-  background: rgba(95, 214, 180, 0.12);
+  border-color: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.5);
+  background: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.14);
   color: var(--accent);
 }
 
@@ -1829,7 +2078,7 @@ details.reply-composer > summary::-webkit-details-marker {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(126, 242, 208, 0.16), rgba(11, 92, 255, 0.2));
+  background: linear-gradient(135deg, rgba(126, 242, 208, 0.16), hsl(var(--primary-h) var(--primary-s) 55% / 0.24));
   border: 1px solid var(--border);
   flex: 0 0 auto;
 }
@@ -2039,7 +2288,7 @@ code {
 
 .onboarding-card {
   border: 1px dashed rgba(154, 177, 211, 0.4);
-  background: rgba(11, 92, 255, 0.06);
+  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.07);
   padding: 1rem 1.2rem;
   border-radius: 1rem;
 }
@@ -2112,7 +2361,7 @@ code {
   top: -150px;
   border: 1px solid rgba(126, 242, 208, 0.2);
   border-radius: 50%;
-  box-shadow: 0 0 0 46px rgba(126, 242, 208, 0.025), 0 0 0 92px rgba(11, 92, 255, 0.025);
+  box-shadow: 0 0 0 46px rgba(126, 242, 208, 0.025), 0 0 0 92px hsl(var(--primary-h) var(--primary-s) 60% / 0.03);
   pointer-events: none;
 }
 
@@ -3038,7 +3287,7 @@ code {
   padding: 1rem;
   border: 1px solid rgba(154, 177, 211, 0.18);
   border-radius: 0.9rem;
-  background: radial-gradient(circle at 50% 0%, rgba(11, 92, 255, 0.08), transparent 42%), rgba(4, 6, 15, 0.26);
+  background: radial-gradient(circle at 50% 0%, hsl(var(--primary-h) var(--primary-s) 60% / 0.09), transparent 42%), rgba(4, 6, 15, 0.26);
 }
 
 .pressure-node {

@@ -6,6 +6,12 @@ import { escapeHtml } from '../../../shared/utils/text.js';
 import { normalizeVerbosityMode } from '../../../shared/utils/parse.js';
 import { getActorLabels } from './actorLabel.js';
 import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
+import {
+  DEFAULT_ACCENT,
+  DEFAULT_DENSITY,
+  DEFAULT_THEME,
+  normalizeInterfaceSettings,
+} from './interfaceSettings.js';
 import { renderNav } from './navigation.js';
 import { deriveStatusMeta, renderStatusStrip } from './status.js';
 
@@ -37,9 +43,13 @@ const TEMPLATE_MODULES = {
 export async function renderPage(templateName, data = {}, { wantsPartial = false, title = DEFAULT_PAGE_TITLE, state } = {}) {
   const bodyTemplate = await loadTemplate(templateName);
   const actorLabels = getActorLabels(state);
-  const body = applyTemplate(bodyTemplate, { ...actorLabels, ...data });
+  const renderedBody = applyTemplate(bodyTemplate, { ...actorLabels, ...data });
   const statusStrip = data.statusStrip !== undefined ? data.statusStrip : renderStatusStrip(deriveStatusMeta(state));
   const pageKey = data.pageKey || templateName;
+  const memberUi = normalizeInterfaceSettings(data.person?.uiSettings || {});
+  // Members can hide module panels for their own view. Honor it server-side so the
+  // choice holds without JavaScript; app.js re-applies it live after partial nav.
+  const body = applyMemberHiddenSections(renderedBody, memberUi.hiddenSections?.[pageKey]);
   const composerSettings = state?.settings?.composer || {};
   const pages = composerSettings.pages && typeof composerSettings.pages === 'object' ? composerSettings.pages : {};
   const pageOverrides = pages[pageKey] && typeof pages[pageKey] === 'object' ? pages[pageKey] : {};
@@ -141,6 +151,11 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     layoutData.composerSettingsAttr = composerSettingsAttr;
   }
   layoutData.composerAllowed = isAdmin ? 'true' : '';
+  // Render the saved appearance onto the body so the very first paint (before app.js
+  // runs, and with JS disabled) already reflects the member's accent/density/theme.
+  layoutData.uiAccent = escapeHtml(memberUi.accent || DEFAULT_ACCENT);
+  layoutData.uiDensity = escapeHtml(memberUi.density || DEFAULT_DENSITY);
+  layoutData.uiTheme = escapeHtml(memberUi.theme || DEFAULT_THEME);
   layoutData.uiSettingsServer = escapeHtml(uiSettingsServer);
   layoutData.composerControls = isAdmin ? buildComposerControls() : '';
   return applyTemplate(layout, layoutData);
@@ -289,14 +304,26 @@ function resolveInterfaceSettingsMeta(person = {}) {
   if (!raw || typeof raw !== 'object') {
     return '{}';
   }
-  const normalized = {
-    largeText: raw.largeText === true,
-    reducedMotion: raw.reducedMotion === true,
-    compactNav: raw.compactNav === true,
-    keepComposerOpen: raw.keepComposerOpen === true,
-    partialNavigation: raw.partialNavigation !== false,
-  };
-  return JSON.stringify(normalized);
+  return JSON.stringify(normalizeInterfaceSettings(raw));
+}
+
+// Inject data-member-hidden="true" into the opening tag of any panel the member has
+// hidden on this page. Panels opt in by carrying an explicit data-composer-section
+// attribute in their template; other markup is left untouched. Idempotent — never
+// double-stamps a tag that already carries the attribute.
+function applyMemberHiddenSections(html, hiddenKeys) {
+  if (!Array.isArray(hiddenKeys) || hiddenKeys.length === 0) return html;
+  let output = html;
+  for (const key of hiddenKeys) {
+    if (typeof key !== 'string' || !key) continue;
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`(<[a-zA-Z][^>]*\\bdata-composer-section="${escaped}")([^>]*>)`, 'g');
+    output = output.replace(pattern, (match, head, tail) => {
+      if (/\bdata-member-hidden=/.test(match)) return match;
+      return `${head} data-member-hidden="true"${tail}`;
+    });
+  }
+  return output;
 }
 
 function buildComposerControls() {

@@ -29,6 +29,51 @@
     </button>
     <span class="muted tiny topbar__sync" data-ui-sync-indicator hidden>Syncing…</span>
     <section class="ui-settings-panel" id="ui-settings-panel" data-ui-settings-panel hidden>
+      <p class="eyebrow">Appearance</p>
+      <div class="ui-appearance">
+        <p class="tiny muted">Accent</p>
+        <div class="accent-swatches" role="radiogroup" aria-label="Accent color">
+          <label class="accent-swatch accent-swatch--violet" title="Violet">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="violet" />
+            <span aria-hidden="true"></span>
+          </label>
+          <label class="accent-swatch accent-swatch--blue" title="Blue">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="blue" />
+            <span aria-hidden="true"></span>
+          </label>
+          <label class="accent-swatch accent-swatch--teal" title="Teal">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="teal" />
+            <span aria-hidden="true"></span>
+          </label>
+          <label class="accent-swatch accent-swatch--green" title="Green">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="green" />
+            <span aria-hidden="true"></span>
+          </label>
+          <label class="accent-swatch accent-swatch--rose" title="Rose">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="rose" />
+            <span aria-hidden="true"></span>
+          </label>
+          <label class="accent-swatch accent-swatch--amber" title="Amber">
+            <input type="radio" name="ui-accent" data-ui-setting="accent" data-ui-value="amber" />
+            <span aria-hidden="true"></span>
+          </label>
+        </div>
+        <p class="tiny muted">Density</p>
+        <div class="segmented" role="radiogroup" aria-label="Density">
+          <label class="segmented__option">
+            <input type="radio" name="ui-density" data-ui-setting="density" data-ui-value="compact" />
+            <span>Compact</span>
+          </label>
+          <label class="segmented__option">
+            <input type="radio" name="ui-density" data-ui-setting="density" data-ui-value="comfortable" />
+            <span>Cozy</span>
+          </label>
+          <label class="segmented__option">
+            <input type="radio" name="ui-density" data-ui-setting="density" data-ui-value="relaxed" />
+            <span>Relaxed</span>
+          </label>
+        </div>
+      </div>
       <p class="eyebrow">Interface settings</p>
       <label class="field checkbox">
         <input type="checkbox" data-ui-setting="largeText" />
@@ -50,7 +95,10 @@
         <input type="checkbox" data-ui-setting="partialNavigation" />
         <span>Fast partial navigation</span>
       </label>
-      <p class="muted tiny">Saved locally in this browser. Save to session defaults to reuse across pages/devices.</p>
+      <p class="eyebrow">Sections on this page</p>
+      <div class="ui-sections" data-ui-sections></div>
+      <p class="muted tiny" data-ui-sections-empty hidden>This page has no toggleable sections.</p>
+      <p class="muted tiny">Uncheck a section to hide it from your own view. Saved locally in this browser. Save to session defaults to reuse across pages/devices.</p>
       <div class="cta-row">
         <button class="ghost tiny" type="button" data-ui-settings-save>Save as session defaults</button>
         <button class="ghost tiny" type="button" data-ui-settings-reset>Use session defaults</button>

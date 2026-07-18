@@ -130,7 +130,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Gossip pull skip-cache**: optional endpoint probes (`/votes/ledger`, `/transactions/ledger`) are cached after module-disabled/optional misses so repeated pulls avoid redundant failures; cache status is visible in `/admin` and `/health`.
 - **Gossip push skip-cache**: outbound endpoint posts (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) are cached after module-disabled/gossip-disabled responses so repeated pushes avoid redundant retries; cache status is visible in `/admin` and `/health`.
 - **Sticky composer UX**: social composer auto-collapses on downward scroll to keep the wall readable while preserving manual expand controls.
-- **Practical interface controls**: top bar includes a persistent Interface panel (large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle), inline save-to-session-defaults, plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts.
+- **Practical interface controls**: top bar includes a persistent Interface panel — appearance (accent hue + density), per-page section show/hide, large text, reduced motion, compact nav, composer auto-collapse preference, and partial-navigation toggle — with inline save-to-session-defaults, plus a side-nav jump filter with `Ctrl/Cmd+K` and `/` shortcuts. The theme is built on an HSL semantic-token system so one accent knob re-tints the whole UI.
 - **Storage‑agnostic**: pluggable persistence adapters and `DATA_MODE` profiles.
 - **Profile attributes**: schema‑driven provider‑local fields with a per‑session editor, schema versioning, inline validation, and stale‑schema warnings; never gossiped.
 - **Extension lifecycle**: discover provider-local extensions, record installed versions, install/update/uninstall safely, and enable runtime hooks without forking (`src/modules/extensions/`, `CIRCLE_EXTENSIONS`).
@@ -256,8 +256,10 @@ npm run db:check
 ### Interface preferences
 
 - Interface preferences are stored in browser localStorage (`organization-web-ui-settings`) and applied across partial/full navigations. The app reads the former `party-web-ui-settings` key once for a lossless upgrade.
-- The top-bar Interface panel can persist the current toggles into session defaults without leaving the active page (`Save as session defaults`), and `Use session defaults` clears local overrides.
-- Current toggles: large text, reduced motion, compact nav, keep social composer open while scrolling, and fast partial navigation (off switches links/forms back to full-page loads).
+- The top-bar Interface panel can persist the current settings into session defaults without leaving the active page (`Save as session defaults`), and `Use session defaults` clears local overrides. Saved settings also render on the initial server response (on the `<html>` element), so a member's appearance holds even with JavaScript disabled.
+- **Appearance** (per member, non-binding on anyone else): an accent-hue picker (six presets driving a single `--primary-h` that re-tints the whole HSL token system) and a density control (compact / cozy / relaxed). The visual system is modern-dark by default; a light palette is planned.
+- **Sections**: a per-page show/hide list of the module panels on the current page. Unchecking a section hides it from the member's own view only — applied server-side (the panel is stamped `data-member-hidden`) and live in the browser. This is member-scoped "ad hoc modularity"; the admin-only Composer remains the tool for deployment-wide brand/layout defaults.
+- Other toggles: large text, reduced motion, compact nav, keep social composer open while scrolling, and fast partial navigation (off switches links/forms back to full-page loads).
 - Side navigation includes a jump filter with keyboard shortcuts: `Ctrl/Cmd+K` focuses search, `/` focuses search when not typing, `Esc` clears.
 
 ### Useful endpoints

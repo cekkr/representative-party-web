@@ -13,14 +13,40 @@ triggerDeepLink();
 
 const UI_SETTINGS_KEY = 'organization-web-ui-settings';
 const LEGACY_UI_SETTINGS_KEY = 'party-web-ui-settings';
+// Keep these in sync with interfaceSettings.js on the server.
+const UI_ACCENT_KEYS = ['violet', 'blue', 'teal', 'green', 'rose', 'amber'];
+const UI_DENSITY_KEYS = ['comfortable', 'compact', 'relaxed'];
+const UI_THEME_KEYS = ['dark'];
 const DEFAULT_UI_SETTINGS = {
   largeText: false,
   reducedMotion: false,
   compactNav: false,
   keepComposerOpen: false,
   partialNavigation: true,
+  accent: 'violet',
+  density: 'comfortable',
+  theme: 'dark',
+  hiddenSections: {},
 };
 let appBusyDepth = 0;
+
+function pickUiChoice(value, allowed, fallback) {
+  return typeof value === 'string' && allowed.includes(value) ? value : fallback;
+}
+
+function normalizeHiddenSections(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  const out = {};
+  for (const [pageKey, list] of Object.entries(raw)) {
+    if (typeof pageKey !== 'string' || !Array.isArray(list)) continue;
+    const keys = [];
+    for (const entry of list) {
+      if (typeof entry === 'string' && entry && !keys.includes(entry)) keys.push(entry);
+    }
+    if (keys.length) out[pageKey] = keys;
+  }
+  return out;
+}
 
 function normalizeUiSettings(raw = {}) {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -30,6 +56,10 @@ function normalizeUiSettings(raw = {}) {
     compactNav: source.compactNav === true,
     keepComposerOpen: source.keepComposerOpen === true,
     partialNavigation: source.partialNavigation !== false,
+    accent: pickUiChoice(source.accent, UI_ACCENT_KEYS, 'violet'),
+    density: pickUiChoice(source.density, UI_DENSITY_KEYS, 'comfortable'),
+    theme: pickUiChoice(source.theme, UI_THEME_KEYS, 'dark'),
+    hiddenSections: normalizeHiddenSections(source.hiddenSections),
   };
 }
 
@@ -100,7 +130,33 @@ function applyUiSettings(settings = readUiSettings()) {
   document.body.dataset.uiNav = normalized.compactNav ? 'compact' : 'normal';
   document.body.dataset.uiComposerAutocollapse = normalized.keepComposerOpen ? 'off' : 'on';
   document.body.dataset.uiPartialNav = normalized.partialNavigation ? 'on' : 'off';
+  // Accent/density/theme live on <html>: the derived token layer is declared on :root
+  // and resolves its nested var() there, so a <body>-level hue override would not reach it.
+  document.documentElement.dataset.uiAccent = normalized.accent;
+  document.documentElement.dataset.uiDensity = normalized.density;
+  document.documentElement.dataset.theme = normalized.theme;
+  applyHiddenSections(normalized);
   return normalized;
+}
+
+// The member "Sections" control hides module panels for the current page only. The
+// server already stamps data-member-hidden on the initial SSR render; this re-applies
+// the member's choice live (after partial nav or an in-panel toggle) by walking the
+// page's [data-composer-section] panels.
+function applyHiddenSections(settings) {
+  if (!document.body) return;
+  const pageKey = document.body.dataset.pageKey || 'default';
+  const hidden = new Set((settings.hiddenSections && settings.hiddenSections[pageKey]) || []);
+  document.querySelectorAll('[data-composer-section]').forEach((panel) => {
+    // Never fight the admin Composer while it is open and reordering/hiding panels.
+    if (document.body.dataset.composerMode === 'on') return;
+    const key = panel.dataset.composerSection;
+    if (hidden.has(key)) {
+      panel.setAttribute('data-member-hidden', 'true');
+    } else {
+      panel.removeAttribute('data-member-hidden');
+    }
+  });
 }
 
 function isPartialNavigationEnabled() {
@@ -2429,14 +2485,25 @@ function initUiSettingsPanel() {
     payload.set('uiCompactNav', nextSettings.compactNav ? 'on' : 'off');
     payload.set('uiKeepComposerOpen', nextSettings.keepComposerOpen ? 'on' : 'off');
     payload.set('uiPartialNavigation', nextSettings.partialNavigation ? 'on' : 'off');
+    payload.set('uiAccent', nextSettings.accent || 'violet');
+    payload.set('uiDensity', nextSettings.density || 'comfortable');
+    payload.set('uiTheme', nextSettings.theme || 'dark');
+    payload.set('uiHiddenSections', JSON.stringify(nextSettings.hiddenSections || {}));
     return payload;
   };
 
   const syncInputs = () => {
     inputs.forEach((input) => {
       const key = input.dataset.uiSetting || '';
-      input.checked = Boolean(settings[key]);
+      if (!key) return;
+      // Choice inputs (accent/density/theme) carry data-ui-value; booleans do not.
+      if (input.dataset.uiValue !== undefined) {
+        input.checked = settings[key] === input.dataset.uiValue;
+      } else {
+        input.checked = Boolean(settings[key]);
+      }
     });
+    if (typeof syncSectionsList === 'function') syncSectionsList();
   };
 
   const syncSaveButton = () => {
@@ -2477,7 +2544,11 @@ function initUiSettingsPanel() {
     inputs.forEach((input) => {
       const key = input.dataset.uiSetting || '';
       if (!key) return;
-      next[key] = input.checked;
+      if (input.dataset.uiValue !== undefined) {
+        if (input.checked) next[key] = input.dataset.uiValue;
+      } else {
+        next[key] = input.checked;
+      }
     });
     settings = writeUiSettings(next);
     applyUiSettings(settings);
@@ -2485,6 +2556,56 @@ function initUiSettingsPanel() {
     if (window.location.pathname === '/social/feed') {
       initStickyComposerAutoCollapse();
     }
+  };
+
+  // Build the per-page "Sections" list: one show/hide checkbox per module panel that
+  // opted in via data-composer-section. Members hide sections for their own view only.
+  const sectionsList = panel.querySelector('[data-ui-sections]');
+  const sectionsEmpty = panel.querySelector('[data-ui-sections-empty]');
+  const resolveSectionLabel = (el, key) => {
+    const explicit = el.getAttribute('data-section-label');
+    if (explicit) return explicit;
+    const heading = el.querySelector('h1, h2, h3, .eyebrow');
+    const text = heading?.textContent?.trim();
+    return text || key;
+  };
+  const syncSectionsList = () => {
+    if (!sectionsList) return;
+    const pageKey = document.body?.dataset?.pageKey || 'default';
+    const panels = Array.from(document.querySelectorAll('[data-composer-section]')).filter(
+      (el) => !el.closest('[data-composer-tool]'),
+    );
+    const hidden = new Set((settings.hiddenSections && settings.hiddenSections[pageKey]) || []);
+    sectionsList.innerHTML = '';
+    if (!panels.length) {
+      if (sectionsEmpty) sectionsEmpty.hidden = false;
+      return;
+    }
+    if (sectionsEmpty) sectionsEmpty.hidden = true;
+    panels.forEach((el) => {
+      const key = el.dataset.composerSection;
+      if (!key) return;
+      const label = document.createElement('label');
+      label.className = 'field checkbox';
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.checked = !hidden.has(key);
+      input.addEventListener('change', () => {
+        const next = { ...settings, hiddenSections: { ...(settings.hiddenSections || {}) } };
+        const list = new Set(next.hiddenSections[pageKey] || []);
+        if (input.checked) list.delete(key);
+        else list.add(key);
+        if (list.size) next.hiddenSections[pageKey] = Array.from(list);
+        else delete next.hiddenSections[pageKey];
+        settings = writeUiSettings(next);
+        applyUiSettings(settings);
+      });
+      const span = document.createElement('span');
+      span.textContent = resolveSectionLabel(el, key);
+      label.appendChild(input);
+      label.appendChild(span);
+      sectionsList.appendChild(label);
+    });
   };
 
   const onSaveClick = async (event) => {

@@ -19,6 +19,7 @@ import {
   renderProfileSummary,
   renderUiPreferencesForm,
 } from '../../../interfaces/http/views/profileView.js';
+import { normalizeInterfaceSettings } from '../../../interfaces/http/views/interfaceSettings.js';
 import { invalidateSessionIndex, validateHandleChoice } from '../../identity/sessions.js';
 import { persistSessions } from '../../../infra/persistence/storage.js';
 import { logTransaction } from '../../transactions/registry.js';
@@ -282,13 +283,3 @@ function listMissingRequired(fields = [], attributes = {}) {
   return missing;
 }
 
-function normalizeInterfaceSettings(source = {}) {
-  const payload = source && typeof source === 'object' ? source : {};
-  return {
-    largeText: parseBoolean(payload.uiLargeText ?? payload.largeText, false),
-    reducedMotion: parseBoolean(payload.uiReducedMotion ?? payload.reducedMotion, false),
-    compactNav: parseBoolean(payload.uiCompactNav ?? payload.compactNav, false),
-    keepComposerOpen: parseBoolean(payload.uiKeepComposerOpen ?? payload.keepComposerOpen, false),
-    partialNavigation: parseBoolean(payload.uiPartialNavigation ?? payload.partialNavigation, true),
-  };
-}

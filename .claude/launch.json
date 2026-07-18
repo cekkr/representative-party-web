@@ -5,7 +5,8 @@
       "name": "web-org-standalone",
       "runtimeExecutable": "./run-standalone.sh",
       "runtimeArgs": [],
-      "port": 3000
+      "port": 3000,
+      "autoPort": true
     }
   ]
 }
