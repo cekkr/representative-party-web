@@ -448,7 +448,7 @@ function renderPetitionComments(comments, state) {
         : '';
       const argumentId =
         comment.argumentTitle || comment.argumentParentId
-          ? `<p class="muted tiny">Argument id: ${escapeHtml(comment.id)}</p>`
+          ? `<p class="muted tiny">Argument node <span class="mono" title="${escapeHtml(String(comment.id))}">${escapeHtml(String(comment.id).slice(0, 8))}…</span></p>`
           : '';
       const stanceKey = normalizeCommentStance(comment.stance);
       const coloredStance = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;

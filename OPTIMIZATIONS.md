@@ -69,6 +69,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Standardize gate messaging copy (allowed/blocked + reason) across discussion/social/petitions so callouts read the same.
 - Normalize direct-message labeling and handle formatting to keep private-post UX consistent with other sections.
 - Keep pill ordering consistent (status, visibility, preview, issuer, timestamp) across all feed cards.
+- Every proposal card renders `Topic: general` because `POST /petitions` has no topic field — the debate topic (`liste-attesa`, `consumo-suolo`, `salario-minimo`) is lost when a discussion becomes a proposal, so the Scenario A proposals all read as `general` (visible in `party-proposal`/`party-signatures`/`party-vote`). Carry the source topic through petition creation (or run the classification hook on the proposal body) so proposals inherit their debate topic and breadcrumbs survive.
 - Make media lock/report CTA wording consistent between social feed cards and admin review panels.
 - Batch or debounce media view-request notifications (per viewer or time window) to avoid alert spam on frequent refreshes.
 - Track signing key origin separately from env hydration so `/admin` can report `settings` vs `env` accurately after startup.

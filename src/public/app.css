@@ -1139,6 +1139,31 @@ ul.plain li:last-child {
   flex: 0 0 auto;
 }
 
+.profile-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.profile-head__name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.profile-head__name .actor {
+  color: var(--text);
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.2rem 0 0;
+}
+
 .structured-outline__list li {
   border-bottom: none;
   padding: 0.35rem 0;
@@ -1897,6 +1922,11 @@ code {
   border-radius: 0.5rem;
   display: inline-block;
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
+.mono {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  letter-spacing: 0.02em;
 }
 
 /* Shared context panel: gates, facts, and guidance kept visually distinct

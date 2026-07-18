@@ -76,10 +76,8 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
     return sendJson(res, 400, { error: 'missing_delegate', message: 'Delegate hash required.' });
   }
   const profile = buildDelegateProfile(state, delegateHash);
-  const handleLabel = profile.handle || resolveHandleForHash(state, profile.hash || delegateHash);
+  const resolvedHash = profile.hash || delegateHash;
   const roleLabel = profile.role || 'unknown';
-  const statusLabel = profile.banned ? 'banned' : 'active';
-  const bio = profile.bio || 'No public bio on file. Add a "publicBio" field in profile settings to share.';
 
   const html = await renderPage(
     'delegate-profile',
@@ -87,11 +85,11 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
       person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
-      delegateHandle: escapeHtml(handleLabel),
-      delegateHash: escapeHtml(profile.hash || delegateHash),
-      delegateRole: escapeHtml(roleLabel),
-      delegateStatus: escapeHtml(statusLabel),
-      delegateBio: escapeHtml(bio),
+      delegateIdentity: renderProfileIdentity(state, resolvedHash, {
+        role: roleLabel,
+        banned: profile.banned,
+        bio: profile.bio,
+      }),
       delegateReputation: renderReputation(profile.deliberationScore),
       delegateStats: renderStats(profile),
       incomingDelegations: renderDelegationTopics('Delegations received', profile.incoming, { showOwners: true }),
@@ -105,6 +103,33 @@ export async function renderDelegateProfile({ req, res, state, wantsPartial, par
   );
 
   return sendHtml(res, html);
+}
+
+// The profile header must read like the People directory row it was reached from:
+// a real person with an avatar and an @handle byline, not a `label: value` debug
+// dump with a raw hash surfaced as identity (see principle-docs/UIReview.md).
+function renderProfileIdentity(state, hash, { role = 'unknown', banned = false, bio = '' } = {}) {
+  const avatar = renderActorAvatar(state, hash, { size: 'md' });
+  const label = renderActorLabel(state, hash, { showHash: true });
+  const roleChip = `<span class="pill ghost">${escapeHtml(role)}</span>`;
+  const statusChip = banned
+    ? '<span class="pill stance stance--concern">banned</span>'
+    : '<span class="pill stance stance--support">active</span>';
+  const bioLine = bio
+    ? `<p class="muted small">${escapeHtml(bio)}</p>`
+    : '<p class="muted tiny">No public bio on file — the member can add a "publicBio" field in profile settings to share one.</p>';
+  return `
+    <div class="profile-head">
+      <div class="person-row__id">
+        ${avatar}
+        <div>
+          <p class="profile-head__name">${label}</p>
+          <p class="chip-row">${roleChip} ${statusChip}</p>
+        </div>
+      </div>
+      ${bioLine}
+    </div>
+  `;
 }
 
 function renderReputation(deliberationScore = {}) {
