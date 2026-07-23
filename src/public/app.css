@@ -649,6 +649,13 @@ header.topbar {
 
 .shell main {
   min-width: 0;
+  /* Two-column page grids inside the shell must react to the width they actually get,
+     not the viewport's: the side-nav takes ~240px plus a 1.5rem gap, so a viewport-keyed
+     breakpoint left the main column at ~160px on a ~850px screen while the aside kept
+     its full 360px. Declaring the container here lets .page-grid collapse on its own
+     measurements. */
+  container-type: inline-size;
+  container-name: shell-main;
 }
 
 .side-nav {
@@ -1200,25 +1207,40 @@ body[data-composer-mode="on"] .composer-tool__panel {
   align-items: start;
 }
 
+/* Collapse to a single column as soon as the main column would be squeezed below a
+   readable measure. Keyed to the shell's content width (see .shell main) so the
+   side-nav is already accounted for. */
+@container shell-main (max-width: 700px) {
+  .page-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .page-aside {
+    order: -1;
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+}
+
 .page-main {
   min-width: 0;
 }
 
+/* A plain column, deliberately: not sticky, no max-height, no overflow.
+   Both of the obvious "nice" rails break once a panel grows past the viewport.
+   Capping the rail with overflow:auto clipped an expanded compose form so its own
+   submit button sat outside the rail's visible box. Making the rail sticky instead is
+   worse: a sticky element taller than the viewport pins at `top` and then stops
+   moving, so its lower half cannot be scrolled to at all. Only a genuinely short,
+   fixed-height panel may pin itself — see .sticky-composer. */
 .page-aside {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   align-self: start;
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
   padding-right: 0.25rem;
-}
-
-.sticky-panel {
-  position: sticky;
-  top: 1rem;
 }
 
 .grid {
@@ -2497,80 +2519,73 @@ code {
   border: 0;
 }
 
+/* A workspace strip, not a landing-page hero. /organization is contractually an
+   inbox-first workspace ("starts with a familiar inbox and source message"), so the
+   header identifies the surface and states that the data is illustrative, then gets
+   out of the way — the pressure inbox has to be reachable without scrolling. The
+   explanatory prose is is-verbose, so compact mode drops it entirely. */
 .coordination-hero {
-  display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.7fr);
-  gap: 1.5rem;
-  align-items: end;
-  overflow: hidden;
-  position: relative;
-}
-
-.coordination-hero::after {
-  content: '';
-  position: absolute;
-  width: 260px;
-  height: 260px;
-  right: -130px;
-  top: -150px;
-  border: 1px solid hsl(var(--marker-hsl) / 0.2);
-  border-radius: 50%;
-  box-shadow: 0 0 0 46px hsl(var(--marker-hsl) / 0.025), 0 0 0 92px hsl(var(--primary-h) var(--primary-s) 60% / 0.03);
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
 }
 
 .coordination-hero__copy {
   max-width: 760px;
-  position: relative;
-  z-index: 1;
 }
 
 .coordination-hero__copy h2 {
   max-width: 680px;
-  font-size: clamp(2rem, 4vw, 3.6rem);
-  line-height: 1.02;
-  letter-spacing: -0.045em;
-  margin: 0.35rem 0 0.85rem;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin: 0.15rem 0 0.55rem;
+}
+
+.coordination-hero__copy .discussion__meta {
+  margin-bottom: 0.35rem;
+}
+
+.coordination-hero__copy p + p {
+  margin-top: 0.35rem;
 }
 
 .coordination-hero__stats {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border: 1px solid hsl(var(--hairline-hsl) / 0.2);
-  border-radius: 1rem;
+  border-radius: var(--radius);
   overflow: hidden;
   background: hsl(var(--inset-hsl) / 0.28);
-  position: relative;
-  z-index: 1;
 }
 
 .coordination-hero__stats article {
   display: flex;
   flex-direction: column;
-  min-height: 112px;
-  padding: 0.95rem;
+  padding: 0.6rem 0.7rem;
   border-right: 1px solid hsl(var(--hairline-hsl) / 0.14);
-  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.14);
 }
 
-.coordination-hero__stats article:nth-child(2n) {
+.coordination-hero__stats article:last-child {
   border-right: 0;
 }
 
-.coordination-hero__stats article:nth-last-child(-n + 2) {
-  border-bottom: 0;
+.coordination-hero__stats span {
+  color: var(--muted);
+  font-size: 0.68rem;
 }
 
-.coordination-hero__stats span,
+/* The qualifier under each number is explanatory, not a value — hide it in compact. */
 .coordination-hero__stats small {
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.66rem;
+  line-height: 1.25;
 }
 
 .coordination-hero__stats strong {
-  margin: auto 0 0.1rem;
-  font-size: 1.75rem;
-  letter-spacing: -0.04em;
+  margin: 0.1rem 0;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
 }
 
 .pressure-workspace {
@@ -3855,14 +3870,13 @@ code {
     position: static;
   }
 
-  .sticky-panel {
-    position: static;
-  }
-
   .composer {
     max-height: none;
   }
 
+  /* Fallback for engines without container queries; the @container rule above is what
+     normally collapses the page grid, and it triggers earlier because it measures the
+     content column rather than the viewport. */
   .page-grid {
     grid-template-columns: 1fr;
   }

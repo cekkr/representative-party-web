@@ -1,0 +1,17 @@
+<section class="panel" id="discussion-filters" data-composer-section="discussion-filters" data-section-label="Feed filters">
+  <p class="eyebrow">Feed controls</p>
+  <h3>Filter the discussion</h3>
+  <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
+    <label class="field">
+      <span>Filter by topic</span>
+      <select name="topic">
+        <option value="" {{topicFilterSelectedAll}}>All topics</option>
+        {{topicFilterOptions}}
+      </select>
+    </label>
+    <div class="cta-row">
+      <button class="ghost" type="submit">Apply filter</button>
+    </div>
+  </form>
+  <p class="muted small">Filter to one topic to follow a single thread of the debate.</p>
+</section>

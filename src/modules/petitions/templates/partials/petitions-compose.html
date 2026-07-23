@@ -1,11 +1,6 @@
-<section class="panel" id="petitions-compose">
+<section class="panel" id="petitions-compose" data-composer-section="petitions-compose" data-section-label="New proposal">
   <p class="eyebrow">Proposals</p>
-  <h2>Decision proposals</h2>
-  {{petitionsContext}}
-  <details class="note is-verbose" id="petitions-delegation-suggestions">
-    <summary>Suggested delegates (from your groups)</summary>
-    <div class="muted small">{{delegationSuggestions}}</div>
-  </details>
+  <h3>Draft a proposal</h3>
   <details class="form-toggle" {{composeOpen}}>
     <summary>Draft a new proposal</summary>
     <form class="stack" method="post" action="/petitions" data-enhance="petitions">

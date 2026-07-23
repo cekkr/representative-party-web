@@ -161,7 +161,7 @@ Composer.
 
 ## 5. Section / modularity inventory
 
-41 panels are section-tagged across modules. **All 36 chrome-bearing panels carry a
+46 panels are section-tagged across modules. **All 41 chrome-bearing panels carry a
 friendly `data-section-label`** — **[done]**. The 5 auth/core pages render no shell, so
 the member Sections control never lists them and a label there would be dead markup.
 `tests/interface-settings.test.js` enforces the rule, so a new panel cannot ship unlabeled.
@@ -174,6 +174,8 @@ than a control — that is what the label pass removed.
 | home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops` | **[done]** all 5 |
 | social | `social-wall`, `social-compose`, `social-controls`, `social-follows` | **[done]** all 4 |
 | forum | `forum-threads`, `forum-compose` | **[done]** both |
+| discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics` | **[done]** all 4 |
+| petitions | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` | **[done]** all 5 |
 | organization | `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[done]** all 4 |
 | delegation | `delegation-overview`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[done]** all 5 |
 | delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[done]** all 7 |
@@ -201,25 +203,45 @@ Two notes from the label pass:
 ## 6. Per-surface structure map
 
 Each member-facing route: owning template, current top-level section order, and the target
-structure/order pulled from the references. The token/component refresh (§2–3) already
-reaches every surface; **[todo]** below means the HTML *structure* still needs the modern
-card/feed rework and label pass. Home/social/forum are the shipped **exemplar**.
+structure/order pulled from the references. The token/component refresh (§2–3) reaches
+every surface, and every panel is now section-tagged and labelled (§5); **[todo]** below
+means the HTML *structure* still needs the modern card/feed rework.
+
+**The exemplar shape** (home/social/forum, now also discussion/petitions): a
+`.page-grid` with the *content* in `.page-main` and short controls in the `.page-aside`
+rail. Content leads — a compose form never sits above the feed it contributes to.
 
 | Route | Template | Current top-level order | Target (reference) | Status |
 | --- | --- | --- | --- | --- |
 | `/` | [home.html](src/modules/home/templates/home.html) | overview → lanes (conversation/decision/audit) → ops | dashboard hero strip + stat row + activity lanes as cards | **[done]** exemplar |
 | `/social/feed` | [social.html](src/modules/social/templates/social.html) | main: wall · aside: composer/filters/follows | two-column feed: sticky composer + card wall + right rail | **[done]** exemplar |
 | `/forum` | [forum.html](src/modules/forum/templates/forum.html) | main: threads · aside: compose | thread list rows + right compose rail | **[done]** exemplar |
-| `/organization` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace header → operating map → pressure board/map | inbox-first: source message, layer tabs, operating map, pressure views | **[partial]** demote hero (see OPTIMIZATIONS), label sections |
-| `/discussion` | [discussion.html](src/modules/discussion/templates/discussion.html) | intake + list | modern list rows + compose | **[todo]** structure + section tags/labels |
-| `/petitions` | [petitions.html](src/modules/petitions/templates/petitions.html) + partials | active/compose/discussion partials | proposal cards, stage chips, argument map | **[todo]** structure + section tags/labels |
-| `/governance` | [governance.html](src/modules/governance/templates/governance.html) | overview → proposals | settings cards + change-proposal list | **[todo]** labels |
-| `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | overview/recommendations/effective/set/current | delegate cards + chain view | **[todo]** labels |
-| `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory/list; profile summary/endorsements/… | searchable people grid + profile dashboard | **[todo]** labels |
-| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | create → list | group cards + election panels | **[todo]** labels |
-| `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | inbox | notification list rows | **[todo]** label |
-| `/profile` | [profile.html](src/modules/profile/templates/profile.html) | summary → interface → fields | account cards + preferences | **[todo]** labels |
+| `/discussion` | [discussion.html](src/modules/discussion/templates/discussion.html) + partials | main: feed · aside: compose/filters/topics | modern list rows + right rail | **[done]** |
+| `/petitions` | [petitions.html](src/modules/petitions/templates/petitions.html) + partials | main: active proposals/deliberations · aside: compose/stage filter/delegates | proposal cards, stage chips, argument map | **[done]** structure; argument-map polish outstanding |
+| `/organization` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → pressure inbox → organizational mirror → operating map | inbox-first: source message, layer tabs, operating map, pressure views | **[done]** hero demoted to a strip; inbox is above the fold |
+| `/governance` | [governance.html](src/modules/governance/templates/governance.html) | overview → proposals | settings cards + change-proposal list | **[todo]** structure |
+| `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | overview/recommendations/effective/set/current | delegate cards + chain view | **[todo]** structure |
+| `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory/list; profile summary/endorsements/… | searchable people grid + profile dashboard | **[todo]** structure |
+| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | create → list | group cards + election panels | **[todo]** structure |
+| `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | inbox → preferences | notification list rows | **[todo]** structure |
+| `/profile` | [profile.html](src/modules/profile/templates/profile.html) | attributes → session/handle → interface | account cards + preferences | **[todo]** structure |
 | `/admin` | [admin.html](src/modules/admin/templates/admin.html) | wizard/policy/modules/… | admin dashboard shell | **[todo]** structure (large template; decompose into partials) |
+
+### Layout rules the rollout established
+
+- **The rail is a plain column.** `.page-aside` is not sticky, has no `max-height`, and
+  does not scroll internally. Both alternatives break once a panel outgrows the viewport:
+  `overflow: auto` clips an expanded compose form so its own submit button sits outside
+  the rail's visible box, and `position: sticky` is worse — a sticky element taller than
+  the viewport pins at `top` and then stops moving, so nothing below the fold can be
+  scrolled to at all. In both cases the member simply cannot submit. Only a genuinely
+  short, fixed-height panel may pin itself (`.sticky-composer` on the social composer).
+  `tests/ui.test.js` → *compose forms stay reachable at a short viewport* guards this.
+- **The grid collapses on its own width, not the viewport's.** `.shell main` declares
+  `container-type: inline-size`, and `.page-grid` collapses via
+  `@container shell-main (max-width: 700px)`. A viewport-keyed breakpoint ignored the
+  ~240px side-nav and left the main column at ~160px on a ~850px screen while the aside
+  kept its full 360px. The old `@media (max-width: 720px)` rule stays as a fallback.
 
 ---
 
@@ -252,6 +274,8 @@ card/feed rework and label pass. Home/social/forum are the shipped **exemplar**.
    adding a key server-side needs no second edit.
 4. **Roll the modern structure out** beyond the exemplar (§6 `[todo]` rows), one surface
    per pass, holding each to [UIReview.md](principle-docs/UIReview.md); tag any new panels.
+   `/discussion`, `/petitions` and `/organization` are done; `/governance`, `/delegation`,
+   `/delegates`, `/groups`, `/notifications`, `/profile` and `/admin` remain.
 5. **Self-host a variable font** under `/public` (no external request) for exact reference
    typography.
 6. **Composer palette** — component insert/delete/wrap + richer property groups (already a

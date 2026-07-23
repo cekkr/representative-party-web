@@ -1463,3 +1463,56 @@ test('UI petition discussion exposes evidence prompt (agent viewport)', { timeou
   const snapshot = await captureViewport(page);
   assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, min: 1 });
 });
+
+// An expanded compose form is taller than a short viewport. Two layout choices break
+// it, and both shipped at some point: capping the aside with overflow:auto clips the
+// form so its submit button sits outside the rail's visible box, and making the aside
+// (or the panel) sticky is worse, because a sticky element taller than the viewport
+// pins at `top` and then stops moving, so nothing below the fold can be scrolled to.
+// Either way the member simply cannot submit. Assert the button is genuinely reachable
+// on every compose surface at a small viewport.
+test('compose forms stay reachable at a short viewport', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  const session = await createVerifiedSession(server.baseUrl, { pidHash: 'compose-reach' });
+  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  t.after(async () => {
+    await browser.close();
+    await server.stop();
+  });
+
+  const surfaces = [
+    { url: '/discussion?compose=post', form: 'form[action="/discussion"]' },
+    { url: '/forum?compose=thread', form: 'form[action="/forum"]' },
+    { url: '/petitions?compose=proposal', form: 'form[action="/petitions"]' },
+  ];
+
+  for (const { url, form } of surfaces) {
+    const page = await browser.newPage();
+    await page.setViewport({ width: 800, height: 600 });
+    await configurePage(page, server.baseUrl);
+    await setSessionCookie(page, server.baseUrl, session.sessionId);
+    await page.goto(`${server.baseUrl}${url}`, { waitUntil: 'networkidle0' });
+
+    const button = await page.$(`${form} button[type="submit"]`);
+    assert.ok(button, `expected a submit button on ${url}`);
+
+    // No ancestor may clip or pin the form out of reach.
+    const trapped = await page.evaluate((formSelector) => {
+      const el = document.querySelector(`${formSelector} button[type="submit"]`);
+      for (let node = el.parentElement; node && node !== document.body; node = node.parentElement) {
+        const cs = getComputedStyle(node);
+        const clips = cs.overflowY === 'auto' || cs.overflowY === 'scroll' || cs.overflowY === 'hidden';
+        const tallerThanViewport = node.getBoundingClientRect().height > window.innerHeight;
+        if (cs.position === 'sticky' && tallerThanViewport) return `sticky ancestor taller than viewport: .${node.className}`;
+        if (clips && node.scrollHeight > node.clientHeight) return `scroll-clipping ancestor: .${node.className}`;
+      }
+      return null;
+    }, form);
+    assert.equal(trapped, null, `${url}: ${trapped}`);
+
+    // And the real proof: Puppeteer can scroll to it and click it.
+    await button.click();
+    await page.close();
+  }
+});

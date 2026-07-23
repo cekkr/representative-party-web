@@ -51,7 +51,10 @@ test('organization coordination route renders the original project reference as 
   const response = await fetch(`${server.baseUrl}/organization`);
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /Turn incoming pressure into accountable action/);
+  assert.match(html, /Coordination workspace/);
+  // The route must keep saying, on the page itself, that the cases are illustrative —
+  // that honesty cue matters more than any particular headline wording.
+  assert.match(html, /Illustrative case data/);
   assert.match(html, /Fundamental need/);
   assert.match(html, /Organizational mirror/);
   assert.match(html, /pressure-layer-protection/);

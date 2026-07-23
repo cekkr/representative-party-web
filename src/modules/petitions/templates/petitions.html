@@ -1,3 +1,11 @@
-{{> petitions-compose}}
-{{> petitions-active}}
-{{> petitions-discussion}}
+<div class="page-grid page-grid--petitions">
+  <div class="page-main">
+    {{> petitions-active}}
+    {{> petitions-discussion}}
+  </div>
+  <aside class="page-aside">
+    {{> petitions-compose}}
+    {{> petitions-filters}}
+    {{> petitions-delegates}}
+  </aside>
+</div>

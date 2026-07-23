@@ -1,0 +1,40 @@
+<section class="panel" id="discussion-compose" data-composer-section="discussion-compose" data-section-label="New post">
+  <p class="eyebrow">Discussion</p>
+  <h3>Share a contribution</h3>
+  <details class="form-toggle" {{composeOpen}}>
+    <summary>Start a discussion post</summary>
+    <form class="stack" method="post" action="/discussion" data-enhance="discussion">
+      <div class="form-grid">
+        <label class="field">
+          <span>Topic</span>
+          <input name="topic" list="topics-list" placeholder="Energy transition" required />
+        </label>
+        <label class="field">
+          <span>Stance</span>
+          <select name="stance">
+            <option value="proposal">Proposal</option>
+            <option value="support">Support</option>
+            <option value="concern">Concern</option>
+            <option value="neutral" selected>Neutral</option>
+          </select>
+        </label>
+      </div>
+      <label class="field">
+        <span>Contribution</span>
+        <textarea name="content" rows="4" placeholder="Share a concise, accountable update or idea." required></textarea>
+      </label>
+      <label class="field">
+        <span>Evidence / citations (optional)</span>
+        <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
+      </label>
+      <p class="muted small">One URL per line.</p>
+      <div class="cta-row">
+        <button class="cta" type="submit">Post to discussion</button>
+        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
+      </div>
+    </form>
+  </details>
+  <datalist id="topics-list">
+    {{topicDatalist}}
+  </datalist>
+</section>
