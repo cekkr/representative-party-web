@@ -161,7 +161,7 @@ Composer.
 
 ## 5. Section / modularity inventory
 
-46 panels are section-tagged across modules. **All 41 chrome-bearing panels carry a
+67 panels are section-tagged across modules. **All 62 chrome-bearing panels carry a
 friendly `data-section-label`** — **[done]**. The 5 auth/core pages render no shell, so
 the member Sections control never lists them and a label there would be dead markup.
 `tests/interface-settings.test.js` enforces the rule, so a new panel cannot ship unlabeled.
@@ -183,6 +183,9 @@ than a control — that is what the label pass removed.
 | groups | `groups-create`, `groups-list` | **[done]** both |
 | notifications | `notifications-inbox`, `notifications-preferences` | **[done]** both |
 | profile | `profile-summary`, `profile-interface`, `profile-fields` | **[done]** all 3 |
+| governance | + `governance-propose` | **[done]** all 3 |
+| delegates | + `delegate-directory` reused for search | **[done]** |
+| admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` | **[done]** all 20 |
 | auth/core | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required` | n/a (chromeless) |
 
 Two notes from the label pass:
@@ -218,14 +221,24 @@ rail. Content leads — a compose form never sits above the feed it contributes 
 | `/forum` | [forum.html](src/modules/forum/templates/forum.html) | main: threads · aside: compose | thread list rows + right compose rail | **[done]** exemplar |
 | `/discussion` | [discussion.html](src/modules/discussion/templates/discussion.html) + partials | main: feed · aside: compose/filters/topics | modern list rows + right rail | **[done]** |
 | `/petitions` | [petitions.html](src/modules/petitions/templates/petitions.html) + partials | main: active proposals/deliberations · aside: compose/stage filter/delegates | proposal cards, stage chips, argument map | **[done]** structure; argument-map polish outstanding |
-| `/organization` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → pressure inbox → organizational mirror → operating map | inbox-first: source message, layer tabs, operating map, pressure views | **[done]** hero demoted to a strip; inbox is above the fold |
-| `/governance` | [governance.html](src/modules/governance/templates/governance.html) | overview → proposals | settings cards + change-proposal list | **[todo]** structure |
-| `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | overview/recommendations/effective/set/current | delegate cards + chain view | **[todo]** structure |
-| `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory/list; profile summary/endorsements/… | searchable people grid + profile dashboard | **[todo]** structure |
-| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | create → list | group cards + election panels | **[todo]** structure |
-| `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | inbox → preferences | notification list rows | **[todo]** structure |
-| `/profile` | [profile.html](src/modules/profile/templates/profile.html) | attributes → session/handle → interface | account cards + preferences | **[todo]** structure |
-| `/admin` | [admin.html](src/modules/admin/templates/admin.html) | wizard/policy/modules/… | admin dashboard shell | **[todo]** structure (large template; decompose into partials) |
+| `/organization` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → pressure inbox → organizational mirror → operating map | inbox-first: source message, layer tabs, operating map, pressure views | **[done]** hero demoted to a strip; inbox above the fold |
+| `/governance` | [governance.html](src/modules/governance/templates/governance.html) | main: constitution → change proposals · aside: propose a change | settings cards + change-proposal list | **[done]** |
+| `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | main: overview → current → effective chains · aside: set a delegate/recommendations | delegate cards + chain view | **[done]** |
+| `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory — main: people list · aside: search. profile — main: summary/coverage/votes/activity · aside: endorsements | searchable people grid + profile dashboard | **[done]** |
+| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | main: available groups · aside: create a group | group cards + election panels | **[done]** |
+| `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | main: alerts inbox · aside: alert preferences | notification list rows | **[done]** |
+| `/profile` | [profile.html](src/modules/profile/templates/profile.html) | main: session/handle → provider-local attributes · aside: interface controls | account cards + preferences | **[done]** |
+| `/admin` | [admin.html](src/modules/admin/templates/admin.html) + partials | 20 anchored panels, single column | admin dashboard shell | **[done]** decomposed into 7 partials; single column on purpose (see below) |
+
+**`/admin` stays a single column deliberately.** The reference "dashboard shell" is a
+persistent left sidebar plus a main content column — which the app already has, in the
+shared side-nav. A settings page whose 20 panels are each a jump target reads better as
+one column than split across a rail, and every panel is now section-tagged so a member
+can hide the ones they don't operate. What it did need was decomposition: `admin.html`
+was a single 742-line template and is now 7 grouped partials
+([setup](src/modules/admin/templates/partials/admin-setup.html), modules, policy,
+structure, federation, observability, operations), which also closes the ROADMAP
+template-hygiene item.
 
 ### Layout rules the rollout established
 
@@ -272,10 +285,11 @@ rail. Content leads — a compose form never sits above the feed it contributes 
    `data-ui-vocabulary` from [`interfaceVocabulary()`](src/interfaces/http/views/interfaceSettings.js);
    `app.js` reads it and keeps its literals only as a fallback for a pre-deploy body, so
    adding a key server-side needs no second edit.
-4. **Roll the modern structure out** beyond the exemplar (§6 `[todo]` rows), one surface
-   per pass, holding each to [UIReview.md](principle-docs/UIReview.md); tag any new panels.
-   `/discussion`, `/petitions` and `/organization` are done; `/governance`, `/delegation`,
-   `/delegates`, `/groups`, `/notifications`, `/profile` and `/admin` remain.
+4. ~~**Roll the modern structure out** beyond the exemplar~~ — **[done]**. Every
+   member-facing route now uses the `.page-grid` shape (§6), `/admin` is decomposed into
+   partials, and the whole set is verified per
+   [UIReview.md](principle-docs/UIReview.md): 13 routes × 2 themes, zero contrast
+   failures, zero horizontal overflow, every panel labelled.
 5. **Self-host a variable font** under `/public` (no external request) for exact reference
    typography.
 6. **Composer palette** — component insert/delete/wrap + richer property groups (already a

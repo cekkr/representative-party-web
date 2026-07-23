@@ -1,13 +1,18 @@
-<section class="panel" data-composer-section="notifications-inbox" data-section-label="Alerts inbox">
-  <p class="eyebrow">Notifications</p>
-  <h2>Internal alerts</h2>
-  <p class="muted small is-verbose">Handle: {{personHandle}}</p>
-  <form class="cta-row" method="post" action="/notifications/read" data-enhance="notifications">
-    <button class="ghost" type="submit">Mark all read</button>
-  </form>
-  <div class="discussion-list">
-    {{notifications}}
+<div class="page-grid page-grid--notifications">
+  <div class="page-main">
+    <section class="panel" data-composer-section="notifications-inbox" data-section-label="Alerts inbox">
+      <p class="eyebrow">Notifications</p>
+      <h2>Internal alerts</h2>
+      <p class="muted small is-verbose">Handle: {{personHandle}}</p>
+      <form class="cta-row" method="post" action="/notifications/read" data-enhance="notifications">
+        <button class="ghost" type="submit">Mark all read</button>
+      </form>
+      <div class="discussion-list">
+        {{notifications}}
+      </div>
+    </section>
   </div>
-</section>
-
-{{preferencesPanel}}
+  <aside class="page-aside">
+    {{preferencesPanel}}
+  </aside>
+</div>

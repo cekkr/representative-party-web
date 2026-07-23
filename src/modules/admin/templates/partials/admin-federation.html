@@ -1,0 +1,145 @@
+<section class="panel" id="federation-gossip" data-composer-section="federation-gossip" data-section-label="Gossip sync">
+  <p class="eyebrow">Federation</p>
+  <h2>Gossip sync</h2>
+  <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>
+  <p class="muted small">{{gossipDisabledNote}}</p>
+  {{gossipOptionalSkipsSummary}}
+  {{gossipPushSkipsSummary}}
+  <div class="stack">
+    <div class="callout">
+      <p class="muted small">Outbound push</p>
+      {{gossipPushSummary}}
+      {{gossipPushPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-push" />
+        <div class="cta-row">
+          <button class="cta" type="submit" data-gossip="push" {{gossipPushDisabledAttr}}>Push gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
+    </div>
+    <div class="callout">
+      <p class="muted small">Inbound pull</p>
+      {{gossipPullSummary}}
+      {{gossipPullPeers}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="gossip-pull" />
+        <div class="cta-row">
+          <button class="cta" type="submit" data-gossip="pull" {{gossipPullDisabledAttr}}>Pull gossip now</button>
+          <p class="muted small">Skips when data mode is centralized or no peers are registered.</p>
+        </div>
+      </form>
+    </div>
+    <div class="callout">
+      <p class="muted small">Peer health</p>
+      {{peerHealthList}}
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <label class="field">
+          <span>Reset peer health entry</span>
+          <select name="peerKey">
+            {{peerHealthOptions}}
+          </select>
+        </label>
+        <div class="cta-row">
+          <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset selected</button>
+          <span class="muted small">Entries: {{peerHealthCount}}</span>
+        </div>
+      </form>
+      <form class="stack" method="post" action="/admin" data-enhance="admin">
+        <input type="hidden" name="intent" value="peer-health-reset" />
+        <input type="hidden" name="resetAll" value="true" />
+        <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset all peer health</button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="provider-blind" data-composer-section="provider-blind" data-section-label="Provider-blind">
+  <p class="eyebrow">Federation</p>
+  <h2>Provider-blind mode</h2>
+  <p class="muted small">Hide provider attribution in gossip envelopes while keeping auditability via a quorum reveal.</p>
+  {{providerBlindErrors}}
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="provider-blind" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Mode</span>
+        <select name="providerBlindMode">
+          <option value="off" {{providerBlindModeOff}}>off</option>
+          <option value="observe" {{providerBlindModeObserve}}>observe</option>
+          <option value="strict" {{providerBlindModeStrict}}>strict</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Ring ID</span>
+        <input name="providerBlindRingId" value="{{providerBlindRingId}}" placeholder="circle-2025-09" />
+        <span class="muted small">Tip: set CIRCLE_RING_ID to prefill this value from the libp2p key generator.</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Ring epoch (seconds)</span>
+        <input name="providerBlindRingEpoch" type="number" min="86400" value="{{providerBlindRingEpoch}}" />
+      </label>
+      <label class="field">
+        <span>Ring size cap</span>
+        <input name="providerBlindRingMaxSize" type="number" min="3" value="{{providerBlindRingMaxSize}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Ring provider public keys (one per block)</span>
+      <span class="muted small">Paste full PEM blocks separated by blank lines (or one-line PEM with \n escapes).</span>
+      <textarea name="providerBlindRingKeys" rows="4" placeholder="provider-key-a">{{providerBlindRingKeys}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field">
+        <span>Audit threshold (t)</span>
+        <input name="providerBlindAuditThreshold" type="number" min="2" value="{{providerBlindAuditThreshold}}" />
+      </label>
+      <label class="field">
+        <span>Max reveal scope (days)</span>
+        <input name="providerBlindAuditMaxScopeDays" type="number" min="1" value="{{providerBlindAuditMaxScopeDays}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Audit committee members (keyId:role:termStart:termEnd)</span>
+      <textarea name="providerBlindAuditMembers" rows="4" placeholder="key-a:member:2025-01-01:2026-01-01">{{providerBlindAuditMembers}}</textarea>
+    </label>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditRequireReason" {{providerBlindAuditRequireReasonChecked}} />
+        <span>Require reason for issuer reveal</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditEmergencyOverride" {{providerBlindAuditEmergencyOverrideChecked}} />
+        <span>Allow emergency override</span>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindAuditOverride" {{providerBlindAuditOverrideChecked}} />
+        <span>Allow custom committee composition</span>
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field checkbox">
+        <input type="checkbox" name="providerBlindTransportMixnet" {{providerBlindTransportMixnetChecked}} />
+        <span>Enable mixnet relays</span>
+      </label>
+      <label class="field">
+        <span>Mixnet max hops</span>
+        <input name="providerBlindTransportMaxHops" type="number" min="1" value="{{providerBlindTransportMaxHops}}" />
+      </label>
+      <label class="field">
+        <span>Mixnet timeout (ms)</span>
+        <input name="providerBlindTransportTimeoutMs" type="number" min="1000" value="{{providerBlindTransportTimeoutMs}}" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Mixnet relay URLs (one per line)</span>
+      <textarea name="providerBlindTransportRelays" rows="3" placeholder="https://relay.example">{{providerBlindTransportRelays}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider-blind settings</button>
+    </div>
+  </form>
+</section>

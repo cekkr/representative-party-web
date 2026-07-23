@@ -1,0 +1,74 @@
+<section class="panel" id="admin-audit" data-composer-section="admin-audit" data-section-label="Admin audit">
+  <p class="eyebrow">Admin audit</p>
+  <h2>Recent configuration changes</h2>
+  <p class="muted small">Last 10 actions are listed; older entries roll off for privacy. Includes schema and profile updates.</p>
+  <div class="stack">
+    {{auditLog}}
+  </div>
+</section>
+
+<section class="panel" id="ops-metrics" data-composer-section="ops-metrics" data-section-label="Runtime metrics">
+  <p class="eyebrow">Ops</p>
+  <h2>Runtime metrics</h2>
+  <p class="muted small">{{metricsNote}}</p>
+  <div class="stack">
+    {{metricsList}}
+  </div>
+</section>
+
+<section class="panel" id="metrics-retention" data-composer-section="metrics-retention" data-section-label="Metrics retention">
+  <p class="eyebrow">Ops</p>
+  <h2>Metrics retention</h2>
+  <p class="muted small">Snapshots persist to <code>settings.json</code>. Interval min 60s; retention min 1h.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="ops-metrics" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Snapshot interval (seconds)</span>
+        <input name="opsMetricsIntervalSeconds" value="{{opsMetricsIntervalValue}}" placeholder="300" />
+      </label>
+      <label class="field">
+        <span>Retention window (hours)</span>
+        <input name="opsMetricsRetentionHours" value="{{opsMetricsRetentionValue}}" placeholder="24" />
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save ops settings</button>
+    </div>
+  </form>
+  {{opsMetricsErrors}}
+</section>
+
+<section class="panel" id="admin-transactions" data-composer-section="admin-transactions" data-section-label="Transactions">
+  <p class="eyebrow">Transactions</p>
+  <h2>Recent ledgered actions</h2>
+  <p class="muted small">Append-only log for sensitive actions (petitions, votes, delegations, social, groups). Export JSON for audits.</p>
+  <div class="stack">
+    {{transactionsList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions" target="_blank" rel="noreferrer">Open JSON log</a>
+    <a class="ghost" href="/transactions/export" target="_blank" rel="noreferrer">Export signed summary</a>
+  </div>
+</section>
+
+<section class="panel" id="outbound-delivery" data-composer-section="outbound-delivery" data-section-label="Outbound delivery">
+  <p class="eyebrow">Outbound</p>
+  <h2>Notification delivery</h2>
+  <p class="muted small">{{outboundSummaryNote}}</p>
+  <div class="stack">
+    {{outboundSummaryList}}
+  </div>
+</section>
+
+<section class="panel" id="transaction-summaries" data-composer-section="transaction-summaries" data-section-label="Transaction summaries">
+  <p class="eyebrow">Transactions gossip</p>
+  <h2>Inbound summaries</h2>
+  <p class="muted small">Signed summaries received from peers (digest lists + policy/profile).</p>
+  <div class="stack">
+    {{transactionSummariesList}}
+  </div>
+  <div class="cta-row">
+    <a class="ghost" href="/transactions/ledger" target="_blank" rel="noreferrer">Open local summary feed</a>
+  </div>
+</section>

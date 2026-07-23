@@ -1,33 +1,38 @@
-<section class="panel" data-composer-section="delegate-profile-summary" data-section-label="Delegate summary">
-  <p class="eyebrow">Delegate profile</p>
-  {{delegateIdentity}}
-  {{delegateReputation}}
-  {{delegateStats}}
-</section>
+<div class="page-grid page-grid--delegate-profile">
+  <div class="page-main">
+    <section class="panel" data-composer-section="delegate-profile-summary" data-section-label="Delegate summary">
+      <p class="eyebrow">Delegate profile</p>
+      {{delegateIdentity}}
+      {{delegateReputation}}
+      {{delegateStats}}
+    </section>
 
-<section class="panel" data-composer-section="delegate-profile-endorsements" data-section-label="Delegation coverage">
-  <p class="eyebrow">Delegations</p>
-  <h2>Delegation coverage</h2>
-  {{incomingDelegations}}
-  {{outgoingDelegations}}
-</section>
+    <section class="panel" data-composer-section="delegate-profile-endorsements" data-section-label="Delegation coverage">
+      <p class="eyebrow">Delegations</p>
+      <h2>Delegation coverage</h2>
+      {{incomingDelegations}}
+      {{outgoingDelegations}}
+    </section>
 
-<section class="panel" data-composer-section="delegate-profile-delegations" data-section-label="Vote history">
-  <p class="eyebrow">Votes</p>
-  <h2>Vote history</h2>
-  {{voteSummary}}
-</section>
+    <section class="panel" data-composer-section="delegate-profile-delegations" data-section-label="Vote history">
+      <p class="eyebrow">Votes</p>
+      <h2>Vote history</h2>
+      {{voteSummary}}
+    </section>
 
-<section class="panel" data-composer-section="delegate-profile-votes" data-section-label="Recent activity">
-  <p class="eyebrow">Activity</p>
-  <h2>Recent activity</h2>
-  {{activitySummary}}
-</section>
-
-<section class="panel" data-composer-section="delegate-profile-history" data-section-label="Group endorsements">
-  <p class="eyebrow">Endorsements</p>
-  <h2>Group endorsements</h2>
-  {{groupEndorsements}}
-  <h2>Election wins</h2>
-  {{electionWins}}
-</section>
+    <section class="panel" data-composer-section="delegate-profile-votes" data-section-label="Recent activity">
+      <p class="eyebrow">Activity</p>
+      <h2>Recent activity</h2>
+      {{activitySummary}}
+    </section>
+  </div>
+  <aside class="page-aside">
+    <section class="panel" data-composer-section="delegate-profile-history" data-section-label="Group endorsements">
+      <p class="eyebrow">Endorsements</p>
+      <h3>Group endorsements</h3>
+      {{groupEndorsements}}
+      <h3>Election wins</h3>
+      {{electionWins}}
+    </section>
+  </aside>
+</div>

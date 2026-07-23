@@ -1,0 +1,80 @@
+<section class="panel" id="structure-manager" data-composer-section="structure-manager" data-section-label="Structure manager">
+  <p class="eyebrow">Structure manager</p>
+  <h2>Profile schema (canonical + provider-local)</h2>
+  <p class="muted small">Canonical fields: {{canonicalProfileSummary}}. Provider-local fields never gossip and fuel provider-owned notifications/consent.</p>
+  <p class="muted small">Schema version: {{profileSchemaVersion}} · Updated: {{profileSchemaUpdatedAt}} {{profileSchemaUpdatedBy}}</p>
+  <p class="muted small">{{profileSchemaStaleNote}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="structure" />
+    <label class="field">
+      <span>Provider-local fields (one per line: key:type:label, add ! for required)</span>
+      <textarea name="providerFields" rows="4" placeholder="email:email:Contact email">{{providerFieldsValue}}</textarea>
+    </label>
+    <p class="muted small">Example: <code>email:email:Contact email</code>. Allowed types: string, email, phone, boolean, number. Canonical fields stay fixed across the party ring (handle, credential/wallet binding, blinded hash, role, banned).</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider schema</button>
+      <span class="muted small">Fields saved: {{providerFieldCount}}</span>
+    </div>
+  </form>
+  {{providerFieldErrors}}
+</section>
+
+<section class="panel" id="provider-profiles" data-composer-section="provider-profiles" data-section-label="Provider profiles">
+  <p class="eyebrow">Provider profile data</p>
+  <h2>Contact/notification attributes</h2>
+  <p class="muted small">Persist provider-local profile values for a session/handle (email, notification prefs). Values stay local; provider owns delivery/consent.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="profile-attributes" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Session ID</span>
+        <input name="attributesSessionId" value="{{attributesSessionId}}" placeholder="copy from /health or logs" />
+      </label>
+    </div>
+    <label class="field">
+      <span>Provider attributes (JSON object or key:value per line)</span>
+      <textarea name="attributesPayload" rows="4" placeholder="email: user@example.org&#10;notify: true">{{attributesPayloadValue}}</textarea>
+    </label>
+    <p class="muted small">Only fields defined in your provider schema are stored. Canonical fields remain fixed and shared across the party ring.</p>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save provider attributes</button>
+    </div>
+  </form>
+  {{profileAttributeErrors}}
+</section>
+
+<section class="panel" id="topic-gardener-review" data-composer-section="topic-gardener-review" data-section-label="Topic gardener">
+  <p class="eyebrow">Topics</p>
+  <h2>Topic gardener review</h2>
+  <p class="muted small">Last sync: {{topicGardenerSyncAt}}</p>
+  <p class="muted small">Last operation: {{topicGardenerLastOperationAt}}</p>
+  <p class="muted small">Pending renames: {{topicRenameCount}} · merges: {{topicMergeCount}} · splits: {{topicSplitCount}} · anchors: {{topicAnchorCount}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="topic-gardener-sync" />
+    <div class="cta-row">
+      <button class="ghost" type="submit">Sync topic gardener now</button>
+    </div>
+  </form>
+  <div class="discussion-list">
+    <div class="stack">
+      <p class="muted small">Rename suggestions</p>
+      {{topicRenameList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Merge suggestions</p>
+      {{topicMergeList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Split suggestions</p>
+      {{topicSplitList}}
+    </div>
+    <div class="stack">
+      <p class="muted small">Anchor suggestions</p>
+      {{topicAnchorList}}
+    </div>
+  </div>
+  <div class="stack">
+    <p class="muted small">Topic history</p>
+    {{topicHistoryList}}
+  </div>
+</section>

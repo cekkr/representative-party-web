@@ -1,87 +1,97 @@
-<section class="panel" data-composer-section="governance-overview" data-section-label="Digital constitution">
-  <p class="eyebrow">Governance</p>
-  <h2>Digital constitution</h2>
-  <p>These defaults describe how proposals move through discussion and voting. Providers can adjust them via admin settings.</p>
-  <div class="callout">
-    <p class="muted small">Default quorum: {{quorumDefault}}</p>
-    <p class="muted small">Discussion window: {{discussionWindowDays}} days</p>
-    <p class="muted small">Vote window: {{voteWindowDays}} days</p>
-    <p class="muted small">Review window: {{reviewWindowHours}} hours</p>
-    <p class="muted small">Default vote method: {{defaultVoteMethod}}</p>
-    <p class="muted small">Delegation decay: {{delegationDecayDays}}</p>
-    <p class="muted small">Last updated: {{governanceUpdatedAt}} - {{governanceUpdatedBy}}</p>
-  </div>
-  <details class="note">
-    <summary>Governance notes</summary>
-    <p class="muted small">{{governanceNotes}}</p>
-  </details>
-</section>
+<div class="page-grid page-grid--governance">
+  <div class="page-main">
+    <section class="panel" data-composer-section="governance-overview" data-section-label="Digital constitution">
+      <p class="eyebrow">Governance</p>
+      <h2>Digital constitution</h2>
+      <p>These defaults describe how proposals move through discussion and voting. Providers can adjust them via admin settings.</p>
+      <div class="callout">
+        <p class="muted small">Default quorum: {{quorumDefault}}</p>
+        <p class="muted small">Discussion window: {{discussionWindowDays}} days</p>
+        <p class="muted small">Vote window: {{voteWindowDays}} days</p>
+        <p class="muted small">Review window: {{reviewWindowHours}} hours</p>
+        <p class="muted small">Default vote method: {{defaultVoteMethod}}</p>
+        <p class="muted small">Delegation decay: {{delegationDecayDays}}</p>
+        <p class="muted small">Last updated: {{governanceUpdatedAt}} - {{governanceUpdatedBy}}</p>
+      </div>
+      <details class="note">
+        <summary>Governance notes</summary>
+        <p class="muted small">{{governanceNotes}}</p>
+      </details>
+    </section>
 
-<section class="panel" data-composer-section="governance-proposals" data-section-label="Change proposals">
-  <p class="eyebrow">Governance</p>
-  <h2>Change proposals</h2>
-  <p class="muted small">{{proposalHelp}}</p>
-  <p class="muted small">{{proposalFlash}}</p>
-  {{proposalErrors}}
-  <form class="stack" method="post" action="/governance/proposals" data-enhance="governance-proposal">
-    <label class="field">
-      <span>Proposal title</span>
-      <input name="governanceProposalTitle" placeholder="Adjust quorum for local pilots" {{proposalDisabled}} />
-    </label>
-    <label class="field">
-      <span>Reason</span>
-      <textarea name="governanceProposalReason" rows="3" placeholder="Explain why this change is needed" {{proposalDisabled}}></textarea>
-    </label>
-    <div class="form-grid">
-      <label class="field">
-        <span>Default quorum</span>
-        <input name="governanceProposalQuorumDefault" type="number" min="0" value="{{proposalQuorumDefault}}" {{proposalDisabled}} />
-      </label>
-      <label class="field">
-        <span>Default vote method</span>
-        <select name="governanceProposalVoteMethod" {{proposalDisabled}}>
-          <option value="majority" {{proposalVoteMethodMajority}}>majority</option>
-          <option value="approval" {{proposalVoteMethodApproval}}>approval</option>
-          <option value="ranked" {{proposalVoteMethodRanked}}>ranked</option>
-          <option value="condorcet" {{proposalVoteMethodCondorcet}}>condorcet</option>
-          <option value="star" {{proposalVoteMethodStar}}>star</option>
-        </select>
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Discussion window (days)</span>
-        <input name="governanceProposalDiscussionWindowDays" type="number" min="0" value="{{proposalDiscussionWindowDays}}" {{proposalDisabled}} />
-      </label>
-      <label class="field">
-        <span>Vote window (days)</span>
-        <input name="governanceProposalVoteWindowDays" type="number" min="0" value="{{proposalVoteWindowDays}}" {{proposalDisabled}} />
-      </label>
-    </div>
-    <div class="form-grid">
-      <label class="field">
-        <span>Review window (hours)</span>
-        <input name="governanceProposalReviewWindowHours" type="number" min="0" value="{{proposalReviewWindowHours}}" {{proposalDisabled}} />
-      </label>
-      <label class="field">
-        <span>Delegation decay (days)</span>
-        <input name="governanceProposalDelegationDecayDays" type="number" min="0" max="3650" value="{{proposalDelegationDecayDays}}" {{proposalDisabled}} />
-      </label>
-    </div>
-    <label class="field">
-      <span>Governance notes</span>
-      <textarea name="governanceProposalNotes" rows="3" {{proposalDisabled}}>{{proposalNotes}}</textarea>
-    </label>
-    <div class="cta-row">
-      <button class="ghost" type="submit" {{proposalDisabled}}>Submit change proposal</button>
-    </div>
-  </form>
-  <div class="stack">
-    <p class="muted small">Open proposals</p>
-    {{governanceProposalList}}
+    <section class="panel" data-composer-section="governance-proposals" data-section-label="Change proposals">
+      <p class="eyebrow">Governance</p>
+      <h2>Change proposals</h2>
+      <div class="stack">
+        <p class="muted small">Open proposals</p>
+        {{governanceProposalList}}
+      </div>
+      <div class="stack">
+        <p class="muted small">Decision history</p>
+        {{governanceHistoryList}}
+      </div>
+    </section>
   </div>
-  <div class="stack">
-    <p class="muted small">Decision history</p>
-    {{governanceHistoryList}}
-  </div>
-</section>
+  <aside class="page-aside">
+    <section class="panel" data-composer-section="governance-propose" data-section-label="Propose a change">
+      <p class="eyebrow">Governance</p>
+      <h3>Propose a change</h3>
+      <p class="muted small">{{proposalHelp}}</p>
+      <p class="muted small">{{proposalFlash}}</p>
+      {{proposalErrors}}
+      <form class="stack" method="post" action="/governance/proposals" data-enhance="governance-proposal">
+        <label class="field">
+          <span>Proposal title</span>
+          <input name="governanceProposalTitle" placeholder="Adjust quorum for local pilots" {{proposalDisabled}} />
+        </label>
+        <label class="field">
+          <span>Reason</span>
+          <textarea name="governanceProposalReason" rows="3" placeholder="Explain why this change is needed" {{proposalDisabled}}></textarea>
+        </label>
+        <div class="form-grid">
+          <label class="field">
+            <span>Default quorum</span>
+            <input name="governanceProposalQuorumDefault" type="number" min="0" value="{{proposalQuorumDefault}}" {{proposalDisabled}} />
+          </label>
+          <label class="field">
+            <span>Default vote method</span>
+            <select name="governanceProposalVoteMethod" {{proposalDisabled}}>
+              <option value="majority" {{proposalVoteMethodMajority}}>majority</option>
+              <option value="approval" {{proposalVoteMethodApproval}}>approval</option>
+              <option value="ranked" {{proposalVoteMethodRanked}}>ranked</option>
+              <option value="condorcet" {{proposalVoteMethodCondorcet}}>condorcet</option>
+              <option value="star" {{proposalVoteMethodStar}}>star</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Discussion window (days)</span>
+            <input name="governanceProposalDiscussionWindowDays" type="number" min="0" value="{{proposalDiscussionWindowDays}}" {{proposalDisabled}} />
+          </label>
+          <label class="field">
+            <span>Vote window (days)</span>
+            <input name="governanceProposalVoteWindowDays" type="number" min="0" value="{{proposalVoteWindowDays}}" {{proposalDisabled}} />
+          </label>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Review window (hours)</span>
+            <input name="governanceProposalReviewWindowHours" type="number" min="0" value="{{proposalReviewWindowHours}}" {{proposalDisabled}} />
+          </label>
+          <label class="field">
+            <span>Delegation decay (days)</span>
+            <input name="governanceProposalDelegationDecayDays" type="number" min="0" max="3650" value="{{proposalDelegationDecayDays}}" {{proposalDisabled}} />
+          </label>
+        </div>
+        <label class="field">
+          <span>Governance notes</span>
+          <textarea name="governanceProposalNotes" rows="3" {{proposalDisabled}}>{{proposalNotes}}</textarea>
+        </label>
+        <div class="cta-row">
+          <button class="ghost" type="submit" {{proposalDisabled}}>Submit change proposal</button>
+        </div>
+      </form>
+    </section>
+  </aside>
+</div>

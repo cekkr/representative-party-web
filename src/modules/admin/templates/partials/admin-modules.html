@@ -1,0 +1,59 @@
+<section class="panel" id="modules" data-composer-section="modules" data-section-label="Modules">
+  <p class="eyebrow">Modules</p>
+  <h2>Module control center</h2>
+  <p class="muted small">Toggle modules by lane so social-community deployments can stay lean while civic governance stays optional.</p>
+  <p class="muted small">{{moduleFamilySummary}}</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="modules" />
+    <div class="stack">{{modulesList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save module toggles</button>
+    </div>
+    <p class="muted small">Reload to refresh navigation after changing modules.</p>
+  </form>
+  <div class="stack">
+    <p class="muted small">Module settings map</p>
+    <div class="stack">
+      {{moduleSettingsList}}
+    </div>
+  </div>
+</section>
+
+<section class="panel" id="composer" data-composer-section="composer" data-section-label="Composer">
+  <p class="eyebrow">Composer</p>
+  <h2>Theme + layout composer</h2>
+  <p class="muted small">Early scaffolding: apply custom CSS and reorder navigation/quick actions. Drag-and-drop layout editing ships next.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="composer" />
+    <label class="field">
+      <span>Quick actions order (comma separated keys)</span>
+      <input
+        name="composerQuickActionsOrder"
+        value="{{composerQuickActionsOrder}}"
+        placeholder="home, auth, social, forum, notifications, profile"
+      />
+    </label>
+    <label class="field">
+      <span>Side nav order (comma separated keys)</span>
+      <input
+        name="composerSideNavOrder"
+        value="{{composerSideNavOrder}}"
+        placeholder="home, auth, social, discussion, forum, petitions, governance, delegation, groups, notifications, profile, admin"
+      />
+    </label>
+    <label class="field">
+      <span>Composer panel width (px)</span>
+      <input name="composerAsideWidth" type="number" min="240" max="600" value="{{composerAsideWidth}}" />
+    </label>
+    <label class="field">
+      <span>Theme CSS overrides</span>
+      <textarea name="composerThemeCss" rows="6" placeholder=":root { --page-aside-width: 420px; }">{{composerThemeCss}}</textarea>
+    </label>
+    <div class="cta-row">
+      <button class="cta" type="submit">Save composer settings</button>
+    </div>
+  </form>
+  <div class="stack">
+    {{composerErrors}}
+  </div>
+</section>

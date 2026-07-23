@@ -1,0 +1,52 @@
+<section class="panel" id="extensions" data-composer-section="extensions" data-section-label="Extensions">
+  <p class="eyebrow">Extensions</p>
+  <h2>Extension lifecycle</h2>
+  <p class="muted small">Discover provider-local extensions, record installed versions, then enable or disable their runtime hooks. Uninstalling deregisters an extension without deleting its source file.</p>
+  <form class="stack" method="post" action="/extensions" data-enhance="extensions">
+    <div class="stack">{{extensionsList}}</div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Apply enabled extensions</button>
+    </div>
+    <p class="muted small">Install/update/uninstall state and enabled hooks persist in provider settings; hook changes apply immediately.</p>
+  </form>
+</section>
+
+<section class="panel" id="session-overrides" data-composer-section="session-overrides" data-section-label="Session overrides">
+  <p class="eyebrow">Session overrides</p>
+  <h2>Roles and bans</h2>
+  <p class="muted small">Update a session role/handle or ban a handle to exercise Circle gates without editing JSON manually.</p>
+  <form class="stack" method="post" action="/admin" data-enhance="admin">
+    <input type="hidden" name="intent" value="session" />
+    <div class="form-grid">
+      <label class="field">
+        <span>Session ID</span>
+        <input name="sessionId" value="{{sessionIdValue}}" placeholder="copy from /health or logs" required />
+      </label>
+      <label class="field">
+        <span>Handle override (optional)</span>
+        <input name="sessionHandle" value="{{sessionHandleValue}}" placeholder="{{actorLabel}}-abcd1234" />
+      </label>
+    </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Role</span>
+        <select name="sessionRole">
+          <option value="user" {{sessionRoleUser}}>user</option>
+          <option value="person" {{sessionRolePerson}}>person</option>
+          <option value="delegate" {{sessionRoleDelegate}}>delegate</option>
+          <option value="moderator" {{sessionRoleModerator}}>moderator</option>
+          <option value="admin" {{sessionRoleAdmin}}>admin</option>
+        </select>
+      </label>
+      <label class="field checkbox">
+        <input type="checkbox" name="sessionBanned" {{sessionBannedChecked}} />
+        <span>Ban this handle/session</span>
+      </label>
+    </div>
+    <div class="cta-row">
+      <button class="cta" type="submit">Update session</button>
+      <a class="ghost" href="/health" target="_blank" rel="noreferrer">Open /health to fetch session IDs</a>
+    </div>
+    <p class="muted small">Changes persist to <code>src/data/sessions.json</code> and are used by Circle gates immediately.</p>
+  </form>
+</section>
