@@ -54,9 +54,15 @@ async function run() {
       sameSite: 'Lax',
     });
 
+    // `/` is an operational workspace, not a feed redirect: a verified session used to
+    // be bounced to /social/feed, and that was deliberately removed (see ROADMAP).
     await page.goto(`${baseUrl}/`, { waitUntil: 'networkidle0' });
-    assert.ok(page.url().includes('/social/feed'), 'Expected / to redirect to /social/feed');
-    await assertNavState(page, { section: 'social', activeLabel: 'Wall', childrenKey: 'social' });
+    assert.ok(!page.url().includes('/social/feed'), 'Expected / to stay on the workspace, not redirect to the feed');
+    await assertNavState(page, { section: 'home', activeLabel: 'Home', childrenKey: 'home' });
+    await maybeDumpViewport(page, 'home');
+
+    await page.goto(`${baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
+    await assertNavState(page, { section: 'social', activeLabel: 'Social feed', childrenKey: 'social' });
     await maybeDumpViewport(page, 'wall');
 
     await page.goto(`${baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });

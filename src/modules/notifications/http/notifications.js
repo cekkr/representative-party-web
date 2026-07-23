@@ -122,7 +122,7 @@ function renderNotificationList(list) {
 function renderPreferencesPanel(state, person) {
   if (!person?.sessionId) {
     return `
-      <section class="panel">
+      <section class="panel" data-composer-section="notifications-preferences" data-section-label="Alert preferences">
         <p class="eyebrow">Preferences</p>
         <h2>Proposal comment alerts</h2>
         <p class="muted small">Verify your wallet to set notification preferences.</p>
@@ -132,7 +132,7 @@ function renderPreferencesPanel(state, person) {
   const prefs = resolveNotificationPreferences(state, { sessionId: person.sessionId, handle: person.handle });
   const checked = prefs.proposalComments ? 'checked' : '';
   return `
-    <section class="panel">
+    <section class="panel" data-composer-section="notifications-preferences" data-section-label="Alert preferences">
       <p class="eyebrow">Preferences</p>
       <h2>Proposal comment alerts</h2>
       <form class="stack" method="post" action="/notifications/preferences" data-enhance="notifications">

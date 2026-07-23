@@ -3,9 +3,10 @@
 // browser (app.js) must agree on the allowed accent/density/theme keys and on how the
 // per-page hidden-section map is shaped, so that vocabulary lives here once.
 //
-// The accent keys map to a --primary-h hue in app.css via `body[data-ui-accent="…"]`
-// rules; the server only validates the key, never a raw hue, so a member can never
-// inject an arbitrary value.
+// The accent keys map to a --primary-h hue in app.css via `:root[data-ui-accent="…"]`
+// rules (on <html>, not <body> — the derived token layer is declared on :root and
+// resolves its nested var() there); the server only validates the key, never a raw
+// hue, so a member can never inject an arbitrary value.
 
 import { parseBoolean } from '../../../shared/utils/parse.js';
 
@@ -15,10 +16,24 @@ export const DEFAULT_ACCENT = 'violet';
 export const DENSITY_KEYS = ['comfortable', 'compact', 'relaxed'];
 export const DEFAULT_DENSITY = 'comfortable';
 
-// Light mode ships in a later pass; keep the field so stored settings are forward
-// compatible, but only accept dark for now.
-export const THEME_KEYS = ['dark'];
+// `system` is stored and rendered verbatim; app.css resolves it through a
+// prefers-color-scheme media query rather than JavaScript, so the member's OS setting
+// applies on the first paint and with JS disabled. The deployment stays dark-first.
+export const THEME_KEYS = ['dark', 'light', 'system'];
 export const DEFAULT_THEME = 'dark';
+
+// The browser needs the same vocabulary to validate what it stores in localStorage.
+// Rather than keeping a hand-maintained copy in app.js (which silently drifted when a
+// key was added here), the layout ships this payload on the body and app.js reads it,
+// so a key added above reaches the client with no second edit.
+export function interfaceVocabulary() {
+  return {
+    accents: [...ACCENT_KEYS],
+    densities: [...DENSITY_KEYS],
+    themes: [...THEME_KEYS],
+    defaults: { accent: DEFAULT_ACCENT, density: DEFAULT_DENSITY, theme: DEFAULT_THEME },
+  };
+}
 
 const MAX_HIDDEN_PAGES = 60;
 const MAX_HIDDEN_PER_PAGE = 40;

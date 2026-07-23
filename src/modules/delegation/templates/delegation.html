@@ -1,4 +1,4 @@
-<section class="panel" data-composer-section="delegation-overview">
+<section class="panel" data-composer-section="delegation-overview" data-section-label="Delegation overview">
   <p class="eyebrow">Delegation</p>
   <h2>Manual delegation preferences</h2>
   <p class="muted small is-verbose">Handle: {{personHandle}} · Role: {{roleLabel}}</p>
@@ -9,21 +9,21 @@
   </div>
 </section>
 
-<section class="panel" data-composer-section="delegation-recommendations">
+<section class="panel" data-composer-section="delegation-recommendations" data-section-label="Suggested delegates">
   <p class="eyebrow">Group recommendations</p>
   <h3>Suggested delegates</h3>
   <p class="muted small">Election winners are tagged so you can see why a suggestion was picked.</p>
   {{delegationSuggestions}}
 </section>
 
-<section class="panel" data-composer-section="delegation-effective">
+<section class="panel" data-composer-section="delegation-effective" data-section-label="Effective chains">
   <p class="eyebrow">Explain my influence</p>
   <h3>Effective delegation chains</h3>
   <p class="muted small">Liquid delegation follows your delegate's own choices per topic. Cycles, banned delegates, and overly long chains are stopped automatically.</p>
   {{effectiveDelegations}}
 </section>
 
-<section class="panel" data-composer-section="delegation-set">
+<section class="panel" data-composer-section="delegation-set" data-section-label="Set a delegate">
   <p class="eyebrow">Set preference</p>
   <h3>Pick a delegate by topic</h3>
   <form class="stack" method="post" action="/delegation" data-enhance="delegation">
@@ -65,7 +65,7 @@
   </div>
 </section>
 
-<section class="panel" data-composer-section="delegation-current">
+<section class="panel" data-composer-section="delegation-current" data-section-label="Current preferences">
   <p class="eyebrow">Current preferences</p>
   {{delegationDecayNote}}
   {{delegationList}}

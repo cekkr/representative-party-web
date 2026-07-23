@@ -2,8 +2,8 @@
   /* Modern semantic token system, dark-first. Inspired by the ForumLab "modern"
      and Zisco ERP references: a single indigo/violet primary hue drives the whole
      accent system, neutral surfaces step up in lightness, and rounding/elevation
-     read as a product, not a neon dashboard. A light palette slots in later via
-     :root[data-theme="light"] without touching component CSS.
+     read as a product, not a neon dashboard. The light palette re-declares only
+     this token block under :root[data-theme="light"] — component CSS is untouched.
 
      --primary-h is the single knob the member "Appearance" control retunes live;
      everything accent-colored derives from it, so changing one channel re-tints the
@@ -19,6 +19,11 @@
   /* Companion hue (primary shifted toward periwinkle) keeps brand gradients alive. */
   --primary-two: hsl(calc(var(--primary-h) + 24) 85% 70%);
   --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.55);
+  /* Ink for text sitting on an accent-tinted chip. --primary itself is tuned to be a
+     fill, and at L66% on its own 14% tint it only reaches 3.5:1 — so accent-tinted
+     chips get a dedicated ink whose lightness is pinned away from the tint in each
+     theme. Follows the live hue/saturation, so accent presets keep working. */
+  --primary-ink: hsl(var(--primary-h) var(--primary-s) 76%);
 
   /* Neutral surfaces */
   --background: #0b0e14;
@@ -32,11 +37,34 @@
   --border-strong: #313d52;
   --nav-surface: #121722;
 
-  /* Semantic status */
-  --success: #5fd6b4;
-  --warning: #f0b45c;
-  --danger: #f2777a;
-  --info: #4c8dff;
+  /* Semantic status. Stored as HSL channel triplets so a component can take the same
+     colour at its own alpha (hsl(var(--warning-hsl) / 0.12)) instead of hardcoding a
+     second, theme-blind rgba() of roughly the same hue. */
+  --success-hsl: 163 59% 60.6%;
+  --warning-hsl: 35.7 83% 65%;
+  --danger-hsl: 358.5 83% 70.8%;
+  --info-hsl: 218.2 100% 64.9%;
+  --success: hsl(var(--success-hsl));
+  --warning: hsl(var(--warning-hsl));
+  --danger: hsl(var(--danger-hsl));
+  --info: hsl(var(--info-hsl));
+
+  /* Neutral colour families that component CSS used to hardcode. Also triplets, for
+     the same reason: dozens of rules take these at a dozen different alphas.
+       hairline — cool grey-blue rules, dashed guides, table gridlines.
+       inset    — recessed wells and popover backdrops, deepest first.
+       marker   — the mint "active / selected / audited" marker.
+       on-accent — ink that sits on top of an accent-filled shape.
+     In the light palette the inset family flips from near-black to near-white; without
+     that, every recessed panel would render as a black hole on a white page. */
+  --hairline-hsl: 216 39.3% 71.6%;
+  --inset-hsl: 229 57.9% 3.7%;
+  --inset-2-hsl: 223 46.7% 5.9%;
+  --inset-3-hsl: 219 45.5% 8.6%;
+  --inset-4-hsl: 222 44.4% 10.6%;
+  --marker-hsl: 162.4 82% 72.2%;
+  --on-accent: #031022;
+  --code-surface: #0c1320;
 
   /* Radius scale */
   --radius-sm: 0.5rem;
@@ -48,7 +76,15 @@
   --shadow: 0 18px 42px -26px rgba(2, 5, 14, 0.8);
   --shadow-soft: 0 2px 12px rgba(0, 0, 0, 0.22);
 
-  /* Density — retuned by body[data-ui-density]; component paddings/gaps scale off it. */
+  /* Overlay tints: the "subtle lift" washes that sit on top of a surface (inset rows,
+     zebra stripes, hovered cells). They must invert with the theme — a white wash is
+     invisible on a light background — so components use these instead of a literal
+     rgba(255, 255, 255, …). Three tiers: softest, soft, strong. */
+  --overlay-softer: rgba(255, 255, 255, 0.022);
+  --overlay-soft: rgba(255, 255, 255, 0.035);
+  --overlay-strong: rgba(255, 255, 255, 0.08);
+
+  /* Density — retuned by :root[data-ui-density]; component paddings/gaps scale off it. */
   --density-scale: 1;
   --pad-card: calc(1.15rem * var(--density-scale));
   --gap-stack: calc(0.9rem * var(--density-scale));
@@ -62,6 +98,120 @@
   --highlight-strong: var(--primary-strong);
   --accent: var(--primary-two);
   --accent-soft: var(--primary-soft);
+}
+
+/* Light palette. Only the neutral/elevation/overlay block is re-declared: the accent
+   engine still derives from --primary-h, so every accent preset works in both themes
+   (the primary is darkened here because a 66%-lightness violet fails contrast on a
+   near-white surface). Components resolve through the same token names, so nothing
+   below this block is theme-aware.
+
+   The same declarations appear twice, by design:
+     :root[data-theme="light"]                         -> the member picked Light.
+     :root[data-theme="system"] + prefers-color-scheme -> the member picked System.
+   CSS resolves "system", not JavaScript, so it holds on the first paint and with JS
+   disabled — no theme flash, no client-side round trip. Plain CSS has no way to share
+   one declaration body across a bare selector and a media-query-scoped one, so
+   `tests/interface-settings.test.js` asserts the two bodies stay byte-identical
+   (whitespace-normalized) instead of trusting them not to drift. Edit both. */
+:root[data-theme='light'] {
+  --primary-l: 52%;
+  --primary-strong: hsl(var(--primary-h) var(--primary-s) 44%);
+  --primary-foreground: hsl(var(--primary-h) 45% 98%);
+  --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.12);
+  --primary-two: hsl(calc(var(--primary-h) + 24) 72% 52%);
+  --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.45);
+  --primary-ink: hsl(var(--primary-h) var(--primary-s) 40%);
+
+  --background: #f4f6fb;
+  --surface: #ffffff;
+  --surface-2: #f1f4fa;
+  --surface-3: #e6eaf3;
+  --card: var(--surface);
+  --foreground: #131824;
+  --muted-foreground: #5a6679;
+  --border: #dfe4ee;
+  --border-strong: #c3ccdc;
+  --nav-surface: #ffffff;
+
+  --success-hsl: 167.4 78% 28.6%;
+  --warning-hsl: 33.2 88% 31%;
+  --danger-hsl: 2.4 61% 47.3%;
+  --info-hsl: 218.3 74% 46.9%;
+
+  --hairline-hsl: 219 22% 46%;
+  --inset-hsl: 222 30% 92%;
+  --inset-2-hsl: 220 30% 96%;
+  --inset-3-hsl: 220 28% 93%;
+  --inset-4-hsl: 0 0% 100%;
+  --marker-hsl: 168 68% 23%;
+  --on-accent: #ffffff;
+  --code-surface: #eef1f8;
+
+  --shadow: 0 18px 42px -30px rgba(19, 24, 36, 0.45);
+  --shadow-soft: 0 2px 10px rgba(19, 24, 36, 0.08);
+
+  --overlay-softer: rgba(19, 24, 36, 0.022);
+  --overlay-soft: rgba(19, 24, 36, 0.04);
+  --overlay-strong: rgba(19, 24, 36, 0.075);
+}
+
+@media (prefers-color-scheme: light) {
+  :root[data-theme='system'] {
+    --primary-l: 52%;
+    --primary-strong: hsl(var(--primary-h) var(--primary-s) 44%);
+    --primary-foreground: hsl(var(--primary-h) 45% 98%);
+    --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.12);
+    --primary-two: hsl(calc(var(--primary-h) + 24) 72% 52%);
+    --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.45);
+    --primary-ink: hsl(var(--primary-h) var(--primary-s) 40%);
+
+    --background: #f4f6fb;
+    --surface: #ffffff;
+    --surface-2: #f1f4fa;
+    --surface-3: #e6eaf3;
+    --card: var(--surface);
+    --foreground: #131824;
+    --muted-foreground: #5a6679;
+    --border: #dfe4ee;
+    --border-strong: #c3ccdc;
+    --nav-surface: #ffffff;
+
+    --success-hsl: 167.4 78% 28.6%;
+    --warning-hsl: 33.2 88% 31%;
+    --danger-hsl: 2.4 61% 47.3%;
+    --info-hsl: 218.3 74% 46.9%;
+
+    --hairline-hsl: 219 22% 46%;
+    --inset-hsl: 222 30% 92%;
+    --inset-2-hsl: 220 30% 96%;
+    --inset-3-hsl: 220 28% 93%;
+    --inset-4-hsl: 0 0% 100%;
+    --marker-hsl: 168 68% 23%;
+    --on-accent: #ffffff;
+    --code-surface: #eef1f8;
+
+    --shadow: 0 18px 42px -30px rgba(19, 24, 36, 0.45);
+    --shadow-soft: 0 2px 10px rgba(19, 24, 36, 0.08);
+
+    --overlay-softer: rgba(19, 24, 36, 0.022);
+    --overlay-soft: rgba(19, 24, 36, 0.04);
+    --overlay-strong: rgba(19, 24, 36, 0.075);
+  }
+}
+
+/* Tell the UA which scheme is in play so native widgets (scrollbars, date pickers,
+   the form controls we do not fully restyle) match the chosen palette. */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='system'] {
+  color-scheme: light dark;
 }
 
 *,
@@ -269,9 +419,9 @@ header.topbar {
 
 .topbar__sync {
   padding: 0.2rem 0.55rem;
-  border: 1px solid rgba(154, 177, 211, 0.4);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.4);
   border-radius: 999px;
-  background: rgba(12, 19, 32, 0.72);
+  background: hsl(var(--inset-3-hsl) / 0.72);
 }
 
 .ui-settings-panel {
@@ -282,7 +432,7 @@ header.topbar {
   z-index: 35;
   border: 1px solid var(--border);
   border-radius: 1rem;
-  background: rgba(8, 12, 22, 0.96);
+  background: hsl(var(--inset-2-hsl) / 0.96);
   box-shadow: var(--shadow);
   padding: 0.85rem 0.95rem;
   display: flex;
@@ -446,7 +596,7 @@ header.topbar {
 .ui-toast {
   border: 1px solid var(--border);
   border-radius: 0.75rem;
-  background: rgba(8, 12, 22, 0.95);
+  background: hsl(var(--inset-2-hsl) / 0.95);
   color: var(--text);
   padding: 0.6rem 0.8rem;
   min-width: 220px;
@@ -454,11 +604,11 @@ header.topbar {
 }
 
 .ui-toast--success {
-  border-color: rgba(126, 242, 208, 0.55);
+  border-color: hsl(var(--marker-hsl) / 0.55);
 }
 
 .ui-toast--error {
-  border-color: rgba(255, 140, 140, 0.55);
+  border-color: hsl(var(--danger-hsl) / 0.55);
 }
 
 .quick-link {
@@ -474,12 +624,12 @@ header.topbar {
 
 .quick-link:hover {
   border-color: var(--accent);
-  background: rgba(126, 242, 208, 0.12);
+  background: hsl(var(--marker-hsl) / 0.12);
   text-decoration: none;
 }
 
 .quick-link--context {
-  border-color: rgba(126, 242, 208, 0.5);
+  border-color: hsl(var(--marker-hsl) / 0.5);
   color: var(--accent);
 }
 
@@ -519,7 +669,7 @@ header.topbar {
   /* The nav is taller than the viewport on smaller screens; keep the scroll
      affordance discreet instead of a bright full-width system scrollbar. */
   scrollbar-width: thin;
-  scrollbar-color: rgba(154, 177, 211, 0.28) transparent;
+  scrollbar-color: hsl(var(--hairline-hsl) / 0.28) transparent;
   overscroll-behavior: contain;
 }
 
@@ -532,19 +682,19 @@ header.topbar {
 }
 
 .side-nav::-webkit-scrollbar-thumb {
-  background: rgba(154, 177, 211, 0.24);
+  background: hsl(var(--hairline-hsl) / 0.24);
   border-radius: 999px;
 }
 
 .side-nav::-webkit-scrollbar-thumb:hover {
-  background: rgba(154, 177, 211, 0.4);
+  background: hsl(var(--hairline-hsl) / 0.4);
 }
 
 .side-nav__filter {
-  border: 1px solid rgba(154, 177, 211, 0.25);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.25);
   border-radius: 0.85rem;
   padding: 0.65rem 0.7rem;
-  background: rgba(4, 6, 15, 0.45);
+  background: hsl(var(--inset-hsl) / 0.45);
   margin-bottom: 0.4rem;
 }
 
@@ -590,7 +740,7 @@ header.topbar {
   flex-direction: column;
   gap: 0.3rem;
   padding-left: 0.6rem;
-  border-left: 1px solid rgba(154, 177, 211, 0.3);
+  border-left: 1px solid hsl(var(--hairline-hsl) / 0.3);
 }
 
 body[data-composer-mode="on"] [data-composer-key] {
@@ -598,21 +748,21 @@ body[data-composer-mode="on"] [data-composer-key] {
 }
 
 body[data-composer-mode="on"] [data-composer-key]:hover {
-  outline: 1px dashed rgba(126, 242, 208, 0.4);
+  outline: 1px dashed hsl(var(--marker-hsl) / 0.4);
   outline-offset: 3px;
 }
 
 body[data-composer-mode="on"] [contenteditable="true"] {
-  outline: 1px dashed rgba(126, 242, 208, 0.55);
+  outline: 1px dashed hsl(var(--marker-hsl) / 0.55);
   outline-offset: 3px;
-  background: rgba(126, 242, 208, 0.08);
+  background: hsl(var(--marker-hsl) / 0.08);
   cursor: text;
 }
 
 body[data-composer-mode="on"] .is-composer-selected {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-  background: rgba(126, 242, 208, 0.12);
+  background: hsl(var(--marker-hsl) / 0.12);
 }
 
 .eyebrow {
@@ -699,7 +849,7 @@ main {
   padding: 0.35rem 0.45rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(8, 12, 22, 0.92);
+  background: hsl(var(--inset-2-hsl) / 0.92);
   box-shadow: 0 10px 24px hsl(var(--primary-h) var(--primary-s) 50% / 0.3);
   cursor: grab;
 }
@@ -737,7 +887,7 @@ main {
   font-weight: 700;
   font-size: 0.9rem;
   background: linear-gradient(135deg, var(--highlight), var(--accent));
-  color: #031022;
+  color: var(--on-accent);
   cursor: pointer;
   box-shadow: 0 12px 30px hsl(var(--primary-h) var(--primary-s) 50% / 0.4);
 }
@@ -823,8 +973,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
 
 .composer-toolbar__button.is-active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 1px rgba(126, 242, 208, 0.2);
-  background: rgba(126, 242, 208, 0.12);
+  box-shadow: 0 0 0 1px hsl(var(--marker-hsl) / 0.2);
+  background: hsl(var(--marker-hsl) / 0.12);
 }
 
 .composer-toolbar--grid .form-grid {
@@ -837,8 +987,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   gap: 0.5rem;
   padding: 0.35rem 0.6rem;
   border-radius: 0.75rem;
-  border: 1px dashed rgba(154, 177, 211, 0.35);
-  background: rgba(4, 6, 15, 0.45);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.35);
+  background: hsl(var(--inset-hsl) / 0.45);
   cursor: grab;
   font-size: 0.85rem;
 }
@@ -849,8 +999,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
 
 .composer-tool__item.is-selected {
   border-style: solid;
-  border-color: rgba(126, 242, 208, 0.6);
-  background: rgba(126, 242, 208, 0.12);
+  border-color: hsl(var(--marker-hsl) / 0.6);
+  background: hsl(var(--marker-hsl) / 0.12);
 }
 
 .composer-tree {
@@ -858,8 +1008,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   overflow: auto;
   padding: 0.35rem;
   border-radius: 0.75rem;
-  border: 1px solid rgba(154, 177, 211, 0.2);
-  background: rgba(4, 6, 15, 0.35);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
+  background: hsl(var(--inset-hsl) / 0.35);
 }
 
 .composer-tree__list {
@@ -874,7 +1024,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
 .composer-tree__list .composer-tree__list {
   margin-left: 0.75rem;
   padding-left: 0.6rem;
-  border-left: 1px dashed rgba(154, 177, 211, 0.25);
+  border-left: 1px dashed hsl(var(--hairline-hsl) / 0.25);
 }
 
 .composer-tree__item {
@@ -888,8 +1038,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   text-align: left;
   padding: 0.25rem 0.5rem;
   border-radius: 0.6rem;
-  border: 1px dashed rgba(154, 177, 211, 0.35);
-  background: rgba(4, 6, 15, 0.4);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.35);
+  background: hsl(var(--inset-hsl) / 0.4);
   color: var(--text);
   font-size: 0.75rem;
   cursor: pointer;
@@ -897,8 +1047,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
 
 .composer-tree__button.is-selected {
   border-style: solid;
-  border-color: rgba(126, 242, 208, 0.6);
-  background: rgba(126, 242, 208, 0.12);
+  border-color: hsl(var(--marker-hsl) / 0.6);
+  background: hsl(var(--marker-hsl) / 0.12);
 }
 
 .composer-tool__toggle {
@@ -915,8 +1065,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   width: 14px;
   height: 14px;
   border-radius: 3px;
-  border: 1px solid rgba(154, 177, 211, 0.6);
-  background: rgba(154, 177, 211, 0.15);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.6);
+  background: hsl(var(--hairline-hsl) / 0.15);
 }
 
 .composer-tool__footer {
@@ -946,8 +1096,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   gap: 0.5rem;
   padding: 0 0.6rem;
   border-radius: 0.8rem 0.8rem 0.95rem 0.95rem;
-  background: rgba(15, 22, 39, 0.95);
-  border: 1px solid rgba(126, 242, 208, 0.5);
+  background: hsl(var(--inset-4-hsl) / 0.95);
+  border: 1px solid hsl(var(--marker-hsl) / 0.5);
   pointer-events: auto;
   cursor: grab;
 }
@@ -975,7 +1125,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
   height: 12px;
   border-radius: 4px;
   background: var(--accent);
-  border: 1px solid rgba(12, 19, 32, 0.9);
+  border: 1px solid hsl(var(--inset-3-hsl) / 0.9);
   pointer-events: auto;
 }
 
@@ -1018,12 +1168,12 @@ body[data-composer-mode="on"] .composer-tool__panel {
   background: var(--accent);
   border-radius: 999px;
   z-index: 140;
-  box-shadow: 0 8px 20px rgba(126, 242, 208, 0.35);
+  box-shadow: 0 8px 20px hsl(var(--marker-hsl) / 0.35);
   pointer-events: none;
 }
 
 .is-composer-drop-target {
-  outline: 2px dashed rgba(126, 242, 208, 0.6);
+  outline: 2px dashed hsl(var(--marker-hsl) / 0.6);
   outline-offset: 4px;
 }
 
@@ -1095,9 +1245,9 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 .home-access {
-  border: 1px solid rgba(154, 177, 211, 0.2);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 1rem;
-  background: rgba(4, 6, 15, 0.28);
+  background: hsl(var(--inset-hsl) / 0.28);
   padding: 1rem;
 }
 
@@ -1111,7 +1261,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
   flex-direction: column;
   gap: 0.35rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px dashed rgba(154, 177, 211, 0.22);
+  border-bottom: 1px dashed hsl(var(--hairline-hsl) / 0.22);
 }
 
 .home-access__item:last-child {
@@ -1131,10 +1281,10 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 .home-stat {
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 1rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-soft);
 }
 
 .home-stat__value {
@@ -1163,7 +1313,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
   flex-direction: column;
   gap: 0.35rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px dashed rgba(154, 177, 211, 0.22);
+  border-bottom: 1px dashed hsl(var(--hairline-hsl) / 0.22);
 }
 
 .home-list__item:last-child {
@@ -1252,7 +1402,7 @@ ul.plain {
 
 ul.plain li {
   padding: 0.3rem 0;
-  border-bottom: 1px dashed rgba(154, 177, 211, 0.3);
+  border-bottom: 1px dashed hsl(var(--hairline-hsl) / 0.3);
 }
 
 ul.plain li:last-child {
@@ -1285,6 +1435,7 @@ ul.plain li:last-child {
   width: 100%;
   max-width: 240px;
   border-radius: 0.75rem;
+  /* Deliberately theme-independent: a QR quiet zone must stay white to scan. */
   background: #fff;
 }
 
@@ -1296,7 +1447,7 @@ ul.plain li:last-child {
   padding: 0.55rem 0.7rem;
   border: 1px solid var(--border);
   border-radius: 0.6rem;
-  background: rgba(4, 6, 15, 0.4);
+  background: hsl(var(--inset-hsl) / 0.4);
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.5;
@@ -1438,7 +1589,7 @@ ul.plain li:last-child {
   border: 1px dashed var(--border);
   border-radius: 0.9rem;
   padding: 0.75rem;
-  background: rgba(12, 19, 32, 0.55);
+  background: hsl(var(--inset-3-hsl) / 0.55);
 }
 
 .argument-children {
@@ -1459,12 +1610,12 @@ ul.plain li:last-child {
   border: 1px dashed var(--border);
   border-radius: 0.9rem;
   padding: 0.75rem;
-  background: rgba(12, 19, 32, 0.7);
+  background: hsl(var(--inset-3-hsl) / 0.7);
 }
 
 .media-card.blocked {
-  border-color: rgba(255, 120, 120, 0.6);
-  background: rgba(80, 20, 20, 0.35);
+  border-color: hsl(var(--danger-hsl) / 0.6);
+  background: hsl(var(--danger-hsl) / 0.35);
 }
 
 .media-embed {
@@ -1522,14 +1673,14 @@ ul.plain li:last-child {
   width: 46px;
   height: 46px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(126, 242, 208, 0.2), hsl(var(--primary-h) var(--primary-s) 50% / 0.3));
+  background: linear-gradient(135deg, hsl(var(--marker-hsl) / 0.2), hsl(var(--primary-h) var(--primary-s) 50% / 0.3));
   border: 1px solid var(--border);
   flex: 0 0 auto;
 }
 
 .composer__input {
   flex: 1 1 auto;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-soft);
   border: 1px solid var(--border);
   border-radius: 1rem;
   padding: 0.55rem 0.85rem;
@@ -1597,7 +1748,7 @@ ul.plain li:last-child {
   padding: 0.35rem 0.6rem;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--overlay-soft);
   color: var(--text);
   font-size: 0.9rem;
 }
@@ -1622,7 +1773,7 @@ ul.plain li:last-child {
   padding: 0.4rem 0.75rem;
   border-radius: 0.85rem;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
   color: var(--muted);
   font-weight: 600;
   cursor: pointer;
@@ -1682,7 +1833,7 @@ ul.plain li:last-child {
   height: 6px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--overlay-strong);
   overflow: hidden;
 }
 
@@ -1709,7 +1860,7 @@ ul.plain li:last-child {
   padding: 0.55rem 0.75rem;
   border-radius: 0.7rem;
   border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
   color: var(--text);
   font-weight: 600;
   cursor: pointer;
@@ -1717,7 +1868,7 @@ ul.plain li:last-child {
 
 .wizard-step-indicator.is-active button {
   border-color: var(--accent);
-  background: rgba(126, 242, 208, 0.12);
+  background: hsl(var(--marker-hsl) / 0.12);
 }
 
 .wizard-step-indicator.is-complete button {
@@ -1728,7 +1879,7 @@ ul.plain li:last-child {
   border: 1px dashed var(--border);
   border-radius: 1rem;
   padding: 1rem;
-  background: rgba(12, 19, 32, 0.6);
+  background: hsl(var(--inset-3-hsl) / 0.6);
 }
 
 .wizard-step[hidden] {
@@ -1783,7 +1934,7 @@ form[data-install-mode="full"] .wizard-actions button[data-wizard-next] {
 input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
 select,
 textarea {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--overlay-soft);
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 0.65rem;
@@ -1823,7 +1974,7 @@ textarea {
 }
 
 details.note {
-  background: rgba(12, 19, 32, 0.8);
+  background: hsl(var(--inset-3-hsl) / 0.8);
   border: 1px solid var(--border);
   padding: 0.9rem;
   border-radius: 0.9rem;
@@ -1837,7 +1988,7 @@ details.note summary {
 }
 
 details.note pre {
-  background: #0c1320;
+  background: var(--code-surface);
   border: 1px solid var(--border);
   padding: 0.9rem;
   border-radius: 0.65rem;
@@ -1858,7 +2009,10 @@ details.note pre {
   font-weight: 700;
   font-size: 1rem;
   color: #0b0e14;
-  background: hsl(var(--avatar-hue, 210) 58% 62%);
+  /* 66%, not 62%: blue hues (~240) are the darkest at a given lightness, and at 62%
+     the near-black initial only reached 4.08:1 on them. 66% clears 4.5:1 for every hue
+     the generator can pick. Theme-independent — the disc is its own surface. */
+  background: hsl(var(--avatar-hue, 210) 58% 66%);
   box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
   user-select: none;
 }
@@ -1953,8 +2107,8 @@ details.note pre {
 }
 
 .pill.stance--concern {
-  border-color: rgba(240, 180, 92, 0.5);
-  background: rgba(240, 180, 92, 0.12);
+  border-color: hsl(var(--warning-hsl) / 0.5);
+  background: hsl(var(--warning-hsl) / 0.12);
   color: var(--warning);
 }
 
@@ -1962,13 +2116,13 @@ details.note pre {
 .pill.stance--neutral {
   border-color: hsl(var(--primary-h) var(--primary-s) 60% / 0.5);
   background: hsl(var(--primary-h) var(--primary-s) 60% / 0.14);
-  color: var(--highlight);
+  color: var(--primary-ink);
 }
 
 .pill.stance--proposal {
-  border-color: rgba(180, 140, 255, 0.5);
-  background: rgba(180, 140, 255, 0.14);
-  color: #c3aaff;
+  border-color: hsl(calc(var(--primary-h) + 13) 100% 77.5% / 0.5);
+  background: hsl(calc(var(--primary-h) + 13) 100% 77.5% / 0.14);
+  color: var(--primary-ink);
 }
 
 /* Proposal cards reuse the feed head; the body flows full-width under it (a proposal
@@ -1999,7 +2153,7 @@ details.note pre {
 .pill.stage--discussion {
   border-color: hsl(var(--primary-h) var(--primary-s) 60% / 0.5);
   background: hsl(var(--primary-h) var(--primary-s) 60% / 0.14);
-  color: var(--highlight);
+  color: var(--primary-ink);
 }
 
 .pill.stage--vote {
@@ -2045,7 +2199,7 @@ details.note pre {
 }
 
 details.reply-composer {
-  border-top: 1px solid rgba(154, 177, 211, 0.25);
+  border-top: 1px solid hsl(var(--hairline-hsl) / 0.25);
   padding: 0;
 }
 
@@ -2064,7 +2218,7 @@ details.reply-composer > summary::-webkit-details-marker {
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.9rem 1.1rem;
-  background: rgba(12, 19, 32, 0.7);
+  background: hsl(var(--inset-3-hsl) / 0.7);
 }
 
 .reply-hint__meta {
@@ -2078,7 +2232,7 @@ details.reply-composer > summary::-webkit-details-marker {
   width: 32px;
   height: 32px;
   border-radius: 999px;
-  background: linear-gradient(135deg, rgba(126, 242, 208, 0.16), hsl(var(--primary-h) var(--primary-s) 55% / 0.24));
+  background: linear-gradient(135deg, hsl(var(--marker-hsl) / 0.16), hsl(var(--primary-h) var(--primary-s) 55% / 0.24));
   border: 1px solid var(--border);
   flex: 0 0 auto;
 }
@@ -2102,17 +2256,17 @@ details.reply-composer > summary::-webkit-details-marker {
   border-radius: 0.8rem;
   padding: 0.35rem 0.75rem;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
   color: var(--text);
 }
 
 .reply-composer__form {
   padding: 1rem 1.1rem 1.2rem;
-  background: rgba(12, 19, 32, 0.5);
+  background: hsl(var(--inset-3-hsl) / 0.5);
 }
 
 details.form-toggle {
-  background: rgba(12, 19, 32, 0.65);
+  background: hsl(var(--inset-3-hsl) / 0.65);
   border: 1px dashed var(--border);
   padding: 0.85rem 1rem;
   border-radius: 0.9rem;
@@ -2129,7 +2283,7 @@ details.form-toggle[open] summary {
 }
 
 details.form-toggle.form-toggle--inline {
-  background: rgba(12, 19, 32, 0.5);
+  background: hsl(var(--inset-3-hsl) / 0.5);
   margin-top: 0.75rem;
 }
 
@@ -2149,7 +2303,7 @@ button.cta {
 }
 
 .ghost.pill {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
 }
 
 .muted {
@@ -2165,7 +2319,7 @@ button.cta {
 }
 
 code {
-  background: #0c1320;
+  background: var(--code-surface);
   border: 1px solid var(--border);
   padding: 0.35rem 0.4rem;
   border-radius: 0.5rem;
@@ -2201,16 +2355,16 @@ code {
   border: 1px solid var(--border);
   border-left: 3px solid var(--border);
   border-radius: 0.7rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
 }
 
 .context-gate.is-ok {
-  border-left-color: var(--accent, #7ef2d0);
+  border-left-color: var(--accent);
 }
 
 .context-gate.is-blocked,
 .context-gate.is-warning {
-  border-left-color: var(--warning, #ffb05c);
+  border-left-color: var(--warning);
 }
 
 .context-gate__row {
@@ -2270,24 +2424,24 @@ code {
 }
 
 .callout {
-  background: rgba(126, 242, 208, 0.06);
-  border: 1px solid rgba(126, 242, 208, 0.3);
+  background: hsl(var(--marker-hsl) / 0.06);
+  border: 1px solid hsl(var(--marker-hsl) / 0.3);
   padding: 0.8rem 1rem;
   border-radius: 0.9rem;
   margin: 0.6rem 0;
 }
 
 .callout.is-warning {
-  background: rgba(255, 176, 92, 0.08);
-  border-color: rgba(255, 176, 92, 0.45);
+  background: hsl(var(--warning-hsl) / 0.08);
+  border-color: hsl(var(--warning-hsl) / 0.45);
 }
 
 .callout.is-warning strong {
-  color: var(--warning, #ffb05c);
+  color: var(--warning);
 }
 
 .onboarding-card {
-  border: 1px dashed rgba(154, 177, 211, 0.4);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.4);
   background: hsl(var(--primary-h) var(--primary-s) 60% / 0.07);
   padding: 1rem 1.2rem;
   border-radius: 1rem;
@@ -2308,8 +2462,8 @@ code {
   margin: 0.8rem 0 0.2rem;
   padding: 0.6rem 0.75rem;
   border-radius: 0.8rem;
-  border: 1px dashed rgba(154, 177, 211, 0.3);
-  background: rgba(4, 6, 15, 0.4);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.3);
+  background: hsl(var(--inset-hsl) / 0.4);
 }
 
 .next-action__row {
@@ -2359,9 +2513,9 @@ code {
   height: 260px;
   right: -130px;
   top: -150px;
-  border: 1px solid rgba(126, 242, 208, 0.2);
+  border: 1px solid hsl(var(--marker-hsl) / 0.2);
   border-radius: 50%;
-  box-shadow: 0 0 0 46px rgba(126, 242, 208, 0.025), 0 0 0 92px hsl(var(--primary-h) var(--primary-s) 60% / 0.03);
+  box-shadow: 0 0 0 46px hsl(var(--marker-hsl) / 0.025), 0 0 0 92px hsl(var(--primary-h) var(--primary-s) 60% / 0.03);
   pointer-events: none;
 }
 
@@ -2382,10 +2536,10 @@ code {
 .coordination-hero__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  border: 1px solid rgba(154, 177, 211, 0.2);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 1rem;
   overflow: hidden;
-  background: rgba(4, 6, 15, 0.28);
+  background: hsl(var(--inset-hsl) / 0.28);
   position: relative;
   z-index: 1;
 }
@@ -2395,8 +2549,8 @@ code {
   flex-direction: column;
   min-height: 112px;
   padding: 0.95rem;
-  border-right: 1px solid rgba(154, 177, 211, 0.14);
-  border-bottom: 1px solid rgba(154, 177, 211, 0.14);
+  border-right: 1px solid hsl(var(--hairline-hsl) / 0.14);
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.14);
 }
 
 .coordination-hero__stats article:nth-child(2n) {
@@ -2457,7 +2611,7 @@ code {
 
 .pressure-board__inbox {
   border-right: 1px solid var(--border);
-  background: rgba(4, 6, 15, 0.2);
+  background: hsl(var(--inset-hsl) / 0.2);
 }
 
 .pressure-board__focus {
@@ -2469,12 +2623,12 @@ code {
   flex-direction: column;
   gap: 0;
   border-left: 1px solid var(--border);
-  background: rgba(4, 6, 15, 0.16);
+  background: hsl(var(--inset-hsl) / 0.16);
 }
 
 .pressure-board__context > section {
   padding: 1rem;
-  border-bottom: 1px solid rgba(154, 177, 211, 0.16);
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.16);
 }
 
 .pressure-board__context > section:last-child {
@@ -2496,7 +2650,7 @@ code {
   height: 28px;
   border-radius: 50%;
   background: var(--accent);
-  color: #031025;
+  color: var(--on-accent);
   font-size: 0.75rem;
   font-weight: 800;
 }
@@ -2516,7 +2670,7 @@ code {
      `auto` track sizes to the widest nowrap preview line, so cards overflowed
      their column and the right-aligned timestamps bled into the focused case. */
   grid-template-columns: minmax(0, 1fr);
-  border-top: 1px solid rgba(154, 177, 211, 0.12);
+  border-top: 1px solid hsl(var(--hairline-hsl) / 0.12);
 }
 
 .pressure-case {
@@ -2525,7 +2679,7 @@ code {
   gap: 0.35rem;
   min-width: 0;
   padding: 0.95rem 1rem;
-  border-bottom: 1px solid rgba(154, 177, 211, 0.14);
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.14);
   color: var(--text);
   position: relative;
 }
@@ -2542,7 +2696,7 @@ code {
 
 .pressure-case:hover,
 .pressure-case.is-active {
-  background: rgba(126, 242, 208, 0.06);
+  background: hsl(var(--marker-hsl) / 0.06);
   text-decoration: none;
 }
 
@@ -2601,12 +2755,12 @@ code {
 }
 
 .pressure-intensity--high::before {
-  background: #ffb067;
-  box-shadow: 0 0 0 3px rgba(255, 176, 103, 0.12);
+  background: var(--warning);
+  box-shadow: 0 0 0 3px hsl(var(--warning-hsl) / 0.12);
 }
 
 .pressure-intensity--medium::before {
-  background: #f4d35e;
+  background: var(--warning);
 }
 
 .pressure-intensity--low::before {
@@ -2619,7 +2773,7 @@ code {
   align-items: flex-start;
   margin: 1rem;
   padding: 0.8rem;
-  border: 1px dashed rgba(154, 177, 211, 0.22);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.22);
   border-radius: 0.8rem;
 }
 
@@ -2640,7 +2794,7 @@ code {
   width: 30px;
   height: 30px;
   flex: 0 0 auto;
-  border: 1px solid rgba(126, 242, 208, 0.35);
+  border: 1px solid hsl(var(--marker-hsl) / 0.35);
   border-radius: 0.65rem;
   color: var(--accent);
   font-weight: 800;
@@ -2671,7 +2825,7 @@ code {
   height: 5px;
   margin: 0.45rem 0 0.25rem;
   border-radius: 999px;
-  background: linear-gradient(90deg, #f4d35e 0 var(--pressure-level), rgba(154, 177, 211, 0.16) var(--pressure-level));
+  background: linear-gradient(90deg, var(--warning) 0 var(--pressure-level), hsl(var(--hairline-hsl) / 0.16) var(--pressure-level));
 }
 
 .pressure-gauge small {
@@ -2687,9 +2841,9 @@ code {
   flex-wrap: wrap;
   gap: 0.4rem;
   padding: 0.35rem;
-  border: 1px solid rgba(154, 177, 211, 0.2);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 0.85rem;
-  background: rgba(4, 6, 15, 0.3);
+  background: hsl(var(--inset-hsl) / 0.3);
 }
 
 .pressure-layer-tab {
@@ -2711,8 +2865,8 @@ code {
 .pressure-layer-tab:hover,
 .pressure-layer-tab.is-active {
   color: var(--text);
-  border-color: rgba(126, 242, 208, 0.28);
-  background: rgba(126, 242, 208, 0.08);
+  border-color: hsl(var(--marker-hsl) / 0.28);
+  background: hsl(var(--marker-hsl) / 0.08);
 }
 
 .pressure-layer-tab:focus-visible {
@@ -2723,8 +2877,10 @@ code {
 .pressure-layer-tab__status {
   padding: 0.08rem 0.3rem;
   border-radius: 999px;
-  background: rgba(126, 242, 208, 0.16);
-  color: var(--accent);
+  background: hsl(var(--marker-hsl) / 0.16);
+  /* Ink matches its own tint family. Pairing the mint chip with the violet accent put
+     two hues against each other and landed at 4.22:1 on the light palette. */
+  color: hsl(var(--marker-hsl));
   font-size: 0.55rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -2732,7 +2888,7 @@ code {
 
 .pressure-layer-tab__status.is-preview {
   color: var(--muted);
-  background: rgba(154, 177, 211, 0.1);
+  background: hsl(var(--hairline-hsl) / 0.1);
 }
 
 .pressure-layer-panels {
@@ -2753,11 +2909,11 @@ code {
   gap: 0.75rem;
   margin: 0.85rem 0;
   padding: 0.65rem 0.75rem;
-  border: 1px dashed rgba(154, 177, 211, 0.28);
+  border: 1px dashed hsl(var(--hairline-hsl) / 0.28);
   border-radius: 0.7rem;
   color: var(--muted);
   font-size: 0.75rem;
-  background: rgba(4, 6, 15, 0.24);
+  background: hsl(var(--inset-hsl) / 0.24);
 }
 
 .pressure-question-grid {
@@ -2774,10 +2930,10 @@ code {
 .pressure-authority-grid article,
 .pressure-funds-summary article,
 .pressure-sector-grid article {
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.8rem;
   padding: 0.8rem;
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--overlay-softer);
 }
 
 .pressure-question-grid span {
@@ -2795,10 +2951,10 @@ code {
 
 .pressure-email {
   margin-top: 0.9rem;
-  border: 1px solid rgba(154, 177, 211, 0.2);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 0.9rem;
   padding: 1rem;
-  background: rgba(4, 6, 15, 0.32);
+  background: hsl(var(--inset-hsl) / 0.32);
 }
 
 .pressure-email__header {
@@ -2816,12 +2972,12 @@ code {
 .pressure-email__subject {
   font-weight: 800;
   padding-bottom: 0.7rem;
-  border-bottom: 1px solid rgba(154, 177, 211, 0.14);
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.14);
 }
 
 .pressure-reply {
   margin-top: 0.75rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.8rem;
   padding: 0.7rem 0.8rem;
 }
@@ -2873,8 +3029,8 @@ code {
 }
 
 .pressure-protection-grid article.is-active {
-  border-color: rgba(126, 242, 208, 0.48);
-  background: rgba(126, 242, 208, 0.065);
+  border-color: hsl(var(--marker-hsl) / 0.48);
+  background: hsl(var(--marker-hsl) / 0.065);
 }
 
 .pressure-safeguards {
@@ -2886,7 +3042,7 @@ code {
 
 .pressure-safeguards span {
   padding: 0.28rem 0.55rem;
-  border: 1px solid rgba(154, 177, 211, 0.2);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 999px;
   color: var(--muted);
   font-size: 0.68rem;
@@ -2901,9 +3057,9 @@ code {
 
 .pressure-flow-compare article {
   padding: 0.75rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.8rem;
-  background: rgba(4, 6, 15, 0.24);
+  background: hsl(var(--inset-hsl) / 0.24);
 }
 
 .pressure-flow-compare strong,
@@ -2944,7 +3100,7 @@ code {
   left: 22px;
   top: 42px;
   height: 18px;
-  border-left: 1px dashed rgba(126, 242, 208, 0.35);
+  border-left: 1px dashed hsl(var(--marker-hsl) / 0.35);
 }
 
 .pressure-escalation__index {
@@ -2952,7 +3108,7 @@ code {
   place-items: center;
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(126, 242, 208, 0.35);
+  border: 1px solid hsl(var(--marker-hsl) / 0.35);
   border-radius: 50%;
   color: var(--accent);
   font-size: 0.7rem;
@@ -2981,7 +3137,7 @@ code {
   padding: 0.12rem 0.4rem;
   border-radius: 0.45rem;
   color: var(--accent);
-  background: rgba(126, 242, 208, 0.1);
+  background: hsl(var(--marker-hsl) / 0.1);
   font-size: 0.65rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -3004,7 +3160,7 @@ code {
   gap: 0.65rem;
   align-items: start;
   padding: 0.55rem 0;
-  border-bottom: 1px dashed rgba(154, 177, 211, 0.18);
+  border-bottom: 1px dashed hsl(var(--hairline-hsl) / 0.18);
 }
 
 .pressure-checklist li > span {
@@ -3048,9 +3204,9 @@ code {
 .pressure-mediation-path li {
   min-width: 0;
   padding: 0.7rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.75rem;
-  background: rgba(255, 255, 255, 0.022);
+  background: var(--overlay-softer);
 }
 
 .pressure-mediation-path li > span {
@@ -3059,7 +3215,7 @@ code {
   width: 24px;
   height: 24px;
   margin-bottom: 0.7rem;
-  border: 1px solid rgba(126, 242, 208, 0.35);
+  border: 1px solid hsl(var(--marker-hsl) / 0.35);
   border-radius: 50%;
   color: var(--accent);
   font-size: 0.62rem;
@@ -3087,9 +3243,9 @@ code {
 
 .pressure-dynamics-summary article {
   padding: 0.65rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.7rem;
-  background: rgba(4, 6, 15, 0.24);
+  background: hsl(var(--inset-hsl) / 0.24);
 }
 
 .pressure-dynamics-summary strong,
@@ -3111,8 +3267,8 @@ code {
 
 .pressure-dynamics-grid article {
   padding: 0.75rem;
-  border-left: 2px solid rgba(126, 242, 208, 0.38);
-  background: rgba(126, 242, 208, 0.035);
+  border-left: 2px solid hsl(var(--marker-hsl) / 0.38);
+  background: hsl(var(--marker-hsl) / 0.035);
 }
 
 .pressure-dynamics-grid span {
@@ -3143,7 +3299,7 @@ code {
 
 .pressure-impact-timeline span {
   padding: 0.42rem;
-  border-top: 2px solid rgba(154, 177, 211, 0.2);
+  border-top: 2px solid hsl(var(--hairline-hsl) / 0.2);
   color: var(--muted);
   font-size: 0.65rem;
   font-weight: 700;
@@ -3160,7 +3316,7 @@ code {
   padding: 0.65rem 0.75rem;
   border-left: 2px solid var(--accent);
   color: var(--muted);
-  background: rgba(126, 242, 208, 0.045);
+  background: hsl(var(--marker-hsl) / 0.045);
   font-size: 0.78rem;
 }
 
@@ -3184,7 +3340,7 @@ code {
   justify-content: space-between;
   gap: 0.6rem;
   padding-bottom: 0.5rem;
-  border-bottom: 1px dashed rgba(154, 177, 211, 0.17);
+  border-bottom: 1px dashed hsl(var(--hairline-hsl) / 0.17);
   font-size: 0.72rem;
 }
 
@@ -3212,7 +3368,7 @@ code {
 
 .pressure-boundaries li {
   padding-left: 0.8rem;
-  border-left: 1px solid rgba(126, 242, 208, 0.35);
+  border-left: 1px solid hsl(var(--marker-hsl) / 0.35);
   color: var(--muted);
   font-size: 0.73rem;
 }
@@ -3239,9 +3395,9 @@ code {
   gap: 1rem;
   margin-top: 1rem;
   padding: 0.55rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.75rem;
-  background: rgba(4, 6, 15, 0.24);
+  background: hsl(var(--inset-hsl) / 0.24);
 }
 
 .organization-mirror__toolbar label {
@@ -3270,9 +3426,9 @@ code {
 }
 
 .mirror-segmented button.is-active {
-  border-color: rgba(126, 242, 208, 0.3);
+  border-color: hsl(var(--marker-hsl) / 0.3);
   color: var(--text);
-  background: rgba(126, 242, 208, 0.07);
+  background: hsl(var(--marker-hsl) / 0.07);
 }
 
 .organization-mirror__body {
@@ -3285,18 +3441,18 @@ code {
 .pressure-topology {
   min-width: 0;
   padding: 1rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.9rem;
-  background: radial-gradient(circle at 50% 0%, hsl(var(--primary-h) var(--primary-s) 60% / 0.09), transparent 42%), rgba(4, 6, 15, 0.26);
+  background: radial-gradient(circle at 50% 0%, hsl(var(--primary-h) var(--primary-s) 60% / 0.09), transparent 42%), hsl(var(--inset-hsl) / 0.26);
 }
 
 .pressure-node {
   position: relative;
   min-width: 0;
   padding: 0.75rem 0.75rem 0.75rem 1.1rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.75rem;
-  background: rgba(15, 22, 39, 0.82);
+  background: hsl(var(--inset-4-hsl) / 0.82);
 }
 
 .pressure-node--root {
@@ -3311,7 +3467,7 @@ code {
   left: 50%;
   top: 100%;
   height: 1.6rem;
-  border-left: 1px dashed rgba(126, 242, 208, 0.28);
+  border-left: 1px dashed hsl(var(--marker-hsl) / 0.28);
 }
 
 .pressure-topology__branches {
@@ -3327,7 +3483,7 @@ code {
   left: 12.5%;
   right: 12.5%;
   top: -0.8rem;
-  border-top: 1px dashed rgba(126, 242, 208, 0.28);
+  border-top: 1px dashed hsl(var(--marker-hsl) / 0.28);
 }
 
 .pressure-topology__branches .pressure-node::before {
@@ -3336,7 +3492,7 @@ code {
   left: 50%;
   bottom: 100%;
   height: 0.8rem;
-  border-left: 1px dashed rgba(126, 242, 208, 0.28);
+  border-left: 1px dashed hsl(var(--marker-hsl) / 0.28);
 }
 
 .pressure-node small,
@@ -3371,18 +3527,18 @@ code {
 }
 
 .pressure-node__level--medium {
-  background: #f4d35e;
+  background: var(--warning);
 }
 
 .pressure-node__level--high {
-  background: #ff8d6b;
-  box-shadow: 0 0 0 4px rgba(255, 141, 107, 0.1);
+  background: var(--danger);
+  box-shadow: 0 0 0 4px hsl(var(--danger-hsl) / 0.1);
 }
 
 .pressure-flow-note {
   margin-top: 1rem;
   padding: 0.75rem;
-  border: 1px dashed rgba(126, 242, 208, 0.28);
+  border: 1px dashed hsl(var(--marker-hsl) / 0.28);
   border-radius: 0.75rem;
 }
 
@@ -3407,9 +3563,9 @@ code {
 
 .pressure-system-signals {
   padding: 1rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.9rem;
-  background: rgba(4, 6, 15, 0.24);
+  background: hsl(var(--inset-hsl) / 0.24);
 }
 
 .pressure-signal-meter {
@@ -3425,7 +3581,7 @@ code {
   display: block;
   height: 5px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent) 0 var(--signal-size), rgba(154, 177, 211, 0.15) var(--signal-size));
+  background: linear-gradient(90deg, var(--accent) 0 var(--signal-size), hsl(var(--hairline-hsl) / 0.15) var(--signal-size));
 }
 
 .pressure-signal-meter strong {
@@ -3435,8 +3591,8 @@ code {
 .pressure-map-warning {
   margin-top: 1rem;
   padding: 0.7rem;
-  border-left: 2px solid #ffb067;
-  background: rgba(255, 176, 103, 0.055);
+  border-left: 2px solid var(--warning);
+  background: hsl(var(--warning-hsl) / 0.055);
 }
 
 .pressure-map-warning p {
@@ -3468,19 +3624,19 @@ code {
   gap: 0.55rem;
   min-width: 0;
   padding: 0.75rem 0.65rem;
-  border-top: 1px solid rgba(154, 177, 211, 0.2);
-  border-bottom: 1px solid rgba(154, 177, 211, 0.2);
+  border-top: 1px solid hsl(var(--hairline-hsl) / 0.2);
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.2);
   color: var(--muted);
   position: relative;
 }
 
 .operating-step:first-child {
-  border-left: 1px solid rgba(154, 177, 211, 0.2);
+  border-left: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 0.75rem 0 0 0.75rem;
 }
 
 .operating-step:last-child {
-  border-right: 1px solid rgba(154, 177, 211, 0.2);
+  border-right: 1px solid hsl(var(--hairline-hsl) / 0.2);
   border-radius: 0 0.75rem 0.75rem 0;
 }
 
@@ -3491,13 +3647,13 @@ code {
   top: 50%;
   z-index: 1;
   transform: translateY(-50%);
-  color: rgba(154, 177, 211, 0.45);
+  color: hsl(var(--hairline-hsl) / 0.45);
   font-size: 1.4rem;
 }
 
 .operating-step.is-on {
   color: var(--text);
-  background: rgba(126, 242, 208, 0.045);
+  background: hsl(var(--marker-hsl) / 0.045);
 }
 
 .operating-step__number {
@@ -3531,9 +3687,9 @@ code {
 .operating-presets article {
   min-height: 235px;
   padding: 1rem;
-  border: 1px solid rgba(154, 177, 211, 0.18);
+  border: 1px solid hsl(var(--hairline-hsl) / 0.18);
   border-radius: 0.9rem;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--overlay-softer);
   position: relative;
   overflow: hidden;
 }
@@ -3545,7 +3701,7 @@ code {
   bottom: -35px;
   width: 90px;
   height: 90px;
-  border: 1px solid rgba(126, 242, 208, 0.12);
+  border: 1px solid hsl(var(--marker-hsl) / 0.12);
   border-radius: 50%;
 }
 
@@ -3571,7 +3727,7 @@ code {
   }
 
   .pressure-board__context > section {
-    border-right: 1px solid rgba(154, 177, 211, 0.16);
+    border-right: 1px solid hsl(var(--hairline-hsl) / 0.16);
     border-bottom: 0;
   }
 
@@ -3587,7 +3743,7 @@ code {
   .operating-step,
   .operating-step:first-child,
   .operating-step:last-child {
-    border: 1px solid rgba(154, 177, 211, 0.2);
+    border: 1px solid hsl(var(--hairline-hsl) / 0.2);
     border-radius: 0.75rem;
   }
 
@@ -3634,7 +3790,7 @@ code {
   }
 
   .pressure-case {
-    border-right: 1px solid rgba(154, 177, 211, 0.14);
+    border-right: 1px solid hsl(var(--hairline-hsl) / 0.14);
   }
 
   .pressure-board__context {
@@ -3643,7 +3799,7 @@ code {
 
   .pressure-board__context > section {
     border-right: 0;
-    border-bottom: 1px solid rgba(154, 177, 211, 0.16);
+    border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.16);
   }
 
   .pressure-question-grid {
@@ -3769,7 +3925,7 @@ code {
   .coordination-hero__stats article:nth-last-child(-n + 2) {
     min-height: 90px;
     border-right: 0;
-    border-bottom: 1px solid rgba(154, 177, 211, 0.14);
+    border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.14);
   }
 
   .coordination-hero__stats article:last-child {

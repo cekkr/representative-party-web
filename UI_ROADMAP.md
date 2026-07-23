@@ -41,17 +41,32 @@ posture) — we use a system/Inter stack, not the references' Google-Fonts pulls
 
 ---
 
-## 2. Design tokens (style) — [done], light [todo]
+## 2. Design tokens (style) — [done]
 
-Implemented in [`src/public/app.css`](src/public/app.css) `:root`. **Dark-first**; a light
-palette is scaffolded but unset.
+Implemented in [`src/public/app.css`](src/public/app.css) `:root`. **Dark-first**, with a
+full light palette.
 
 - **Accent engine:** `--primary-h/s/l` → `--primary`, `--primary-strong`,
   `--primary-foreground`, `--primary-soft`, `--primary-two` (gradient companion), `--ring`.
   One hue knob (`--primary-h`) re-tints the whole system.
+- **Accent ink:** `--primary-ink` — text that sits *on* an accent-tinted chip. `--primary`
+  is tuned as a fill; at L66% on its own 14% tint it only reaches 3.5:1, so tinted chips
+  take this instead. Follows the live hue/saturation, so accent presets keep working.
 - **Neutrals:** `--background`, `--surface`, `--surface-2/3`, `--card`, `--foreground`,
   `--muted-foreground`, `--border`, `--border-strong`, `--nav-surface`.
-- **Status:** `--success`, `--warning`, `--danger`, `--info`.
+- **Status:** `--success`, `--warning`, `--danger`, `--info`, each backed by an
+  `-hsl` channel triplet (`--warning-hsl`, …) so a component can take the same colour at
+  its own alpha rather than hardcoding a second, theme-blind `rgba()` of the same hue.
+- **Neutral families** (also triplets, same reason — dozens of rules take them at a dozen
+  alphas): `--hairline-hsl` (rules, dashed guides, gridlines), `--inset-hsl` /
+  `--inset-2/3/4-hsl` (recessed wells and popover backdrops, deepest first),
+  `--marker-hsl` (the mint "active / selected / audited" marker), plus `--on-accent`
+  (ink on an accent-filled shape) and `--code-surface`. **The inset family flips from
+  near-black to near-white in the light palette** — without it every recessed panel would
+  render as a black hole on a white page.
+- **Overlay tints:** `--overlay-softer`, `--overlay-soft`, `--overlay-strong` — the
+  "subtle lift" washes on top of a surface. They invert with the theme; a white wash is
+  invisible on a light background.
 - **Radius scale:** `--radius-sm`, `--radius`, `--radius-lg`, `--radius-pill`.
 - **Elevation:** `--shadow`, `--shadow-soft`.
 - **Density:** `--density-scale` → `--pad-card`, `--gap-stack`.
@@ -67,10 +82,29 @@ layer is declared on `:root` and resolves its nested `var(--primary-h)` there; a
 
 Accent presets: `violet` (default), `blue`, `teal`, `green`, `rose`, `amber`.
 Density presets: `comfortable` (cozy, default), `compact`, `relaxed`.
+Themes: `dark` (default), `light`, `system`.
 
-**[todo]** light palette (`:root[data-theme="light"]`) + a light/dark/system toggle in the
-Appearance control; **[todo]** optionally self-host a variable font (Inter / Space Grotesk /
-Geist) under `/public` to match the reference type exactly with no external request.
+**Light palette — [done].** `:root[data-theme="light"]` re-declares only the
+neutral/status/overlay block; the accent engine still derives from `--primary-h`, so every
+preset works in both themes (the primary is darkened to L52% because a 66%-lightness
+violet fails contrast on a near-white surface). `color-scheme` is declared per theme so
+native widgets (scrollbars, date pickers) match.
+
+**`system` is resolved by CSS, not JavaScript** — `data-theme="system"` plus a
+`prefers-color-scheme` media query — so it holds on the first paint and with JS disabled:
+no theme flash, no client round trip. Plain CSS cannot share one declaration body between
+a bare selector and a media-query-scoped one, so the light palette is written **twice**.
+`tests/interface-settings.test.js` asserts the two bodies stay identical — **edit both**.
+
+**Contrast is verified, not assumed:** every member-facing route was audited in both
+themes against WCAG AA (4.5:1 body, 3:1 large). The pass also fixed three pre-existing
+dark-mode failures — avatar discs (62%→66% lightness, blue hues were at 4.08:1), the
+`stance--question`/`--neutral` chips (3.5:1, now on `--primary-ink`), and the
+`stance--proposal` chip, which was pinned to a fixed violet and stopped matching once a
+member repicked their accent.
+
+**[todo]** optionally self-host a variable font (Inter / Space Grotesk / Geist) under
+`/public` to match the reference type exactly with no external request.
 
 ---
 
@@ -98,15 +132,21 @@ and modularity"* for invariants.
 
 - **Member Interface panel** ([`topbar.html`](src/modules/core/templates/partials/topbar.html),
   driven by [`app.js`](src/public/app.js)) — per-member, per-view, non-binding on anyone else:
-  - **Appearance:** accent-hue swatches + density segmented control. **[done]**
+  - **Appearance:** accent-hue swatches, theme (dark/light/system) and density segmented
+    controls. **[done]**
   - **Sections:** per-page show/hide list of the current page's module panels. **[done]**
+    Lists only panels that opted in from their template. The admin Composer synthesizes
+    an index-derived key (`panel-N`) for untagged panels; those are flagged
+    `data-composer-synthetic` and excluded, because such a key shifts when the page
+    changes shape and the server knows nothing about it — hiding one would not survive
+    SSR.
   - **Interface settings:** large text, reduced motion, compact nav, keep-composer-open,
     fast partial navigation. **[done]**
   - Persistence: dynamic in `localStorage`, permanent via *Save as session defaults* →
     `person.uiSettings` (session store). Rendered on `<html>` at SSR time so it holds
     **without JavaScript**. Vocabulary is centralized in
-    [`interfaceSettings.js`](src/interfaces/http/views/interfaceSettings.js); the `app.js`
-    mirror (`UI_ACCENT_KEYS`/`UI_DENSITY_KEYS`/`UI_THEME_KEYS`) must stay in sync.
+    [`interfaceSettings.js`](src/interfaces/http/views/interfaceSettings.js) and shipped to
+    the browser on `data-ui-vocabulary`, so there is no hand-maintained mirror to drift.
 - **Admin Composer** ([`buildComposerControls`](src/interfaces/http/views/templates.js) +
   `app.js`) — deployment-wide brand/layout defaults: inline text/style overrides, drag
   reorder, panel hide/show, theme CSS. Admin-gated (`composerAllowed = isAdmin`). **[done]**
@@ -121,24 +161,40 @@ Composer.
 
 ## 5. Section / modularity inventory
 
-40 panels are already section-tagged across modules; **11 carry friendly
-`data-section-label`s** (the home/social/forum exemplar). Untagged-label sections fall back
-to their heading text in the member Sections list — **[todo]: add `data-section-label` to
-the remaining 29** so the control reads cleanly everywhere.
+41 panels are section-tagged across modules. **All 36 chrome-bearing panels carry a
+friendly `data-section-label`** — **[done]**. The 5 auth/core pages render no shell, so
+the member Sections control never lists them and a label there would be dead markup.
+`tests/interface-settings.test.js` enforces the rule, so a new panel cannot ship unlabeled.
+
+Without a label the control falls back to heading text, which reads as page copy rather
+than a control — that is what the label pass removed.
 
 | Module | Section keys | Labels |
 | --- | --- | --- |
 | home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops` | **[done]** all 5 |
 | social | `social-wall`, `social-compose`, `social-controls`, `social-follows` | **[done]** all 4 |
 | forum | `forum-threads`, `forum-compose` | **[done]** both |
-| organization | `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[todo]** labels |
-| delegation | `delegation-overview`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[todo]** labels |
-| delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[todo]** labels |
-| governance | `governance-overview`, `governance-proposals` | **[todo]** labels |
-| groups | `groups-create`, `groups-list` | **[todo]** labels |
-| notifications | `notifications-inbox` | **[todo]** label |
-| profile | `profile-summary`, `profile-interface`, `profile-fields` | **[todo]** labels |
+| organization | `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[done]** all 4 |
+| delegation | `delegation-overview`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[done]** all 5 |
+| delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[done]** all 7 |
+| governance | `governance-overview`, `governance-proposals` | **[done]** both |
+| groups | `groups-create`, `groups-list` | **[done]** both |
+| notifications | `notifications-inbox`, `notifications-preferences` | **[done]** both |
+| profile | `profile-summary`, `profile-interface`, `profile-fields` | **[done]** all 3 |
 | auth/core | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required` | n/a (chromeless) |
+
+Two notes from the label pass:
+
+- **`notifications-preferences` was untagged.** It is rendered from a controller string
+  (`renderPreferencesPanel` in [notifications.js](src/modules/notifications/http/notifications.js)),
+  not a template, so it never opted in. It now carries a key and a label.
+- **Labels describe the panel's visible content, not its key.** In
+  [profile.html](src/modules/profile/templates/profile.html) and
+  [delegate-profile.html](src/modules/delegates/templates/delegate-profile.html) the keys
+  are rotated one position out of step with the panels they sit on (`profile-summary`
+  wraps the *attributes* panel; `delegate-profile-delegations` wraps *vote history*).
+  Renaming them would invalidate members' stored `hiddenSections` and any saved Composer
+  layout, so it needs a migration — logged in [OPTIMIZATIONS.md](OPTIMIZATIONS.md).
 
 ---
 
@@ -176,7 +232,7 @@ card/feed rework and label pass. Home/social/forum are the shipped **exemplar**.
 | Verbosity (compact/full: default, per-session, per-page presets) | **[done]** |
 | Appearance: accent hue | **[done]** |
 | Appearance: density | **[done]** |
-| Appearance: light/dark/system toggle | **[todo]** (needs light palette) |
+| Appearance: light/dark/system toggle | **[done]** (`system` resolved by CSS, holds without JS) |
 | Sections: member per-page show/hide (SSR + live) | **[done]** |
 | Admin Composer: text/style/reorder/hide/theme defaults | **[done]** |
 | Side-nav jump filter (`Ctrl/Cmd+K`, `/`, `Esc`) | **[done]** |
@@ -188,21 +244,22 @@ card/feed rework and label pass. Home/social/forum are the shipped **exemplar**.
 
 ## 8. To-implement backlog (ordered)
 
-1. **Light palette + toggle** — fill `:root[data-theme="light"]` from the references'
-   light tokens; add `light`/`dark`/`system` to `THEME_KEYS` + the Appearance control +
-   the `app.js` mirror; respect `prefers-color-scheme` for `system`.
-2. **Label the remaining 29 sections** (§5) with `data-section-label` so the member
-   Sections control reads cleanly on every surface.
-3. **Roll the modern structure out** beyond the exemplar (§6 `[todo]` rows), one surface
+1. ~~**Light palette + toggle**~~ — **[done]**, see §2.
+2. ~~**Label the remaining sections**~~ — **[done]**, see §5, test-enforced.
+3. ~~**De-duplicate the accent/density vocabulary**~~ — **[done]**. The layout ships
+   `data-ui-vocabulary` from [`interfaceVocabulary()`](src/interfaces/http/views/interfaceSettings.js);
+   `app.js` reads it and keeps its literals only as a fallback for a pre-deploy body, so
+   adding a key server-side needs no second edit.
+4. **Roll the modern structure out** beyond the exemplar (§6 `[todo]` rows), one surface
    per pass, holding each to [UIReview.md](principle-docs/UIReview.md); tag any new panels.
-4. **Self-host a variable font** under `/public` (no external request) for exact reference
-   typography; ship with the light palette.
-5. **Composer palette** — component insert/delete/wrap + richer property groups (already a
+5. **Self-host a variable font** under `/public` (no external request) for exact reference
+   typography.
+6. **Composer palette** — component insert/delete/wrap + richer property groups (already a
    ROADMAP Phase-2 item).
-6. **Chrome fixes** — favicon; admin composer-bar/status-strip overlap on narrow widths;
+7. **Chrome fixes** — favicon; admin composer-bar/status-strip overlap on narrow widths;
    mobile side-nav disclosure.
-7. **De-duplicate the accent/density vocabulary** so the `app.js` mirror can't drift from
-   [`interfaceSettings.js`](src/interfaces/http/views/interfaceSettings.js) (see OPTIMIZATIONS).
+8. **Rename the rotated section keys** in `profile.html` / `delegate-profile.html` behind a
+   migration for stored `hiddenSections` and Composer layouts (§5).
 
 Performance/redundancy follow-ups (e.g. `applyMemberHiddenSections` per-key rescan) live in
 [OPTIMIZATIONS.md](OPTIMIZATIONS.md).
@@ -221,3 +278,9 @@ Performance/redundancy follow-ups (e.g. `applyMemberHiddenSections` per-key resc
 - Accent/density/theme belong on `<html>`, not `<body>` (§2 scope rule).
 - Member customization → `person.uiSettings`; deployment defaults → admin Composer. Never
   merge the two persistence paths.
+- Components stay theme-agnostic: they resolve through token names only. Never add a
+  `:root[data-theme="…"]` override to a component rule — retune the token instead.
+- The two light-palette blocks (`[data-theme="light"]` and the `system` media query) must
+  stay identical; a test enforces it.
+- New panels ship with **both** `data-composer-section` (a stable, meaningful key — never
+  index-derived) and `data-section-label`; a test enforces the label.

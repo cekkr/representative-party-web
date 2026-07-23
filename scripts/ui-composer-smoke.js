@@ -88,14 +88,19 @@ async function run() {
         .filter(Boolean),
     );
     assert.equal(quickLabels[0], 'Forum');
-    assert.equal(quickLabels[1], 'Wall');
+    assert.equal(quickLabels[1], 'Social');
 
     const conversationLabels = await page.evaluate(() => {
       const groups = Array.from(document.querySelectorAll('.side-nav__group'));
-      const group = groups.find((item) => item.querySelector('.eyebrow')?.textContent.trim() === 'Conversation');
+      // Match on the stable composer key, not the display label: the group has been
+      // renamed before ("Conversation" -> "Social/community") and a text match makes
+      // this assertion silently degrade to an empty list instead of failing loudly.
+      const group = groups.find(
+        (item) => item.querySelector('.eyebrow')?.dataset.composerKey === 'nav.group.conversation',
+      );
       return group ? Array.from(group.querySelectorAll('.side-nav__link')).map((link) => link.textContent.trim()) : [];
     });
-    assert.deepEqual(conversationLabels.slice(0, 3), ['Forum', 'Discussion', 'Wall']);
+    assert.deepEqual(conversationLabels.slice(0, 3), ['Forum', 'Discussion', 'Social feed']);
 
     const snapshot = await captureViewport(page, { mode: 'balanced' });
     assertSnapshot(snapshot, [

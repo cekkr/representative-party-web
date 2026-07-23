@@ -1,9 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile, readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import {
   ACCENT_KEYS,
   DENSITY_KEYS,
+  THEME_KEYS,
+  interfaceVocabulary,
   normalizeHiddenSections,
   normalizeInterfaceSettings,
   sanitizeSectionKey,
@@ -11,6 +16,8 @@ import {
 import { createVerifiedSession } from './helpers/auth.js';
 import { fetchText, postForm } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
+
+const SRC = fileURLToPath(new URL('../src/', import.meta.url));
 
 test('normalizeInterfaceSettings validates appearance choices and defaults on garbage', () => {
   const fromPost = normalizeInterfaceSettings({
@@ -36,6 +43,101 @@ test('normalizeInterfaceSettings validates appearance choices and defaults on ga
   for (const key of DENSITY_KEYS) {
     assert.equal(normalizeInterfaceSettings({ density: key }).density, key);
   }
+  for (const key of THEME_KEYS) {
+    assert.equal(normalizeInterfaceSettings({ theme: key }).theme, key);
+  }
+});
+
+test('the theme vocabulary offers dark, light and system, and stays dark-first', () => {
+  assert.deepEqual(THEME_KEYS, ['dark', 'light', 'system']);
+  const vocabulary = interfaceVocabulary();
+  assert.deepEqual(vocabulary.themes, THEME_KEYS);
+  assert.deepEqual(vocabulary.accents, ACCENT_KEYS);
+  assert.deepEqual(vocabulary.densities, DENSITY_KEYS);
+  // The deployment default stays dark even though light is now selectable.
+  assert.equal(vocabulary.defaults.theme, 'dark');
+  assert.equal(normalizeInterfaceSettings({}).theme, 'dark');
+
+  // Mutating the returned lists must not corrupt the module's own vocabulary.
+  vocabulary.themes.push('neon');
+  assert.deepEqual(interfaceVocabulary().themes, THEME_KEYS);
+});
+
+test('every theme key has a palette, and the two light blocks cannot drift apart', async () => {
+  const css = await readFile(join(SRC, 'public/app.css'), 'utf8');
+
+  // A key the Appearance control offers but the stylesheet does not implement would
+  // render as an unstyled theme, so hold every key to having a colour-scheme rule.
+  for (const key of THEME_KEYS) {
+    assert.match(
+      css,
+      new RegExp(`:root\\[data-theme=['"]${key}['"]\\]`),
+      `app.css must style :root[data-theme="${key}"]`,
+    );
+  }
+
+  // Plain CSS cannot share one declaration body between a bare selector and a
+  // media-query-scoped one, so the light palette is written twice: once for an
+  // explicit Light choice, once for System + prefers-color-scheme. Editing only one
+  // would give "System" a different palette than "Light" — assert they stay identical.
+  const bodies = [...css.matchAll(/:root\[data-theme=['"]light['"]\]\s*\{([^}]*)\}/g)].map(
+    ([, body]) => body,
+  );
+  const systemBody = css.match(
+    /@media \(prefers-color-scheme: light\)\s*\{\s*:root\[data-theme=['"]system['"]\]\s*\{([^}]*)\}/,
+  );
+  assert.ok(systemBody, 'app.css must resolve data-theme="system" through prefers-color-scheme');
+
+  const declarations = (body) =>
+    body
+      .split(';')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('--'))
+      .sort();
+
+  const lightPalette = bodies.map(declarations).find((list) => list.length > 4);
+  assert.ok(lightPalette?.length, 'expected a populated :root[data-theme="light"] token block');
+  assert.deepEqual(
+    declarations(systemBody[1]),
+    lightPalette,
+    'the "system" light palette drifted from the explicit "light" palette — edit both blocks',
+  );
+});
+
+test('every section-tagged panel outside the chromeless pages carries a friendly label', async () => {
+  // The member "Sections" control falls back to heading text without a label, which
+  // reads as page copy rather than a control. Chromeless pages (auth handoff, error,
+  // module-disabled, admin-required) render no shell, so they are exempt by design.
+  const CHROMELESS = new Set([
+    'auth-eudi',
+    'verification-complete',
+    'error-message',
+    'module-disabled',
+    'admin-required',
+  ]);
+
+  async function* walk(dir) {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) yield* walk(full);
+      else if (entry.name.endsWith('.html') || entry.name.endsWith('.js')) yield full;
+    }
+  }
+
+  const missing = [];
+  let tagged = 0;
+  for await (const file of walk(join(SRC, 'modules'))) {
+    const source = await readFile(file, 'utf8');
+    for (const match of source.matchAll(/<[a-z]+[^>]*\bdata-composer-section="([^"]+)"[^>]*>/g)) {
+      const [tag, key] = [match[0], match[1]];
+      tagged += 1;
+      if (CHROMELESS.has(key)) continue;
+      if (!/\bdata-section-label="[^"]+"/.test(tag)) missing.push(`${file.replace(SRC, '')} → ${key}`);
+    }
+  }
+
+  assert.ok(tagged > 30, `expected the section inventory to be found, saw ${tagged}`);
+  assert.deepEqual(missing, [], `sections missing data-section-label:\n  ${missing.join('\n  ')}`);
 });
 
 test('normalizeInterfaceSettings accepts both stored-object and POST key shapes', () => {
@@ -102,6 +204,46 @@ test('appearance defaults and hidden sections persist through the session and SS
     const overviewTag = home.match(/<section[^>]*data-composer-section="home-overview"[^>]*>/);
     assert.ok(overviewTag);
     assert.doesNotMatch(overviewTag[0], /data-member-hidden/);
+  } finally {
+    await server.stop();
+  }
+});
+
+test('theme choice renders on <html> server-side and rejects unknown values', async () => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port });
+  try {
+    const { cookie } = await createVerifiedSession(server.baseUrl);
+
+    const save = async (uiTheme) =>
+      postForm(
+        `${server.baseUrl}/profile`,
+        { intent: 'ui-preferences', uiVerbosity: '', uiAccent: 'violet', uiDensity: 'comfortable', uiTheme },
+        { cookie, partial: true },
+      );
+    const themeOf = async () => {
+      const { text } = await fetchText(`${server.baseUrl}/`, { headers: { Cookie: cookie } });
+      return text.match(/<html[^>]*data-theme="([^"]*)"/)?.[1];
+    };
+
+    // Light and system both round-trip, so the palette holds without JavaScript.
+    for (const key of THEME_KEYS) {
+      assert.equal((await save(key)).status, 200);
+      assert.equal(await themeOf(), key, `theme "${key}" should render on <html>`);
+    }
+
+    // An unknown theme falls back to the dark-first default rather than rendering raw.
+    assert.equal((await save('neon')).status, 200);
+    assert.equal(await themeOf(), 'dark');
+
+    // The browser reads its allowed keys from the server rather than a hand-kept copy.
+    const { text } = await fetchText(`${server.baseUrl}/`, { headers: { Cookie: cookie } });
+    const vocabularyAttr = text.match(/data-ui-vocabulary="([^"]*)"/)?.[1];
+    assert.ok(vocabularyAttr, 'layout should ship the appearance vocabulary');
+    const shipped = JSON.parse(vocabularyAttr.replace(/&quot;/g, '"').replace(/&amp;/g, '&'));
+    assert.deepEqual(shipped.themes, THEME_KEYS);
+    assert.deepEqual(shipped.accents, ACCENT_KEYS);
+    assert.deepEqual(shipped.densities, DENSITY_KEYS);
   } finally {
     await server.stop();
   }

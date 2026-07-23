@@ -13,10 +13,40 @@ triggerDeepLink();
 
 const UI_SETTINGS_KEY = 'organization-web-ui-settings';
 const LEGACY_UI_SETTINGS_KEY = 'party-web-ui-settings';
-// Keep these in sync with interfaceSettings.js on the server.
-const UI_ACCENT_KEYS = ['violet', 'blue', 'teal', 'green', 'rose', 'amber'];
-const UI_DENSITY_KEYS = ['comfortable', 'compact', 'relaxed'];
-const UI_THEME_KEYS = ['dark'];
+// The appearance vocabulary is owned by interfaceSettings.js on the server and shipped
+// on the body as data-ui-vocabulary, so adding an accent or theme there needs no edit
+// here. These literals are only the fallback for a body that predates the attribute
+// (a cached layout, or a partial rendered before a deploy completes).
+const FALLBACK_UI_VOCABULARY = {
+  accents: ['violet', 'blue', 'teal', 'green', 'rose', 'amber'],
+  densities: ['comfortable', 'compact', 'relaxed'],
+  themes: ['dark', 'light', 'system'],
+  defaults: { accent: 'violet', density: 'comfortable', theme: 'dark' },
+};
+
+function readUiVocabulary() {
+  const raw = document.body?.dataset.uiVocabulary || '';
+  if (!raw) return FALLBACK_UI_VOCABULARY;
+  try {
+    const parsed = JSON.parse(raw);
+    return {
+      accents: Array.isArray(parsed.accents) && parsed.accents.length ? parsed.accents : FALLBACK_UI_VOCABULARY.accents,
+      densities:
+        Array.isArray(parsed.densities) && parsed.densities.length
+          ? parsed.densities
+          : FALLBACK_UI_VOCABULARY.densities,
+      themes: Array.isArray(parsed.themes) && parsed.themes.length ? parsed.themes : FALLBACK_UI_VOCABULARY.themes,
+      defaults: { ...FALLBACK_UI_VOCABULARY.defaults, ...(parsed.defaults || {}) },
+    };
+  } catch (_error) {
+    return FALLBACK_UI_VOCABULARY;
+  }
+}
+
+// Resolved once at load: the server re-renders the body on full navigation, and a
+// partial navigation cannot change the deployment's vocabulary.
+let uiVocabulary = FALLBACK_UI_VOCABULARY;
+
 const DEFAULT_UI_SETTINGS = {
   largeText: false,
   reducedMotion: false,
@@ -56,9 +86,9 @@ function normalizeUiSettings(raw = {}) {
     compactNav: source.compactNav === true,
     keepComposerOpen: source.keepComposerOpen === true,
     partialNavigation: source.partialNavigation !== false,
-    accent: pickUiChoice(source.accent, UI_ACCENT_KEYS, 'violet'),
-    density: pickUiChoice(source.density, UI_DENSITY_KEYS, 'comfortable'),
-    theme: pickUiChoice(source.theme, UI_THEME_KEYS, 'dark'),
+    accent: pickUiChoice(source.accent, uiVocabulary.accents, uiVocabulary.defaults.accent),
+    density: pickUiChoice(source.density, uiVocabulary.densities, uiVocabulary.defaults.density),
+    theme: pickUiChoice(source.theme, uiVocabulary.themes, uiVocabulary.defaults.theme),
     hiddenSections: normalizeHiddenSections(source.hiddenSections),
   };
 }
@@ -2115,6 +2145,7 @@ function createComposerTool(tool) {
     listEl.innerHTML = '';
     panels.forEach((panel, index) => {
       const key = panel.dataset.composerSection || panel.id || `panel-${index + 1}`;
+      if (!panel.dataset.composerSection && !panel.id) panel.dataset.composerSynthetic = 'true';
       panel.dataset.composerSection = key;
       if (!panel.dataset.composerKey) {
         panel.dataset.composerKey = `panel.${key}`;
@@ -2485,9 +2516,9 @@ function initUiSettingsPanel() {
     payload.set('uiCompactNav', nextSettings.compactNav ? 'on' : 'off');
     payload.set('uiKeepComposerOpen', nextSettings.keepComposerOpen ? 'on' : 'off');
     payload.set('uiPartialNavigation', nextSettings.partialNavigation ? 'on' : 'off');
-    payload.set('uiAccent', nextSettings.accent || 'violet');
-    payload.set('uiDensity', nextSettings.density || 'comfortable');
-    payload.set('uiTheme', nextSettings.theme || 'dark');
+    payload.set('uiAccent', nextSettings.accent || uiVocabulary.defaults.accent);
+    payload.set('uiDensity', nextSettings.density || uiVocabulary.defaults.density);
+    payload.set('uiTheme', nextSettings.theme || uiVocabulary.defaults.theme);
     payload.set('uiHiddenSections', JSON.stringify(nextSettings.hiddenSections || {}));
     return payload;
   };
@@ -2573,7 +2604,10 @@ function initUiSettingsPanel() {
     if (!sectionsList) return;
     const pageKey = document.body?.dataset?.pageKey || 'default';
     const panels = Array.from(document.querySelectorAll('[data-composer-section]')).filter(
-      (el) => !el.closest('[data-composer-tool]'),
+      // Only panels that opted in from their template: a synthesized key is
+      // index-derived (so it moves when the page changes shape) and is unknown to
+      // applyMemberHiddenSections server-side, so hiding one would not survive SSR.
+      (el) => !el.closest('[data-composer-tool]') && el.dataset.composerSynthetic !== 'true',
     );
     const hidden = new Set((settings.hiddenSections && settings.hiddenSections[pageKey]) || []);
     sectionsList.innerHTML = '';
@@ -2878,8 +2912,13 @@ function getPanelColumns() {
   const allPanels = Array.from(root.querySelectorAll('.panel'));
   allPanels.forEach((panel, index) => {
     if (panel.dataset.composerSection) return;
+    // The admin Composer needs a handle on every panel, so untagged ones get a
+    // synthesized key. Flag it: an index-derived key shifts when the page changes
+    // shape, and the server knows nothing about it, so the member "Sections" control
+    // must not offer it — see syncSectionsList.
     const key = panel.id || `panel-${index + 1}`;
     panel.dataset.composerSection = key;
+    if (!panel.id) panel.dataset.composerSynthetic = 'true';
   });
   const mainPanels =
     mainColumn === root
@@ -3122,6 +3161,9 @@ function isHtmlResponse(response) {
 (() => {
   const root = document.querySelector('[data-shell]');
   if (!root) return;
+  // Must run before any settings are normalized: it decides which accent/density/theme
+  // keys are considered valid.
+  uiVocabulary = readUiVocabulary();
   applyUiSettings(readUiSettings());
   initInstallWizard(root);
   syncPageMeta();

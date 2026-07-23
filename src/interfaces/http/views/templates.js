@@ -10,10 +10,15 @@ import {
   DEFAULT_ACCENT,
   DEFAULT_DENSITY,
   DEFAULT_THEME,
+  interfaceVocabulary,
   normalizeInterfaceSettings,
 } from './interfaceSettings.js';
 import { renderNav } from './navigation.js';
 import { deriveStatusMeta, renderStatusStrip } from './status.js';
+
+// The allowed appearance keys never vary per request, so serialize them once. app.js
+// validates against this instead of carrying its own copy of the key lists.
+const UI_VOCABULARY_ATTR = escapeHtml(JSON.stringify(interfaceVocabulary()));
 
 const templateCache = new Map();
 const MODULES_ROOT = join(PATHS.ROOT, 'modules');
@@ -157,6 +162,7 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   layoutData.uiDensity = escapeHtml(memberUi.density || DEFAULT_DENSITY);
   layoutData.uiTheme = escapeHtml(memberUi.theme || DEFAULT_THEME);
   layoutData.uiSettingsServer = escapeHtml(uiSettingsServer);
+  layoutData.uiVocabulary = UI_VOCABULARY_ATTR;
   layoutData.composerControls = isAdmin ? buildComposerControls() : '';
   return applyTemplate(layout, layoutData);
 }
