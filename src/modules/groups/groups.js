@@ -4,6 +4,7 @@ import { persistGroups } from '../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { pickWinner } from './groupElections.js';
 import { getGroupPolicy } from './groupPolicy.js';
+import { buildTopicMatchKeys, topicMatchRank } from '../topics/topicMatch.js';
 
 export function listGroups(state) {
   return filterVisibleEntries(state.groups, state);
@@ -101,19 +102,19 @@ export async function setGroupDelegate({ groupId, topic, delegateHash, priority,
   return group;
 }
 
-export function recommendDelegationForPerson(person, topic, state) {
+export function recommendDelegationForPerson(person, topic, state, { matchKeys } = {}) {
   if (!person?.pidHash) return { suggestions: [], conflict: false };
   const topicKey = normalizeTopicKey(topic);
+  // A group cachet set on a parent category should cover its subcategories, narrowest first,
+  // with `general` as the outermost fallback — the same rule personal delegations follow.
+  const keys = matchKeys || buildTopicMatchKeys(topic);
   const groups = filterVisibleEntries(state.groups, state).filter((g) => g.members?.includes(person.pidHash));
   const suggestions = [];
   for (const group of groups) {
     const policy = getGroupPolicy(state, group.id);
     const electionMode = policy.electionMode || 'priority';
-    const electionWinner = electionMode === 'vote' ? findLatestElectionWinner(state, group, topicKey) : null;
-    const match =
-      electionWinner ||
-      (group.delegates || []).find((d) => d.topic === topicKey) ||
-      (group.delegates || []).find((d) => d.topic === 'general');
+    const electionWinner = electionMode === 'vote' ? findLatestElectionWinner(state, group, topicKey, keys) : null;
+    const match = electionWinner || findBestGroupDelegate(group.delegates, keys);
     if (!match) continue;
     suggestions.push({
       groupId: group.id,
@@ -136,15 +137,34 @@ export function recommendDelegationForPerson(person, topic, state) {
   return { suggestions, conflict, chosen, conflictRule };
 }
 
-function findLatestElectionWinner(state, group, topicKey) {
+// Narrowest group cachet that covers the topic's match keys.
+function findBestGroupDelegate(delegates = [], matchKeys = []) {
+  let best = null;
+  let bestRank = Infinity;
+  for (const entry of delegates || []) {
+    const rank = topicMatchRank(entry.topic, matchKeys);
+    if (rank === -1 || rank >= bestRank) continue;
+    best = entry;
+    bestRank = rank;
+    if (rank === 0) break;
+  }
+  return best;
+}
+
+function findLatestElectionWinner(state, group, topicKey, matchKeys = []) {
   const elections = filterVisibleEntries(state.groupElections || [], state).filter(
     (entry) => entry.groupId === group.id && entry.status === 'closed',
   );
   if (!elections.length) return null;
 
-  const exactMatches = elections.filter((entry) => normalizeTopicKey(entry.topic) === topicKey);
-  const generalMatches = elections.filter((entry) => normalizeTopicKey(entry.topic) === 'general');
-  const candidates = exactMatches.length ? exactMatches : generalMatches;
+  // Prefer the election held on the narrowest topic that covers this one, so a branch
+  // group's subcategory election outranks the parent group's general election.
+  const keys = matchKeys.length ? matchKeys : buildTopicMatchKeys(topicKey);
+  let candidates = [];
+  for (const key of keys) {
+    candidates = elections.filter((entry) => normalizeTopicKey(entry.topic) === key);
+    if (candidates.length) break;
+  }
   if (!candidates.length) return null;
 
   const latest = candidates

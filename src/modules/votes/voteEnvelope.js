@@ -21,6 +21,13 @@ export function buildVoteEnvelope(vote, { policy, issuer, providerBlind } = {}) 
     createdAt: vote.createdAt,
     status,
   };
+  // A delegated ballot's meaning lives in who holds it and until when, not in `choice`
+  // (which is just "delegate"). Sign that binding too, so a peer cannot reassign a ballot to
+  // a different delegate or quietly extend its window and still present a valid envelope.
+  const delegateBinding = normalizeDelegateBinding(vote.delegate);
+  if (delegateBinding) {
+    payload.delegate = delegateBinding;
+  }
 
   const providerBlindSettings = normalizeProviderBlindSettings(providerBlind || {});
   const ringId = providerBlindSettings.ring.currentId;
@@ -36,6 +43,9 @@ export function buildVoteEnvelope(vote, { policy, issuer, providerBlind } = {}) 
       status: payload.status,
       ringId,
     };
+    if (delegateBinding) {
+      ringPayload.delegate = delegateBinding;
+    }
     const ringSignature = signRingPayload(ringPayload);
     if (ringSignature) {
       const ringEnvelope = {
@@ -83,6 +93,19 @@ export function verifyVoteEnvelope(envelope, { providerBlind } = {}) {
     return { valid, skipped: false, payload };
   }
   return { valid: true, skipped: true, payload };
+}
+
+// Only the fields that define the binding are signed, in a fixed key order, so an envelope
+// stays byte-stable regardless of how the vote record was assembled.
+function normalizeDelegateBinding(delegate) {
+  const hash = typeof delegate?.hash === 'string' ? delegate.hash.trim() : '';
+  if (!hash) return null;
+  return {
+    hash,
+    via: typeof delegate.via === 'string' && delegate.via ? delegate.via : 'direct',
+    at: delegate.at || null,
+    deadline: delegate.deadline || null,
+  };
 }
 
 function signPayload(payload) {

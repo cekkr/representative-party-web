@@ -4,6 +4,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../federation/replication
 import { recommendDelegationForPerson } from '../groups/groups.js';
 import { findSessionByHash } from '../identity/sessions.js';
 import { getGovernanceSettings } from '../governance/constitution.js';
+import { buildTopicMatchKeys, topicMatchRank } from '../topics/topicMatch.js';
 
 // Cap how far a liquid-delegation chain is followed to bound work and guard runaway chains.
 export const MAX_DELEGATION_CHAIN_DEPTH = 8;
@@ -51,12 +52,28 @@ function activeDelegations(state) {
   return visible.filter((entry) => !isDelegationExpired(entry, decayDays, now));
 }
 
+// Pick the narrowest delegation an owner has that covers `matchKeys`. A member who delegated
+// "environment" expects that to cover a proposal filed under Environment / Energy, but a
+// later, more specific delegation on "energy" must win over it.
+function findBestDelegation(delegations, ownerHash, matchKeys) {
+  let best = null;
+  let bestRank = Infinity;
+  for (const entry of delegations) {
+    if (entry.ownerHash !== ownerHash) continue;
+    const rank = topicMatchRank(entry.topic, matchKeys);
+    if (rank === -1 || rank >= bestRank) continue;
+    best = entry;
+    bestRank = rank;
+    if (rank === 0) break;
+  }
+  return best;
+}
+
 // Resolve the first delegation hop for a topic using stored delegations, extensions, or group recs.
-function resolveFirstHop(person, topicKey, state, { notify } = {}) {
+function resolveFirstHop(person, topicKey, state, { notify, matchKeys } = {}) {
+  const keys = matchKeys || buildTopicMatchKeys(topicKey);
   const delegations = activeDelegations(state);
-  const direct = delegations.find(
-    (entry) => entry.ownerHash === person.pidHash && entry.topic === topicKey,
-  );
+  const direct = findBestDelegation(delegations, person.pidHash, keys);
   if (direct) return { ...direct, via: direct.via || 'direct' };
 
   const extensions = state?.extensions?.active || [];
@@ -67,7 +84,7 @@ function resolveFirstHop(person, topicKey, state, { notify } = {}) {
     }
   }
 
-  const groupRec = recommendDelegationForPerson(person, topicKey, state);
+  const groupRec = recommendDelegationForPerson(person, topicKey, state, { matchKeys: keys });
   if (groupRec.conflict && typeof notify === 'function') {
     notify({
       type: 'delegation_conflict',
@@ -93,12 +110,20 @@ function resolveFirstHop(person, topicKey, state, { notify } = {}) {
 // Follow direct (manual) delegations transitively from a starting delegate (liquid democracy).
 // Group/extension recommendations resolve the first hop only; subsequent hops follow explicit
 // per-topic delegations so the chain reflects choices delegates made for themselves.
-function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topicKey }) {
+function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topicKey, matchKeys }) {
+  const keys = matchKeys || buildTopicMatchKeys(topicKey);
   const delegations = activeDelegations(state);
+  // Each forwarding hop uses the same narrowest-match rule as the first, so a delegate who
+  // only ever set a broad category still forwards a subcategory ballot.
   const byOwner = new Map();
+  const rankByOwner = new Map();
   for (const entry of delegations) {
-    if (entry.topic !== topicKey || !entry.ownerHash || !entry.delegateHash) continue;
-    if (!byOwner.has(entry.ownerHash)) byOwner.set(entry.ownerHash, entry);
+    if (!entry.ownerHash || !entry.delegateHash) continue;
+    const rank = topicMatchRank(entry.topic, keys);
+    if (rank === -1) continue;
+    if (rankByOwner.has(entry.ownerHash) && rankByOwner.get(entry.ownerHash) <= rank) continue;
+    byOwner.set(entry.ownerHash, entry);
+    rankByOwner.set(entry.ownerHash, rank);
   }
 
   const visited = new Set([startOwnerHash, firstDelegateHash]);
@@ -134,10 +159,13 @@ function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topic
 }
 
 // Resolve delegation for a topic, following the liquid chain to its terminal delegate.
-export function resolveDelegation(person, topic, state, { notify } = {}) {
+// `topicPath` is the full classification path the item was filed under (e.g. the proposal's
+// `topicPath`); passing it lets a delegation on a parent category cover its subcategories.
+export function resolveDelegation(person, topic, state, { notify, topicPath } = {}) {
   if (!person || !person.pidHash) return null;
   const topicKey = normalizeTopic(topic);
-  const first = resolveFirstHop(person, topicKey, state, { notify });
+  const matchKeys = buildTopicMatchKeys(topic, topicPath);
+  const first = resolveFirstHop(person, topicKey, state, { notify, matchKeys });
   if (!first || !first.delegateHash) return first;
 
   const chain = followDelegationChain({
@@ -145,10 +173,12 @@ export function resolveDelegation(person, topic, state, { notify } = {}) {
     startOwnerHash: person.pidHash,
     firstDelegateHash: first.delegateHash,
     topicKey,
+    matchKeys,
   });
 
   return {
     ...first,
+    matchedTopic: first.topic || topicKey,
     immediateDelegateHash: first.delegateHash,
     delegateHash: chain.terminal,
     transitive: chain.hops.length > 0,
@@ -160,10 +190,10 @@ export function resolveDelegation(person, topic, state, { notify } = {}) {
 }
 
 // Build a human-readable resolution path (owner → … → terminal) for chain visualization.
-export function buildDelegationChain(state, ownerHash, topic) {
+export function buildDelegationChain(state, ownerHash, topic, { topicPath } = {}) {
   if (!ownerHash) return null;
   const topicKey = normalizeTopic(topic);
-  const resolved = resolveDelegation({ pidHash: ownerHash }, topicKey, state);
+  const resolved = resolveDelegation({ pidHash: ownerHash }, topic, state, { topicPath });
   if (!resolved || !resolved.delegateHash) return null;
   const path = [ownerHash, resolved.immediateDelegateHash || resolved.delegateHash];
   for (const hop of resolved.hops || []) {

@@ -263,6 +263,15 @@
         <p class="muted small">0 disables decay. Otherwise delegations lapse after this many days without renewal so liquid power does not persist unattended.</p>
       </div>
     </div>
+    <div class="form-grid">
+      <label class="field">
+        <span>Delegate vote window (days)</span>
+        <input name="governanceDelegateVoteWindowDays" type="number" min="0" max="365" value="{{governanceDelegateVoteWindowDays}}" />
+      </label>
+      <div class="stack">
+        <p class="muted small">Days a delegate has to cast a ballot handed to them. A ballot still inside its window is not counted yet; after it, the ballot lapses to abstain. The member can override it at any time. 0 removes the deadline.</p>
+      </div>
+    </div>
     <label class="field">
       <span>Governance notes</span>
       <textarea name="governanceNotes" rows="3" placeholder="Document constitution intent">{{governanceNotes}}</textarea>

@@ -91,6 +91,11 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
           ? `${governance.delegationDecayDays} day(s) without renewal`
           : 'Off (delegations stay active until cleared)',
       ),
+      delegateVoteWindowDays: escapeHtml(
+        governance.delegateVoteWindowDays
+          ? `${governance.delegateVoteWindowDays} day(s) for a delegate to cast a delegated ballot`
+          : 'Off (a delegated ballot waits until the delegate votes)',
+      ),
       governanceNotes: escapeHtml(governance.notes || 'No governance notes published yet.'),
       governanceUpdatedAt: escapeHtml(updatedAt),
       governanceUpdatedBy: escapeHtml(updatedBy),
@@ -110,6 +115,7 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
       proposalVoteMethodCondorcet: governance.defaultVoteMethod === 'condorcet' ? 'selected' : '',
       proposalVoteMethodStar: governance.defaultVoteMethod === 'star' ? 'selected' : '',
       proposalDelegationDecayDays: escapeHtml(String(governance.delegationDecayDays)),
+      proposalDelegateVoteWindowDays: escapeHtml(String(governance.delegateVoteWindowDays)),
       proposalNotes: escapeHtml(governance.notes || ''),
       governanceProposalList: renderGovernanceProposalList(openProposals),
       governanceHistoryList: renderGovernanceHistoryList(history),

@@ -78,6 +78,8 @@ const NOTIFICATION_TYPE_LABELS = {
   group_delegate: 'Group delegate set',
   group_delegate_set: 'Group delegate set',
   vote_recorded: 'Vote recorded',
+  delegated_ballot_received: 'A ballot was delegated to you',
+  delegated_ballot_resolved: 'Your delegate voted',
 };
 
 // Human-readable label for a notification event type, with a Title Case fallback so new

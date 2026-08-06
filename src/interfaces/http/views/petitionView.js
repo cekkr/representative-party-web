@@ -14,6 +14,11 @@ import {
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
+import {
+  buildPetitionVoteIndex,
+  resolveVoteChoice,
+  tallyVotes,
+} from '../../../modules/delegation/delegatedBallots.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -38,7 +43,9 @@ export function renderPetitionList(
     return renderPetitionOnboarding();
   }
 
-  const voteBuckets = buildVoteBuckets(votes);
+  const now = Date.now();
+  const voteBuckets = tallyVotes(state, votes, { now });
+  const voteIndex = buildPetitionVoteIndex(votes);
   const signatureBuckets = buildSignatureBuckets(signatures || [], person);
 
   const topicCache = new Map();
@@ -46,7 +53,15 @@ export function renderPetitionList(
     .map((petition) => {
       const topicLabel = resolveTopicBreadcrumb(petition, state, topicCache);
       const statusLabel = displayStatus(petition.status);
-      const tally = voteBuckets.get(petition.id) || { yes: 0, no: 0, abstain: 0 };
+      const tally = voteBuckets.get(petition.id) || {
+        yes: 0,
+        no: 0,
+        abstain: 0,
+        pending: 0,
+        lapsed: 0,
+        delegated: 0,
+        unresolved: 0,
+      };
       const stageAllowsVoting = isVotingStage(petition.status);
       const stageAllowsEditing = isEditableStage(petition.status);
       const canEdit = allowEditing && stageAllowsEditing;
@@ -57,6 +72,8 @@ export function renderPetitionList(
       const signatureSummary = signatureBuckets.get(petition.id) || { count: 0, signed: false };
       const signatureCount = signatureSummary.count;
       const hasSigned = signatureSummary.signed;
+      const myResolution = resolveMyBallot(state, petition, voteIndex, person, now);
+      const hasDelegatedBallot = Boolean(myResolution) && myResolution.status !== 'direct';
       const comments = commentsByPetition.get(petition.id) || [];
       const { argumentCount, lastCommentAt } = summarizeComments(comments);
       const revisions = Array.isArray(petition.versions) ? petition.versions : [];
@@ -117,7 +134,8 @@ export function renderPetitionList(
           ${structuredOutline}
           ${evidenceBlock}
           ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
-          <p class="muted small">Votes — yes: ${tally.yes} · no: ${tally.no} · abstain: ${tally.abstain}</p>
+          ${renderVoteTally(tally)}
+          ${renderMyBallot(state, myResolution)}
           ${
             hasSigned
               ? '<p class="muted small">You already signed.</p>'
@@ -138,9 +156,9 @@ export function renderPetitionList(
               <option value="yes">yes</option>
               <option value="no">no</option>
               <option value="abstain" selected>abstain</option>
-              ${allowDelegation ? '<option value="auto">auto (use delegation)</option>' : ''}
+              ${allowDelegation ? '<option value="auto">hand to my delegate</option>' : ''}
             </select>
-            <button type="submit" class="ghost">Vote</button>
+            <button type="submit" class="ghost">${hasDelegatedBallot ? 'Override' : 'Vote'}</button>
           </form>
           `
           }
@@ -178,20 +196,91 @@ function renderPetitionOnboarding() {
 }
 
 
-function buildVoteBuckets(votes) {
-  const buckets = new Map();
-  for (const vote of votes || []) {
-    const key = vote.petitionId;
-    if (!buckets.has(key)) {
-      buckets.set(key, { yes: 0, no: 0, abstain: 0 });
-    }
-    const tally = buckets.get(key);
-    const choice = (vote.choice || 'abstain').toLowerCase();
-    if (choice === 'yes') tally.yes += 1;
-    else if (choice === 'no') tally.no += 1;
-    else tally.abstain += 1;
+// A delegated ballot is resolved through the delegate's own vote before it is counted, and
+// one still inside its window is reported apart from the abstentions rather than folded into
+// them — see `delegatedBallots.js`.
+function renderVoteTally(tally) {
+  const parts = [`yes: ${tally.yes}`, `no: ${tally.no}`, `abstain: ${tally.abstain}`];
+  if (tally.pending) parts.push(`awaiting delegates: ${tally.pending}`);
+  const notes = [];
+  if (tally.delegated) {
+    notes.push(`${tally.delegated} delegated ${tally.delegated === 1 ? 'ballot' : 'ballots'}`);
   }
-  return buckets;
+  if (tally.lapsed) {
+    notes.push(`${tally.lapsed} lapsed to abstain`);
+  }
+  if (tally.unresolved) {
+    notes.push(`${tally.unresolved} unresolvable chain${tally.unresolved === 1 ? '' : 's'}`);
+  }
+  const noteLine = notes.length ? `<p class="muted tiny">${escapeHtml(notes.join(' · '))}</p>` : '';
+  return `<p class="muted small">Votes — ${escapeHtml(parts.join(' · '))}</p>${noteLine}`;
+}
+
+function resolveMyBallot(state, petition, voteIndex, person, now) {
+  if (!person?.pidHash) return null;
+  const byAuthor = voteIndex.get(petition.id);
+  const myVote = byAuthor?.get(person.pidHash);
+  if (!myVote) return null;
+  return resolveVoteChoice(state, myVote, { byAuthor, now });
+}
+
+// The member's own standing on this proposal: a delegated ballot has to say who holds it,
+// how long they have, and that overriding is available — otherwise the member has no way to
+// tell a delegated vote from a silent one.
+function renderMyBallot(state, resolution) {
+  if (!resolution) return '';
+  if (resolution.status === 'direct') {
+    return `<p class="muted small">You voted <strong>${escapeHtml(resolution.choice)}</strong>.</p>`;
+  }
+
+  const delegateLabel = renderActorLabel(state, resolution.delegateHash, { showHash: false });
+  const deadlineNote = resolution.deadline
+    ? ` Deadline ${escapeHtml(formatTimestamp(resolution.deadline))}.`
+    : ' No deadline is set in this deployment.';
+
+  if (resolution.status === 'resolved') {
+    const through =
+      resolution.resolvedByHash && resolution.resolvedByHash !== resolution.delegateHash
+        ? ` (forwarded to ${renderActorLabel(state, resolution.resolvedByHash, { showHash: false })})`
+        : '';
+    return `
+      <div class="callout">
+        <p class="small">Your ballot is delegated to ${delegateLabel}${through} and counted as
+          <strong>${escapeHtml(resolution.choice)}</strong>.</p>
+        <p class="muted tiny">Vote below to override it while the proposal is open.</p>
+      </div>
+    `;
+  }
+  if (resolution.status === 'pending') {
+    const left =
+      resolution.daysLeft === null
+        ? 'no deadline'
+        : `${resolution.daysLeft} day${resolution.daysLeft === 1 ? '' : 's'} left`;
+    return `
+      <div class="callout">
+        <p class="small">Your ballot is delegated to ${delegateLabel} — awaiting their vote
+          (<strong>${escapeHtml(left)}</strong>).</p>
+        <p class="muted tiny">It is not counted yet.${deadlineNote} Vote below to override.</p>
+      </div>
+    `;
+  }
+  if (resolution.status === 'lapsed') {
+    return `
+      <div class="callout">
+        <p class="small">Your delegate ${delegateLabel} did not vote in time — your ballot lapsed to
+          <strong>abstain</strong>.</p>
+        <p class="muted tiny">Vote below to record your own choice while the proposal is open.</p>
+      </div>
+    `;
+  }
+  const reason = resolution.reason === 'depth' ? 'the chain ran too deep' : 'the chain loops back';
+  return `
+    <div class="callout">
+      <p class="small">Your delegated ballot could not resolve — ${escapeHtml(reason)}. It counts as
+        <strong>abstain</strong>.</p>
+      <p class="muted tiny">Vote below, or fix the delegation chain on the Delegation page.</p>
+    </div>
+  `;
 }
 
 function buildSignatureBuckets(signatures = [], person) {

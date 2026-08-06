@@ -11,6 +11,7 @@
         <p class="muted small">Review window: {{reviewWindowHours}} hours</p>
         <p class="muted small">Default vote method: {{defaultVoteMethod}}</p>
         <p class="muted small">Delegation decay: {{delegationDecayDays}}</p>
+        <p class="muted small">Delegate vote window: {{delegateVoteWindowDays}}</p>
         <p class="muted small">Last updated: {{governanceUpdatedAt}} - {{governanceUpdatedBy}}</p>
       </div>
       <details class="note">
@@ -83,6 +84,15 @@
             <span>Delegation decay (days)</span>
             <input name="governanceProposalDelegationDecayDays" type="number" min="0" max="3650" value="{{proposalDelegationDecayDays}}" {{proposalDisabled}} />
           </label>
+        </div>
+        <div class="form-grid">
+          <label class="field">
+            <span>Delegate vote window (days)</span>
+            <input name="governanceProposalDelegateVoteWindowDays" type="number" min="0" max="365" value="{{proposalDelegateVoteWindowDays}}" {{proposalDisabled}} />
+          </label>
+          <div class="stack">
+            <p class="muted small">How long a delegate has to cast a ballot handed to them. 0 removes the deadline.</p>
+          </div>
         </div>
         <label class="field">
           <span>Governance notes</span>

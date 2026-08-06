@@ -902,6 +902,7 @@ async function updateGovernance(state, body, person) {
   const reviewInput = sanitizeText(body.governanceReviewWindowHours || '', 12);
   const methodInput = sanitizeText(body.governanceVoteMethod || prev.defaultVoteMethod || '', 32).toLowerCase();
   const decayInput = sanitizeText(body.governanceDelegationDecayDays || '', 12);
+  const delegateWindowInput = sanitizeText(body.governanceDelegateVoteWindowDays || '', 12);
   const notesInput = sanitizeText(body.governanceNotes || '', 400);
 
   const quorumResult = normalizeNumericInput(quorumInput, {
@@ -934,6 +935,12 @@ async function updateGovernance(state, body, person) {
     max: 3650,
     label: 'Delegation decay days',
   });
+  const delegateWindowResult = normalizeNumericInput(delegateWindowInput, {
+    fallback: prev.delegateVoteWindowDays,
+    min: 0,
+    max: 365,
+    label: 'Delegate vote window days',
+  });
 
   const draft = normalizeGovernanceSettings({
     ...prev,
@@ -943,6 +950,7 @@ async function updateGovernance(state, body, person) {
     reviewWindowHours: reviewResult.value ?? prev.reviewWindowHours,
     defaultVoteMethod: methodInput || prev.defaultVoteMethod,
     delegationDecayDays: decayResult.value ?? prev.delegationDecayDays,
+    delegateVoteWindowDays: delegateWindowResult.value ?? prev.delegateVoteWindowDays,
     notes: notesInput,
   });
 
@@ -952,6 +960,7 @@ async function updateGovernance(state, body, person) {
     ...voteResult.errors,
     ...reviewResult.errors,
     ...decayResult.errors,
+    ...delegateWindowResult.errors,
   ];
   if (methodInput && methodInput !== draft.defaultVoteMethod) {
     errors.push('Default vote method must be one of: majority, approval, ranked, condorcet, star.');
@@ -967,6 +976,7 @@ async function updateGovernance(state, body, person) {
       governanceReviewWindowHoursValue: reviewInput || String(prev.reviewWindowHours),
       governanceVoteMethodValue: methodInput || prev.defaultVoteMethod,
       governanceDelegationDecayDaysValue: decayInput || String(prev.delegationDecayDays),
+      governanceDelegateVoteWindowDaysValue: delegateWindowInput || String(prev.delegateVoteWindowDays),
       governanceNotesValue: notesInput || prev.notes,
     };
   }
@@ -992,7 +1002,7 @@ async function updateGovernance(state, body, person) {
   });
   recordAdminAudit(state, {
     action: 'governance.update',
-    summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod} decay=${next.delegationDecayDays}d`,
+    summary: `quorum=${next.quorumDefault} discussion=${next.discussionWindowDays}d vote=${next.voteWindowDays}d method=${next.defaultVoteMethod} decay=${next.delegationDecayDays}d delegateWindow=${next.delegateVoteWindowDays}d`,
   });
   await logTransaction(state, {
     type: 'governance_update',
@@ -1012,6 +1022,7 @@ async function updateGovernance(state, body, person) {
     governanceReviewWindowHoursValue: String(next.reviewWindowHours),
     governanceVoteMethodValue: next.defaultVoteMethod,
     governanceDelegationDecayDaysValue: String(next.delegationDecayDays),
+    governanceDelegateVoteWindowDaysValue: String(next.delegateVoteWindowDays),
     governanceNotesValue: next.notes,
   };
 }
@@ -1597,6 +1608,7 @@ function buildAdminViewModel(
     governanceReviewWindowHoursValue,
     governanceVoteMethodValue,
     governanceDelegationDecayDaysValue,
+    governanceDelegateVoteWindowDaysValue,
     governanceNotesValue,
     providerBlindErrors,
     providerBlindModeValue,
@@ -1743,6 +1755,8 @@ function buildAdminViewModel(
   const governanceReviewWindowHours = governanceReviewWindowHoursValue ?? String(governance.reviewWindowHours);
   const governanceVoteMethod = governanceVoteMethodValue ?? governance.defaultVoteMethod;
   const governanceDelegationDecayDays = governanceDelegationDecayDaysValue ?? String(governance.delegationDecayDays);
+  const governanceDelegateVoteWindowDays =
+    governanceDelegateVoteWindowDaysValue ?? String(governance.delegateVoteWindowDays);
   const governanceNotes = governanceNotesValue ?? governance.notes;
   const governanceUpdatedAt = governance.updatedAt ? formatTimestamp(governance.updatedAt) : 'Not yet';
   const governanceProposalList = renderGovernanceProposalDecisionList(listGovernanceProposals(state, { limit: 20 }));
@@ -1947,6 +1961,7 @@ function buildAdminViewModel(
     governanceVoteMethodCondorcet: governanceVoteMethod === 'condorcet' ? 'selected' : '',
     governanceVoteMethodStar: governanceVoteMethod === 'star' ? 'selected' : '',
     governanceDelegationDecayDays,
+    governanceDelegateVoteWindowDays,
     governanceNotes,
     governanceUpdatedAt,
     governanceProposalList,

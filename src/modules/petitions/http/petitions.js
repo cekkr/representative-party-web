@@ -23,7 +23,7 @@ import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPetitionList, renderProposalDiscussionFeed } from '../../../interfaces/http/views/petitionView.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
-import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
@@ -31,6 +31,12 @@ import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimi
 import { recordRateLimit } from '../../ops/metrics.js';
 import { normalizeCommentStance } from '../../petitions/commentStance.js';
 import { getGovernanceSettings } from '../../governance/constitution.js';
+import {
+  DELEGATED_CHOICE,
+  buildDelegatedBallot,
+  getDelegateVoteWindowDays,
+  listOwnersFollowingDelegate,
+} from '../../delegation/delegatedBallots.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -443,12 +449,23 @@ export async function castVote({ req, res, state, wantsPartial }) {
   if (choice === 'auto' && !isModuleEnabled(state, 'delegation')) {
     choice = 'abstain';
   }
+  // A delegated ballot is not a choice — it hands the choice to the delegate and stays open
+  // until they vote. `delegate` records who holds it and by when, so the tally can resolve it
+  // through their vote (transitively) instead of silently counting it as an abstention.
+  let delegateBallot = null;
   if (!choice || choice === 'auto') {
     const delegation = resolveDelegation(person, exists.topic, state, {
       notify: (notification) => createNotification(state, notification),
+      topicPath: exists.topicPath,
     });
-    if (delegation) {
-      choice = `delegate:${delegation.delegateHash}`;
+    if (delegation?.delegateHash) {
+      delegateBallot = buildDelegatedBallot({
+        delegateHash: delegation.delegateHash,
+        via: delegation.via || 'direct',
+        topic: delegation.matchedTopic || exists.topic,
+        windowDays: getDelegateVoteWindowDays(state),
+      });
+      choice = DELEGATED_CHOICE;
     } else {
       choice = 'abstain';
     }
@@ -464,12 +481,20 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   const authorHash = person?.pidHash || 'anonymous';
+  // Read who was following this voter *before* the store changes: once their vote lands, a
+  // ballot it resolves no longer looks like it was ever waiting.
+  const followers = delegateBallot
+    ? []
+    : listOwnersFollowingDelegate(state, { petitionId, delegateHash: authorHash });
   const vote = {
     petitionId,
     authorHash,
     choice,
     createdAt: new Date().toISOString(),
   };
+  if (delegateBallot) {
+    vote.delegate = delegateBallot;
+  }
   const stamped = stampLocalEntry(state, vote);
   vote.envelope = buildVoteEnvelope({ ...stamped, ...vote }, {
     policy,
@@ -486,14 +511,43 @@ export async function castVote({ req, res, state, wantsPartial }) {
     type: 'vote_cast',
     actorHash: authorHash,
     petitionId,
-    payload: { choice, envelope: vote.envelope },
+    payload: {
+      choice,
+      delegate: delegateBallot ? { hash: delegateBallot.hash, via: delegateBallot.via, deadline: delegateBallot.deadline } : null,
+      envelope: vote.envelope,
+    },
   });
   if (person?.pidHash) {
     await createNotification(state, {
       type: 'vote_recorded',
       recipientHash: person.pidHash,
       petitionId,
-      message: `Vote recorded for petition "${exists.title}" with choice "${choice}".`,
+      message: delegateBallot
+        ? `Ballot on "${exists.title}" delegated to @${resolveHandleForHash(state, delegateBallot.hash)}${describeBallotDeadline(delegateBallot.deadline)}. Vote yourself any time to override.`
+        : `Vote recorded for petition "${exists.title}" with choice "${choice}".`,
+      expiresAt: null,
+    });
+  }
+
+  // Tell the delegate a ballot is now riding on them, with the deadline they have to act.
+  if (delegateBallot?.hash && delegateBallot.hash !== authorHash) {
+    await createNotification(state, {
+      type: 'delegated_ballot_received',
+      recipientHash: delegateBallot.hash,
+      petitionId,
+      message: `A member delegated their vote on "${exists.title}" to you${describeBallotDeadline(delegateBallot.deadline)}.`,
+      expiresAt: null,
+    });
+  }
+
+  // Tell everyone whose ballot flows through this voter, so overriding stays their call.
+  for (const follower of followers) {
+    if (!follower.ownerHash || follower.ownerHash === authorHash) continue;
+    await createNotification(state, {
+      type: 'delegated_ballot_resolved',
+      recipientHash: follower.ownerHash,
+      petitionId,
+      message: `Your delegate @${resolveHandleForHash(state, authorHash)} voted "${choice}" on "${exists.title}". Vote yourself to override.`,
       expiresAt: null,
     });
   }
@@ -503,6 +557,15 @@ export async function castVote({ req, res, state, wantsPartial }) {
   }
 
   return sendRedirect(res, '/petitions');
+}
+
+// " — 5 days to vote" / "" when the deployment runs without a delegate window.
+function describeBallotDeadline(deadline) {
+  if (!deadline) return '';
+  const ms = Date.parse(deadline);
+  if (!Number.isFinite(ms)) return '';
+  const days = Math.max(0, Math.ceil((ms - Date.now()) / (1000 * 60 * 60 * 24)));
+  return ` — ${days} day${days === 1 ? '' : 's'} to vote`;
 }
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {

@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 22;
+export const LATEST_SCHEMA_VERSION = 23;
 
 const MIGRATIONS = [
   {
@@ -544,6 +544,50 @@ const MIGRATIONS = [
             settings.extensionInstallations,
             settings.extensions,
           ),
+        },
+      };
+    },
+  },
+  {
+    version: 23,
+    description: 'Convert delegated votes to structured ballots and add the delegate vote window.',
+    up: (data) => {
+      // Delegated votes used to be stored as the opaque string `delegate:<hash>`, which no
+      // tally understood — every one of them silently counted as an abstention. Lift the
+      // delegate out into a structured binding so resolution can follow it. Existing rows get
+      // no deadline (`deadline: null`): a window cannot be applied retroactively without
+      // lapsing ballots members were never told had a clock on them.
+      const votes = (data.votes || []).map((vote) => {
+        if (vote?.delegate?.hash) return vote;
+        const choice = typeof vote?.choice === 'string' ? vote.choice.trim().toLowerCase() : '';
+        if (!choice.startsWith('delegate:')) return vote;
+        const delegateHash = choice.slice('delegate:'.length).trim();
+        if (!delegateHash) return vote;
+        return {
+          ...vote,
+          choice: 'delegate',
+          delegate: {
+            hash: delegateHash,
+            via: 'direct',
+            topic: null,
+            at: vote.createdAt || null,
+            deadline: null,
+          },
+        };
+      });
+
+      const settings = data.settings || {};
+      const governance = settings.governance || {};
+      return {
+        ...data,
+        votes,
+        settings: {
+          ...settings,
+          governance: {
+            ...governance,
+            delegateVoteWindowDays:
+              governance.delegateVoteWindowDays === undefined ? 5 : governance.delegateVoteWindowDays,
+          },
         },
       };
     },

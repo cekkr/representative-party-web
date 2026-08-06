@@ -79,7 +79,7 @@ test('extension lifecycle migration registers previously enabled extensions', ()
     meta: { schemaVersion: 21, migrations: [] },
   });
 
-  assert.equal(meta.schemaVersion, 22);
+  assert.equal(meta.schemaVersion, LATEST_SCHEMA_VERSION);
   assert.deepEqual(data.settings.extensionInstallations, [
     {
       id: 'sample-policy-tighten',

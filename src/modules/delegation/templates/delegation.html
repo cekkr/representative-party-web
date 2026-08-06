@@ -11,6 +11,20 @@
       </div>
     </section>
 
+    <section class="panel" data-composer-section="delegation-inbox" data-section-label="Ballots delegated to you">
+      <p class="eyebrow">Delegated to you</p>
+      <h3>Ballots waiting on your vote</h3>
+      <p class="muted small">{{delegateWindowNote}}</p>
+      {{delegateBallotInbox}}
+    </section>
+
+    <section class="panel" data-composer-section="delegation-my-ballots" data-section-label="Your delegated ballots">
+      <p class="eyebrow">Your ballots</p>
+      <h3>Votes riding on a delegate</h3>
+      <p class="muted small">A ballot is only counted once your delegate votes. Override it yourself at any time while the proposal is open.</p>
+      {{myDelegatedBallots}}
+    </section>
+
     <section class="panel" data-composer-section="delegation-current" data-section-label="Current preferences">
       <p class="eyebrow">Current preferences</p>
       <h3>Who you delegate to</h3>

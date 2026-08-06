@@ -9,6 +9,7 @@ const DEFAULT_GOVERNANCE = {
   reviewWindowHours: 24,
   defaultVoteMethod: 'majority',
   delegationDecayDays: 0,
+  delegateVoteWindowDays: 5,
   notes: '',
   updatedAt: null,
   updatedBy: null,
@@ -21,6 +22,7 @@ export const GOVERNANCE_FIELDS = [
   'reviewWindowHours',
   'defaultVoteMethod',
   'delegationDecayDays',
+  'delegateVoteWindowDays',
   'notes',
 ];
 
@@ -31,6 +33,7 @@ const FIELD_LABELS = {
   reviewWindowHours: 'Review window',
   defaultVoteMethod: 'Default vote method',
   delegationDecayDays: 'Delegation decay',
+  delegateVoteWindowDays: 'Delegate vote window',
   notes: 'Governance notes',
 };
 
@@ -60,6 +63,14 @@ export function normalizeGovernanceSettings(input = {}) {
     min: 0,
     max: 3650,
   });
+  // Days a delegate has to cast a ballot handed to them before it lapses to an abstention.
+  // 0 removes the deadline; the ballot then waits until the delegate votes or the member
+  // overrides it. Capped at the delegation decay ceiling for the same reason.
+  const delegateVoteWindowDays = normalizeNumber(
+    input.delegateVoteWindowDays,
+    DEFAULT_GOVERNANCE.delegateVoteWindowDays,
+    { min: 0, max: 365 },
+  );
   return {
     quorumDefault,
     discussionWindowDays,
@@ -67,6 +78,7 @@ export function normalizeGovernanceSettings(input = {}) {
     reviewWindowHours,
     defaultVoteMethod,
     delegationDecayDays,
+    delegateVoteWindowDays,
     notes: sanitizeText(input.notes || DEFAULT_GOVERNANCE.notes, 400),
     updatedAt: input.updatedAt || null,
     updatedBy: input.updatedBy || null,
@@ -110,6 +122,12 @@ export function createGovernanceProposal(state, input = {}, actor = {}) {
       'delegationDecayDays',
       'governanceProposalDelegationDecayDays',
       base.delegationDecayDays,
+    ),
+    delegateVoteWindowDays: readInputField(
+      input,
+      'delegateVoteWindowDays',
+      'governanceProposalDelegateVoteWindowDays',
+      base.delegateVoteWindowDays,
     ),
     notes: readInputField(input, 'notes', 'governanceProposalNotes', base.notes),
   });

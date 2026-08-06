@@ -10,6 +10,11 @@ import {
   renewDelegation,
   setDelegation,
 } from '../../delegation/delegation.js';
+import {
+  getDelegateVoteWindowDays,
+  listBallotsAwaitingDelegate,
+  listDelegatedBallotsForOwner,
+} from '../../delegation/delegatedBallots.js';
 import { recommendDelegationForPerson } from '../../groups/groups.js';
 import { getTopicConfig } from '../../topics/topicGardenerClient.js';
 import { listPeopleDirectory } from '../../delegation/delegateProfiles.js';
@@ -81,6 +86,9 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       effectiveDelegations: renderEffectiveDelegations({ person, state, delegations }),
       delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state), state }),
       delegationDecayNote: renderDecayNote(getDelegationDecayDays(state)),
+      delegateWindowNote: renderDelegateWindowNote(getDelegateVoteWindowDays(state)),
+      delegateBallotInbox: renderDelegateBallotInbox({ person, state }),
+      myDelegatedBallots: renderMyDelegatedBallots({ person, state }),
       peopleDatalist: renderPeopleDatalist(state, person),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
@@ -136,6 +144,110 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
   return sendRedirect(res, '/delegation');
 }
 
+
+function renderDelegateWindowNote(windowDays = 0) {
+  if (!windowDays) {
+    return 'No delegate deadline is set in this deployment — a delegated ballot waits until you vote or the member overrides it.';
+  }
+  return `Members who delegate to you expect a vote within ${windowDays} day${windowDays === 1 ? '' : 's'}. After that the ballot lapses to an abstention.`;
+}
+
+// The delegate's side of the contract: which ballots are riding on them, on what, and how
+// long they have. Without this a delegate has no way to discover a ballot they were handed.
+function renderDelegateBallotInbox({ person, state } = {}) {
+  if (!person?.pidHash) {
+    return '<p class="muted">Login to see ballots delegated to you.</p>';
+  }
+  const rows = listBallotsAwaitingDelegate(state, person.pidHash, { includeLapsed: true });
+  if (!rows.length) {
+    return '<p class="muted">No ballots are waiting on your vote.</p>';
+  }
+  const items = rows
+    .map(({ petition, resolution, ownerHash }) => {
+      const urgency = describeBallotUrgency(resolution);
+      const ownerLabel = renderActorLabel(state, ownerHash, { showHash: false });
+      const forwarded =
+        resolution.delegateHash !== person.pidHash
+          ? `<p class="muted tiny">Forwarded through ${renderActorLabel(state, resolution.delegateHash, { showHash: false })}.</p>`
+          : '';
+      return `
+        <div class="list-row">
+          <div>
+            <p class="small"><a href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
+            <p class="muted tiny">Delegated by ${ownerLabel} · Topic ${escapeHtml(resolution.topic || petition.topic || 'general')}</p>
+            ${forwarded}
+          </div>
+          <div>
+            ${urgency}
+            <a class="ghost" href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>Vote</a>
+          </div>
+        </div>
+      `;
+    })
+    .join('\n');
+  return `<div class="list-stack">${items}</div>`;
+}
+
+// The member's side: what a delegate is currently holding for them, and whether it still has
+// time to land. Overriding is a link to the proposal, where the vote form already lives.
+function renderMyDelegatedBallots({ person, state } = {}) {
+  if (!person?.pidHash) {
+    return '<p class="muted">Login to see ballots you delegated.</p>';
+  }
+  const rows = listDelegatedBallotsForOwner(state, person.pidHash);
+  if (!rows.length) {
+    return '<p class="muted">You have no delegated ballots. Choose "hand to my delegate" when voting on a proposal.</p>';
+  }
+  const items = rows
+    .map(({ petition, resolution, open }) => {
+      const delegateLabel = renderActorLabel(state, resolution.delegateHash, { showHash: false });
+      const statusPill = describeBallotStatus(resolution);
+      const outcome =
+        resolution.status === 'resolved'
+          ? `<p class="muted tiny">Counted as <strong>${escapeHtml(resolution.choice)}</strong>.</p>`
+          : '';
+      const override = open
+        ? `<a class="ghost" href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>Override</a>`
+        : '<span class="muted tiny">Closed</span>';
+      return `
+        <div class="list-row">
+          <div>
+            <p class="small"><a href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
+            <p class="muted tiny">Held by ${delegateLabel} · Topic ${escapeHtml(resolution.topic || petition.topic || 'general')}</p>
+            ${outcome}
+          </div>
+          <div>
+            ${statusPill}
+            ${override}
+          </div>
+        </div>
+      `;
+    })
+    .join('\n');
+  return `<div class="list-stack">${items}</div>`;
+}
+
+function describeBallotUrgency(resolution) {
+  if (resolution.status === 'lapsed') {
+    return '<span class="pill warning">Lapsed</span>';
+  }
+  if (resolution.daysLeft === null) {
+    return '<span class="pill ghost">No deadline</span>';
+  }
+  const days = resolution.daysLeft;
+  const klass = days <= 1 ? 'pill warning' : 'pill';
+  return `<span class="${klass}">${days} day${days === 1 ? '' : 's'} left</span>`;
+}
+
+function describeBallotStatus(resolution) {
+  if (resolution.status === 'resolved') return '<span class="pill">Counted</span>';
+  if (resolution.status === 'lapsed') return '<span class="pill warning">Lapsed to abstain</span>';
+  if (resolution.status === 'unresolved') return '<span class="pill warning">Chain broken</span>';
+  if (resolution.daysLeft === null) return '<span class="pill ghost">Awaiting delegate</span>';
+  const days = resolution.daysLeft;
+  const klass = days <= 1 ? 'pill warning' : 'pill ghost';
+  return `<span class="${klass}">Awaiting · ${days}d left</span>`;
+}
 
 function renderEffectiveDelegations({ person, state, delegations = [] } = {}) {
   if (!person?.pidHash) {
