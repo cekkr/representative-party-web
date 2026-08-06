@@ -280,6 +280,7 @@ template-hygiene item.
 | Promote-to-upper-level control (shown only when it would succeed) | **[done]** |
 | Promotion request + approve/decline controls (both lanes) | **[done]** |
 | Group members-and-roles panel (lane moderator assignment) | **[done]** |
+| Scenario A README coverage: branch tree, category directory, internal lane, promotion, delegated-ballot state and delegate inbox (`party-journeys.js`, 17 captures) | **[done]** |
 | Proposal Category field (compose + draft edit) with topic datalist | **[done]** |
 | Favicon (kills `/favicon.ico` 404) | **[todo]** (see OPTIMIZATIONS) |
 | Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |

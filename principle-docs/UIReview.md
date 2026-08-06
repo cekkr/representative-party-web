@@ -26,7 +26,7 @@ rm -rf .local/standalone
 ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
   DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh   # terminal 1
 
-# 2. Seed + drive + capture the member journey (asserts each step, writes 10 images)
+# 2. Seed + drive + capture the member journey (asserts each step, writes 17 images)
 BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party node scripts/party-journeys.js
 ```
 

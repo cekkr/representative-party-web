@@ -851,6 +851,345 @@ async function journeyElection(browser) {
   });
 }
 
+/** Reads the id of the group card whose name matches, from any form that carries it. */
+async function findGroupIdByName(page, name) {
+  return page.evaluate((want) => {
+    const cards = [...document.querySelectorAll('article')];
+    const card = cards.find((c) => (c.querySelector('h3')?.textContent || '').toLowerCase().includes(want.toLowerCase()));
+    return card?.querySelector('input[name="groupId"]')?.value || null;
+  }, name);
+}
+
+async function joinGroup(page, groupId) {
+  await visit(page, '/groups');
+  await page.evaluate((id) => {
+    const form = [...document.querySelectorAll('form[action="/groups"]')].find(
+      (f) => f.querySelector('input[name="action"][value="join"]') && f.querySelector(`input[name="groupId"][value="${id}"]`),
+    );
+    form?.querySelector('button[type="submit"]')?.click();
+  }, groupId);
+  await settle(page);
+}
+
+/** Applies a group's policy form (lanes, visibility, election mode, roll-up) in one submit. */
+async function setGroupPolicy(page, groupId, patch) {
+  await visit(page, '/groups');
+  const applied = await page.evaluate(
+    (id, values) => {
+      const form = [...document.querySelectorAll('form[action="/groups/policy"]')].find((f) =>
+        f.querySelector(`input[name="groupId"][value="${id}"]`),
+      );
+      if (!form) return false;
+      form.closest('details')?.setAttribute('open', 'open');
+      for (const [name, value] of Object.entries(values)) {
+        const field = form.querySelector(`[name="${name}"]`);
+        if (!field) continue;
+        if (field.type === 'checkbox') field.checked = Boolean(value);
+        else field.value = value;
+      }
+      form.querySelector('button[type="submit"]')?.click();
+      return true;
+    },
+    groupId,
+    patch,
+  );
+  if (!applied) record(`no policy form for group ${groupId}`);
+  await settle(page);
+  return applied;
+}
+
+/**
+ * A9 — Structure that grows a branch. A party circle gains a topic-focused think tank
+ * beneath it, both declare the categories they work on, and the directory turns that into
+ * an answer to "who do I delegate this to?" — the question topic-scoped delegation asks of
+ * every member and, before this, left them to answer alone.
+ */
+async function journeyBranchGroups(browser) {
+  console.log('\n— branches: a think tank inside the party, and a category directory');
+  const irene = await member(browser, 'irene.fabbri');
+  await visit(irene, '/groups');
+
+  const parentId = await findGroupIdByName(irene, 'Circolo Sanità Pubblica');
+  if (!parentId) {
+    record('the parent circle from the election journey is missing');
+    return null;
+  }
+
+  // The parent declares the broad categories it covers.
+  await irene.evaluate((id) => {
+    const form = [...document.querySelectorAll('form[action="/groups/topics"]')].find((f) =>
+      f.querySelector(`input[name="groupId"][value="${id}"]`),
+    );
+    if (form) {
+      form.closest('details')?.setAttribute('open', 'open');
+      form.querySelector('input[name="topics"]').value = 'Sanità, Lavoro';
+      form.querySelector('button[type="submit"]').click();
+    }
+  }, parentId);
+  await settle(irene);
+
+  // The branch: narrower, with its own subcategory and its own membership.
+  await visit(irene, '/groups');
+  await typeInto(irene, 'form[data-enhance="groups"] input[name="name"]', 'Officina Liste d’Attesa');
+  await typeInto(irene, 'form[data-enhance="groups"] input[name="topics"]', 'Sanità / Liste di attesa');
+  await selectOptionByLabel(irene, 'form[data-enhance="groups"] select[name="parentId"]', 'Circolo Sanità Pubblica');
+  await typeInto(
+    irene,
+    'form[data-enhance="groups"] textarea[name="description"]',
+    'Ramo tematico del Circolo: lavora solo sui tempi di attesa e sull’intramoenia.',
+  );
+  await submitNear(irene, 'form[data-enhance="groups"] input[name="name"]');
+
+  await visit(irene, '/groups');
+  const branchId = await findGroupIdByName(irene, 'Officina Liste');
+  if (!branchId) {
+    record('the branch group was not created');
+    return null;
+  }
+  await expectText(irene, 'Branch of Circolo Sanità Pubblica', 'the branch shows its lineage, not just a name');
+  await expectText(irene, 'Branches: Officina', 'the parent lists its branches');
+
+  // The branch puts the elected nurse forward on its own subcategory.
+  await visit(irene, '/groups');
+  await irene.evaluate((id) => {
+    const form = [...document.querySelectorAll('form[action="/groups/delegate"]')].find((f) =>
+      f.querySelector(`input[name="groupId"][value="${id}"]`),
+    );
+    if (form) {
+      form.closest('details')?.setAttribute('open', 'open');
+      form.querySelector('input[name="topic"]').value = 'Sanità / Liste di attesa';
+      form.querySelector('input[name="delegateHash"]').value = 'giulia.ferrero';
+      form.querySelector('input[name="priority"]').value = '1';
+      form.querySelector('button[type="submit"]').click();
+    }
+  }, branchId);
+  await settle(irene);
+
+  await visit(irene, '/groups');
+  await shot(
+    irene,
+    'party-branch-groups',
+    'Structure grows a branch: a topic-focused think tank sits under the party circle, indented and labelled “Branch of”. Nesting is structural, not authority — the branch keeps its own membership and its own delegate cachets.',
+    { focus: '[data-composer-section="groups-list"]' },
+  );
+
+  await expectText(irene, 'Sanità / Liste di attesa', 'the branch subcategory reaches the directory');
+  await shot(
+    irene,
+    'party-categories',
+    'Who works on what: every category a group has declared, the circles covering it, and who each currently puts forward — with one-click delegation. This is the answer to the question topic-scoped delegation asks and used to leave to the member.',
+    { focus: '[data-composer-section="groups-categories"]' },
+  );
+
+  return { parentId, branchId };
+}
+
+/**
+ * A10 — An internal lane, and the path out of it. A branch can hold its own working
+ * discussion without publishing every note to the whole party; an ordinary member can ask
+ * for one to be taken up a level, and a lane moderator — not only an admin — decides.
+ */
+async function journeyGroupLane(browser, ids) {
+  console.log('\n— lanes: an internal branch discussion, and a member asking to move it up');
+  if (!ids?.branchId) {
+    record('no branch group to open a lane on');
+    return;
+  }
+  const { parentId, branchId } = ids;
+  const irene = await member(browser, 'irene.fabbri');
+
+  // Both levels open their internal discussion lane, members-only.
+  await setGroupPolicy(irene, branchId, {
+    electionMode: 'priority',
+    conflictRule: 'highest_priority',
+    laneDiscussion: true,
+    lanesVisibility: 'members',
+  });
+  await setGroupPolicy(irene, parentId, {
+    electionMode: 'vote',
+    conflictRule: 'prompt_user',
+    laneDiscussion: true,
+    lanesVisibility: 'members',
+    adoptBranchElections: true,
+  });
+
+  for (const handle of ['nadia.hamdi', 'tommaso.ricci', 'sofia.bianchi']) {
+    await joinGroup(await member(browser, handle), branchId);
+  }
+
+  // sofia moderates the lane without being able to change what the group *is*.
+  await visit(irene, '/groups');
+  const roleSet = await irene.evaluate(
+    (id, handleFragment) => {
+      const forms = [...document.querySelectorAll('form[action="/groups/roles"]')].filter((f) =>
+        f.querySelector(`input[name="groupId"][value="${id}"]`),
+      );
+      const row = forms.find((f) => (f.closest('.list-row')?.textContent || '').toLowerCase().includes(handleFragment));
+      if (!row) return false;
+      row.closest('details')?.setAttribute('open', 'open');
+      row.querySelector('select[name="role"]').value = 'laneModerator';
+      row.querySelector('button[type="submit"]').click();
+      return true;
+    },
+    branchId,
+    'sofia',
+  );
+  if (!roleSet) record('the branch roles panel did not offer sofia a role control');
+  await settle(irene);
+
+  // A working note that belongs to the branch, not yet to the party.
+  const nadia = await member(browser, 'nadia.hamdi');
+  await visit(nadia, `/discussion?group=${branchId}`);
+  await typeInto(nadia, '#discussion-compose input[name="topic"]', 'Sanità / Liste di attesa');
+  await selectOptionByLabel(nadia, '#discussion-compose select[name="groupId"]', 'Officina Liste');
+  await selectOption(nadia, '#discussion-compose select[name="stance"]', 'proposal');
+  await typeInto(
+    nadia,
+    '#discussion-compose textarea[name="content"]',
+    'Nota di lavoro del ramo: sui codici B il CUP di Palermo sfora del 41%. Prima di portarlo al Circolo verifichiamo i dati di altre tre ASP.',
+  );
+  await submitNear(nadia, '#discussion-compose textarea[name="content"]');
+
+  await visit(nadia, `/discussion?group=${branchId}`);
+  await expectText(nadia, 'Nota di lavoro del ramo', 'the branch lane carries the working note');
+  await shot(
+    nadia,
+    'party-group-lane',
+    'An optional internal lane: the branch works in its own discussion, members-only and off by default. Notes here stay out of the party-wide feed until someone moves them up — so a working draft is not a public position.',
+    { focus: '[data-composer-section="discussion-feed"]' },
+  );
+
+  // A note posted in a branch lane must not leak into the Circle-wide feed.
+  await visit(nadia, '/discussion');
+  const leaked = (await pageText(nadia)).toLowerCase().includes('nota di lavoro del ramo');
+  if (leaked) record('a branch-lane note leaked into the Circle-wide discussion feed');
+  else ok('the branch note stays out of the Circle-wide feed');
+
+  // tommaso is a plain member: he can ask, not decide.
+  const tommaso = await member(browser, 'tommaso.ricci');
+  await visit(tommaso, `/discussion?group=${branchId}`);
+  await typeInto(
+    tommaso,
+    'form[data-enhance="promotion-request"] input[name="note"]',
+    'I dati reggono: questa riguarda tutto il Circolo, non solo il ramo.',
+  );
+  await submitNear(tommaso, 'form[data-enhance="promotion-request"] input[name="note"]');
+  await visit(tommaso, `/discussion?group=${branchId}`);
+  await expectText(tommaso, 'asked for this to move up', 'the request is visible to the whole branch, not a private ping');
+
+  // sofia — lane moderator, not admin — decides.
+  const sofia = await member(browser, 'sofia.bianchi');
+  await visit(sofia, `/discussion?group=${branchId}`);
+  const approved = await sofia.evaluate(() => {
+    const form = document.querySelector('form[data-enhance="promotion-decision"]');
+    const button = [...(form?.querySelectorAll('button') || [])].find((b) => b.value === 'approve');
+    if (!button) return false;
+    button.click();
+    return true;
+  });
+  if (!approved) record('the lane moderator was not offered the approve control');
+  await settle(sofia);
+
+  // First verify the boundary: sofia moderates the branch but never joined the parent,
+  // and the parent's lane is members-only — so she should not be able to read it.
+  await visit(sofia, `/discussion?group=${parentId}`);
+  const moderatorCanRead = (await pageText(sofia)).toLowerCase().includes('nota di lavoro del ramo');
+  if (moderatorCanRead) record('a branch moderator can read the parent circle’s members-only lane');
+  else ok('the parent circle’s lane stays closed to a non-member, even a branch moderator');
+
+  // Then read the result as someone who is actually in the parent circle.
+  await visit(irene, `/discussion?group=${parentId}`);
+  await expectText(irene, 'Nota di lavoro del ramo', 'the approved note now sits in the parent circle’s lane');
+  await expectText(irene, 'Promoted from', 'the move is stamped on the item, not silent');
+  await shot(
+    irene,
+    'party-promotion',
+    'A member asks, a lane moderator decides: the branch note is moved up to the parent circle and stamped “Promoted from …”. It is a move, not a copy — the thread keeps its id, so its replies travel with it and a decline would have carried a reason.',
+    { focus: '[data-composer-section="discussion-feed"]' },
+  );
+}
+
+/**
+ * A11 — Handing a vote to a delegate, honestly. A delegation on the *parent* category
+ * reaches a proposal filed in a subcategory, the ballot stays visibly uncounted while the
+ * delegate still has time, and the delegate can see what is riding on them.
+ */
+async function journeyDelegatedBallot(browser) {
+  console.log('\n— delegated ballots: a category delegation, a deadline, and an override');
+
+  // davide delegates the broad category; the proposal below is filed under a subcategory of it.
+  const davide = await member(browser, 'davide.villa');
+  await visit(davide, '/delegation');
+  await typeInto(davide, 'form[data-enhance="delegation"] input[name="topic"]', 'Sanità');
+  await typeInto(davide, 'form[data-enhance="delegation"] input[name="delegateHash"]', 'giulia.ferrero');
+  await submitNear(davide, 'form[data-enhance="delegation"] input[name="delegateHash"]');
+
+  // A proposal whose category the author chooses — narrower than the delegation above.
+  const nadia = await member(browser, 'nadia.hamdi');
+  await visit(nadia, '/petitions');
+  await typeInto(nadia, '#petitions-compose input[name="title"]', 'Tetto ai tempi CUP per i codici B nelle ASP siciliane');
+  await typeInto(nadia, '#petitions-compose input[name="topic"]', 'Sanità / Liste di attesa');
+  await typeInto(nadia, '#petitions-compose input[name="quorum"]', '1');
+  await typeInto(
+    nadia,
+    '#petitions-compose textarea[name="summary"]',
+    'Applicare il tetto PNGLA di 10 giorni ai codici B con pubblicazione mensile degli scostamenti per ogni ASP.',
+  );
+  await submitNear(nadia, '#petitions-compose input[name="title"]');
+  await expectText(nadia, 'Sanità / Liste di attesa', 'the proposal keeps the category its author chose');
+
+  const petitionId = await findPetitionId(nadia, 'codici B');
+  if (!petitionId) {
+    record('could not locate the subcategory proposal');
+    return;
+  }
+  await signPetition(nadia, 'codici B');
+
+  // The party secretary freezes and opens it.
+  const elena = await member(browser, 'elena.rossi');
+  await visit(elena, '/petitions');
+  await elena.evaluate((id) => {
+    const form = document.getElementById(`petition-${id}`)?.querySelector('form[action="/petitions/status"]');
+    if (!form) return;
+    form.querySelector('select[name="status"]').value = 'vote';
+    const confirm = form.querySelector('input[name="confirmFreeze"]');
+    if (confirm) confirm.checked = true;
+    form.querySelector('button[type="submit"]')?.click();
+  }, petitionId);
+  await settle(elena);
+
+  // davide hands the ballot to whoever his category delegation resolves to.
+  await visit(davide, '/petitions');
+  await selectOption(davide, `#petition-${petitionId} form[action="/petitions/vote"] select[name="choice"]`, 'auto');
+  await davide.evaluate((id) => {
+    const form = document.querySelector(`#petition-${id} form[action="/petitions/vote"]`);
+    form?.querySelector('button[type="submit"], button:not([type])')?.click();
+  }, petitionId);
+  await settle(davide);
+
+  await visit(davide, '/petitions');
+  await expectText(davide, 'giulia.ferrero', 'the delegation on the parent category reaches the subcategory proposal');
+  await expectText(davide, 'awaiting delegates', 'an open delegated ballot is reported apart from the abstentions');
+  await shot(
+    davide,
+    'party-delegated-ballot',
+    'A delegated vote is a real ballot, not an abstention: davide delegated the broad category “Sanità”, and it reaches a proposal filed under “Sanità / Liste di attesa”. Until @giulia.ferrero votes it is counted as nothing — shown as “awaiting delegates”, never folded into the abstentions — and he can override it himself at any time.',
+    { focus: `#petition-${petitionId}` },
+  );
+
+  // The other side of the contract: the delegate can see what is riding on her.
+  const giulia = await member(browser, 'giulia.ferrero');
+  await visit(giulia, '/delegation');
+  await expectText(giulia, 'codici B', 'the delegate sees the ballot handed to her');
+  await expectText(giulia, 'left', 'the delegate sees how long she has to act');
+  await shot(
+    giulia,
+    'party-delegate-inbox',
+    'The delegate’s side of the same contract: ballots handed to her, what each is about, and how many days remain before one lapses to an abstention. Delegation stops being something that happens to a delegate without their knowledge.',
+    { focus: '[data-composer-section="delegation-inbox"]' },
+  );
+}
+
 /** A8 — Accountability without compulsion: the People directory and a delegate dashboard. */
 async function journeyAccountability(browser) {
   console.log('\n— accountability: the People directory and a delegate dashboard');
@@ -966,6 +1305,12 @@ async function main() {
     if (wanted('vote')) await journeyVote(browser, petitionId);
     if (wanted('delegation')) await journeyDelegation(browser);
     if (wanted('election')) await journeyElection(browser);
+    // Branches build on the circle the election journey created, and the lane journey
+    // needs the branch, so these run in order.
+    let groupIds = null;
+    if (wanted('branches')) groupIds = await journeyBranchGroups(browser);
+    if (wanted('lanes')) await journeyGroupLane(browser, groupIds);
+    if (wanted('ballots')) await journeyDelegatedBallot(browser);
     if (wanted('accountability')) await journeyAccountability(browser);
   } finally {
     if (process.env.KEEP !== '1') await browser.close();

@@ -3262,7 +3262,17 @@ function isHtmlResponse(response) {
     }
     try {
       setAppBusy(true);
-      const formData = new FormData(form);
+      // A plain form POST includes the name/value of the button that submitted it; a bare
+      // `new FormData(form)` does not. Any form offering two named submit buttons — approve
+      // vs decline on a promotion request, for one — would otherwise arrive without the
+      // choice, and the server would fall back to its default. Pass the submitter (and
+      // append it by hand where the two-argument form is unsupported) so the enhanced path
+      // sends exactly what the unenhanced one would.
+      const submitter = event.submitter;
+      const formData = new FormData(form, submitter);
+      if (submitter?.name && !formData.has(submitter.name)) {
+        formData.append(submitter.name, submitter.value ?? '');
+      }
       const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
       const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
       const method = (form.method || 'POST').toUpperCase();
