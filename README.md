@@ -1,5 +1,7 @@
 # Web Organization Framework
 
+**Repository: [https://codeberg.org/eorg/web-org](https://codeberg.org/eorg/web-org)**
+
 <img src="md-assets/weborg-logo.png" alt="The Web Organization Framework logo" style="max-width: 640px; width: 100%;" width="640" />
 
 A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
