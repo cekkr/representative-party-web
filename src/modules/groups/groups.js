@@ -5,7 +5,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../federation/replication
 import { pickWinner } from './groupElections.js';
 import { getGroupPolicy } from './groupPolicy.js';
 import { buildTopicMatchKeys, topicMatchRank } from '../topics/topicMatch.js';
-import { getGroupDepth } from './groupTree.js';
+import { getGroupDepth, listDescendantGroups } from './groupTree.js';
 
 export function listGroups(state) {
   return filterVisibleEntries(state.groups, state);
@@ -29,6 +29,45 @@ export function isGroupMember(group, memberHash) {
 
 export function isGroupAdmin(group, memberHash) {
   return getGroupMemberRole(group, memberHash) === 'admin';
+}
+
+// Group roles, weakest first. `laneModerator` sits between member and admin: it can act on
+// what the lanes carry — promoting an item, deciding a promotion request — without being
+// able to change the group's policy, categories, delegates or roles. Those are the things
+// that define what the group *is*, and handing them out to keep a busy forum moving is how
+// a moderation role quietly becomes an ownership role.
+export const GROUP_ROLES = ['member', 'laneModerator', 'admin'];
+
+export function isValidGroupRole(role) {
+  return GROUP_ROLES.includes(String(role || ''));
+}
+
+export function canModerateGroupLane(group, memberHash) {
+  const role = getGroupMemberRole(group, memberHash);
+  return role === 'admin' || role === 'laneModerator';
+}
+
+export async function setGroupMemberRole({ groupId, memberHash, role, state }) {
+  const group = findGroupById(state, groupId);
+  if (!group || !memberHash) return { ok: false, error: 'group_not_found' };
+  if (!isValidGroupRole(role)) return { ok: false, error: 'invalid_role' };
+  if (!isGroupMember(group, memberHash)) {
+    return { ok: false, error: 'not_a_member', message: 'That person is not in this group.' };
+  }
+  // A group must keep at least one admin, or nobody can ever change its policy again.
+  const admins = (group.roles || []).filter((entry) => entry.role === 'admin');
+  if (role !== 'admin' && admins.length === 1 && admins[0].hash === memberHash) {
+    return { ok: false, error: 'last_admin', message: 'A group must keep at least one admin.' };
+  }
+  group.roles = group.roles || [];
+  const existing = group.roles.find((entry) => entry.hash === memberHash);
+  if (existing) {
+    existing.role = role;
+  } else {
+    group.roles.push({ hash: memberHash, role, joinedAt: new Date().toISOString() });
+  }
+  await persistGroups(state);
+  return { ok: true, group, role };
 }
 
 export async function createGroup({ name, description, topics, creatorHash, parentId = null, state }) {
@@ -143,6 +182,7 @@ export function recommendDelegationForPerson(person, topic, state, { matchKeys }
       electionMode,
       electionId: match.electionId || null,
       electionMethod: match.electionMethod || null,
+      adoptedFromGroupName: match.adoptedFromGroupName || '',
     });
   }
   if (!suggestions.length) return { suggestions, conflict: false };
@@ -176,8 +216,18 @@ function findBestGroupDelegate(delegates = [], matchKeys = []) {
 }
 
 function findLatestElectionWinner(state, group, topicKey, matchKeys = []) {
+  const policy = getGroupPolicy(state, group.id);
+  // Roll-up is opt-in and parent-side: a group that asked for it also considers its
+  // branches' closed elections, so a think tank's vote can inform the party without the
+  // party having to re-run it. The group's own election always wins when it has one — a
+  // branch never overrides a decision the whole group actually took.
+  const ownGroupIds = new Set([group.id]);
+  const branchGroupIds = new Set(
+    policy.adoptBranchElections ? listDescendantGroups(state, group.id).map((entry) => entry.id) : [],
+  );
   const elections = filterVisibleEntries(state.groupElections || [], state).filter(
-    (entry) => entry.groupId === group.id && entry.status === 'closed',
+    (entry) =>
+      entry.status === 'closed' && (ownGroupIds.has(entry.groupId) || branchGroupIds.has(entry.groupId)),
   );
   if (!elections.length) return null;
 
@@ -191,21 +241,31 @@ function findLatestElectionWinner(state, group, topicKey, matchKeys = []) {
   }
   if (!candidates.length) return null;
 
-  const latest = candidates
+  // At the same topic, the group's own election beats an adopted branch one: roll-up fills a
+  // gap, it never overrules a vote this group's whole membership actually took.
+  const own = candidates.filter((entry) => ownGroupIds.has(entry.groupId));
+  const pool = own.length ? own : candidates;
+  const latest = pool
     .slice()
     .sort((a, b) => compareTimestamp(b.closedAt || b.createdAt, a.closedAt || a.createdAt))[0];
   if (!latest) return null;
 
   const winner = pickWinner(latest, state);
   if (!winner) return null;
+  const adopted = !ownGroupIds.has(latest.groupId);
+  const sourceGroup = adopted ? findGroupById(state, latest.groupId) : null;
   return {
     delegateHash: winner.candidateHash,
-    provider: 'group-election',
+    provider: adopted ? 'branch-election' : 'group-election',
     priority: 10,
     electionId: latest.id,
     electionMethod: winner.method,
     electionClosedAt: latest.closedAt || latest.createdAt || null,
     electionTopic: latest.topic || topicKey,
+    // Named so the UI can say which branch a recommendation came from. An adopted result
+    // that looked like the parent's own would hide where the decision was actually made.
+    adoptedFromGroupId: adopted ? latest.groupId : null,
+    adoptedFromGroupName: sourceGroup?.name || '',
   };
 }
 

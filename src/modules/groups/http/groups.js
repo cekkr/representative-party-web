@@ -10,7 +10,11 @@ import {
   leaveGroup,
   listGroups,
   setGroupDelegate,
+  setGroupMemberRole,
   setGroupTopics,
+  GROUP_ROLES,
+  canModerateGroupLane,
+  getGroupMemberRole,
 } from '../../groups/groups.js';
 import {
   buildGroupTree,
@@ -313,6 +317,43 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
   return renderGroups({ req, res, state, wantsPartial });
 }
 
+export async function setGroupMemberRoleRoute({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
+  }
+  const person = getPerson(req, state);
+  const body = await readRequestBody(req);
+  const groupId = sanitizeText(body.groupId || '', 80);
+  const group = findGroupById(state, groupId);
+  if (!group) {
+    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+  }
+  if (!person) {
+    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set group roles.' });
+  }
+  // Roles are an admin power on purpose: a lane moderator who could appoint lane moderators
+  // would be an admin by another name.
+  const permission = evaluateAction(state, person, 'moderate');
+  if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+  }
+  const memberHash = resolveActorHash(state, sanitizeText(body.memberHash || '', 80));
+  const role = sanitizeText(body.role || 'member', 24);
+  const result = await setGroupMemberRole({ groupId, memberHash, role, state });
+  if (!result.ok) {
+    return sendJson(res, result.error === 'group_not_found' ? 404 : 400, {
+      error: result.error,
+      message: result.message || 'Could not set that role.',
+    });
+  }
+  await logTransaction(state, {
+    type: 'group_role_set',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { groupId, memberHash, role },
+  });
+  return renderGroups({ req, res, state, wantsPartial });
+}
+
 export async function setGroupTopicsRoute({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
     return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
@@ -376,13 +417,64 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
     petitions: Boolean(body.lanePetitions),
   });
   const lanesVisibility = sanitizeText(body.lanesVisibility || 'members', 16);
-  await setGroupPolicy(state, { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility });
+  const adoptBranchElections = Boolean(body.adoptBranchElections);
+  await setGroupPolicy(state, {
+    groupId,
+    electionMode,
+    conflictRule,
+    categoryWeighted,
+    lanes,
+    lanesVisibility,
+    adoptBranchElections,
+  });
   await logTransaction(state, {
     type: 'group_policy_set',
     actorHash: person?.pidHash || 'anonymous',
-    payload: { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility },
+    payload: { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility, adoptBranchElections },
   });
   return renderGroups({ req, res, state, wantsPartial });
+}
+
+// Group roles are visible to members so it is clear who can act on the lanes, and editable
+// by admins. Kept minimal on purpose: the point is a moderation role that is not ownership.
+function renderRolePanel(group, person, state) {
+  const viewerIsAdmin = person?.pidHash ? isGroupAdmin(group, person.pidHash) : false;
+  const members = group.members || [];
+  if (!members.length) return '';
+  const rows = members
+    .map((hash) => {
+      const role = getGroupMemberRole(group, hash) || 'member';
+      const label = renderActorLabel(state, hash, { showHash: false });
+      const control = viewerIsAdmin
+        ? `
+          <form class="form-inline" method="post" action="/groups/roles" data-enhance="groups">
+            <input type="hidden" name="groupId" value="${escapeHtml(group.id)}" />
+            <input type="hidden" name="memberHash" value="${escapeHtml(hash)}" />
+            <select name="role">
+              ${GROUP_ROLES.map(
+                (value) =>
+                  `<option value="${escapeHtml(value)}" ${role === value ? 'selected' : ''}>${escapeHtml(formatRoleLabel(value))}</option>`,
+              ).join('')}
+            </select>
+            <button type="submit" class="ghost">Set role</button>
+          </form>`
+        : `<span class="pill ghost">${escapeHtml(formatRoleLabel(role))}</span>`;
+      return `<div class="list-row"><div><p class="small">${label}</p></div><div>${control}</div></div>`;
+    })
+    .join('');
+  return `
+    <details class="note">
+      <summary>Members and roles</summary>
+      <div class="list-stack">${rows}</div>
+      <p class="muted tiny">Lane moderators can promote items and decide promotion requests. They cannot change policy, categories, delegates or roles.</p>
+    </details>
+  `;
+}
+
+function formatRoleLabel(role) {
+  if (role === 'laneModerator') return 'Lane moderator';
+  if (role === 'admin') return 'Admin';
+  return 'Member';
 }
 
 function renderParentOptions(state) {
@@ -550,10 +642,16 @@ function renderGroupList(groups, person, state) {
                   <option value="public" ${policy.lanesVisibility === 'public' ? 'selected' : ''}>Readable by anyone</option>
                 </select>
               </label>
+              <label class="field checkbox">
+                <input type="checkbox" name="adoptBranchElections" ${policy.adoptBranchElections ? 'checked' : ''} />
+                <span>Adopt branch election results</span>
+              </label>
               <button type="submit" class="ghost">Save policy</button>
             </form>
-            <p class="muted tiny">Internal lanes are off by default. Items posted in them stay out of the Circle feed until a group admin moves them up a level.</p>
+            <p class="muted tiny">Internal lanes are off by default. Items posted in them stay out of the Circle feed until a group admin or lane moderator moves them up a level.</p>
+            <p class="muted tiny">Adopting branch elections lets this group use a branch's closed election for a category it has not voted on itself. Its own election always wins where it has one.</p>
           </details>
+          ${renderRolePanel(group, person, state)}
           <details class="note">
             <summary>Group categories</summary>
             <form class="form-inline" method="post" action="/groups/topics" data-enhance="groups">

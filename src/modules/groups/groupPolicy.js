@@ -18,6 +18,11 @@ export function getGroupPolicy(state, groupId) {
     ...base,
     lanes: normalizeLanes(base.lanes),
     lanesVisibility: base.lanesVisibility === 'public' ? 'public' : 'members',
+    // Opt-in, parent-side: when set, this group also considers the closed elections of its
+    // branches for a topic it has no election of its own on. Off by default because a parent
+    // adopting a branch's choice without saying so would make the branch's vote bind people
+    // who never joined it.
+    adoptBranchElections: Boolean(base.adoptBranchElections),
   };
 }
 
@@ -42,6 +47,7 @@ export async function setGroupPolicy(state, policy) {
       ...policy,
       lanes: normalizeLanes(policy.lanes),
       lanesVisibility: policy.lanesVisibility === 'public' ? 'public' : 'members',
+      adoptBranchElections: Boolean(policy.adoptBranchElections),
     }),
   );
   state.groupPolicies = filtered;

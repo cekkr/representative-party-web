@@ -31,6 +31,9 @@ import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimi
 import { recordRateLimit } from '../../ops/metrics.js';
 import { normalizeCommentStance } from '../../petitions/commentStance.js';
 import { getGovernanceSettings } from '../../governance/constitution.js';
+import { getTopicConfig } from '../../topics/topicGardenerClient.js';
+import { getTopicPreferences } from '../../topics/preferences.js';
+import { buildTopicOptions, renderTopicDatalist } from '../../../interfaces/http/views/topicHelpers.js';
 import {
   DELEGATED_CHOICE,
   buildDelegatedBallot,
@@ -44,7 +47,35 @@ import {
   readGroupScope,
   resolveGroupScope,
 } from '../../groups/groupScope.js';
-import { applyPromotion, evaluatePromotion } from '../../groups/promotion.js';
+import {
+  applyPromotion,
+  applyPromotionDecision,
+  applyPromotionRequest,
+  evaluatePromotion,
+  evaluatePromotionDecision,
+  evaluatePromotionRequest,
+} from '../../groups/promotion.js';
+
+
+// A proposal's topic decides which delegations, group cachets and category filters can ever
+// reach it. The classifier only ever returns an anchor, and with no gardener or classifying
+// extension installed that is always the first anchor — so every proposal on a default
+// deployment landed on `general`, collapsing topic-scoped delegation to a single bucket.
+// A member's own pick is therefore authoritative when they made one; the classifier is the
+// fallback for when they did not. `previous` keeps an edit that omits the field from
+// silently reclassifying a proposal someone already filed deliberately.
+async function resolvePetitionTopic(state, { input, classifyText, previous } = {}) {
+  const picked = sanitizeText(input || '', 80);
+  const fallback = picked || previous || '';
+  const raw = fallback || (await classifyTopic(classifyText || '', state));
+  const result = await ensureTopicPath(state, raw, { source: 'petition' });
+  return {
+    topic: result.topic?.label || raw || 'general',
+    topicId: result.topic?.id || null,
+    topicPath: result.path?.length ? result.path.map((entry) => entry.label) : [],
+    chosenByAuthor: Boolean(picked),
+  };
+}
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -141,11 +172,21 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
         state,
         groupId: activeGroupId,
         promotable: (entry) => evaluatePromotion(state, person, { kind: 'petition', entry }),
+        requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'petition', entry }),
+        decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'petition', entry }),
       }),
       petitionsPager,
       petitionsScopeTabs: renderPetitionScopeTabs({ state, person, activeGroupId }),
       petitionsScopeNotice: scopeNotice ? `<p class="muted small">${escapeHtml(scopeNotice)}</p>` : '',
       petitionsGroupPicker: renderPetitionGroupPicker(state, person, activeGroupId),
+      topicDatalist: renderTopicDatalist(
+        buildTopicOptions({
+          anchors: getTopicConfig(state).anchors,
+          pinned: getTopicConfig(state).pinned,
+          preferences: getTopicPreferences(state, person),
+          entries: petitions,
+        }),
+      ),
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
       quorumDefault: governance.quorumDefault,
@@ -300,13 +341,11 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     });
   }
 
-  const classifiedTopic = await classifyTopic(
-    `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
-    state,
-  );
-  const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
-  const topic = topicResult.topic?.label || classifiedTopic || 'general';
-  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
+  const topicResult = await resolvePetitionTopic(state, {
+    input: body.topic,
+    classifyText: `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
+  });
+  const { topic, topicPath } = topicResult;
 
   if (!title || !summary) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
@@ -337,7 +376,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     quorum,
     groupId: petitionScope.groupId,
     topic,
-    topicId: topicResult.topic?.id || null,
+    topicId: topicResult.topicId,
     topicPath,
     versions: [
       buildPetitionRevision({
@@ -348,7 +387,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
         person,
         note: 'Initial draft',
         topic,
-        topicId: topicResult.topic?.id || null,
+        topicId: topicResult.topicId,
         topicPath,
         evidenceSummary,
         evidenceLinks,
@@ -438,13 +477,12 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'missing_fields', message: 'Title and summary are required.' });
   }
 
-  const classifiedTopic = await classifyTopic(
-    `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
-    state,
-  );
-  const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'petition' });
-  const topic = topicResult.topic?.label || classifiedTopic || petition.topic || 'general';
-  const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
+  const topicResult = await resolvePetitionTopic(state, {
+    input: body.topic,
+    previous: petition.topic,
+    classifyText: `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
+  });
+  const { topic, topicPath } = topicResult;
 
   const revision = buildPetitionRevision({
     petitionId,
@@ -454,7 +492,7 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     person,
     note: note || 'Draft update',
     topic,
-    topicId: topicResult.topic?.id || petition.topicId || null,
+    topicId: topicResult.topicId || petition.topicId || null,
     topicPath,
     evidenceSummary,
     evidenceLinks,
@@ -476,7 +514,7 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
   petition.risks = structuredFields.risks;
   petition.implementationPlan = structuredFields.implementationPlan;
   petition.topic = topic;
-  petition.topicId = topicResult.topic?.id || petition.topicId || null;
+  petition.topicId = topicResult.topicId || petition.topicId || null;
   petition.topicPath = topicPath.length ? topicPath : petition.topicPath || [];
   petition.updatedAt = revision.createdAt;
   petition.updatedBy = revision.authorHash;
@@ -653,8 +691,84 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
   }
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
+  const intent = sanitizeText(body.intent || 'promote', 24);
   const petitionId = sanitizeText(body.petitionId || '', 120);
   const entry = (state.petitions || []).find((item) => item.id === petitionId);
+
+  if (intent === 'promote-request') {
+    const request = applyPromotionRequest(state, person, {
+      kind: 'petition',
+      entry,
+      note: sanitizeText(body.note || '', 240),
+    });
+    if (!request.ok) {
+      return sendJson(res, request.error === 'entry_not_found' ? 404 : 403, {
+        error: request.error,
+        message: request.message,
+      });
+    }
+    await persistPetitions(state);
+    await logTransaction(state, {
+      type: 'petition_promotion_requested',
+      actorHash: person?.pidHash || 'anonymous',
+      petitionId,
+      payload: { groupId: entry.groupId, targetGroupId: request.targetId },
+    });
+    for (const hash of listGroupDeciders(request.group)) {
+      await createNotification(state, {
+        type: 'promotion_requested',
+        recipientHash: hash,
+        petitionId,
+        message: `A member asked to move proposal "${entry.title}" up to ${request.targetLabel}.`,
+      });
+    }
+    return finishPetitionPromotion({ req, res, state, wantsPartial, groupId: entry.groupId });
+  }
+
+  if (intent === 'promote-decide') {
+    const verdict = sanitizeText(body.decision || 'decline', 16);
+    const result = applyPromotionDecision(state, person, {
+      kind: 'petition',
+      entry,
+      decision: verdict,
+      reason: sanitizeText(body.reason || '', 240),
+    });
+    if (!result.ok) {
+      return sendJson(res, result.error === 'entry_not_found' ? 404 : 403, {
+        error: result.error,
+        message: result.message,
+      });
+    }
+    await persistPetitions(state);
+    await logTransaction(state, {
+      type: result.approved ? 'petition_promoted' : 'petition_promotion_declined',
+      actorHash: person?.pidHash || 'anonymous',
+      petitionId,
+      payload: {
+        fromGroupId: result.fromGroupId ?? null,
+        toGroupId: result.toGroupId ?? null,
+        requestedByHash: result.request?.byHash || null,
+      },
+    });
+    if (result.request?.byHash) {
+      await createNotification(state, {
+        type: result.approved ? 'promotion_approved' : 'promotion_declined',
+        recipientHash: result.request.byHash,
+        petitionId,
+        message: result.approved
+          ? `Your request to move "${entry.title}" up to ${result.request.targetLabel} was approved.`
+          : `Your request to move "${entry.title}" up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
+      });
+    }
+    return finishPetitionPromotion({
+      req,
+      res,
+      state,
+      wantsPartial,
+      groupId: result.approved ? result.toGroupId : entry.groupId,
+    });
+  }
+
   const decision = applyPromotion(state, person, { kind: 'petition', entry });
   if (!decision.ok) {
     return sendJson(res, decision.error === 'entry_not_found' ? 404 : 403, {
@@ -675,13 +789,22 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
     petitionId,
     message: `Proposal "${entry.title}" was moved up to ${decision.targetLabel}.`,
   });
+  return finishPetitionPromotion({ req, res, state, wantsPartial, groupId: decision.toGroupId });
+}
+
+async function finishPetitionPromotion({ req, res, state, wantsPartial, groupId }) {
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
-  return sendRedirect(
-    res,
-    decision.toGroupId ? `/petitions?group=${encodeURIComponent(decision.toGroupId)}` : '/petitions',
-  );
+  return sendRedirect(res, groupId ? `/petitions?group=${encodeURIComponent(groupId)}` : '/petitions');
+}
+
+// Group admins and lane moderators — the people who may decide a request.
+function listGroupDeciders(group) {
+  return (group?.roles || [])
+    .filter((entry) => entry.role === 'admin' || entry.role === 'laneModerator')
+    .map((entry) => entry.hash)
+    .filter(Boolean);
 }
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {

@@ -1,4 +1,4 @@
-import { findGroupById, isGroupAdmin } from './groups.js';
+import { canModerateGroupLane, findGroupById, isGroupMember } from './groups.js';
 import { getGroupPolicy } from './groupPolicy.js';
 import { getParentGroup } from './groupTree.js';
 import { evaluateAction } from '../circle/policy.js';
@@ -25,11 +25,11 @@ export function resolvePromotionTarget(state, groupId) {
   return { ok: true, group, target: parent, targetLabel: parent.name || 'the parent group', targetId: parent.id };
 }
 
-// A group admin owns what leaves their group; a Circle moderator can also act, because they
-// carry moderation accountability for the surface the item is being promoted onto.
+// A group admin or lane moderator owns what leaves their group; a Circle moderator can also
+// act, because they carry moderation accountability for the surface it is being promoted onto.
 export function canPromote(state, person, group) {
   if (!person?.pidHash || !group) return false;
-  if (isGroupAdmin(group, person.pidHash)) return true;
+  if (canModerateGroupLane(group, person.pidHash)) return true;
   return evaluateAction(state, person, 'moderate').allowed;
 }
 
@@ -101,6 +101,116 @@ export function applyPromotion(state, person, { kind, entry }) {
   entry.groupId = to;
 
   return { ...decision, ok: true, fromGroupId: from, toGroupId: to, entry };
+}
+
+// ---------------------------------------------------------------------------
+// Promotion requests
+//
+// Promotion is an admin/lane-moderator action, which left an ordinary member who thinks a
+// branch discussion belongs at the parent level with no move to make. A request gives them
+// one without handing them the decision: it is visible, auditable, and declinable with a
+// reason — the same soft-power shape the rest of the product uses, rather than either a
+// silent dead end or a second way to actually move the item.
+
+export function getOpenPromotionRequest(entry) {
+  return (entry?.promotionRequests || []).find((request) => request.status === 'open') || null;
+}
+
+export function listPromotionRequests(entry) {
+  return Array.isArray(entry?.promotionRequests) ? entry.promotionRequests : [];
+}
+
+// Who may ask: any member of the group the item currently sits in, except someone who can
+// already promote it themselves (for them the request would be a detour around their own
+// button) and except when a request is already open.
+export function evaluatePromotionRequest(state, person, { kind, entry } = {}) {
+  if (!PROMOTABLE_KINDS.has(kind)) {
+    return { ok: false, error: 'not_promotable', message: 'This item cannot be promoted.' };
+  }
+  if (!entry) return { ok: false, error: 'entry_not_found', message: 'Item not found.' };
+  if (!entry.groupId) {
+    return { ok: false, error: 'already_top_level', message: 'This item is already at Circle level.' };
+  }
+  if (!person?.pidHash) {
+    return { ok: false, error: 'verification_required', message: 'Login to request a promotion.' };
+  }
+  const resolved = resolvePromotionTarget(state, entry.groupId);
+  if (!resolved.ok) return resolved;
+  if (!isGroupMember(resolved.group, person.pidHash)) {
+    return refuse('group_membership_required', 'Join the group to request a promotion.', resolved);
+  }
+  if (canPromote(state, person, resolved.group)) {
+    return refuse('can_promote_directly', 'You can promote this item yourself.', resolved);
+  }
+  if (getOpenPromotionRequest(entry)) {
+    return refuse('request_already_open', 'A promotion request is already open for this item.', resolved);
+  }
+  return { ok: true, ...resolved };
+}
+
+export function applyPromotionRequest(state, person, { kind, entry, note = '' }) {
+  const decision = evaluatePromotionRequest(state, person, { kind, entry });
+  if (!decision.ok) return decision;
+  const request = {
+    id: `${entry.id}-${Date.now()}`,
+    at: new Date().toISOString(),
+    byHash: person.pidHash,
+    note: String(note || '').slice(0, 240),
+    status: 'open',
+    targetGroupId: decision.targetId,
+    targetLabel: decision.targetLabel,
+  };
+  entry.promotionRequests = [...listPromotionRequests(entry), request].slice(-10);
+  return { ...decision, ok: true, request };
+}
+
+// Who may decide: exactly who may promote. Approving performs the move; declining records
+// the reason so the asker learns something rather than watching a request evaporate.
+export function evaluatePromotionDecision(state, person, { kind, entry } = {}) {
+  if (!entry) return { ok: false, error: 'entry_not_found', message: 'Item not found.' };
+  const request = getOpenPromotionRequest(entry);
+  if (!request) {
+    return { ok: false, error: 'no_open_request', message: 'No promotion request is open for this item.' };
+  }
+  if (!entry.groupId) {
+    return { ok: false, error: 'already_top_level', message: 'This item is already at Circle level.' };
+  }
+  const resolved = resolvePromotionTarget(state, entry.groupId);
+  if (!resolved.ok) return resolved;
+  if (!canPromote(state, person, resolved.group)) {
+    return refuse(
+      'group_admin_required',
+      'Group admin, lane moderator or Circle moderator required to decide this request.',
+      resolved,
+    );
+  }
+  return { ok: true, ...resolved, request };
+}
+
+export function applyPromotionDecision(state, person, { kind, entry, decision: verdict, reason = '' }) {
+  const decision = evaluatePromotionDecision(state, person, { kind, entry });
+  if (!decision.ok) return decision;
+
+  const request = decision.request;
+  request.decidedAt = new Date().toISOString();
+  request.decidedByHash = person?.pidHash || null;
+  request.reason = String(reason || '').slice(0, 240);
+
+  if (verdict !== 'approve') {
+    request.status = 'declined';
+    return { ...decision, ok: true, approved: false, request };
+  }
+
+  const promoted = applyPromotion(state, person, { kind, entry });
+  if (!promoted.ok) {
+    // The request stays open: the blocker (a closed parent lane, say) is fixable, and
+    // silently marking it approved would lose the ask.
+    delete request.decidedAt;
+    delete request.decidedByHash;
+    return promoted;
+  }
+  request.status = 'approved';
+  return { ...promoted, ok: true, approved: true, request };
 }
 
 export function describePromotionTrail(entry) {

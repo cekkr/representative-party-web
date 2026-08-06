@@ -120,12 +120,14 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Topic gardener review**: admin confirms rename/merge/split plus anchor promotion/archival suggestions with history diff previews.
 - **Audit trails**: append‑only transactions for discussions, petitions (signatures/comments), social, group actions, and outbound deliveries with exportable summaries.
 - **Identity throttles**: per‑handle/session rate limiting (IP fallback) to curb spam without CAPTCHA.
-- **Liquid representation**: topic‑scoped delegation with revocable overrides. A delegation on a category also covers its subcategories, narrowest match first.
+- **Liquid representation**: topic‑scoped delegation with revocable overrides. A delegation on a category also covers its subcategories, narrowest match first — and proposals carry the category their author chose, so those delegations actually reach them.
 - **Delegated ballots with a deadline**: handing your vote to your delegate records a real ballot, not an abstention. It resolves through the delegate's own vote (transitively), stays uncounted while it waits, lapses to abstain if the delegate misses the window (`delegateVoteWindowDays`, default 5), and you can override it yourself at any time.
 - **Branch groups**: a group can be a subgroup of another — a party with a think tank, a working wing, or an alternative line. Nesting is structural, not authority: a branch keeps its own membership and cachets.
 - **Group categories + directory**: groups declare the categories they discuss, and `/groups` answers "who works on what" — each category, the groups covering it, and who they put forward — with one-click delegation.
 - **Optional group lanes**: a group can switch on its own internal discussion and proposal lanes (off by default, members-only or public to read). Internal items stay out of the Circle feed until promoted.
-- **Promote to the upper level**: a group discussion or proposal can be moved to the parent group, or to the whole Circle. It is a move, not a copy — comments, signatures and votes travel with it.
+- **Promote to the upper level**: a group discussion or proposal can be moved to the parent group, or to the whole Circle. It is a move, not a copy — comments, signatures and votes travel with it. Ordinary members can *request* a promotion; group admins and lane moderators decide, and a decline carries a reason.
+- **Group roles**: `member`, `lane moderator` (can act on lane items but not on what defines the group), and `admin`.
+- **Branch election roll-up (optional)**: a parent group can opt in to adopting a branch's closed election for a category it has not voted on itself, always labelled with the branch it came from.
 - **Delegate profiles**: view delegation counts, vote history, and group endorsements (optional `publicBio` profile field).
 - **Federation scaffolding + redundancy knobs**: gossip endpoints, signed envelopes, and ActivityPub inbox ingestion (preview‑gated) for auditability.
 - **Libp2p readiness (optional)**: dependency included to evaluate P2P transport and future Circle key continuity not tied to the first provider.

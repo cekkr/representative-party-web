@@ -129,3 +129,60 @@ function buildTopicCacheKey(entry) {
   if (entry?.topic) return `topic:${entry.topic}`;
   return null;
 }
+
+
+// Promotion request controls, shared by the discussion and proposal lanes so the two read
+// identically. `options.requestable` / `options.decidable` are predicates that run the same
+// checks the POST handlers will, so a control is only ever shown when it would succeed.
+export function renderPromotionRequestControls(entry, options = {}, { action, idField } = {}) {
+  const parts = [];
+  const open = (entry?.promotionRequests || []).find((request) => request.status === 'open');
+
+  if (open) {
+    const note = open.note ? ` — “${escapeHtmlSafe(open.note)}”` : '';
+    parts.push(
+      `<p class="muted small">A member asked for this to move up to ${escapeHtmlSafe(open.targetLabel || 'the upper level')}${note}</p>`,
+    );
+  }
+
+  if (typeof options.decidable === 'function') {
+    const decision = options.decidable(entry);
+    if (decision?.ok) {
+      parts.push(`
+        <form class="form-inline" method="post" action="${escapeHtmlSafe(action)}" data-enhance="promotion-decision">
+          <input type="hidden" name="intent" value="promote-decide" />
+          <input type="hidden" name="${escapeHtmlSafe(idField)}" value="${escapeHtmlSafe(String(entry.id))}" />
+          <input name="reason" placeholder="Reason (optional)" />
+          <button type="submit" name="decision" value="approve" class="ghost">Approve move up</button>
+          <button type="submit" name="decision" value="decline" class="ghost">Decline</button>
+        </form>
+      `);
+    }
+  }
+
+  if (typeof options.requestable === 'function') {
+    const request = options.requestable(entry);
+    if (request?.ok) {
+      parts.push(`
+        <form class="form-inline" method="post" action="${escapeHtmlSafe(action)}" data-enhance="promotion-request">
+          <input type="hidden" name="intent" value="promote-request" />
+          <input type="hidden" name="${escapeHtmlSafe(idField)}" value="${escapeHtmlSafe(String(entry.id))}" />
+          <input name="note" placeholder="Why should this move up?" />
+          <button type="submit" class="ghost">Ask to move up to ${escapeHtmlSafe(request.targetLabel)}</button>
+        </form>
+      `);
+    }
+  }
+
+  const declined = (entry?.promotionRequests || []).filter((request) => request.status === 'declined').slice(-1)[0];
+  if (declined && !open) {
+    const reason = declined.reason ? `: ${escapeHtmlSafe(declined.reason)}` : '';
+    parts.push(`<p class="muted tiny">A previous request to move this up was declined${reason}</p>`);
+  }
+
+  return parts.join('\n');
+}
+
+function escapeHtmlSafe(value) {
+  return escapeHtml(String(value ?? ''));
+}

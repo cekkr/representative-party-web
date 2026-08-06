@@ -14,6 +14,11 @@
           <input name="quorum" type="number" min="0" placeholder="{{quorumDefault}}" />
           <span class="muted tiny">Default: {{quorumDefault}}</span>
         </label>
+        <label class="field">
+          <span>Category</span>
+          <input name="topic" list="petition-topics" placeholder="Energy / Solar" />
+          <span class="muted tiny">Decides which delegations reach this proposal. Leave blank to classify automatically.</span>
+        </label>
         {{petitionsGroupPicker}}
       </div>
       <label class="field">
@@ -60,5 +65,8 @@
         <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
       </div>
     </form>
+    <datalist id="petition-topics">
+      {{topicDatalist}}
+    </datalist>
   </details>
 </section>

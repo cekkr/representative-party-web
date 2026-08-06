@@ -80,6 +80,10 @@ const NOTIFICATION_TYPE_LABELS = {
   vote_recorded: 'Vote recorded',
   delegated_ballot_received: 'A ballot was delegated to you',
   delegated_ballot_resolved: 'Your delegate voted',
+  promotion_requested: 'Request to move an item up',
+  promotion_approved: 'Your promotion request was approved',
+  promotion_declined: 'Your promotion request was declined',
+  petition_promoted: 'Proposal moved up a level',
 };
 
 // Human-readable label for a notification event type, with a Title Case fallback so new

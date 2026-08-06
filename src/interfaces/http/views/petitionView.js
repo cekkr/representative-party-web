@@ -11,6 +11,7 @@ import {
   renderEvidenceLinks,
   renderIssuerPill,
   renderPreviewPill,
+  renderPromotionRequestControls,
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
@@ -90,7 +91,10 @@ export function renderPetitionList(
           : [];
       const promotionNote = describePromotionTrail(petition);
       const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
-      const promoteControl = renderPromoteControl(petition, options);
+      const promoteControl = `${renderPromoteControl(petition, options)}${renderPromotionRequestControls(petition, options, {
+        action: '/petitions/promote',
+        idField: 'petitionId',
+      })}`;
       const freezeNotice = renderFreezeNotice(petition, state);
       const reviewPrompt = renderReviewPrompt(petition, revisions);
       const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
@@ -409,6 +413,11 @@ function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, acto
           <input name="title" value="${escapeHtml(petition.title || '')}" required />
         </label>
         <label class="field">
+          <span>Category</span>
+          <input name="topic" value="${escapeHtml(formatTopicInput(petition))}" placeholder="Energy / Solar" />
+          <span class="muted tiny">Decides which delegations reach this proposal.</span>
+        </label>
+        <label class="field">
           <span>Summary</span>
           <textarea name="summary" rows="3" required>${escapeHtml(petition.summary || '')}</textarea>
         </label>
@@ -452,6 +461,14 @@ function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, acto
       </form>
     </details>
   `;
+}
+
+// The editable form of a proposal's topic: its full path, so editing a subcategory proposal
+// and saving does not quietly flatten it back to the leaf label.
+function formatTopicInput(petition) {
+  const path = Array.isArray(petition?.topicPath) ? petition.topicPath.filter(Boolean) : [];
+  if (path.length) return path.join(' / ');
+  return petition?.topic || '';
 }
 
 function renderRevisionHistory(petition, state) {

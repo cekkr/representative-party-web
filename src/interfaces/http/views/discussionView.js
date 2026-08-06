@@ -5,6 +5,7 @@ import {
   renderEvidenceLinks,
   renderIssuerPill,
   renderPreviewPill,
+  renderPromotionRequestControls,
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { describePromotionTrail } from '../../../modules/groups/promotion.js';
@@ -26,6 +27,10 @@ export function renderDiscussionList(entries, state, options = {}) {
       const promotionNote = describePromotionTrail(entry);
       const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
       const promote = renderPromoteControl(entry, options);
+      const promotionRequests = renderPromotionRequestControls(entry, options, {
+        action: '/discussion',
+        idField: 'discussionId',
+      });
       return `
         <article class="topic-card">
           <div class="topic-head">
@@ -49,6 +54,7 @@ export function renderDiscussionList(entries, state, options = {}) {
             <p>${escapeHtml(entry.content)}</p>
             ${evidenceBlock}
             ${promote}
+            ${promotionRequests}
           </div>
         </article>
       `;

@@ -278,6 +278,9 @@ template-hygiene item.
 | Category directory (`/groups`): who works on what, one-click delegate | **[done]** |
 | Group lane tabs + destination picker on `/discussion` and `/petitions` | **[done]** |
 | Promote-to-upper-level control (shown only when it would succeed) | **[done]** |
+| Promotion request + approve/decline controls (both lanes) | **[done]** |
+| Group members-and-roles panel (lane moderator assignment) | **[done]** |
+| Proposal Category field (compose + draft edit) with topic datalist | **[done]** |
 | Favicon (kills `/favicon.ico` 404) | **[todo]** (see OPTIMIZATIONS) |
 | Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |
 

@@ -6,6 +6,7 @@ import { getTopicConfig } from '../../topics/topicGardenerClient.js';
 import { formatTopicList, getTopicPreferences, normalizeTopicKey, storeTopicPreferences } from '../../topics/preferences.js';
 import { ensureTopicPath } from '../../topics/registry.js';
 import { logTransaction } from '../../transactions/registry.js';
+import { createNotification } from '../../messaging/notifications.js';
 import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
 import { filterVisibleEntries, stampLocalEntry } from '../../federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
@@ -27,7 +28,14 @@ import {
   readGroupScope,
   resolveGroupScope,
 } from '../../groups/groupScope.js';
-import { applyPromotion, evaluatePromotion } from '../../groups/promotion.js';
+import {
+  applyPromotion,
+  applyPromotionDecision,
+  applyPromotionRequest,
+  evaluatePromotion,
+  evaluatePromotionDecision,
+  evaluatePromotionRequest,
+} from '../../groups/promotion.js';
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
@@ -56,8 +64,8 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
     return sendRedirect(res, '/discussion');
   }
 
-  if (intent === 'promote') {
-    return promoteDiscussion({ req, res, state, wantsPartial, url, body, person });
+  if (intent === 'promote' || intent === 'promote-request' || intent === 'promote-decide') {
+    return promoteDiscussion({ req, res, state, wantsPartial, url, body, person, intent });
   }
 
   const permission = evaluateAction(state, person, 'post');
@@ -141,9 +149,84 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
 
 // Move a group's discussion one level up: to the parent group, or to the Circle when the
 // group is already top level.
-async function promoteDiscussion({ req, res, state, wantsPartial, url, body, person }) {
+async function promoteDiscussion({ req, res, state, wantsPartial, url, body, person, intent = 'promote' }) {
   const discussionId = sanitizeText(body.discussionId || '', 120);
   const entry = (state.discussions || []).find((item) => item.id === discussionId);
+
+  if (intent === 'promote-request') {
+    const request = applyPromotionRequest(state, person, {
+      kind: 'discussion',
+      entry,
+      note: sanitizeText(body.note || '', 240),
+    });
+    if (!request.ok) {
+      return sendJson(res, request.error === 'entry_not_found' ? 404 : 403, {
+        error: request.error,
+        message: request.message,
+      });
+    }
+    await persistDiscussions(state);
+    await logTransaction(state, {
+      type: 'discussion_promotion_requested',
+      actorHash: person?.pidHash || 'anonymous',
+      payload: { discussionId, groupId: entry.groupId, targetGroupId: request.targetId },
+    });
+    // Everyone who can decide gets told, so a request does not sit unseen.
+    for (const hash of listGroupDeciders(state, request.group)) {
+      await createNotification(state, {
+        type: 'promotion_requested',
+        recipientHash: hash,
+        message: `A member asked to move a discussion up to ${request.targetLabel}.`,
+      });
+    }
+    return finishDiscussionPromotion({ req, res, state, wantsPartial, url, person, groupId: entry.groupId });
+  }
+
+  if (intent === 'promote-decide') {
+    const verdict = sanitizeText(body.decision || 'decline', 16);
+    const result = applyPromotionDecision(state, person, {
+      kind: 'discussion',
+      entry,
+      decision: verdict,
+      reason: sanitizeText(body.reason || '', 240),
+    });
+    if (!result.ok) {
+      return sendJson(res, result.error === 'entry_not_found' ? 404 : 403, {
+        error: result.error,
+        message: result.message,
+      });
+    }
+    await persistDiscussions(state);
+    await logTransaction(state, {
+      type: result.approved ? 'discussion_promoted' : 'discussion_promotion_declined',
+      actorHash: person?.pidHash || 'anonymous',
+      payload: {
+        discussionId,
+        fromGroupId: result.fromGroupId ?? null,
+        toGroupId: result.toGroupId ?? null,
+        requestedByHash: result.request?.byHash || null,
+      },
+    });
+    if (result.request?.byHash) {
+      await createNotification(state, {
+        type: result.approved ? 'promotion_approved' : 'promotion_declined',
+        recipientHash: result.request.byHash,
+        message: result.approved
+          ? `Your request to move a discussion up to ${result.request.targetLabel} was approved.`
+          : `Your request to move a discussion up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
+      });
+    }
+    return finishDiscussionPromotion({
+      req,
+      res,
+      state,
+      wantsPartial,
+      url,
+      person,
+      groupId: result.approved ? result.toGroupId : entry.groupId,
+    });
+  }
+
   const decision = applyPromotion(state, person, { kind: 'discussion', entry });
   if (!decision.ok) {
     return sendJson(res, decision.error === 'entry_not_found' ? 404 : 403, {
@@ -157,14 +240,23 @@ async function promoteDiscussion({ req, res, state, wantsPartial, url, body, per
     actorHash: person?.pidHash || 'anonymous',
     payload: { discussionId, fromGroupId: decision.fromGroupId, toGroupId: decision.toGroupId },
   });
+  return finishDiscussionPromotion({ req, res, state, wantsPartial, url, person, groupId: decision.toGroupId });
+}
+
+async function finishDiscussionPromotion({ res, state, wantsPartial, url, person, groupId }) {
   if (wantsPartial) {
-    const html = await renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride: decision.toGroupId });
+    const html = await renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride: groupId ?? null });
     return sendHtml(res, html);
   }
-  return sendRedirect(
-    res,
-    decision.toGroupId ? `/discussion?group=${encodeURIComponent(decision.toGroupId)}` : '/discussion',
-  );
+  return sendRedirect(res, groupId ? `/discussion?group=${encodeURIComponent(groupId)}` : '/discussion');
+}
+
+// Group admins and lane moderators — the people who may decide a request.
+function listGroupDeciders(state, group) {
+  return (group?.roles || [])
+    .filter((entry) => entry.role === 'admin' || entry.role === 'laneModerator')
+    .map((entry) => entry.hash)
+    .filter(Boolean);
 }
 
 async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride }) {
@@ -243,6 +335,8 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
       discussionList: renderDiscussionList(pageInfo.items, state, {
         groupId: activeGroupId,
         promotable: (entry) => evaluatePromotion(state, person, { kind: 'discussion', entry }),
+        requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'discussion', entry }),
+        decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'discussion', entry }),
       }),
       discussionPager,
       discussionScopeTabs: renderScopeTabs({ state, person, activeGroupId, lane: 'discussion', baseHref: '/discussion' }),

@@ -19,7 +19,7 @@ import {
 import { applyPromotion, evaluatePromotion, resolvePromotionTarget } from '../src/modules/groups/promotion.js';
 import { buildCategoryDirectory } from '../src/modules/groups/categoryDirectory.js';
 import { recommendDelegationForPerson } from '../src/modules/groups/groups.js';
-import { runMigrations } from '../src/infra/persistence/migrations.js';
+import { LATEST_SCHEMA_VERSION, runMigrations } from '../src/infra/persistence/migrations.js';
 
 const dataConfig = { mode: 'centralized', adapter: 'memory', validationLevel: 'strict', allowPreviews: false };
 
@@ -251,7 +251,7 @@ test('migration 24 defaults groups to top level, lanes off, and entries to Circl
     meta: { schemaVersion: 23, migrations: [] },
   });
 
-  assert.equal(meta.schemaVersion, 24);
+  assert.equal(meta.schemaVersion, LATEST_SCHEMA_VERSION);
   assert.equal(data.groups[0].parentId, null);
   assert.deepEqual(data.groups[0].topics, []);
   assert.deepEqual(data.groupPolicies[0].lanes, { discussion: false, petitions: false });

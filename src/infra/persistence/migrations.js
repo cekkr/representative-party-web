@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 24;
+export const LATEST_SCHEMA_VERSION = 25;
 
 const MIGRATIONS = [
   {
@@ -624,6 +624,42 @@ const MIGRATIONS = [
         groupPolicies,
         discussions: (data.discussions || []).map(scopeToCircle),
         petitions: (data.petitions || []).map(scopeToCircle),
+      };
+    },
+  },
+  {
+    version: 25,
+    description: 'Add group lane-moderator roles, promotion requests, and branch election roll-up.',
+    up: (data) => {
+      // Existing group role entries keep whatever they had; anything unrecognised falls back
+      // to `member` rather than being dropped, so a hand-edited store cannot silently strip
+      // someone's membership. Roll-up defaults off: a parent adopting a branch's election
+      // without having asked would make that branch's vote bind people who never joined it.
+      const allowedRoles = new Set(['member', 'laneModerator', 'admin']);
+      const groups = (data.groups || []).map((group) => ({
+        ...group,
+        roles: (group.roles || []).map((entry) => ({
+          ...entry,
+          role: allowedRoles.has(entry?.role) ? entry.role : 'member',
+        })),
+      }));
+
+      const groupPolicies = (data.groupPolicies || []).map((policy) => ({
+        ...policy,
+        adoptBranchElections: Boolean(policy.adoptBranchElections),
+      }));
+
+      const withRequests = (entry) => ({
+        ...entry,
+        promotionRequests: Array.isArray(entry.promotionRequests) ? entry.promotionRequests : [],
+      });
+
+      return {
+        ...data,
+        groups,
+        groupPolicies,
+        discussions: (data.discussions || []).map(withRequests),
+        petitions: (data.petitions || []).map(withRequests),
       };
     },
   },
