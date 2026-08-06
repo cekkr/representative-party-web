@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 23;
+export const LATEST_SCHEMA_VERSION = 24;
 
 const MIGRATIONS = [
   {
@@ -589,6 +589,41 @@ const MIGRATIONS = [
               governance.delegateVoteWindowDays === undefined ? 5 : governance.delegateVoteWindowDays,
           },
         },
+      };
+    },
+  },
+  {
+    version: 24,
+    description: 'Add group nesting, internal lane policy, and group scoping for discussions and proposals.',
+    up: (data) => {
+      // Existing groups become top-level (`parentId: null`) and existing discussions and
+      // proposals stay at Circle level (`groupId: null`). Both defaults are deliberate: a
+      // group that predates nesting has no parent, and an entry that predates group lanes
+      // was posted to everyone — inferring a group for it would retroactively hide it.
+      const groups = (data.groups || []).map((group) => ({
+        ...group,
+        parentId: group.parentId ?? null,
+        topics: Array.isArray(group.topics) ? group.topics : [],
+      }));
+
+      // Lanes default off so no group silently acquires an internal forum and ballot box.
+      const groupPolicies = (data.groupPolicies || []).map((policy) => ({
+        ...policy,
+        lanes: {
+          discussion: Boolean(policy.lanes?.discussion),
+          petitions: Boolean(policy.lanes?.petitions),
+        },
+        lanesVisibility: policy.lanesVisibility === 'public' ? 'public' : 'members',
+      }));
+
+      const scopeToCircle = (entry) => ({ ...entry, groupId: entry.groupId ?? null });
+
+      return {
+        ...data,
+        groups,
+        groupPolicies,
+        discussions: (data.discussions || []).map(scopeToCircle),
+        petitions: (data.petitions || []).map(scopeToCircle),
       };
     },
   },

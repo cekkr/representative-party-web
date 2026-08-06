@@ -38,6 +38,27 @@ test('topicMatchRank orders parent below child', () => {
   assert.equal(topicMatchRank('transport', keys), -1);
 });
 
+test('a stored path matches however the member spaced the separator', () => {
+  // A preference is stored as typed, lowercased — "Energy / Solar" keeps its spaces — while
+  // match keys join as "energy/solar". Both sides must canonicalize to the same key.
+  const keys = buildTopicMatchKeys('Solar', ['Energy', 'Solar']);
+  for (const stored of ['energy / solar', 'Energy/Solar', 'energy  /  solar', 'Energy > Solar']) {
+    assert.equal(topicMatchRank(stored, keys), 0, `"${stored}" should match the exact path`);
+  }
+});
+
+test('a delegation typed with spaces still resolves', () => {
+  const state = {
+    delegations: [{ ownerHash: 'owner', delegateHash: 'ada', topic: 'energy / solar' }],
+    groups: [],
+    groupElections: [],
+    sessions: [],
+    settings: {},
+  };
+  const resolved = resolveDelegation({ pidHash: 'owner' }, 'Solar', state, { topicPath: ['Energy', 'Solar'] });
+  assert.equal(resolved?.delegateHash, 'ada');
+});
+
 function stateWithDelegations(delegations) {
   return {
     delegations,

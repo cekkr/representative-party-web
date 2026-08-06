@@ -69,10 +69,20 @@ export function buildTopicMatchKeys(rawTopic, topicPath) {
   return keys;
 }
 
+// Canonical form of a stored topic, so both sides of a comparison are shaped identically.
+// A preference is stored as whatever the member typed, lowercased — "Energy / Solar" becomes
+// "energy / solar", spaces and all — while match keys join segments as "energy/solar".
+// Comparing those raw would miss every path a member wrote with spaces around the separator,
+// which is the natural way to type one.
+export function canonicalizeTopicKey(value) {
+  const segments = parseTopicSegments(value);
+  return segments.length ? segments.join('/') : normalizeTopicMatchKey(value);
+}
+
 // True when `storedTopic` is the key a preference was saved under and it covers `matchKeys`.
 // Returns the match depth (0 = most specific) so callers can prefer the narrowest hit.
 export function topicMatchRank(storedTopic, matchKeys = []) {
-  const key = normalizeTopicMatchKey(storedTopic);
+  const key = canonicalizeTopicKey(storedTopic);
   if (!key) return -1;
   return matchKeys.indexOf(key);
 }

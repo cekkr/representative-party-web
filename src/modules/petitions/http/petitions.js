@@ -37,6 +37,14 @@ import {
   getDelegateVoteWindowDays,
   listOwnersFollowingDelegate,
 } from '../../delegation/delegatedBallots.js';
+import {
+  listPostableGroupLanes,
+  listReadableGroupLanes,
+  matchesGroupScope,
+  readGroupScope,
+  resolveGroupScope,
+} from '../../groups/groupScope.js';
+import { applyPromotion, evaluatePromotion } from '../../groups/promotion.js';
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
@@ -63,18 +71,25 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   } else if (showDelegation) {
     suggestions = renderSuggestions(person, state);
   }
-  const petitions = filterVisibleEntries(state.petitions, state);
+  const query = url || new URL(req.url, `http://${req.headers.host}`);
+  const scope = resolveGroupScope(state, person, readGroupScope(query.searchParams), { lane: 'petitions' });
+  // A refused scope falls back to Circle level with the reason shown, rather than an empty
+  // list that reads as "this group has no proposals".
+  const activeGroupId = scope.ok ? scope.groupId : null;
+  const scopeNotice = scope.ok ? '' : scope.message;
+  const petitions = filterVisibleEntries(state.petitions, state, (entry) =>
+    matchesGroupScope(entry, activeGroupId),
+  );
   const votes = filterVisibleEntries(state.votes, state);
   const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
   const governance = getGovernanceSettings(state);
-  const query = url || new URL(req.url, `http://${req.headers.host}`);
   const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
   const composeOpen = query.searchParams.get('compose') ? 'open' : '';
   const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
   const petitionsPageInfo = paginate(filteredPetitions, { page: parsePage(query.searchParams.get('page')) });
   const petitionsPager = renderPager(petitionsPageInfo, {
     baseHref: '/petitions',
-    query: { stage: stageFilter === 'all' ? '' : stageFilter },
+    query: { stage: stageFilter === 'all' ? '' : stageFilter, group: activeGroupId || '' },
     label: 'proposals',
   });
   const petitionLookup = buildPetitionLookup(petitions);
@@ -124,8 +139,13 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
         editGate: petitionGate,
         actorLabels,
         state,
+        groupId: activeGroupId,
+        promotable: (entry) => evaluatePromotion(state, person, { kind: 'petition', entry }),
       }),
       petitionsPager,
+      petitionsScopeTabs: renderPetitionScopeTabs({ state, person, activeGroupId }),
+      petitionsScopeNotice: scopeNotice ? `<p class="muted small">${escapeHtml(scopeNotice)}</p>` : '',
+      petitionsGroupPicker: renderPetitionGroupPicker(state, person, activeGroupId),
       delegationSuggestions: suggestions,
       quorumAdvanceLabel,
       quorumDefault: governance.quorumDefault,
@@ -136,6 +156,41 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
     { wantsPartial, title: 'Proposals & Votes', state },
   );
   return sendHtml(res, html);
+}
+
+function renderPetitionScopeTabs({ state, person, activeGroupId }) {
+  const groups = listReadableGroupLanes(state, person, 'petitions');
+  if (!groups.length) return '';
+  const tab = (href, label, active) =>
+    `<a class="pill ${active ? '' : 'ghost'}" href="${escapeHtml(href)}" data-partial>${escapeHtml(label)}</a>`;
+  const tabs = [tab('/petitions', 'Whole Circle', !activeGroupId)];
+  for (const group of groups) {
+    tabs.push(
+      tab(`/petitions?group=${encodeURIComponent(group.id)}`, group.name || 'Group', activeGroupId === group.id),
+    );
+  }
+  return `<div class="discussion__meta">${tabs.join('')}</div>`;
+}
+
+// Only shown when the member belongs to a group with an open proposals lane.
+function renderPetitionGroupPicker(state, person, activeGroupId) {
+  const groups = listPostableGroupLanes(state, person, 'petitions');
+  if (!groups.length) return '';
+  const options = groups
+    .map(
+      (group) =>
+        `<option value="${escapeHtml(group.id)}" ${activeGroupId === group.id ? 'selected' : ''}>${escapeHtml(group.name || 'Group')}</option>`,
+    )
+    .join('');
+  return `
+    <label class="field">
+      <span>Propose to</span>
+      <select name="groupId">
+        <option value="" ${activeGroupId ? '' : 'selected'}>Whole Circle</option>
+        ${options}
+      </select>
+    </label>
+  `;
 }
 
 function renderSuggestions(person, state) {
@@ -225,6 +280,26 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
   const evidenceSummary = sanitizeText(body.evidenceSummary || '', 800);
   const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   const structuredFields = parseStructuredFields(body);
+  // A proposal may live in a group's internal lane. Membership and the lane toggle are both
+  // enforced here, so a crafted POST cannot file a proposal inside a group.
+  const requestedGroup = readGroupScope(sanitizeText(body.groupId || '', 80));
+  const petitionScope = resolveGroupScope(state, person, requestedGroup, { lane: 'petitions' });
+  if (!petitionScope.ok) {
+    return sendJson(res, petitionScope.error === 'group_not_found' ? 404 : 403, {
+      error: petitionScope.error,
+      message: petitionScope.message,
+    });
+  }
+  if (
+    petitionScope.scoped &&
+    !listPostableGroupLanes(state, person, 'petitions').some((g) => g.id === petitionScope.groupId)
+  ) {
+    return sendJson(res, 403, {
+      error: 'group_membership_required',
+      message: 'Join the group to file a proposal in its internal lane.',
+    });
+  }
+
   const classifiedTopic = await classifyTopic(
     `${title} ${summary} ${proposalText} ${structuredFields.problem} ${structuredFields.proposedAction} ${structuredFields.impact} ${structuredFields.risks} ${structuredFields.implementationPlan}`,
     state,
@@ -260,6 +335,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     updatedBy: person?.pidHash || 'anonymous',
     status: 'draft',
     quorum,
+    groupId: petitionScope.groupId,
     topic,
     topicId: topicResult.topic?.id || null,
     topicPath,
@@ -566,6 +642,46 @@ function describeBallotDeadline(deadline) {
   if (!Number.isFinite(ms)) return '';
   const days = Math.max(0, Math.ceil((ms - Date.now()) / (1000 * 60 * 60 * 24)));
   return ` — ${days} day${days === 1 ? '' : 's'} to vote`;
+}
+
+// Move a group's proposal one level up: to the parent group, or to the Circle when the
+// group is top level. The proposal keeps its id, so its signatures, comments and votes come
+// with it rather than being forked.
+export async function promotePetition({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'petitions')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
+  }
+  const person = getPerson(req, state);
+  const body = await readRequestBody(req);
+  const petitionId = sanitizeText(body.petitionId || '', 120);
+  const entry = (state.petitions || []).find((item) => item.id === petitionId);
+  const decision = applyPromotion(state, person, { kind: 'petition', entry });
+  if (!decision.ok) {
+    return sendJson(res, decision.error === 'entry_not_found' ? 404 : 403, {
+      error: decision.error,
+      message: decision.message,
+    });
+  }
+  await persistPetitions(state);
+  await logTransaction(state, {
+    type: 'petition_promoted',
+    actorHash: person?.pidHash || 'anonymous',
+    petitionId,
+    payload: { fromGroupId: decision.fromGroupId, toGroupId: decision.toGroupId },
+  });
+  await createNotification(state, {
+    type: 'petition_promoted',
+    recipientHash: entry.authorHash || 'broadcast',
+    petitionId,
+    message: `Proposal "${entry.title}" was moved up to ${decision.targetLabel}.`,
+  });
+  if (wantsPartial) {
+    return renderPetitions({ req, res, state, wantsPartial: true });
+  }
+  return sendRedirect(
+    res,
+    decision.toGroupId ? `/petitions?group=${encodeURIComponent(decision.toGroupId)}` : '/petitions',
+  );
 }
 
 export async function updatePetitionStatus({ req, res, state, wantsPartial }) {

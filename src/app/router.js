@@ -13,9 +13,10 @@ import {
   updatePetitionStatus,
   signPetitionRoute,
   postPetitionComment,
+  promotePetition,
 } from '../modules/petitions/http/petitions.js';
 import { renderForumRoute, postThread, postComment } from '../modules/forum/http/forum.js';
-import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, updateGroupPolicyRoute } from '../modules/groups/http/groups.js';
+import { renderGroups, createOrJoinGroup, setGroupDelegateRoute, setGroupTopicsRoute, updateGroupPolicyRoute } from '../modules/groups/http/groups.js';
 import { proposeGovernanceChange, renderGovernance } from '../modules/governance/http/governance.js';
 import { renderHealth } from '../interfaces/http/controllers/health.js';
 import { renderHome } from '../modules/home/http/home.js';
@@ -59,10 +60,12 @@ const routes = [
   { method: 'POST', path: '/petitions/comment', action: postPetitionComment },
   { method: 'POST', path: '/petitions/vote', action: castVote },
   { method: 'POST', path: '/petitions/status', action: updatePetitionStatus },
+  { method: 'POST', path: '/petitions/promote', action: promotePetition },
   { method: 'GET', path: '/groups', action: renderGroups },
   { method: 'POST', path: '/groups', action: createOrJoinGroup },
   { method: 'POST', path: '/groups/delegate', action: setGroupDelegateRoute },
   { method: 'POST', path: '/groups/policy', action: updateGroupPolicyRoute },
+  { method: 'POST', path: '/groups/topics', action: setGroupTopicsRoute },
   { method: 'POST', path: '/circle/gossip', action: handleGossip },
   { method: 'GET', path: '/circle/ledger', action: exportLedger },
   { method: 'GET', path: '/circle/peers', action: listPeers },

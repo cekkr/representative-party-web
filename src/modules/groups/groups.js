@@ -5,6 +5,7 @@ import { filterVisibleEntries, stampLocalEntry } from '../federation/replication
 import { pickWinner } from './groupElections.js';
 import { getGroupPolicy } from './groupPolicy.js';
 import { buildTopicMatchKeys, topicMatchRank } from '../topics/topicMatch.js';
+import { getGroupDepth } from './groupTree.js';
 
 export function listGroups(state) {
   return filterVisibleEntries(state.groups, state);
@@ -30,11 +31,12 @@ export function isGroupAdmin(group, memberHash) {
   return getGroupMemberRole(group, memberHash) === 'admin';
 }
 
-export async function createGroup({ name, description, topics, creatorHash, state }) {
+export async function createGroup({ name, description, topics, creatorHash, parentId = null, state }) {
   const group = {
     id: randomUUID(),
     name,
     description,
+    parentId: parentId || null,
     topics: topics || [],
     members: creatorHash ? [creatorHash] : [],
     roles: creatorHash ? [{ hash: creatorHash, role: 'admin', joinedAt: new Date().toISOString() }] : [],
@@ -45,6 +47,17 @@ export async function createGroup({ name, description, topics, creatorHash, stat
   state.groups.unshift(stamped);
   await persistGroups(state);
   return stamped;
+}
+
+// Declared categories the group discusses. Members use these to find who to delegate for a
+// category, so they are stored as real topic labels rather than free-text tags.
+export async function setGroupTopics({ groupId, topics, state }) {
+  const group = findGroupById(state, groupId);
+  if (!group) return null;
+  group.topics = Array.isArray(topics) ? topics : [];
+  group.updatedAt = new Date().toISOString();
+  await persistGroups(state);
+  return group;
 }
 
 export function getGroupRoles(group) {
@@ -118,6 +131,11 @@ export function recommendDelegationForPerson(person, topic, state, { matchKeys }
     if (!match) continue;
     suggestions.push({
       groupId: group.id,
+      groupName: group.name || '',
+      // How deep the group sits in the branch tree. A think tank inside a party is a
+      // narrower expression of the same membership than the party itself, so at equal
+      // priority its cachet answers first instead of the tie being arbitrary.
+      groupDepth: getGroupDepth(state, group),
       delegateHash: match.delegateHash,
       priority: Number(match.priority) || 0,
       provider: match.provider || 'local',
@@ -128,12 +146,18 @@ export function recommendDelegationForPerson(person, topic, state, { matchKeys }
     });
   }
   if (!suggestions.length) return { suggestions, conflict: false };
-  suggestions.sort((a, b) => b.priority - a.priority);
+  suggestions.sort((a, b) => b.priority - a.priority || b.groupDepth - a.groupDepth);
   const topPriority = suggestions[0].priority;
   const top = suggestions.filter((s) => s.priority === topPriority);
-  const conflict = new Set(top.map((s) => s.delegateHash)).size > 1;
+  // Branch depth breaks a tie the priority rule leaves open; it never overrides an explicit
+  // priority, and it only silences a conflict when the deeper group is unambiguously one
+  // group. Two branches at the same depth disagreeing is still a real conflict to surface.
+  const deepest = Math.max(...top.map((s) => s.groupDepth));
+  const deepestSet = top.filter((s) => s.groupDepth === deepest);
+  const decisive = new Set(deepestSet.map((s) => s.delegateHash)).size === 1 ? deepestSet : top;
+  const conflict = new Set(decisive.map((s) => s.delegateHash)).size > 1;
   const conflictRule = top.some((s) => s.conflictRule === 'prompt_user') ? 'prompt_user' : 'highest_priority';
-  const chosen = conflict && conflictRule === 'prompt_user' ? null : top[0];
+  const chosen = conflict && conflictRule === 'prompt_user' ? null : decisive[0];
   return { suggestions, conflict, chosen, conflictRule };
 }
 

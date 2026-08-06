@@ -10,9 +10,18 @@ import {
   leaveGroup,
   listGroups,
   setGroupDelegate,
+  setGroupTopics,
 } from '../../groups/groups.js';
+import {
+  buildGroupTree,
+  formatGroupLineage,
+  listChildGroups,
+  validateParent,
+} from '../../groups/groupTree.js';
+import { buildCategoryDirectory } from '../../groups/categoryDirectory.js';
+import { ensureTopicPath } from '../../topics/registry.js';
 import { createNotification } from '../../messaging/notifications.js';
-import { getGroupPolicy, setGroupPolicy } from '../../groups/groupPolicy.js';
+import { getGroupPolicy, normalizeLanes, setGroupPolicy } from '../../groups/groupPolicy.js';
 import { startElection, listElections, castElectionVote, pickWinner, closeElection } from '../../groups/groupElections.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
@@ -51,6 +60,8 @@ export async function renderGroups({ req, res, state, wantsPartial }) {
     'groups',
     {
       groups: renderGroupList(groups, person, state),
+      groupCategories: renderCategoryDirectory(state, person),
+      parentGroupOptions: renderParentOptions(state),
       person,
       personHandle: resolvePersonHandle(person),
       personHash: person?.pidHash || '',
@@ -232,7 +243,28 @@ export async function createOrJoinGroup({ req, res, state, wantsPartial }) {
   const name = sanitizeText(body.name || '', 120);
   const description = sanitizeText(body.description || '', 400);
   const topics = (body.topics || '').split(',').map((t) => sanitizeText(t, 64)).filter(Boolean);
-  const group = await createGroup({ name, description, topics, creatorHash: person?.pidHash, state });
+  // A group may be a branch of another — a party's think tank, a divergent wing. The parent
+  // is validated here for existence, self-reference, cycles and depth.
+  const parentCheck = validateParent(state, { parentId: sanitizeText(body.parentId || '', 80) || null });
+  if (!parentCheck.ok) {
+    return sendJson(res, parentCheck.error === 'parent_not_found' ? 404 : 400, {
+      error: parentCheck.error,
+      message: parentCheck.message,
+    });
+  }
+  // Register declared categories in the topic registry so group categories and site
+  // categories are the same nested tree, not two vocabularies that drift apart.
+  for (const label of topics) {
+    await ensureTopicPath(state, label, { source: 'group' });
+  }
+  const group = await createGroup({
+    name,
+    description,
+    topics,
+    parentId: parentCheck.parentId,
+    creatorHash: person?.pidHash,
+    state,
+  });
   await createNotification(state, {
     type: 'group_created',
     recipientHash: person?.pidHash || 'broadcast',
@@ -281,6 +313,43 @@ export async function setGroupDelegateRoute({ req, res, state, wantsPartial }) {
   return renderGroups({ req, res, state, wantsPartial });
 }
 
+export async function setGroupTopicsRoute({ req, res, state, wantsPartial }) {
+  if (!isModuleEnabled(state, 'groups')) {
+    return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
+  }
+  const person = getPerson(req, state);
+  const body = await readRequestBody(req);
+  const groupId = sanitizeText(body.groupId || '', 80);
+  const group = findGroupById(state, groupId);
+  if (!group) {
+    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+  }
+  if (!person) {
+    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set group categories.' });
+  }
+  const permission = evaluateAction(state, person, 'moderate');
+  if (!permission.allowed && !isGroupAdmin(group, person.pidHash)) {
+    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+  }
+  const topics = (body.topics || '')
+    .split(',')
+    .map((entry) => sanitizeText(entry, 64))
+    .filter(Boolean)
+    .slice(0, 12);
+  // Group categories join the same nested topic tree the site uses, so "Energy / Solar"
+  // declared by a branch group is the same category a delegation can be scoped to.
+  for (const label of topics) {
+    await ensureTopicPath(state, label, { source: 'group' });
+  }
+  await setGroupTopics({ groupId, topics, state });
+  await logTransaction(state, {
+    type: 'group_topics_set',
+    actorHash: person?.pidHash || 'anonymous',
+    payload: { groupId, topics },
+  });
+  return renderGroups({ req, res, state, wantsPartial });
+}
+
 export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
     return sendModuleDisabledJson({ res, moduleKey: 'groups', state });
@@ -302,20 +371,93 @@ export async function updateGroupPolicyRoute({ req, res, state, wantsPartial }) 
   const electionMode = sanitizeText(body.electionMode || 'priority', 32);
   const conflictRule = sanitizeText(body.conflictRule || 'highest_priority', 32);
   const categoryWeighted = Boolean(body.categoryWeighted);
-  await setGroupPolicy(state, { groupId, electionMode, conflictRule, categoryWeighted });
+  const lanes = normalizeLanes({
+    discussion: Boolean(body.laneDiscussion),
+    petitions: Boolean(body.lanePetitions),
+  });
+  const lanesVisibility = sanitizeText(body.lanesVisibility || 'members', 16);
+  await setGroupPolicy(state, { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility });
   await logTransaction(state, {
     type: 'group_policy_set',
     actorHash: person?.pidHash || 'anonymous',
-    payload: { groupId, electionMode, conflictRule, categoryWeighted },
+    payload: { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility },
   });
   return renderGroups({ req, res, state, wantsPartial });
 }
 
+function renderParentOptions(state) {
+  const rows = buildGroupTree(listGroups(state));
+  const options = rows
+    .map(({ group, depth }) => {
+      const indent = depth ? `${'\u00a0\u00a0'.repeat(depth)}\u21b3 ` : '';
+      return `<option value="${escapeHtml(group.id)}">${indent}${escapeHtml(group.name || 'Group')}</option>`;
+    })
+    .join('');
+  return `<option value="" selected>No parent — top level</option>${options}`;
+}
+
+// "Who works on what": the categories groups have declared, and who each group currently
+// puts forward for them. This is the discovery path for topic-scoped delegation.
+function renderCategoryDirectory(state, person) {
+  const rows = buildCategoryDirectory(state);
+  if (!rows.length) {
+    return '<p class="muted">No group has declared a category yet. Add topics to a group to appear here.</p>';
+  }
+  const items = rows
+    .map((row) => {
+      const groupNames = row.groups
+        .map((group) => {
+          const lineage = group.lineage.length ? `${group.lineage.join(' / ')} / ` : '';
+          return `<span class="pill ghost">${escapeHtml(lineage + group.name)}</span>`;
+        })
+        .join(' ');
+      const delegates = row.delegates.length
+        ? row.delegates
+            .slice(0, 4)
+            .map((entry) => {
+              const label = renderActorLabel(state, entry.delegateHash, { showHash: false });
+              const via = entry.source === 'election' ? 'elected' : 'cachet';
+              const delegateForm = person
+                ? `
+                  <form class="form-inline" method="post" action="/delegation" data-enhance="delegation">
+                    <input type="hidden" name="intent" value="set" />
+                    <input type="hidden" name="topic" value="${escapeHtml(row.label)}" />
+                    <input type="hidden" name="delegateHash" value="${escapeHtml(entry.delegateHash)}" />
+                    <button type="submit" class="ghost">Delegate ${escapeHtml(row.label)}</button>
+                  </form>`
+                : '';
+              return `
+                <div class="list-row">
+                  <div>
+                    <p class="small">${label}</p>
+                    <p class="muted tiny">${escapeHtml(entry.groupName)} · ${escapeHtml(via)}</p>
+                  </div>
+                  <div>${delegateForm}</div>
+                </div>
+              `;
+            })
+            .join('')
+        : '<p class="muted tiny">No delegate put forward yet — join a group above to help pick one.</p>';
+      return `
+        <article class="discussion">
+          <div class="discussion__meta">
+            <span class="pill">${escapeHtml(row.label)}</span>
+            ${groupNames}
+          </div>
+          <div class="list-stack">${delegates}</div>
+        </article>
+      `;
+    })
+    .join('\n');
+  return `<div class="list-stack">${items}</div>`;
+}
+
 function renderGroupList(groups, person, state) {
   if (!groups.length) return '<p class="muted">No groups yet.</p>';
-  return groups
-    .map((group) => {
+  return buildGroupTree(groups)
+    .map(({ group, depth }) => {
       const member = person?.pidHash ? group.members?.includes(person.pidHash) : false;
+      const moderator = person ? evaluateAction(state, person, 'moderate').allowed : false;
       const policy = group.policy || {};
       const delegates = (group.delegates || [])
         .map((d) => {
@@ -332,16 +474,42 @@ function renderGroupList(groups, person, state) {
       const name = escapeHtml(group.name || 'Group');
       const description = escapeHtml(group.description || '');
       const groupId = escapeHtml(group.id || '');
+      const lineage = formatGroupLineage(state, group);
+      const branchPill = lineage ? `<span class="pill ghost">Branch of ${escapeHtml(lineage)}</span>` : '';
+      const children = listChildGroups(state, group.id);
+      const childNote = children.length
+        ? `<p class="muted tiny">Branches: ${children.map((child) => escapeHtml(child.name || 'Group')).join(', ')}</p>`
+        : '';
+      const lanes = policy.lanes || {};
+      const canReadLanes = member || moderator;
+      const laneLinks = [
+        lanes.discussion && canReadLanes
+          ? `<a class="pill ghost" href="/discussion?group=${groupId}" data-partial>Group discussion</a>`
+          : '',
+        lanes.petitions && canReadLanes
+          ? `<a class="pill ghost" href="/petitions?group=${groupId}" data-partial>Group proposals</a>`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const laneNote =
+        (lanes.discussion || lanes.petitions) && !canReadLanes
+          ? '<p class="muted tiny">This group runs internal lanes. Join to read them.</p>'
+          : '';
       return `
-        <article class="discussion">
+        <article class="discussion" style="margin-left: ${Math.min(depth, 3) * 1.25}rem">
           <div class="discussion__meta">
             <span class="pill">Group</span>
+            ${branchPill}
             ${renderPreviewPill(group)}
             <span class="muted small">${topicLabel}</span>
           </div>
           <h3>${name}</h3>
           <p>${description}</p>
           <p class="muted small">Members: ${group.members?.length || 0}</p>
+          ${childNote}
+          ${laneLinks ? `<div class="discussion__meta">${laneLinks}</div>` : ''}
+          ${laneNote}
           <div class="muted small">Delegates:<ul>${delegates || '<li>None</li>'}</ul></div>
           <form class="form-inline" method="post" action="/groups" data-enhance="groups">
             <input type="hidden" name="groupId" value="${groupId}" />
@@ -368,8 +536,34 @@ function renderGroupList(groups, person, state) {
                 <input type="checkbox" name="categoryWeighted" ${policy.categoryWeighted ? 'checked' : ''} />
                 <span>Weight by category</span>
               </label>
+              <label class="field checkbox">
+                <input type="checkbox" name="laneDiscussion" ${policy.lanes?.discussion ? 'checked' : ''} />
+                <span>Internal discussion lane</span>
+              </label>
+              <label class="field checkbox">
+                <input type="checkbox" name="lanePetitions" ${policy.lanes?.petitions ? 'checked' : ''} />
+                <span>Internal proposals lane</span>
+              </label>
+              <label>Lane visibility
+                <select name="lanesVisibility">
+                  <option value="members" ${policy.lanesVisibility !== 'public' ? 'selected' : ''}>Members only</option>
+                  <option value="public" ${policy.lanesVisibility === 'public' ? 'selected' : ''}>Readable by anyone</option>
+                </select>
+              </label>
               <button type="submit" class="ghost">Save policy</button>
             </form>
+            <p class="muted tiny">Internal lanes are off by default. Items posted in them stay out of the Circle feed until a group admin moves them up a level.</p>
+          </details>
+          <details class="note">
+            <summary>Group categories</summary>
+            <form class="form-inline" method="post" action="/groups/topics" data-enhance="groups">
+              <input type="hidden" name="groupId" value="${groupId}" />
+              <label>Categories (comma separated, use Parent / Child for subcategories)
+                <input name="topics" value="${escapeHtml((group.topics || []).join(', '))}" placeholder="Energy, Energy / Solar" />
+              </label>
+              <button type="submit" class="ghost">Save categories</button>
+            </form>
+            <p class="muted tiny">Declared categories put this group in the category directory, so members can find who to delegate for them.</p>
           </details>
           <details class="note">
             <summary>Set preferred delegate</summary>

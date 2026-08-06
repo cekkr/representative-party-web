@@ -19,6 +19,7 @@ import {
   resolveVoteChoice,
   tallyVotes,
 } from '../../../modules/delegation/delegatedBallots.js';
+import { describePromotionTrail } from '../../../modules/groups/promotion.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -40,7 +41,7 @@ export function renderPetitionList(
   const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
   const state = options.state;
   if (!petitions.length) {
-    return renderPetitionOnboarding();
+    return renderPetitionOnboarding(options);
   }
 
   const now = Date.now();
@@ -87,6 +88,9 @@ export function renderPetitionList(
         : Array.isArray(petition.evidenceLinks)
           ? petition.evidenceLinks
           : [];
+      const promotionNote = describePromotionTrail(petition);
+      const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
+      const promoteControl = renderPromoteControl(petition, options);
       const freezeNotice = renderFreezeNotice(petition, state);
       const reviewPrompt = renderReviewPrompt(petition, revisions);
       const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
@@ -121,6 +125,7 @@ export function renderPetitionList(
                 <span class="pill ghost">Signatures: ${signatureCount}</span>
                 ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
                 <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
+                ${promotionPill}
                 ${renderPreviewPill(petition)}
                 ${renderIssuerPill(petition)}
               </div>
@@ -162,6 +167,7 @@ export function renderPetitionList(
           </form>
           `
           }
+          ${promoteControl}
           ${renderDiscussionBlock(petition, comments, state)}
           ${renderDraftUpdateForm(petition, {
             canEdit,
@@ -177,7 +183,33 @@ export function renderPetitionList(
     .join('\n');
 }
 
-function renderPetitionOnboarding() {
+// Offered only when the promotion would actually succeed: the caller passes a predicate
+// that runs the same checks the POST handler will.
+function renderPromoteControl(petition, options = {}) {
+  if (typeof options.promotable !== 'function') return '';
+  const decision = options.promotable(petition);
+  if (!decision?.ok) return '';
+  return `
+    <form class="form-inline" method="post" action="/petitions/promote" data-enhance="petitions">
+      <input type="hidden" name="petitionId" value="${escapeHtml(String(petition.id))}" />
+      <button type="submit" class="ghost">Move up to ${escapeHtml(decision.targetLabel)}</button>
+    </form>
+  `;
+}
+
+function renderPetitionOnboarding(options = {}) {
+  if (options.groupId) {
+    return `
+      <div class="onboarding-card">
+        <p class="eyebrow">Group proposals</p>
+        <h3>No proposals in this group's lane yet</h3>
+        <p class="muted small">Proposals filed here stay internal to the group until they are moved up a level.</p>
+        <div class="onboarding-actions">
+          <a class="cta" href="#petitions-compose">Draft proposal</a>
+        </div>
+      </div>
+    `;
+  }
   return `
     <div class="onboarding-card">
       <p class="eyebrow">Proposals</p>

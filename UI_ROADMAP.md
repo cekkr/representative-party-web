@@ -161,7 +161,7 @@ Composer.
 
 ## 5. Section / modularity inventory
 
-69 panels are section-tagged across modules. **All 64 chrome-bearing panels carry a
+70 panels are section-tagged across modules. **All 65 chrome-bearing panels carry a
 friendly `data-section-label`** — **[done]**. The 5 auth/core pages render no shell, so
 the member Sections control never lists them and a label there would be dead markup.
 `tests/interface-settings.test.js` enforces the rule, so a new panel cannot ship unlabeled.
@@ -180,7 +180,7 @@ than a control — that is what the label pass removed.
 | delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[done]** all 7 |
 | delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[done]** all 7 |
 | governance | `governance-overview`, `governance-proposals` | **[done]** both |
-| groups | `groups-create`, `groups-list` | **[done]** both |
+| groups | `groups-create`, `groups-list`, `groups-categories` | **[done]** all 3 |
 | notifications | `notifications-inbox`, `notifications-preferences` | **[done]** both |
 | profile | `profile-summary`, `profile-interface`, `profile-fields` | **[done]** all 3 |
 | governance | + `governance-propose` | **[done]** all 3 |
@@ -225,7 +225,7 @@ rail. Content leads — a compose form never sits above the feed it contributes 
 | `/governance` | [governance.html](src/modules/governance/templates/governance.html) | main: constitution → change proposals · aside: propose a change | settings cards + change-proposal list | **[done]** |
 | `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | main: overview → delegated-ballot inbox → your delegated ballots → current → effective chains · aside: set a delegate/recommendations | delegate cards + chain view + ballot inbox | **[done]** |
 | `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory — main: people list · aside: search. profile — main: summary/coverage/votes/activity · aside: endorsements | searchable people grid + profile dashboard | **[done]** |
-| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | main: available groups · aside: create a group | group cards + election panels | **[done]** |
+| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | main: group tree (branches indented under parents) → category directory · aside: create a group | group cards + election panels + category directory | **[done]** |
 | `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | main: alerts inbox · aside: alert preferences | notification list rows | **[done]** |
 | `/profile` | [profile.html](src/modules/profile/templates/profile.html) | main: session/handle → provider-local attributes · aside: interface controls | account cards + preferences | **[done]** |
 | `/admin` | [admin.html](src/modules/admin/templates/admin.html) + partials | 20 anchored panels, single column | admin dashboard shell | **[done]** decomposed into 7 partials; single column on purpose (see below) |
@@ -274,6 +274,10 @@ template-hygiene item.
 | Sticky social composer auto-collapse | **[done]** |
 | Delegated-ballot state on `/petitions` (holder, countdown, override) | **[done]** |
 | Delegate ballot inbox + member ballot list on `/delegation` | **[done]** |
+| Group tree: branches indented under their parent, lineage on the card | **[done]** |
+| Category directory (`/groups`): who works on what, one-click delegate | **[done]** |
+| Group lane tabs + destination picker on `/discussion` and `/petitions` | **[done]** |
+| Promote-to-upper-level control (shown only when it would succeed) | **[done]** |
 | Favicon (kills `/favicon.ico` 404) | **[todo]** (see OPTIMIZATIONS) |
 | Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |
 

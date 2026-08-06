@@ -9,6 +9,13 @@
         {{groups}}
       </div>
     </section>
+
+    <section class="panel" data-composer-section="groups-categories" data-section-label="Category directory">
+      <p class="eyebrow">Categories</p>
+      <h2>Who works on what</h2>
+      <p class="muted small">Categories groups have declared, and who each group currently puts forward for them. Suggestions are advisory — you can delegate to anyone, and override at any time.</p>
+      {{groupCategories}}
+    </section>
   </div>
   <aside class="page-aside">
     <section class="panel" data-composer-section="groups-create" data-section-label="Create a group">
@@ -22,10 +29,17 @@
             <input name="name" placeholder="Energy Circle" required />
           </label>
           <label class="field">
-            <span>Topics (comma-separated)</span>
-            <input name="topics" placeholder="energy,climate" />
+            <span>Categories (comma-separated)</span>
+            <input name="topics" placeholder="Energy, Energy / Solar" />
           </label>
         </div>
+        <label class="field">
+          <span>Parent group (optional)</span>
+          <select name="parentId">
+            {{parentGroupOptions}}
+          </select>
+          <span class="muted tiny">Make this a branch — a think tank, a working wing, or an alternative line inside a larger group.</span>
+        </label>
         <label class="field">
           <span>Description</span>
           <textarea name="description" rows="3" placeholder="Purpose of this group"></textarea>
