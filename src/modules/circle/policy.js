@@ -16,7 +16,7 @@ export function getEffectivePolicy(state) {
   return {
     ...POLICIES,
     id: settings.policyId || POLICIES.id,
-    circleName: settings.circleName || 'Organization',
+    circleName: settings.circleName || POLICIES.name,
     enforceCircle: settings.enforceCircle ?? POLICIES.enforceCircle,
     requireVerification: settings.requireVerification ?? POLICIES.requireVerification,
     adminContact: settings.adminContact || '',

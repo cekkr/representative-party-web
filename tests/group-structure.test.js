@@ -232,6 +232,28 @@ test('the category directory indexes declared categories and who groups put forw
   assert.deepEqual(byKey.get('energy').groups.map((g) => g.id), ['party']);
 });
 
+test('an election winner who is also the cachet is listed once, as elected', () => {
+  const state = withPolicy(partyState(), 'party', { electionMode: 'vote' });
+  // Closing an election writes the winner as the cachet too (A5.6).
+  state.groups[0].delegates = [{ topic: 'energy', delegateHash: 'party-pick', priority: 10 }];
+  state.groupElections = [
+    {
+      id: 'e1',
+      groupId: 'party',
+      topic: 'energy',
+      status: 'closed',
+      candidates: ['party-pick', 'runner-up'],
+      votes: [
+        { voterHash: 'ada', candidateHash: 'party-pick' },
+        { voterHash: 'bruno', candidateHash: 'party-pick' },
+      ],
+    },
+  ];
+  const row = buildCategoryDirectory(state).find((entry) => entry.key === 'energy');
+  assert.equal(row.delegates.length, 1, 'one row per group and person');
+  assert.equal(row.delegates[0].source, 'election');
+});
+
 test('a category with no delegate still lists its groups, so members can go ask', () => {
   const state = partyState();
   const row = buildCategoryDirectory(state).find((entry) => entry.key === 'energy');

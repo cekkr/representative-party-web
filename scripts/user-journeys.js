@@ -104,7 +104,10 @@ async function member(browser, handle) {
 /** Navigates a member's tab, fronting it first so interactions can proceed. */
 async function visit(page, url) {
   await page.bringToFront();
-  await page.goto(`${BASE_URL}${url}`, { waitUntil: 'networkidle0' });
+  // `networkidle0` inside goto() intermittently times out with nothing in flight across
+  // many browser contexts; wait for `load`, then settle on network idle separately.
+  await page.goto(`${BASE_URL}${url}`, { waitUntil: 'load' });
+  await page.waitForNetworkIdle({ idleTime: 250, timeout: 5000 }).catch(() => {});
 }
 
 /**

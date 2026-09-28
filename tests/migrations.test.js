@@ -91,3 +91,19 @@ test('extension lifecycle migration registers previously enabled extensions', ()
     },
   ]);
 });
+
+test('a fresh store takes its policy id and name from CIRCLE_POLICY_ID/CIRCLE_NAME, not hardcoded defaults', async () => {
+  // Stored settings take precedence over the env in policy.js, so the migration that first
+  // writes settings must write the configured id. Run in a child so config reads the env.
+  const { execFileSync } = await import('node:child_process');
+  const script = `
+    const { runMigrations } = await import(${JSON.stringify(new URL('../src/infra/persistence/migrations.js', import.meta.url).href)});
+    const { data } = runMigrations({ data: {} });
+    process.stdout.write(data.settings.policyId + '|' + data.settings.circleName);
+  `;
+  const out = execFileSync(process.execPath, ['--input-type=module', '-e', script], {
+    env: { ...process.env, CIRCLE_POLICY_ID: 'rete-civica-nazionale', CIRCLE_NAME: 'Rete Civica Nazionale' },
+    encoding: 'utf8',
+  });
+  assert.equal(out, 'rete-civica-nazionale|Rete Civica Nazionale');
+});

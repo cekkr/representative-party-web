@@ -125,6 +125,11 @@ function splitForumEntries(entries = []) {
       threads.push(entry);
     }
   }
+  // Entries are stored newest-first, which is right for the thread list but wrong inside a
+  // thread: a reply must read after the comment it answers, so comments run oldest-first.
+  for (const list of commentsByThread.values()) {
+    list.sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  }
   return { threads, commentsByThread };
 }
 

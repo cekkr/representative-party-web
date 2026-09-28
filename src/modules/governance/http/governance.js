@@ -13,7 +13,7 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderActorLabel, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 
 export async function renderGovernance({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
@@ -117,8 +117,8 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
       proposalDelegationDecayDays: escapeHtml(String(governance.delegationDecayDays)),
       proposalDelegateVoteWindowDays: escapeHtml(String(governance.delegateVoteWindowDays)),
       proposalNotes: escapeHtml(governance.notes || ''),
-      governanceProposalList: renderGovernanceProposalList(openProposals),
-      governanceHistoryList: renderGovernanceHistoryList(history),
+      governanceProposalList: renderGovernanceProposalList(openProposals, state),
+      governanceHistoryList: renderGovernanceHistoryList(history, state),
     },
     { wantsPartial, title: 'Governance', state },
   );
@@ -135,21 +135,20 @@ function renderProposalErrors(errors = []) {
   `;
 }
 
-function renderGovernanceProposalList(proposals = []) {
+function renderGovernanceProposalList(proposals = [], state) {
   if (!proposals.length) {
     return '<p class="muted small">No open governance proposals.</p>';
   }
   return `
-    <ul class="stack">
+    <ul class="callout-list">
       ${proposals
         .map((proposal) => {
           const changes = renderChangeList(proposal.changes || []);
-          const author = proposal.authorHandle || String(proposal.authorHash || '').slice(0, 12) || 'verified user';
           return `
             <li class="callout">
               <strong>${escapeHtml(proposal.title)}</strong>
               <p class="muted small">${escapeHtml(proposal.reason)}</p>
-              <p class="muted small">Proposed by ${escapeHtml(author)} on ${escapeHtml(formatTimestamp(proposal.createdAt))}</p>
+              <p class="muted small">Proposed by ${renderGovernanceActor(state, proposal.authorHash, proposal.authorHandle, 'a verified member')} · ${escapeHtml(formatTimestamp(proposal.createdAt))}</p>
               ${changes}
             </li>
           `;
@@ -159,21 +158,45 @@ function renderGovernanceProposalList(proposals = []) {
   `;
 }
 
-function renderGovernanceHistoryList(history = []) {
+// History entries store event types (`proposal_approved`); members read decisions.
+const HISTORY_LABELS = {
+  proposal_approved: 'Approved',
+  proposal_rejected: 'Rejected',
+  governance_update: 'Changed by the provider',
+  admin_update: 'Set by the provider',
+};
+
+function renderGovernanceActor(state, hash, handle, fallback) {
+  if (hash) return renderActorLabel(state, hash, { showHash: false });
+  return escapeHtml(handle ? `@${handle}` : fallback);
+}
+
+function renderGovernanceHistoryList(history = [], state) {
   if (!history.length) {
     return '<p class="muted small">No governance history entries yet.</p>';
   }
+  const proposals = Array.isArray(state?.settings?.governanceProposals) ? state.settings.governanceProposals : [];
+  const byId = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   return `
-    <ul class="stack">
+    <ul class="callout-list">
       ${history
         .map((entry) => {
-          const actor = entry.actorHandle || String(entry.actorHash || '').slice(0, 12) || 'admin';
-          const title = entry.title ? ` - ${escapeHtml(entry.title)}` : '';
+          const label = HISTORY_LABELS[entry.type] || String(entry.type || 'Update').replace(/_/g, ' ');
+          const title = entry.title ? ` — ${escapeHtml(entry.title)}` : '';
+          const proposal = entry.proposalId ? byId.get(entry.proposalId) : null;
+          // Who asked and who decided are different people; the record keeps both, so a
+          // provider decision on a member's proposal is never presented as the member's own.
+          const proposer = proposal
+            ? `Proposed by ${renderGovernanceActor(state, proposal.authorHash, proposal.authorHandle, 'a verified member')} · `
+            : '';
+          const decider = renderGovernanceActor(state, entry.actorHash, entry.actorHandle, 'the provider');
+          const reason = proposal?.reason ? `<p class="muted small">${escapeHtml(proposal.reason)}</p>` : '';
           return `
             <li class="callout">
-              <strong>${escapeHtml(entry.type)}${title}</strong>
+              <strong>${escapeHtml(label)}${title}</strong>
+              ${reason}
               <p class="muted small">${escapeHtml(entry.summary || '')}</p>
-              <p class="muted small">${escapeHtml(formatTimestamp(entry.at))} by ${escapeHtml(actor)}</p>
+              <p class="muted small">${proposer}decided by ${decider} · ${escapeHtml(formatTimestamp(entry.at))}</p>
             </li>
           `;
         })

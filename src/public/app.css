@@ -1414,6 +1414,15 @@ a.home-list__title:hover {
   letter-spacing: -0.03em;
 }
 
+/* A list whose items are already cards: no bullets, card spacing. */
+ul.callout-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
 ul.plain {
   list-style: none;
   padding: 0;

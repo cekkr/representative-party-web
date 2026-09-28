@@ -51,14 +51,17 @@ della Comunità and COT), `D.lgs. 24/2023` (whistleblowing) appear as themselves
 Quantities are realistic orders of magnitude tied to their source year — update
 them when reseeding; never present them as live statistics.
 
-**These scenarios' in-app conversation and case copy is in English.** The deployments remain
-Italian: names, handles, topic IDs, institutions, legal terms, `€` amounts, and
-`dd/mm/yyyy` dates retain their Italian context. This makes the scenarios usable
-for English-language product review without pretending that the laws or
-institutions are generic. Tests should assert on the English fixture strings.
-Evidence links use the fictional domain `esempio.rcn.it` /
-`esempio.aslvalsereno.it` — real norms are cited by name in the text instead of
-by URL, so nothing rots.
+**These scenarios' in-app copy is in English — conversation, case text, topic
+categories, and group names.** What stays Italian is the world the deployment
+lives in: people's names and handles, institutions, legal terms and citations,
+`€` amounts, and `dd/mm/yyyy` dates. This makes every screenshot readable for an
+English-language product review without pretending that the laws or institutions
+are generic. Tests and journey scripts assert on the English fixture strings.
+Scenario A's topics are an English category hierarchy (`Healthcare / Waiting
+lists`, `Labour / Minimum wage`, …), so topic-scoped delegation, the group
+directory and breadcrumbs all resolve against one tree. Evidence links use the
+fictional domains `example.rcn.it` / `esempio.aslvalsereno.it` — real norms are
+cited by name in the text instead of by URL, so nothing rots.
 
 ---
 
@@ -244,7 +247,11 @@ an employer, and `/organization` would be noise here.
 
 Governance defaults (`/governance`, admin `intent=governance`):
 `quorum 250` · `discussion window 14d` · `vote window 7d` ·
-`vote method condorcet` · `delegationDecayDays 180`.
+`vote method majority` · `delegationDecayDays 180`.
+
+The method stays `majority` on purpose: proposal ballots are yes/no/abstain today,
+and publishing `condorcet` would claim a count the code does not perform. Switch it
+when multi-method ballots land (ROADMAP Phase 3).
 
 The decay setting is not decoration. It is the answer to the super-delegate
 problem (`RepresentativeParties.md` §2.4, §6.2.1): delegated power lapses unless
@@ -321,52 +328,56 @@ the thesis:
 ## A.2 Topics
 
 Structural Italian debates, each chosen because it stresses something specific.
+Each is a subcategory under an English parent (`Healthcare`, `Labour`,
+`Institutions`, `Energy`, `Citizenship`, `Environment`), so a member can delegate
+a whole parent and have it reach every subcategory beneath it — narrowest match
+first (see `topicMatch.js`).
 Each carries its **realtà di riferimento** — the actual norms and numbers the
 fictional members argue about — so seeded content reads like Italy, not like
 lorem ipsum with Italian words.
 
-| Topic id | Debate | Stresses |
+| Category | Debate | Stresses |
 | --- | --- | --- |
-| `salario-minimo` | Statutory minimum wage | Direct material interest on both sides |
-| `autonomia-differenziata` | Regional differentiated autonomy | Splits the party geographically, not ideologically |
-| `liste-attesa` | Public healthcare waiting lists | Expertise vs lived experience |
-| `transizione-energetica` | Energy transition and plant siting | Delegation conflict: national good, local cost |
-| `ius-scholae` | Citizenship through schooling | Values, not numbers — resists delegation |
-| `consumo-suolo` | Land consumption | Long-tail: few members, real stakes |
+| `Labour / Minimum wage` | Statutory minimum wage | Direct material interest on both sides |
+| `Institutions / Differentiated autonomy` | Regional differentiated autonomy | Splits the party geographically, not ideologically |
+| `Healthcare / Waiting lists` | Public healthcare waiting lists | Expertise vs lived experience |
+| `Energy / Energy transition` | Energy transition and plant siting | Delegation conflict: national good, local cost |
+| `Citizenship / Ius scholae` | Citizenship through schooling | Values, not numbers — resists delegation |
+| `Environment / Land consumption` | Land consumption | Long-tail: few members, real stakes |
 
 **Realtà di riferimento:**
 
-- `salario-minimo` — the 2023 unified opposition bill set 9 €/h gross as the
+- `Labour / Minimum wage` — the 2023 unified opposition bill set 9 €/h gross as the
   floor; the CNEL istruttoria (2023) counted **over 900 deposited CCNL**, with
   the ~20 largest covering the great majority of employees — the fight is less
   about contract count than about expired renewals and sub-threshold sectors
   (vigilanza, multiservizi, some terziario). Direttiva (UE) 2022/2041 does not
   oblige a statutory minimum where collective coverage is high; the contested
   question is whether *effective* coverage qualifies.
-- `autonomia-differenziata` — art. 116 c.3 Cost.; L. 86/2024 ("legge
+- `Institutions / Differentiated autonomy` — art. 116 c.3 Cost.; L. 86/2024 ("legge
   Calderoli"); the LEP (livelli essenziali delle prestazioni) as the
   precondition everyone cites and nobody has financed; **sent. 192/2024** struck
   parts of the law; **sent. 10/2025** ruled the total-repeal referendum
   inadmissible. The debate survives all of it — which is why it is in the
   fixture.
-- `liste-attesa` — PNGLA priority classes **U/B/D/P = 72h / 10 / 30–60 / 120
+- `Healthcare / Waiting lists` — PNGLA priority classes **U/B/D/P = 72h / 10 / 30–60 / 120
   days**; intramoenia (ALPI) bounded by L. 120/2007 — private in-house activity
   may not exceed institutional volumes, a constraint everyone knows and audits
   weakly; DL 73/2024 conv. L. 107/2024 added the national AGENAS platform and
   mandatory disdetta systems.
-- `transizione-energetica` — aree idonee (d.lgs. 199/2021 + DM 2024),
+- `Energy / Energy transition` — aree idonee (d.lgs. 199/2021 + DM 2024),
   commissari straordinari and compensazioni territoriali for strategic plants,
   CER (comunità energetiche rinnovabili, DM CACER 2024) as the bottom-up
   counterweight.
-- `ius-scholae` — L. 91/1992 is still the law; the ius scholae proposals tie
+- `Citizenship / Ius scholae` — L. 91/1992 is still the law; the ius scholae proposals tie
   citizenship to a five-year school cycle; the **giugno 2025 referendum**
   (residency 10→5 years) failed quorum at ~30% turnout with ~65% yes among
   voters. Unfinished by design.
-- `consumo-suolo` — ISPRA/SNPA 2024: ~72 km² consumed in 2023, ~20 hectares a
+- `Environment / Land consumption` — ISPRA/SNPA 2024: ~72 km² consumed in 2023, ~20 hectares a
   day, ~2,3 m²/s; the national framework bill has been stalled for over a
   decade; the EU target is net zero by 2050.
 
-`autonomia-differenziata` earns its place by cutting across the party the wrong
+`Institutions / Differentiated autonomy` earns its place by cutting across the party the wrong
 way. `@tommaso.ricci` (Trento) and `@nadia.hamdi` (Palermo) are on the same side
 of every other topic and opposite sides of this one. A fixture where all
 disagreement is one-dimensional cannot show whether the interface helps.
@@ -421,29 +432,29 @@ voice dies quietly the day the first comitato gets one.
 The order matters. A proposal drafted before this act exists is exactly the
 failure mode the README names: shipping voting before conversation.
 
-### The waiting-list thread (`liste-attesa`)
+### The waiting-list thread (`Healthcare / Waiting lists`)
 
 **A2.1** `@giulia.ferrero` — `POST /discussion` — **[drive]**
-`topic=liste-attesa`, `stance=concern`,
+`topic=Healthcare / Waiting lists`, `stance=concern`,
 `content=In my department, the first available non-urgent cardiology appointment is 14 months away. Patients who can afford it use intramoenia and are seen within two weeks. Same building, same doctors, same day.`
-`evidenceLinks=https://esempio.rcn.it/liste-attesa/rilevazione-2026`
+`evidenceLinks=https://example.rcn.it/waiting-lists/survey-2026`
 → a concrete, checkable claim from someone with standing to make it.
 
-**A2.2** `@marco.deluca` — `POST /discussion` — `topic=liste-attesa`, `stance=support` — **[drive]**
+**A2.2** `@marco.deluca` — `POST /discussion` — `topic=Healthcare / Waiting lists`, `stance=support` — **[drive]**
 `content=The CUP data I aggregated across three regions confirm it: for priority classes D and P, exceeding PNGLA waiting times is the rule, not the exception. And where the public service runs late, intramoenia in the same specialty runs on time. This is not a local anomaly; it is an economic equilibrium.`
 → expertise *corroborating* lived experience, not overriding it.
 
-**A2.6** `@valentina.sanna` — `POST /discussion` — `topic=liste-attesa`, `stance=neutral` — **[drive]**
+**A2.6** `@valentina.sanna` — `POST /discussion` — `topic=Healthcare / Waiting lists`, `stance=neutral` — **[drive]**
 `content=Is the 14-month figure a median or a worst case? That changes everything: a median describes the system, while a worst case describes a queue. Before we build a proposal on it, we need the distribution, not an anecdote.`
 → the fixture must contain someone checking, not only asserting.
 
-**A2.11** `@nadia.hamdi` — `POST /discussion` — `topic=liste-attesa`, `stance=concern` — **[drive]**
+**A2.11** `@nadia.hamdi` — `POST /discussion` — `topic=Healthcare / Waiting lists`, `stance=concern` — **[drive]**
 `content=From general practice: I prescribe priority class B, which means 10 days under the PNGLA. The CUP offers me 96 days, or the paid pathway in the same building. The priority class has become a statement of intent.`
 → the same failure seen from the territory. Two professions, one mechanism.
 
-**A2.12** `@giulia.ferrero` — `POST /discussion` — `topic=liste-attesa`, `stance=neutral` — **[drive]**
+**A2.12** `@giulia.ferrero` — `POST /discussion` — `topic=Healthcare / Waiting lists`, `stance=neutral` — **[drive]**
 `content=@valentina.sanna Median, not worst case: an internal survey of 14 health authorities, March 2026, with the method attached. The worst cases are far beyond that.`
-`evidenceLinks=https://esempio.rcn.it/liste-attesa/metodo-rilevazione`
+`evidenceLinks=https://example.rcn.it/waiting-lists/survey-method`
 → the fact-check loop **closes**: question asked, method published, thread
 moves on. A deliberation culture is exactly this exchange being normal.
 → note the gap the fixture makes visible: the `@mention` here notifies nobody —
@@ -452,28 +463,28 @@ so Valentina finds this answer by rereading the thread. Logged in
 `OPTIMIZATIONS.md`; when discussion mentions notify, this act gains the
 assertion.
 
-### The minimum-wage thread (`salario-minimo`)
+### The minimum-wage thread (`Labour / Minimum wage`)
 
-**A2.3** `@luca.esposito` — `POST /discussion` — `topic=salario-minimo`, `stance=concern` — **[drive]**
+**A2.3** `@luca.esposito` — `POST /discussion` — `topic=Labour / Minimum wage`, `stance=concern` — **[drive]**
 `content=Nine euros gross per hour for a restaurant with four seasonal employees means either raising prices by 12% or closing in November. I am not against a minimum wage; I am against doing it without looking at hospitality's real margins.`
 → **the dissent must be reasonable.** A fixture whose opposition is a strawman
 proves nothing about deliberation.
 
-**A2.4** `@ahmed.ben.salah` — `POST /discussion` — `topic=salario-minimo`, `stance=support` — **[drive]**
+**A2.4** `@ahmed.ben.salah` — `POST /discussion` — `topic=Labour / Minimum wage`, `stance=support` — **[drive]**
 `content=At my warehouse, the pirate contract pays €6.40 an hour. That is not competition on margins; it is competition over who will accept less. The minimum wage does not close honest businesses; it closes the ones that survive like this.`
 → the reply that makes the disagreement real. Both are true at once. This is
 the pair the interface has to hold without flattening.
 
-**A2.9** `@valentina.sanna` — `POST /discussion` — `topic=salario-minimo`, `stance=neutral` — **[drive]**
+**A2.9** `@valentina.sanna` — `POST /discussion` — `topic=Labour / Minimum wage`, `stance=neutral` — **[drive]**
 `content=CNEL figures, 2023 review: more than 900 CCNL agreements are filed, but the 20 most used cover the vast majority of employees. The problem is not the number of contracts; it is renewals expired for years and pay scales below €7 in security, multiservices, and parts of the tertiary sector. Any proposal must say what it does about THIS.`
 → the researcher reframes the fight with the actual CNEL finding. Evidence
 changes what the proposal will have to address.
 
-**A2.10** `@marco.deluca` — `POST /discussion` — `topic=salario-minimo`, `stance=neutral` — **[drive]**
+**A2.10** `@marco.deluca` — `POST /discussion` — `topic=Labour / Minimum wage`, `stance=neutral` — **[drive]**
 `content=EU context: Directive 2022/2041 does not require a statutory minimum where collective-agreement coverage is high. The real question is whether our EFFECTIVE coverage — weighted for expired renewals — meets that standard. If it does not, a statutory minimum is not ideology; it is compliance.`
 → the economist supplies the frame the debate actually happens in.
 
-### The split that isn't left-right (`autonomia-differenziata`)
+### The split that isn't left-right (`Institutions / Differentiated autonomy`)
 
 **A2.5** `@tommaso.ricci` and `@nadia.hamdi` — `POST /discussion` ×3 — **[drive]**
 - Tommaso, `stance=support`: `Healthcare administration in the special-autonomy and benchmark regions shows that local fiscal responsibility can work. The problem is not autonomy; it is doing it without LEP.`
@@ -485,11 +496,11 @@ theatre, and screenshots should be able to show the opposite happening.
 
 ### The rest of the map
 
-**A2.16** `@anna.conti` — `POST /discussion` — `topic=ius-scholae`, `stance=proposal` — **[drive]**
+**A2.16** `@anna.conti` — `POST /discussion` — `topic=Citizenship / Ius scholae`, `stance=proposal` — **[drive]**
 `content=The June 2025 referendum on reducing the residency requirement from 10 to 5 years missed quorum with about 30% turnout — but about 65% of those who voted said yes. And ius scholae was not even on the ballot: under Law 91/1992, five years of schooling in Italy count for nothing. I propose that we take this to the assembly.`
 → the topic that resists delegation: values, not parameters. Watch **A6.8**.
 
-**A2.17** `@davide.villa` — `POST /discussion` — `topic=consumo-suolo`, `stance=concern` — **[drive]**
+**A2.17** `@davide.villa` — `POST /discussion` — `topic=Environment / Land consumption`, `stance=concern` — **[drive]**
 `content=ISPRA reports about 20 hectares of land consumed per day, 2.3 square metres per second. The national law has been stalled for more than ten years. Meanwhile, my municipality is sealing yet another agricultural area for logistics. Does anyone besides me work on this?`
 → **the long tail**: one member, one post, a real stake. The principle docs
 promise the small topic is not buried by volume; the fixture needs one to check.
@@ -526,7 +537,7 @@ platform is built against; soft power as the only constitutional path.
 how §9.3's "ethical pact" differs from a party whip — the comment a reader
 would actually leave.
 
-**A2.18** the topic gardener proposes merging stray tags (`sanita`, `sanità-pubblica`) into `liste-attesa`; `@rcn.provider` reviews in `/admin` — **[drive]**, with `src/infra/workers/topic-gardener/server.py` running and its URL configured
+**A2.18** the topic gardener proposes merging stray tags (`health`, `public-health`) into `Healthcare / Waiting lists`; `@rcn.provider` reviews in `/admin` — **[drive]**, with `src/infra/workers/topic-gardener/server.py` running and its URL configured
 → rename/merge suggestions appear with previews; accept records topic history;
 discussions keep their threads. Members named their topics freely and the
 garden stays tidy **with a human gate** — never silently.
@@ -567,7 +578,7 @@ implementationPlan=Measure at three months on the national platform; trial the
         cap in two pilot health authorities at six months; review at twelve.
 evidenceSummary=RCN survey of 14 health authorities (March 2026); review of
         AGENAS monitoring; legal framework: Laws 120/2007 and 107/2024.
-evidenceLinks=https://esempio.rcn.it/liste-attesa/rilevazione-2026
+evidenceLinks=https://example.rcn.it/waiting-lists/survey-2026
 ```
 → The `problem` field now does the honest thing: it names the law that already
 exists and says *why it fails* — the proposal tightens a weak constraint rather
@@ -664,7 +675,7 @@ distinct-agent and step-local counter assertions as **A3.3**.
 → the long-tail concern in **A2.17** becomes a visible draft without pretending
 that local salience has already produced national support.
 Populate its structured outline through the form from **A2.17** and the
-`consumo-suolo` reference facts above.
+`Environment / Land consumption` reference facts above.
 
 **A3.16** 41 concrete signer agents — `POST /petitions/sign` — **[drive]**
 → expand to `A3.16/sign-001` … `A3.16/sign-041`; assert the counter after every
@@ -672,8 +683,8 @@ signature and assert that the proposal remains `draft` after number 41. The
 missing 209 signatures are meaningful state, not setup left for later.
 
 Stage-diversity target: these three proposals finish in different stages — the
-intramoenia proposal in `vote`, `salario-minimo` in `discussion`, and
-`consumo-suolo` in `draft` below quorum. **A4.1** (specified in the next section
+intramoenia proposal in `vote`, `Labour / Minimum wage` in `discussion`, and
+`Environment / Land consumption` in `draft` below quorum. **A4.1** (specified in the next section
 but replayed earlier by the canonical phase schedule) creates a fourth,
 conflict-focused proposal; none may be preloaded to obtain this arrangement.
 
@@ -686,16 +697,16 @@ terminal should be accepted with negotiated conditions, not simply endured.
 
 **A4.2** `@stefano.lombardi` — `POST /petitions/comment` — `stance=concern` — **[drive]**
 `content=My members live two kilometres from the quay. The benefit is national; the cost is theirs: the view, fishing, and perceived risk. Compensation must not be negotiated AFTER the national position; it must be negotiated into it.`
-→ **Both are right.** `transizione-energetica` exists in the fixture to hold a
+→ **Both are right.** `Energy / Energy transition` exists in the fixture to hold a
 conflict with no correct answer, only an accountable one.
 
-**A4.3** `@chiara.moretti` — `POST /groups` — `action=create`, `name=Energy and Territory Circle`, `topics=transizione-energetica,consumo-suolo` — **[drive]**
+**A4.3** `@chiara.moretti` — `POST /groups` — `action=create`, `name=Energy and Territory Circle`, `topics=Energy / Energy transition, Environment / Land consumption` — **[drive]**
 `description=CER, suitable areas, strategic plants: where the national meets the local.`
 → the second group. One group cannot show a group *list*, and the two groups
 run **opposite election policies** (see A4.4 vs A5.3) — the contrast is the
 fixture.
 
-**A4.4** `@chiara.moretti` and `@stefano.lombardi` — `POST /groups/delegate` — `groupId=...`, `topic=transizione-energetica`, `delegateHash=<own>`, `priority=80` / `priority=60` — **[drive]**
+**A4.4** `@chiara.moretti` and `@stefano.lombardi` — `POST /groups/delegate` — `groupId=...`, `topic=Energy / Energy transition`, `delegateHash=<own>`, `priority=80` / `priority=60` — **[drive]**
 → **priority-mode cachet**: the group publishes ranked delegate preferences
 without any election (`electionMode=priority`, the default). Chiara outranks
 Stefano on paper; his members now have a reason to look at **A6.5**'s conflict
@@ -704,13 +715,13 @@ the group-policy separation is untested.
 
 ## A.7 Act 5 — Groups, and choosing people
 
-**A5.1** `@irene.fabbri` — `POST /groups` — `action=create`, `name=Public Healthcare Circle`, `topics=liste-attesa,salario-minimo` — **[drive]**
+**A5.1** `@irene.fabbri` — `POST /groups` — `action=create`, `name=Public Healthcare Circle`, `topics=Healthcare / Waiting lists, Labour / Minimum wage` — **[drive]**
 **A5.2** eight members — `POST /groups` — `action=join` — **[drive]**
 **A5.3** `@irene.fabbri` — `POST /groups/policy` — `electionMode=vote`, `conflictRule=prompt_user` — **[drive]**
 → `prompt_user` is the honest setting: when recommendations clash the member
 chooses. `highest_priority` would decide silently on their behalf.
 
-**A5.4** `@irene.fabbri` — `POST /groups` — `action=startElection`, `topic=liste-attesa`, `candidates=marco.deluca,giulia.ferrero,valentina.sanna` — **[drive]**
+**A5.4** `@irene.fabbri` — `POST /groups` — `action=startElection`, `topic=Healthcare / Waiting lists`, `candidates=marco.deluca,giulia.ferrero,valentina.sanna` — **[drive]**
 
 **A5.5** nine members — `POST /groups` — `action=voteElection`, `electionId=...`, `candidateHash=...`, `secondChoiceHash=...`, `thirdChoiceHash=...` — **[drive]**
 → the ballots are part of the fixture, because the arithmetic is the test:
@@ -730,7 +741,7 @@ what they exist to do. Assert: winner `giulia.ferrero`, method `vote`, rounds 2.
 
 **A5.6** `@irene.fabbri` — `POST /groups` — `action=closeElection`, `electionId=...` — **[drive]**
 → winner, method, and round count surface on the card; the group's delegate
-cachet for `liste-attesa` updates to Giulia automatically.
+cachet for `Healthcare / Waiting lists` updates to Giulia automatically.
 
 **A5.7** the group's recommendation reaches a member — **[drive]**
 → it is **advisory**. A member who ignores it is not overridden. Group cachets
@@ -745,9 +756,9 @@ inside the party.
 
 ## A.8 Act 6 — Liquid delegation, and being able to read it
 
-**A6.1** `@davide.villa` — `POST /delegation` — `intent=set`, `topic=liste-attesa`, `delegateHash=marco.deluca` — **[drive]**
-**A6.2** `@paolo.greco` — `POST /delegation` — `intent=set`, `topic=liste-attesa`, `delegateHash=giulia.ferrero` — **[drive]**
-**A6.3** `@giulia.ferrero` — `POST /delegation` — `intent=set`, `topic=liste-attesa`, `delegateHash=marco.deluca` — **[drive]**
+**A6.1** `@davide.villa` — `POST /delegation` — `intent=set`, `topic=Healthcare / Waiting lists`, `delegateHash=marco.deluca` — **[drive]**
+**A6.2** `@paolo.greco` — `POST /delegation` — `intent=set`, `topic=Healthcare / Waiting lists`, `delegateHash=giulia.ferrero` — **[drive]**
+**A6.3** `@giulia.ferrero` — `POST /delegation` — `intent=set`, `topic=Healthcare / Waiting lists`, `delegateHash=marco.deluca` — **[drive]**
 → **transitive chain**: `@paolo.greco → @giulia.ferrero → @marco.deluca`.
 `/delegation` must state plainly where Paolo's vote ends up. A chain a member
 cannot read is a chain they cannot revoke, and revocability is the entire
@@ -757,15 +768,15 @@ mechanism (§2.2.2).
 → the member who delegates nearly everything. Legitimate, and the thing to
 watch.
 
-**A6.5** conflict — the Circolo Sanità cachet now recommends `@giulia.ferrero` (the election winner, per vote-mode policy); `@davide.villa`'s manual choice is `@marco.deluca` — `POST /delegation/conflict` — **[drive]**
+**A6.5** conflict — the Public Healthcare Circle cachet now recommends `@giulia.ferrero` (the election winner, per vote-mode policy); `@davide.villa`'s manual choice is `@marco.deluca` — `POST /delegation/conflict` — **[drive]**
 → with `conflictRule=prompt_user`, **he chooses** — and he keeps Marco, against
 the election result. The prompt names both sources and why each is suggested
 (election-winner metadata included). Advisory-vs-binding stops being a doc
 claim exactly here: a member overrides a formal election and the system's only
 job is to make sure he did it knowingly.
 
-**A6.6** `@marco.deluca` accumulates delegations across `liste-attesa`,
-`salario-minimo`, `transizione-energetica` — **[drive]**
+**A6.6** `@marco.deluca` accumulates delegations across `Healthcare / Waiting lists`,
+`Labour / Minimum wage`, `Energy / Energy transition` — **[drive]**
 → **the super-delegate, on purpose.** §2.4 says this is the model's most serious
 failure mode and the German Pirate Party observed it for real. The fixture must
 *contain* it, or nothing tests the mitigation.
@@ -774,7 +785,7 @@ failure mode and the German Pirate Party observed it for real. The fixture must
 → §6.2.1 pairs decay with soft caps. Decay exists; caps do not. Recorded as a
 gap, not a test.
 
-**A6.8** `@anna.conti` — `POST /delegation` — `intent=clear`, `topic=ius-scholae` — **[drive]**
+**A6.8** `@anna.conti` — `POST /delegation` — `intent=clear`, `topic=Citizenship / Ius scholae` — **[drive]**
 → she had delegated the topic to Sofia; after the assembly debate (**A2.16**)
 she clears it to vote in person. Some questions do not delegate — the interface
 must make taking a vote *back* one gesture, because §2.2.2's revocability
@@ -786,7 +797,7 @@ promise is measured at exactly this moment.
 → `@davide.villa`'s un-renewed delegations **lapse** and drop out of
 resolution. Influence is not a possession.
 
-**A7.2** `@davide.villa` — `POST /delegation` — `intent=renew`, `topic=liste-attesa` — **[drive]**
+**A7.2** `@davide.villa` — `POST /delegation` — `intent=renew`, `topic=Healthcare / Waiting lists` — **[drive]**
 → renewed deliberately, one topic. He does not renew the other four.
 → the difference between 5 delegations and 1 after decay is the mechanism
 working. `/delegation` shows freshness pills; a test asserts resolution changes.
@@ -831,7 +842,7 @@ is the design.
 `governanceProposalQuorumDefault=120`
 `governanceProposalReason=A land-consumption proposal in one municipality cannot reasonably collect 250 national signatures: a uniform quorum kills the long tail.`
 → a member proposes changing the constitution's defaults — motivated by
-Davide's stalled `consumo-suolo` draft, which is the fixture proving his point.
+Davide's stalled `Environment / Land consumption` draft, which is the fixture proving his point.
 
 **A9.2** `@rcn.provider` — `POST /admin` — `intent=governance-proposal-decision` — **[drive]**
 → accepted; defaults update; the decision enters public history.
@@ -847,7 +858,7 @@ hybrid profile assumes regional providers gossiping a shared ledger. These acts
 are driven by the node tests (`p2p`, `gossip-policy`, ring consistency) rather
 than by `user-journeys.js`.
 
-**A10.1** `@rcn.provider` — `/admin` — add peer `https://sud.esempio.rcn.it` (`peerJoin`), enable gossip push/pull — **[drive]**
+**A10.1** `@rcn.provider` — `/admin` — add peer `https://sud.example.rcn.it` (`peerJoin`), enable gossip push/pull — **[drive]**
 → `/admin` shows the peer with capability hints (modules + data mode); `/health`
 records ledger hash snapshots per peer (match/mismatch).
 
@@ -1392,8 +1403,16 @@ the doc keeps those as case descriptors.
   by replaying **[drive]** actions through their real boundaries. Never run
   `scripts/seed-demo.js` first. A seeded store is useful for manual exploration
   and screenshots, but it cannot pass this execution contract.
-- `scripts/party-journeys.js` is the current Scenario A browser walkthrough;
-  `scripts/user-journeys.js` is the separate organization/care walkthrough.
+- `scripts/party-journeys.js` is the current Scenario A browser walkthrough and
+  the source of every README capture (20 images in `md-assets/party/`). It drives
+  A1 (arrival, roles, the A.0 constitution, delegate bios), A2 (discussion,
+  forum, social), A3 (proposal, revision, quorum, argument map, the revision that
+  answers its own deliberation, freeze, vote), A5, A6.2/A6.3, branch groups,
+  lanes and promotion, delegated ballots, A8, and A9.1/A9.2. Start it against a
+  fresh strict-Circle store:
+  `ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh`.
+  `scripts/user-journeys.js` is the separate organization-operations regression
+  driver; it produces no README captures.
   They already isolate browser sessions and make step assertions, but they are
   partial walkthroughs, not full conformance until they emit the trace, expand
   every compound action—including the 250-signature cohort—and replay every

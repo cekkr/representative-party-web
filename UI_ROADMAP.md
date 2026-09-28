@@ -280,7 +280,12 @@ template-hygiene item.
 | Promote-to-upper-level control (shown only when it would succeed) | **[done]** |
 | Promotion request + approve/decline controls (both lanes) | **[done]** |
 | Group members-and-roles panel (lane moderator assignment) | **[done]** |
-| Scenario A README coverage: branch tree, category directory, internal lane, promotion, delegated-ballot state and delegate inbox (`party-journeys.js`, 17 captures) | **[done]** |
+| Scenario A README coverage, all English copy: discussion, forum, proposal/revisions/deliberation/vote, delegation, election, branch tree, category directory, internal lane, promotion, delegated ballot + delegate inbox, People, delegate dashboard, governance change, social (`party-journeys.js`, 20 captures). The README carries no non-political walkthrough | **[done]** |
+| Thread order: forum replies and proposal discussion read oldest-first; the comment form follows the notes; rebuttals name the claim they build on | **[done]** |
+| Ballot select starts on the member's current vote ("Change vote"), never back on abstain | **[done]** |
+| Group election panel leads with results; "start a new election" follows | **[done]** |
+| Governance history reads as decisions ("Approved — …", proposer vs decider) instead of event types | **[done]** |
+| Cachet / delegation-topic labels in the member's casing (`Healthcare / Waiting lists`, not the normalised key) | **[todo]** (see OPTIMIZATIONS) |
 | Proposal Category field (compose + draft edit) with topic datalist | **[done]** |
 | Favicon (kills `/favicon.ico` 404) | **[todo]** (see OPTIMIZATIONS) |
 | Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |

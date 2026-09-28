@@ -19,6 +19,8 @@ export const MIME_TYPES = {
 
 export const POLICIES = {
   id: process.env.CIRCLE_POLICY_ID || 'party-circle-alpha',
+  // Display name a fresh store starts with (the shell brand); /admin can rename it later.
+  name: process.env.CIRCLE_NAME || 'Organization',
   version: 1,
   requireVerification: true,
   enforceCircle: process.env.ENFORCE_CIRCLE === 'true',

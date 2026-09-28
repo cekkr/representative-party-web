@@ -269,7 +269,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   state.settings = {
     ...prev,
     initialized: true,
-    circleName: sanitizeText(body.circleName || prev.circleName || 'Organization', 80),
+    circleName: sanitizeText(body.circleName || prev.circleName || POLICIES.name, 80),
     policyId: sanitizeText(body.policyId || prev.policyId || POLICIES.id, 64) || POLICIES.id,
     enforceCircle,
     requireVerification,

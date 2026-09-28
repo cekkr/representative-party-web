@@ -675,6 +675,8 @@ function renderGroupList(groups, person, state) {
           </details>
           <details class="note">
             <summary>Delegate election</summary>
+            ${elections}
+            <p class="muted small">Start a new election</p>
             <form class="stack" method="post" action="/groups" data-enhance="groups">
               <input type="hidden" name="action" value="startElection" />
               <input type="hidden" name="groupId" value="${groupId}" />
@@ -688,7 +690,6 @@ function renderGroupList(groups, person, state) {
               </label>
               <button class="ghost" type="submit">Start election</button>
             </form>
-            ${elections}
           </details>
         </article>
       `;

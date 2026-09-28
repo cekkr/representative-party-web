@@ -2,13 +2,17 @@
 /**
  * seed-demo
  * ---------
- * Fills a running deployment with a small, plausible organization so the UI can
- * be reviewed (and screenshotted) against real content instead of empty states.
+ * Fills a running deployment with a compact slice of Scenario A — Rete Civica Nazionale,
+ * the fictional Italian civic party of principle-docs/SimulationScenarios.md — so the UI
+ * can be reviewed (and screenshotted with ui-screenshots.js) against real political
+ * content instead of empty states. In-app copy is English; people, laws and institutions
+ * stay Italian, as the scenario specifies.
  *
- * The scenario follows the adoption staircase in
- * principle-docs/OrganizationPressureManagement.md: a care cooperative that
- * starts from a shared inbox and has grown into proposals and delegation.
+ * This is a seed, not a replay: it posts forms directly and asserts nothing. For the
+ * causal, asserted walkthrough (and the README captures) run scripts/party-journeys.js.
  *
+ *   ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+ *     DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh    # terminal 1
  *   BASE_URL=http://127.0.0.1:3000 ADMIN_SESSION=admin node scripts/seed-demo.js
  *
  * Safe to re-run: it appends, so use a fresh store for a clean set.
@@ -17,12 +21,20 @@ const BASE_URL = (process.env.BASE_URL || 'http://127.0.0.1:3000').replace(/\/$/
 const ADMIN_SESSION = process.env.ADMIN_SESSION || 'admin';
 
 const MEMBERS = [
-  { pid: 'seed-nadia', handle: 'nadia', role: 'person', bio: 'Night nursing lead' },
-  { pid: 'seed-tomas', handle: 'tomas', role: 'person', bio: 'Pharmacy coordination' },
-  { pid: 'seed-ines', handle: 'ines', role: 'delegate', bio: 'Elected delegate, care quality' },
-  { pid: 'seed-koen', handle: 'koen', role: 'person', bio: 'Logistics, evening rota' },
-  { pid: 'seed-mara', handle: 'mara', role: 'moderator', bio: 'Works council moderator' },
+  { pid: 'seed-giulia', handle: 'giulia.ferrero', role: 'person' }, // nurse, Torino
+  { pid: 'seed-marco', handle: 'marco.deluca', role: 'delegate' }, // health economist
+  { pid: 'seed-sofia', handle: 'sofia.bianchi', role: 'delegate' }, // constitutional lawyer
+  { pid: 'seed-luca', handle: 'luca.esposito', role: 'person' }, // restaurant owner
+  { pid: 'seed-ahmed', handle: 'ahmed.ben.salah', role: 'person' }, // warehouse worker
+  { pid: 'seed-valentina', handle: 'valentina.sanna', role: 'person' }, // researcher
+  { pid: 'seed-elena', handle: 'elena.rossi', role: 'moderator' }, // party secretary
+  { pid: 'seed-paolo', handle: 'paolo.greco', role: 'person' }, // retired teacher
 ];
+
+const TOPIC = {
+  waitingLists: 'Healthcare / Waiting lists',
+  minimumWage: 'Labour / Minimum wage',
+};
 
 async function form(path, data, { cookie } = {}) {
   const body = new URLSearchParams();
@@ -75,106 +87,97 @@ async function run() {
     console.log(`member  @${member.handle} (${member.role})`);
   }
 
-  // --- Social lane: small talk and coordination, deliberately non-binding.
+  // --- Discussion: conversation before any vote (A2.1–A2.4, A2.6).
+  const discussions = [
+    ['giulia.ferrero', TOPIC.waitingLists, 'concern', 'In my department, the first available non-urgent cardiology appointment is 14 months away. Patients who can afford it use intramoenia and are seen within two weeks. Same building, same doctors, same day.'],
+    ['marco.deluca', TOPIC.waitingLists, 'support', 'The CUP data I aggregated across three regions confirm it: for priority classes D and P, exceeding PNGLA waiting times is the rule, not the exception. This is not a local anomaly; it is an economic equilibrium.'],
+    ['valentina.sanna', TOPIC.waitingLists, 'neutral', 'Is the 14-month figure a median or a worst case? That changes everything. Before we build a proposal on it, we need the distribution, not an anecdote.'],
+    ['luca.esposito', TOPIC.minimumWage, 'concern', "Nine euros gross per hour for a restaurant with four seasonal employees means either raising prices by 12% or closing in November. I am not against a minimum wage; I am against doing it without looking at hospitality's real margins."],
+    ['ahmed.ben.salah', TOPIC.minimumWage, 'support', 'At my warehouse, the pirate contract pays €6.40 an hour. That is not competition on margins; it is competition over who will accept less.'],
+  ];
+  for (const [handle, topic, stance, content] of discussions) {
+    await form('/discussion', { topic, stance, content }, { cookie: people[handle].cookie });
+  }
+  console.log(`discuss ${discussions.length} notes`);
+
+  // --- Forum: the free-mandate argument (A2.8).
+  await form('/forum', {
+    title: 'Why software cannot engineer around the free-mandate rule',
+    content:
+      'Article 67 of the Constitution says every member of Parliament represents the Nation and serves without a binding mandate. '
+      + 'No platform can change that, and none should try. What software can do is make the record impossible to rewrite — '
+      + 'who proposed what, how the text changed, how the members voted, and how the representative voted afterwards. '
+      + 'That is soft power, and it is the only constitutional path open to us.',
+  }, { cookie: people['sofia.bianchi'].cookie });
+  console.log('forum   1 article');
+
+  // --- Social lane: small talk, deliberately non-binding.
   const posts = [
-    ['nadia', 'Third late pharmacy release this week. Logging it before the rota meeting so we have the pattern, not just the anecdote.'],
-    ['tomas', 'Confirmed from our side: the 21:40 release depends on one porter run. If that slips, everything downstream slips.'],
-    ['koen', 'Evening rota is short one porter on Tuesdays and Thursdays. That lines up with the delays Nadia flagged.'],
-    ['ines', 'Collecting this into a proposal so it gets a decision path rather than another thread. Keeping the original messages attached.'],
-    ['mara', 'Reminder: this lane stays conversational. Nothing here is a decision — the proposal track is where it counts.'],
+    ['giulia.ferrero', 'Ward full again today. The intramoenia proposal is almost ready — if your circle still has signatures to collect, now is the time.'],
+    ['valentina.sanna', 'For everyone asking where the waiting-list numbers come from: the internal survey of 14 health authorities, not the regional portals.'],
+    ['paolo.greco', 'Verified at the circle office, with some help from the young ones. Count me in.'],
+    ['luca.esposito', 'I do not agree with everything here, but the level of debate is something else compared with the usual social groups.'],
   ];
   for (const [handle, content] of posts) {
     await form('/social/post', { content }, { cookie: people[handle].cookie });
   }
-  console.log(`social  ${posts.length} posts`);
-
-  const follows = [
-    ['nadia', 'tomas', 'circle'], ['nadia', 'ines', 'info'], ['tomas', 'nadia', 'circle'],
-    ['koen', 'nadia', 'alerts'], ['ines', 'nadia', 'circle'], ['ines', 'tomas', 'interest'],
-    ['mara', 'ines', 'info'], ['koen', 'tomas', 'circle'],
-  ];
-  for (const [from, to, type] of follows) {
-    await form('/social/follow', { handle: to, type }, { cookie: people[from].cookie });
-  }
-  // The feed only shows people you follow, so the operator account follows the
-  // team too — otherwise the seeded deployment still looks empty when reviewed
-  // or screenshotted as admin.
-  const adminFollows = [['nadia', 'circle'], ['tomas', 'circle'], ['ines', 'info'], ['koen', 'alerts'], ['mara', 'info']];
+  // The feed only shows people you follow, so the operator account follows the members
+  // too — otherwise the seeded deployment still looks empty when reviewed as admin.
+  const adminFollows = [['giulia.ferrero', 'circle'], ['valentina.sanna', 'interest'], ['paolo.greco', 'circle'], ['luca.esposito', 'info']];
   for (const [handle, type] of adminFollows) {
     await form('/social/follow', { handle, type }, { cookie: adminCookie });
   }
-  console.log(`follows ${follows.length + adminFollows.length} edges`);
+  console.log(`social  ${posts.length} posts, ${adminFollows.length} follows`);
 
-  // --- Discussion lane: deliberation with evidence.
-  const discussions = [
-    ['nadia', 'Night medication delivery keeps missing the safety window. Four times this month the ward received deliveries more than 30 minutes after pharmacy release. The checks still happened, but the available time was compressed.'],
-    ['tomas', 'Pharmacy release timing, porter capacity, and ward hand-off need to be looked at together. Treating them separately is why this keeps recurring.'],
-    ['koen', 'Proposing we measure across three shifts before changing the sequence, so we are not trading one bottleneck for another.'],
-    ['ines', 'Agreed on measuring first. Adding the shift data to the proposal as evidence rather than asserting the cause.'],
-  ];
-  for (const [handle, content] of discussions) {
-    await form('/discussion', { content }, { cookie: people[handle].cookie });
-  }
-  console.log(`discuss ${discussions.length} posts`);
-
-  // --- Forum: long-form.
-  await form('/forum', {
-    title: 'Review: what the delivery-sequence pilot actually changed',
-    content:
-      'A bounded pilot ran for three weeks across the night rota. Median delay fell from 34 to 11 minutes. '
-      + 'Recurrence checks matter more than the headline: two of the three wards report the pressure moved to the '
-      + 'evening hand-off rather than disappearing. Closing a case is not the same as solving the problem, so the '
-      + 'displacement check stays open for the next review window.',
-  }, { cookie: people.ines.cookie });
-  console.log('forum   1 article');
-
-  // --- Governance: a proposal mid-deliberation with signatures and stance-tagged notes.
+  // --- A proposal mid-deliberation (A3.1, A3.3, A3.4–A3.6).
   await form('/petitions', {
-    title: 'Validate the night delivery sequence before changing the rota',
-    summary: 'Measure the pharmacy-release to ward-delivery sequence across three shifts, then run a bounded pilot with an explicit stop condition.',
-    quorum: '3',
-    problem: 'Night deliveries arrive after the safety window, compressing checks rather than removing them.',
-    proposedAction: 'Instrument the current sequence for three shifts, then pilot a revised release order on one ward.',
-    impact: 'Restores the intended check window without moving risk onto the ward team.',
-    risks: 'The bottleneck may move to the evening hand-off; the pilot needs a displacement check and a stop condition.',
-    implementationPlan: 'Weeks 1-3 measure. Week 4 review. Weeks 5-7 bounded pilot on one ward. Week 8 impact review.',
-    evidenceSummary: 'Four logged late deliveries this month; porter capacity gaps on Tuesday and Thursday evenings.',
-  }, { cookie: people.ines.cookie });
+    title: 'Conditional intramoenia: an ALPI cap wherever PNGLA windows are missed',
+    topic: TOPIC.waitingLists,
+    quorum: '4',
+    summary: 'In specialties where public-service waiting times exceed PNGLA priority classes, intramoenia activity in the same specialty falls to 15% of public-service volumes until those times return to compliance.',
+    problem: 'Law 120/2007 already prohibits ALPI from exceeding public-service volumes, but the constraint is aggregated and weakly checked. This is not a waiting list; it is a pricing mechanism.',
+    proposedAction: "A 15% cap per specialty, tied to the national platform's monitoring (Law 107/2024), with automatic suspension once waiting times return to the U/B/D/P priority classes.",
+    impact: 'Patients without the means to pay regain access within statutory time limits.',
+    risks: 'Specialists may leave for the fully private sector; the cap must be paired with incentives for public-service activity.',
+    implementationPlan: 'Measure at three months; trial the cap in two pilot health authorities at six months; review at twelve.',
+    evidenceSummary: 'RCN survey of 14 health authorities (March 2026); Laws 120/2007 and 107/2024.',
+  }, { cookie: people['giulia.ferrero'].cookie });
 
   const petitionsPage = await fetch(`${BASE_URL}/petitions`, { headers: { Cookie: adminCookie } }).then((r) => r.text());
   const petitionId = (petitionsPage.match(/id="petition-([^"]+)"/) || [])[1];
   if (!petitionId) throw new Error('could not find the seeded proposal');
 
-  for (const handle of ['nadia', 'tomas', 'koen']) {
+  for (const handle of ['giulia.ferrero', 'marco.deluca', 'valentina.sanna', 'ahmed.ben.salah']) {
     await form('/petitions/sign', { petitionId }, { cookie: people[handle].cookie });
   }
   const notes = [
-    ['nadia', 'support', 'Measuring before changing the sequence is the right order. The pattern is consistent across three wards.'],
-    ['tomas', 'concern', 'Pharmacy cannot absorb an earlier release without a second porter run. That constraint needs to be visible in the plan.'],
-    ['koen', 'question', 'Does the pilot include the evening hand-off, or only the night rota? The displacement risk sits at the boundary.'],
+    ['luca.esposito', 'concern', 'If the cap bites, specialists will move to accredited private providers and public-service waits will worsen. What concretely offsets it?'],
+    ['sofia.bianchi', 'concern', 'Healthcare organization is a regional competence under Title V: a national cap by specialty risks a conflict of competences.'],
+    ['valentina.sanna', 'question', 'The survey covers 14 health authorities out of more than 100: is that a sufficient sample for a national cap?'],
   ];
   for (const [handle, stance, content] of notes) {
     await form('/petitions/comment', { petitionId, stance, content }, { cookie: people[handle].cookie });
   }
-  console.log(`propose 1 proposal, 3 signatures, ${notes.length} notes`);
+  console.log(`propose 1 proposal, 4 signatures, ${notes.length} notes`);
 
-  // --- Delegation: topic-scoped and revocable.
+  // --- Delegation: topic-scoped, transitive, revocable (A6.2/A6.3).
   const delegations = [
-    ['nadia', 'ines', 'care-quality'],
-    ['koen', 'ines', 'care-quality'],
-    ['tomas', 'nadia', 'logistics'],
+    ['giulia.ferrero', 'marco.deluca', TOPIC.waitingLists],
+    ['paolo.greco', 'giulia.ferrero', TOPIC.waitingLists],
+    ['ahmed.ben.salah', 'sofia.bianchi', 'Institutions'],
   ];
   for (const [from, to, topic] of delegations) {
-    await form('/delegation', { topic, delegateHash: people[to].pid }, { cookie: people[from].cookie });
+    await form('/delegation', { topic, delegateHash: to }, { cookie: people[from].cookie });
   }
   console.log(`delegate ${delegations.length} edges`);
 
   // --- A group that publishes an advisory cachet.
   await form('/groups', {
     action: 'create',
-    name: 'Night rota working group',
-    description: 'Temporary group coordinating the delivery-sequence review. Advisory only; it does not hold decision rights.',
-  }, { cookie: people.mara.cookie });
+    name: 'Public Healthcare Circle',
+    topics: `${TOPIC.waitingLists}, ${TOPIC.minimumWage}`,
+    description: 'Delegates and priorities on waiting times and healthcare work. Advisory only; it holds no decision rights.',
+  }, { cookie: people['marco.deluca'].cookie });
   console.log('groups  1 group');
 
   console.log('\nSeeded. Capture with: BASE_URL=%s node scripts/ui-screenshots.js', BASE_URL);

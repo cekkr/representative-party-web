@@ -122,5 +122,9 @@ test('verified users can propose governance changes and admin approval updates t
 
   const { text: governanceText } = await fetchText(`${server.baseUrl}/governance`);
   assert.match(governanceText, /Default quorum: 9/);
-  assert.match(governanceText, /proposal_approved/);
+  // The public history reads as a decision, keeps who proposed it apart from who decided,
+  // and never leaks the internal event type.
+  assert.match(governanceText, /Approved — Pilot quorum update/);
+  assert.match(governanceText, /Proposed by .*decided by/);
+  assert.doesNotMatch(governanceText, /proposal_approved/);
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import { DATA_DEFAULTS, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
+import { DATA_DEFAULTS, POLICIES, normalizeDataAdapter, normalizeDataMode, normalizeValidationLevel } from '../../config.js';
 import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
@@ -42,8 +42,11 @@ const MIGRATIONS = [
         ...data,
         settings: {
           initialized: Boolean(data.settings?.initialized),
-          circleName: data.settings?.circleName || 'Organization',
-          policyId: data.settings?.policyId || 'party-circle-alpha',
+          circleName: data.settings?.circleName || POLICIES.name,
+          // The configured id (CIRCLE_POLICY_ID), not a literal: settings win over the env in
+          // policy.js, so a hardcoded default here silently ignored CIRCLE_POLICY_ID on every
+          // fresh store.
+          policyId: data.settings?.policyId || POLICIES.id,
           enforceCircle: data.settings?.enforceCircle ?? null,
           requireVerification: data.settings?.requireVerification ?? null,
           adminContact: data.settings?.adminContact || '',

@@ -13,8 +13,8 @@ screen as a place they participate.
 Screenshots and UX judgements default to **Scenario A — Rete Civica Nazionale**
 (`principle-docs/RepresentativeParties.md`, `principle-docs/SimulationScenarios.md`).
 It exercises the member-facing feed surfaces (discussion, forum, social, proposals,
-delegation, People) with real Italian deliberation content, verified people, and
-attribution — exactly the surfaces where "demo-like" defects hide. Scenario B (ASL
+delegation, People) with real deliberation content — English copy about real Italian
+policy questions — verified people, and attribution — exactly the surfaces where "demo-like" defects hide. Scenario B (ASL
 organization operations) is the secondary lens for the `/organization` workspace only;
 do **not** let it become the product's default face.
 
@@ -23,10 +23,10 @@ do **not** let it become the product's default face.
 ```bash
 # 1. Fresh, seeded, strict-Circle party deployment
 rm -rf .local/standalone
-ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
   DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh   # terminal 1
 
-# 2. Seed + drive + capture the member journey (asserts each step, writes 17 images)
+# 2. Seed + drive + capture the member journey (asserts each step, writes 20 images)
 BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party node scripts/party-journeys.js
 ```
 
@@ -35,8 +35,9 @@ BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party node scripts/party-journe
    plus `/` and `/organization`. Look at each with the checklist below.
 4. Fix defects in source (templates / `app.css` / view helpers), restart, re-verify.
 5. Regenerate committed images and confirm they match the README prose
-   (`OUT_DIR=md-assets/party node scripts/party-journeys.js`; the org walkthrough uses
-   the default standalone with `OUT_DIR=md-assets/walkthrough node scripts/user-journeys.js`).
+   (`OUT_DIR=md-assets/party node scripts/party-journeys.js`). The README carries only
+   Scenario A captures; `scripts/user-journeys.js` is an organization-operations
+   regression driver and writes to `.local/journeys`, not to `md-assets/`.
 6. Run `npm run test:ui` (and the focused view tests) before committing.
 
 Note: the in-app browser screenshot tool captures reliably only at scroll-top. To see
@@ -73,6 +74,14 @@ content, never for locally-authored posts (`local-circle` / own issuer are suppr
 **Deterministic, locale-appropriate dates** — dates render `dd/mm/yyyy` regardless of
 the host machine's locale, so Italian content reads correctly and screenshots are
 reproducible. Never emit machine-locale `m/d/yyyy`.
+
+**English copy, Italian world** — every string a member reads (posts, proposals, group
+and category names, notes) is English; only names, handles, institutions, and legal
+citations stay Italian. A capture with Italian copy fails the review.
+
+**Replies read after what they answer** — inside a thread (forum replies, proposal
+discussion, argument-map rebuttals) the order is oldest-first, and a rebuttal names the
+claim it builds on rather than a raw node id. Feeds of *threads* stay newest-first.
 
 **Every screen has a story** — per `SimulationScenarios.md`, no empty states in the
 seeded deployment, and every number on screen has content behind it. An empty feed or a

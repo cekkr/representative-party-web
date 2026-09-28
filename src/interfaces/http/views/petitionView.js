@@ -161,13 +161,8 @@ export function renderPetitionList(
               : `
           <form class="form-inline" method="post" action="/petitions/vote" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
-            <select name="choice">
-              <option value="yes">yes</option>
-              <option value="no">no</option>
-              <option value="abstain" selected>abstain</option>
-              ${allowDelegation ? '<option value="auto">hand to my delegate</option>' : ''}
-            </select>
-            <button type="submit" class="ghost">${hasDelegatedBallot ? 'Override' : 'Vote'}</button>
+            ${renderBallotSelect(myResolution, allowDelegation)}
+            <button type="submit" class="ghost">${hasDelegatedBallot ? 'Override' : myResolution ? 'Change vote' : 'Vote'}</button>
           </form>
           `
           }
@@ -263,6 +258,24 @@ function resolveMyBallot(state, petition, voteIndex, person, now) {
 // The member's own standing on this proposal: a delegated ballot has to say who holds it,
 // how long they have, and that overriding is available — otherwise the member has no way to
 // tell a delegated vote from a silent one.
+// The ballot select starts on the member's current choice. Defaulting a member who
+// already voted "yes" back to "abstain" meant one careless click silently changed the vote.
+function renderBallotSelect(resolution, allowDelegation) {
+  const current = !resolution ? 'abstain' : resolution.status === 'direct' ? resolution.choice : 'auto';
+  const options = [
+    ['yes', 'yes'],
+    ['no', 'no'],
+    ['abstain', 'abstain'],
+    ...(allowDelegation ? [['auto', 'hand to my delegate']] : []),
+  ];
+  return `
+            <select name="choice">
+              ${options
+                .map(([value, label]) => `<option value="${value}"${value === current ? ' selected' : ''}>${label}</option>`)
+                .join('')}
+            </select>`;
+}
+
 function renderMyBallot(state, resolution) {
   if (!resolution) return '';
   if (resolution.status === 'direct') {
@@ -478,13 +491,18 @@ function renderRevisionHistory(petition, state) {
     .map((revision, index) => {
       const previous = versions[index + 1];
       const when = formatTimestamp(revision.createdAt);
-      const author = String(revision.authorHandle || revision.authorHash || 'anonymous');
+      // Resolve through the shared label so a revision reads as @handle (with the hash cue)
+      // like every other byline, instead of a bare stored handle or a raw hash.
+      const author = revision.authorHash
+        ? renderActorLabel(state, revision.authorHash)
+        : escapeHtml(revision.authorHandle ? `@${revision.authorHandle}` : 'anonymous');
       const note = revision.note ? `<div class="muted small">${escapeHtml(String(revision.note))}</div>` : '';
       const topicLabel = resolveTopicBreadcrumb(revision, state);
-      const diffBlock = renderRevisionDiff(revision, previous, state);
+      // The first revision's note already says it is the initial draft; do not repeat it.
+      const diffBlock = !previous && revision.note ? '' : renderRevisionDiff(revision, previous, state);
       return `
         <li>
-          <div class="muted small">${escapeHtml(when)} · ${escapeHtml(author)} · Topic: ${escapeHtml(topicLabel)}</div>
+          <div class="muted small">${escapeHtml(when)} · ${author} · Topic: ${escapeHtml(topicLabel)}</div>
           <div>${escapeHtml(revision.title || petition.title || 'Untitled')}</div>
           ${note}
           ${diffBlock}
@@ -505,7 +523,10 @@ function renderRevisionHistory(petition, state) {
 function renderDiscussionBlock(petition, comments, state) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
-  const discussionList = renderPetitionComments(comments, state);
+  // Stored newest-first; a deliberation reads oldest-first so a rebuttal follows the
+  // objection it answers.
+  const ordered = comments.slice().sort(sortByCreatedAt);
+  const discussionList = renderPetitionComments(ordered, state, { argumentTitles: indexArgumentTitles(comments) });
   const stanceSummary = renderCommentStanceSummary(comments);
   const argumentData = collectArgumentNodes(comments);
   const argumentMap = renderArgumentMap(argumentData, state);
@@ -516,6 +537,9 @@ function renderDiscussionBlock(petition, comments, state) {
       <summary>Discussion (${count})</summary>
       ${stanceSummary ? `<p class="muted small">${escapeHtml(stanceSummary)}</p>` : ''}
       ${argumentMap}
+      <div class="discussion-list">
+        ${discussionList}
+      </div>
       ${
         disabled
           ? '<p class="muted small">Discussion closed.</p>'
@@ -539,8 +563,8 @@ function renderDiscussionBlock(petition, comments, state) {
             <input name="argumentTitle" placeholder="Claim or evidence headline" />
           </label>
           <label class="field">
-            <span>Builds on argument id</span>
-            <input name="argumentParentId" list="${escapeHtml(argumentDatalistId)}" placeholder="Paste an argument id" />
+            <span>Builds on (pick an argument from the map)</span>
+            <input name="argumentParentId" list="${escapeHtml(argumentDatalistId)}" placeholder="Start typing a claim title" />
           </label>
           ${argumentDatalist}
           <p class="muted small">Use short titles to map pro/con threads and link related notes.</p>
@@ -558,14 +582,34 @@ function renderDiscussionBlock(petition, comments, state) {
       </form>
       `
       }
-      <div class="discussion-list">
-        ${discussionList}
-      </div>
     </details>
   `;
 }
 
-function renderPetitionComments(comments, state) {
+// Argument node id -> the title a member gave it, so "builds on" names the claim being
+// answered instead of printing a raw node id.
+function indexArgumentTitles(comments = []) {
+  const titles = new Map();
+  for (const comment of comments) {
+    if (!comment?.id) continue;
+    titles.set(comment.id, ownArgumentTitle(comment) || truncateText(comment.content || 'an earlier note', 60));
+  }
+  return titles;
+}
+
+// The comment route stores "Argument note" as the title of an untitled reply. That is a
+// placeholder, not something the member wrote, so it must not read as the claim's name.
+function ownArgumentTitle(node) {
+  const title = node?.argumentTitle || '';
+  return node?.argumentParentId && title === 'Argument note' ? '' : title;
+}
+
+function describeArgumentParent(parentId, titles) {
+  const title = titles?.get(parentId);
+  return title ? `Builds on “${escapeHtml(title)}”` : `Builds on ${escapeHtml(String(parentId).slice(0, 8))}`;
+}
+
+function renderPetitionComments(comments, state, { argumentTitles } = {}) {
   if (!comments.length) {
     return renderEmptyState('No discussion notes yet.', { size: 'small' });
   }
@@ -578,11 +622,11 @@ function renderPetitionComments(comments, state) {
         comment.argumentTitle || comment.argumentParentId ? '<span class="pill ghost">Argument map</span>' : '';
       const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
       const createdAt = formatTimestamp(comment.createdAt);
-      const argumentTitle = comment.argumentTitle
-        ? `<p class="muted small">Argument: ${escapeHtml(comment.argumentTitle)}</p>`
+      const argumentTitle = ownArgumentTitle(comment)
+        ? `<p class="muted small">Argument: ${escapeHtml(ownArgumentTitle(comment))}</p>`
         : '';
       const argumentParent = comment.argumentParentId
-        ? `<p class="muted small">Builds on ${escapeHtml(String(comment.argumentParentId).slice(0, 8))}</p>`
+        ? `<p class="muted small">${describeArgumentParent(comment.argumentParentId, argumentTitles)}</p>`
         : '';
       const argumentId =
         comment.argumentTitle || comment.argumentParentId
@@ -776,7 +820,8 @@ function renderArgumentMap(argumentData, state) {
   }
 
   const visited = new Set();
-  const items = roots.map((node) => renderArgumentNode(node, childMap, visited, 0, state)).join('');
+  const titles = indexArgumentTitles(nodes);
+  const items = roots.map((node) => renderArgumentNode(node, childMap, visited, 0, state, titles)).join('');
   const truncatedNote = truncated
     ? `<p class="muted small">Showing latest ${nodes.length} of ${total} argument nodes.</p>`
     : '';
@@ -791,7 +836,7 @@ function renderArgumentMap(argumentData, state) {
   `;
 }
 
-function renderArgumentNode(node, childMap, visited, depth, state) {
+function renderArgumentNode(node, childMap, visited, depth, state, titles) {
   if (!node || visited.has(node.id) || depth > MAX_ARGUMENT_DEPTH) return '';
   visited.add(node.id);
   const stanceLabel = getCommentStanceLabel(node.stance);
@@ -799,15 +844,13 @@ function renderArgumentNode(node, childMap, visited, depth, state) {
   const factCheckPill = node.factCheck ? '<span class="pill warning">Fact check</span>' : '';
   const previewPill = renderPreviewPill(node);
   const createdAt = formatTimestamp(node.createdAt);
-  const title = node.argumentTitle || 'Argument note';
+  const title = ownArgumentTitle(node) || (node.argumentParentId ? 'Reply' : 'Argument note');
   const shortId = String(node.id || '').slice(0, 8);
-  const parentHint = node.argumentParentId
-    ? `Builds on ${escapeHtml(String(node.argumentParentId).slice(0, 8))}`
-    : '';
+  const parentHint = node.argumentParentId ? describeArgumentParent(node.argumentParentId, titles) : '';
   const content = node.content ? `<p>${escapeHtml(node.content)}</p>` : '';
   const author = renderAuthorHashLine(node.authorHash, { size: 'tiny', state });
   const children = childMap.get(node.id) || [];
-  const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1, state)).join('');
+  const childItems = children.map((child) => renderArgumentNode(child, childMap, visited, depth + 1, state, titles)).join('');
   const childBlock = childItems ? `<ul class="argument-children">${childItems}</ul>` : '';
   return `
     <li>
@@ -833,7 +876,7 @@ function renderArgumentDatalist(nodes = [], datalistId = 'argument-map-options')
   if (!nodes.length) return '';
   const options = nodes
     .map((node) => {
-      const label = node.argumentTitle || truncateText(node.content || 'Argument note', 80);
+      const label = ownArgumentTitle(node) || truncateText(node.content || 'Argument note', 80);
       const stanceLabel = getCommentStanceLabel(node.stance);
       return `<option value="${escapeHtml(node.id)}">${escapeHtml(label)} · ${escapeHtml(stanceLabel)}</option>`;
     })

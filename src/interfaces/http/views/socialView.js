@@ -148,7 +148,7 @@ function renderReplyForm(post, { open = false } = {}) {
 
 function renderReshare(post, mediaById) {
   if (!post.reshare) return '';
-  const author = escapeHtml(post.reshare.authorHandle || post.reshare.authorHash || 'unknown');
+  const author = escapeHtml(post.reshare.authorHandle ? `@${post.reshare.authorHandle}` : post.reshare.authorHash || 'unknown');
   const content = escapeHtml(post.reshare.content || '');
   const created = formatTimestamp(post.reshare.createdAt);
   const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], mediaById);

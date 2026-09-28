@@ -11,23 +11,14 @@ This repository is a Node.js SSR application that starts as a usable email/discu
 
 ---
 
-## Two walkthroughs
-
-The framework has two halves, and each has a walkthrough driven end-to-end through the interface itself — one browser session per member, an assertion at every step, so a broken flow fails the run instead of quietly producing a nice picture.
-
-- **A party decides its own position** exercises the *civic* half: verified people, deliberation before voting, liquid delegation, and soft-power accountability. It follows `principle-docs/RepresentativeParties.md` and Scenario A of `principle-docs/SimulationScenarios.md`.
-- **An organization takes a concern to a decision** exercises the *operations* half: a message becoming a case, pressure the organization can see, and structure earned by use. It follows `principle-docs/OrganizationPressureManagement.md`.
-
----
-
 ## Walkthrough: a party decides its own position
 
-Members of *Rete Civica Nazionale* — a **fictional** Italian civic party — take a real Italian policy question from a message to a decision, under strict Circle enforcement (**one verified person = one voice**). The in-app content is in Italian and the norms are the real ones (`L. 120/2007` and `L. 107/2024` on intramoenia and CUP monitoring, the PNGLA priority classes, `sent. 192/2024` on differentiated autonomy); the people and the institution are invented.
+The demo deployment is the framework's civic mode — the representative-party model of `principle-docs/RepresentativeParties.md`, played out as Scenario A of `principle-docs/SimulationScenarios.md`. Members of *Rete Civica Nazionale* — a **fictional** Italian civic party — take real Italian policy questions from a message to a decision, under strict Circle enforcement (**one verified person = one voice**). The copy is English; the party's legal order stays Italian and real (`Law 120/2007` and `Law 107/2024` on intramoenia and CUP monitoring, the PNGLA priority classes, judgment `192/2024` on differentiated autonomy, art. 67 of the Constitution on the free mandate). The people and the institution are invented.
 
-Every screenshot below is produced by `scripts/party-journeys.js`, which drives these flows through the interface — one browser session per member — and asserts the outcome at each step.
+Every screenshot below is produced by `scripts/party-journeys.js`, which drives these flows through the interface — one browser session per member, clicking the controls and typing into the fields — and asserts the outcome at each step, so a broken flow fails the run instead of quietly producing a nice picture.
 
 ```bash
-ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
   DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh    # terminal 1
 BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party \
   node scripts/party-journeys.js                                      # terminal 2
@@ -35,40 +26,20 @@ BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party \
 
 | | |
 |:--|:--|
-| ![Waiting-list discussion thread on liste-attesa](md-assets/party/party-discussion.png)<br>**1 · Conversation before any vote** — five stance-tagged notes on `liste-attesa`, each authored by a verified `@handle` with its blinded-hash cue: lived experience, aggregated CUP data, the territory, and a researcher checking the number. | ![Cross-topic concession on autonomia differenziata](md-assets/party/party-discussion-concession.png)<br>**Deliberation that changes a mind** — on *autonomia differenziata* (a split that is geographic, not left-vs-right), `@tommaso.ricci` concedes a point in public and the thread survives it. |
-| ![Structured intramoenia proposal card](md-assets/party/party-proposal.png)<br>**2 · A proposal earns its way** — the structured outline (problem / action / impact / risks / plan) tightens `L. 120/2007` instead of inventing a new right. | ![Two proposals, one below quorum](md-assets/party/party-signatures.png)<br>**3 · Quorum, not an admin, moves it** — signatures carry the proposal into discussion; a single-member land-use draft stays visible under its own higher quorum, so the long tail is not buried. |
-| ![Deliberation feed with argument map and fact check](md-assets/party/party-deliberation.png)<br>**4 · The disagreement has a shape** — a Titolo V argument-map node from `@sofia.bianchi` and a fact-check request landing on a specific claim, not a vibe. | ![Frozen proposal with dissenting tally](md-assets/party/party-vote.png)<br>**5 · Opening a vote is deliberate** — a moderator's attributed, timestamped pre-vote freeze; votes are cast against text that can no longer move, and the tally records the `no`. |
-| ![Effective delegation chain](md-assets/party/party-delegation.png)<br>**6 · Delegation is liquid and readable** — the "explain my influence" chain `You → @giulia.ferrero → @marco.deluca`, chosen by `@handle`, topic-scoped, revocable, and decay-aware. | ![Ranked group election won on transfers](md-assets/party/party-election.png)<br>**7 · Choosing people, on transfers** — the economist leads first preferences, but the frontline nurse wins on the second round: the first-preference leader loses, as ranked transfers exist to allow. |
-| ![A party circle with a topic-focused branch](md-assets/party/party-branch-groups.png)<br>**8 · Structure can grow without inheriting power** — *Officina Liste d’Attesa* sits beneath *Circolo Sanità Pubblica*, but keeps its own membership and delegate cachets. The tree describes where work happens; it does not manufacture authority. | ![The group category and delegate directory](md-assets/party/party-categories.png)<br>**Who works on what** — declared categories become a browsable directory of the groups covering them and the people they put forward. A member can delegate from the directory, then override that advice at any time. |
-| ![A members-only discussion inside a branch](md-assets/party/party-group-lane.png)<br>**9 · Working notes can stay internal** — optional group lanes are off by default. This members-only branch discussion stays out of the Circle-wide feed until someone explicitly asks to move it upward. | ![A promoted discussion retaining its history](md-assets/party/party-promotion.png)<br>**A member asks; a lane moderator decides** — the note moves to the parent circle with a visible provenance stamp. It is a move, not a copy, so the thread keeps its id and its replies travel with it. |
-| ![A delegated ballot waiting outside the tally](md-assets/party/party-delegated-ballot.png)<br>**10 · A delegated ballot is not an abstention** — `@davide.villa` delegates the broad `Sanità` category and it reaches a `Sanità / Liste di attesa` proposal. While the delegate still has time, the ballot is shown as awaiting and stays outside every tally bucket; the member can override it. | ![A delegate inbox showing an assigned ballot and deadline](md-assets/party/party-delegate-inbox.png)<br>**The delegate sees what is riding on them** — `@giulia.ferrero` gets the proposal, its source member, and the five-day countdown. If the window lapses the ballot becomes an abstention; until then it remains pending. |
-| ![People directory listing members by handle](md-assets/party/party-delegates.png)<br>**11 · Accountability is soft power** — members browse People by `@handle`, never by pasting a hash; delegates rank first. | ![A delegate's public accountability dashboard](md-assets/party/party-delegate-profile.png)<br>**The accountability dashboard** — delegations received and set, vote history, and group endorsements, beside an **advisory** (never binding) deliberation score. |
-| ![The party social feed with typed follows and a reshare](md-assets/party/party-social.png) | **The social lane stays social** — short attributed updates from followed people, typed follows (`circle` / `interest` / `info` / `alerts`), and a reshare with commentary. At a glance a social post is *not* a vote: no quorum, no stance, no tally — the "small talk + info" lane is kept structurally separate from the formal decision track. |
+| ![Waiting-list discussion thread](md-assets/party/party-discussion.png)<br>**1 · Conversation before any vote** — five stance-tagged notes on *Healthcare / Waiting lists*, each by a verified `@handle` with its blinded-hash cue: lived experience, aggregated CUP data, the territory, and a researcher asking whether the number is a median — answered with a method. | ![A public concession on differentiated autonomy](md-assets/party/party-discussion-concession.png)<br>**Deliberation that changes a mind** — on differentiated autonomy (a split that is geographic, not left-vs-right), `@tommaso.ricci` concedes a point in public and the thread survives it. |
+| ![A forum article on the free mandate with replies](md-assets/party/party-forum.png)<br>**2 · The long-form lane** — the constitutional lawyer argues why software cannot engineer around the free mandate (art. 67); a member asks whether the ethical pact is a party whip by another name, and she answers in the thread. | ![Structured intramoenia proposal card](md-assets/party/party-proposal.png)<br>**3 · A proposal earns its way** — the structured outline (problem / action / impact / risks / plan) tightens `Law 120/2007` instead of inventing a new right. |
+| ![Two proposals, one below quorum](md-assets/party/party-signatures.png)<br>**4 · Quorum, not an admin, moves it** — signatures from distinct people carry the proposal into discussion; a single-member land-use draft stays visible under its own higher quorum, so the long tail is not buried. | ![Deliberation feed with argument map and fact check](md-assets/party/party-deliberation.png)<br>**5 · The disagreement has a shape** — a Title V objection as an argument node with the economist's rebuttal under it, the restaurateur's concern, and a fact-check request on a specific claim, read oldest-first. |
+| ![Version history showing three attributed revisions](md-assets/party/party-revisions.png)<br>**Deliberation changes the text** — draft → the economist's cap revision → the author's answer to the concerns, each revision attributed, noted, and diffable. | ![Frozen proposal with dissenting tally](md-assets/party/party-vote.png)<br>**6 · Opening a vote is deliberate** — the party secretary's attributed, timestamped pre-vote freeze; votes are cast against text that can no longer move, and the tally records the `no`. |
+| ![Effective delegation chain](md-assets/party/party-delegation.png)<br>**7 · Delegation is liquid and readable** — the "explain my influence" chain `You → @giulia.ferrero → @marco.deluca`, chosen by `@handle`, topic-scoped, revocable, and decay-aware. | ![Ranked group election won on transfers](md-assets/party/party-election.png)<br>**8 · Choosing people, on transfers** — the economist leads first preferences, but the frontline nurse wins in round two: the first-preference leader loses, as ranked transfers exist to allow. |
+| ![A party circle with a topic-focused branch](md-assets/party/party-branch-groups.png)<br>**9 · Structure can grow without inheriting power** — the *Waiting Lists Workshop* sits beneath the *Public Healthcare Circle* but keeps its own membership and delegate cachets. The tree describes where work happens; it does not manufacture authority. | ![The group category and delegate directory](md-assets/party/party-categories.png)<br>**Who works on what** — declared categories become a browsable directory of the groups covering them and the people they put forward. A member can delegate from the directory, then override that advice at any time. |
+| ![A members-only discussion inside a branch](md-assets/party/party-group-lane.png)<br>**10 · Working notes can stay internal** — optional group lanes are off by default. This members-only branch note stays out of the Circle-wide feed until someone asks to move it up. | ![A promoted discussion retaining its history](md-assets/party/party-promotion.png)<br>**A member asks; a lane moderator decides** — the note moves to the parent circle with a visible provenance stamp. It is a move, not a copy, so the thread keeps its id and its replies travel with it. |
+| ![A delegated ballot waiting outside the tally](md-assets/party/party-delegated-ballot.png)<br>**11 · A delegated ballot is not an abstention** — `@davide.villa` delegates the broad `Healthcare` category and it reaches a `Healthcare / Primary care` proposal. While the delegate still has time, the ballot is shown as awaiting and stays outside every tally bucket; he can override it. | ![A delegate inbox showing an assigned ballot and deadline](md-assets/party/party-delegate-inbox.png)<br>**The delegate sees what is riding on them** — `@giulia.ferrero` gets the proposal, who handed it to her, and the five-day countdown. If the window lapses the ballot becomes an abstention; until then it remains pending. |
+| ![People directory listing members by handle](md-assets/party/party-delegates.png)<br>**12 · Accountability is soft power** — members browse People by `@handle`, never by pasting a hash; delegates rank first. | ![A delegate's public accountability dashboard](md-assets/party/party-delegate-profile.png)<br>**The accountability dashboard** — a provider-local public bio, delegations received and set, vote history, and group endorsements, beside an **advisory** (never binding) deliberation score. |
+| ![The digital constitution with an approved member proposal](md-assets/party/party-governance.png)<br>**13 · The rules can be changed from below** — a member proposes lowering the default quorum because the uniform one starves the long tail; the decision keeps who proposed it apart from who decided it. The tension stays visible: today the provider decides. | ![The party social feed with typed follows and a reshare](md-assets/party/party-social.png)<br>**The social lane stays social** — short attributed updates from followed people, typed follows (`circle` / `interest` / `info` / `alerts`), and a reshare with commentary. No quorum, no stance, no tally: it is structurally separate from the decision track. |
 
-Nothing here compels a representative: a member could vote against the platform's own outcome and the record would simply show it. The free mandate (art. 67 Cost.) stays intact; the accountability is that no one can quietly rewrite what happened.
+Nothing here compels a representative: a member could vote against the platform's own outcome and the record would simply show it. The free mandate (art. 67 of the Constitution) stays intact; the accountability is that no one can quietly rewrite what happened.
 
----
-
-## Walkthrough: an organization takes a concern to a decision
-
-Six members of a care cooperative — `@nadia` (night nursing), `@tomas` (pharmacy), `@ines` (delegate), `@koen` (logistics), `@mara` (works council), and the provider admin — take one concern from a message to a decision.
-
-Every screenshot below is produced by `scripts/user-journeys.js`, which drives these flows through the interface itself: clicking the controls, typing into the fields, one browser session per member. It asserts the outcome at each step, so a broken flow fails the run instead of quietly producing a nice picture.
-
-```bash
-./run-standalone.sh                                     # terminal 1
-BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js   # terminal 2
-```
-
-| | |
-|:--|:--|
-| ![Discussion post about late ward deliveries](md-assets/walkthrough/discussion-posted.png)<br>**1 · It starts as a message** — `@nadia` raises a recurring problem in the discussion lane: no case, no form, no taxonomy — a post, attributed to her handle, with the blinded hash as the cue. | ![The organization workspace](md-assets/walkthrough/organization-case.png)<br>**2 · The organization can see the pressure** — the source message stays canonical in the middle, the inbox on the left, and the case lens on the right explains *why this needs attention*. |
-| ![A disabled layer shown as a labeled preview](md-assets/walkthrough/organization-layer.png)<br>**Unenabled layers stay honest** — they render as labeled previews with the enable path explained, never pretending to persist or execute a workflow. | ![The structured proposal draft form](md-assets/walkthrough/proposal-drafted.png)<br>**3 · It becomes a proposal** — when a decision is actually needed, the structured outline (problem / action / impact / risks / plan) forces the argument to be explicit. |
-| ![Proposal card at quorum in the discussion stage](md-assets/walkthrough/proposal-signatures.png)<br>**4 · Signatures carry it to quorum** — four distinct members sign; quorum, not an administrator, moves it into discussion. | ![A stance-tagged deliberation note](md-assets/walkthrough/proposal-deliberation.png)<br>**Deliberation has a shape** — notes are stance-tagged (support / concern / question), so a reader sees the disagreement instead of a flat thread. |
-| ![The frozen proposal open for voting](md-assets/walkthrough/proposal-vote-open.png)<br>**5 · Opening a vote is deliberate** — the author cannot open a vote on their own proposal; a moderator confirms an attributed, timestamped pre-vote freeze. | ![The auditable vote tally](md-assets/walkthrough/vote-cast.png)<br>**6 · The tally is auditable** — each vote is a signed envelope; the card carries quorum, signatures, revisions, and the frozen revision id beside the tally. |
-| ![A working group card with its own controls](md-assets/walkthrough/group-joined.png)<br>**7 · Groups organize the work** — group policy, preferred delegates, and delegate elections live inside the group, separate from Circle policy. | ![Delegation chain explained by handle](md-assets/walkthrough/delegation-set.png)<br>**8 · Delegation is explained** — `@koen` delegates `care-quality` to `@ines` by handle; "explain my influence" states plainly where the vote goes. |
-
-Delegation stays topic-scoped, advisory, and revocable: cycles, banned delegates, and overlong chains are stopped automatically.
+The same kernel also runs outside politics. The organization-operations half (`principle-docs/OrganizationPressureManagement.md`) has its own driver, `scripts/user-journeys.js`, which exercises intake, the `/organization` workspace, and the shared proposal/vote/group/delegation flows as a regression check; it is not the product's demo face.
 
 ---
 
@@ -192,26 +163,28 @@ npm start
 The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`). Signing keys are exported as PEM **text** — passing a file path leaves envelopes unsigned and `/admin` reports the key as ignored rather than loaded.
 
 ```bash
-# Drive the organization-operations flows through the UI (discussion, proposal,
-# vote, groups, delegation) and capture that walkthrough's screenshots
-BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js
+# The demo deployment: a strict-Circle party (Scenario A: Rete Civica Nazionale)
+ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
+  DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh
 
-# Drive the representative-party flows (Scenario A: Rete Civica Nazionale) and
-# capture the party walkthrough. Needs a strict-Circle standalone:
-#   ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
-#     DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh
+# Drive the representative-party flows through the UI and capture the walkthrough
+# (asserts every step; ONLY=forum,governance runs a subset, HEADLESS=false shows it)
 BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js
 
-# Fill a running deployment with a plausible demo organization
+# Or fill it with a compact, unasserted slice of the same party for manual review
 BASE_URL=http://127.0.0.1:3000 node scripts/seed-demo.js
 
 # Capture one screenshot per route + a layout audit (clipping, blocked clicks)
 BASE_URL=http://127.0.0.1:3000 node scripts/ui-screenshots.js
+
+# Regression-drive the organization-operations flows (default standalone)
+BASE_URL=http://127.0.0.1:3000 node scripts/user-journeys.js
 ```
 
-`user-journeys.js` gives each member their own browser context, so quorum and
-"another member sees it" are checked against genuinely distinct sessions. Use
-`HEADLESS=false` to watch a run, or `ONLY=proposal,vote` to drive one track.
+Both journey drivers give each member their own browser context, so quorum and
+"another member sees it" are checked against genuinely distinct sessions. Run them
+against a fresh store: they create handles and records, and a second run collides
+with the first.
 
 On first run, visit `/admin` to complete the installation wizard (Circle basics, data mode, peer alignment, optional defaults). Saving persists settings to the configured adapter (JSON/KV under `src/data/` by default). The module control center in `/admin` keeps toggles and related settings linked with jump anchors.
 
@@ -415,7 +388,7 @@ Ledger exports (`/circle/ledger`, `/votes/ledger`, `/transactions/ledger`) respe
 ### Core knobs (env)
 
 - Server: `HOST`, `PORT`
-- Circle/policy: `ENFORCE_CIRCLE`, `CIRCLE_POLICY_ID`, `CIRCLE_ISSUER`, `GOSSIP_INTERVAL_SECONDS`, `GOSSIP_OPTIONAL_SKIP_SECONDS` (issuer labels gossip envelopes; `/admin` can override it in settings)
+- Circle/policy: `ENFORCE_CIRCLE`, `CIRCLE_POLICY_ID`, `CIRCLE_NAME` (the name a fresh deployment starts with; `/admin` can rename it), `CIRCLE_ISSUER`, `GOSSIP_INTERVAL_SECONDS`, `GOSSIP_OPTIONAL_SKIP_SECONDS` (issuer labels gossip envelopes; `/admin` can override it in settings)
 - Topic gardener: `TOPIC_GARDENER_SYNC_SECONDS` (poll `/operations` for rename/merge/split suggestions)
 - Extensions: `CIRCLE_EXTENSIONS` (comma‑separated module names under `src/modules/extensions/`; initial migrations register these as installed and enabled)
 - Signing: `CIRCLE_PRIVATE_KEY`, `CIRCLE_PUBLIC_KEY` (PEM). Use `npm run keys:circle` for PEM + .env‑ready output (optional libp2p ring ID included). Set `CIRCLE_RING_ID` to prefill the provider-blind ring ID in `/admin`. `/admin` can generate and persist keys into `settings.json`; env vars still override on restart.

@@ -26,6 +26,10 @@ export function buildCategoryDirectory(state, { limit = MAX_CATEGORIES } = {}) {
     if (!row) {
       row = { key, label: String(rawLabel).trim(), groups: [], delegates: [] };
       byCategory.set(key, row);
+    } else if (row.label === row.label.toLowerCase() && String(rawLabel).trim() !== row.label) {
+      // Cachets and elections store the normalised key; a group's declared category keeps
+      // the member's casing ("Healthcare / Waiting lists"). Prefer the written form.
+      row.label = String(rawLabel).trim();
     }
     if (!row.groups.some((candidate) => candidate.id === group.id)) {
       row.groups.push({
@@ -40,6 +44,17 @@ export function buildCategoryDirectory(state, { limit = MAX_CATEGORIES } = {}) {
       });
     }
     if (entry?.delegateHash) {
+      // Closing an election also writes the winner as the group's cachet, so the same person
+      // would be listed twice for one group. One row per (group, person); an election is the
+      // stronger reason, so it names the source.
+      const existing = row.delegates.find(
+        (candidate) => candidate.groupId === group.id && candidate.delegateHash === entry.delegateHash,
+      );
+      if (existing) {
+        if (entry.source === 'election') existing.source = 'election';
+        existing.priority = Math.max(existing.priority, Number(entry.priority) || 0);
+        return;
+      }
       row.delegates.push({
         groupId: group.id,
         groupName: group.name || 'Group',

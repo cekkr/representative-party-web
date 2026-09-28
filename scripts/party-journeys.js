@@ -2,18 +2,26 @@
 /**
  * party-journeys — Scenario A: Rete Civica Nazionale
  * --------------------------------------------------
- * Drives the *representative party* half of the framework through the UI, in
- * Italian, the way a member actually uses it: deliberation before any vote, a
- * proposal that earns its way to a ballot, an attributed freeze, a tally that
- * shows the dissent, a readable delegation chain, a ranked election won on
- * transfers, and an accountability trail nobody can quietly rewrite.
+ * Drives the *representative party* half of the framework through the UI the way a
+ * member actually uses it: deliberation before any vote, a long-form argument about
+ * the free mandate, a proposal that earns its way to a ballot and is visibly changed
+ * by its own deliberation, an attributed freeze, a tally that shows the dissent, a
+ * readable delegation chain, a ranked election won on transfers, a constitution that
+ * members can propose to change, and an accountability trail nobody can quietly
+ * rewrite.
  *
- * It is the companion to user-journeys.js (the organization-pressure / care
- * track). Reference: principle-docs/SimulationScenarios.md (Scenario A) and
+ * The in-app copy is English; the party, its people and its legal order stay Italian
+ * (names, handles, laws, institutions), as principle-docs/SimulationScenarios.md
+ * specifies. Every screenshot this writes is a README capture.
+ *
+ * It is the companion to user-journeys.js (the organization-operations regression
+ * driver). Reference: principle-docs/SimulationScenarios.md (Scenario A) and
  * principle-docs/RepresentativeParties.md.
  *
- *   ENFORCE_CIRCLE=true PORT=3000 ./run-standalone.sh                 # terminal 1
- *   BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js     # terminal 2
+ *   ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale \
+ *     DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh   # terminal 1
+ *   BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party \
+ *     node scripts/party-journeys.js                                       # terminal 2
  *
  * Options (env):
  *   BASE_URL   deployment to drive (default http://127.0.0.1:3000)
@@ -109,9 +117,15 @@ async function member(browser, handle) {
   return page;
 }
 
+/**
+ * Navigates, then settles separately. Waiting on `networkidle0` inside goto() times out
+ * intermittently with nothing in flight (Chrome drops the lifecycle event in one of many
+ * contexts), which aborted whole runs; `load` plus a bounded idle wait is equivalent here.
+ */
 async function visit(page, url) {
   await page.bringToFront();
-  await page.goto(`${BASE_URL}${url}`, { waitUntil: 'networkidle0' });
+  await page.goto(`${BASE_URL}${url}`, { waitUntil: 'load' });
+  await page.waitForNetworkIdle({ idleTime: 250, timeout: 5000 }).catch(() => {});
 }
 
 /** The provider operator. Verifies the seeded pending admin session by following its login link. */
@@ -243,7 +257,10 @@ async function typeInto(page, selector, value) {
   }
   const el = await page.$(selector);
   if (!el) return false;
+  // Clear first: a triple-click does not select a prefilled number input, and a revision
+  // form arrives prefilled with the current text, so typing would append to it.
   await guard(`focus ${selector}`, () => el.click({ clickCount: 3 }));
+  await el.evaluate((node) => { node.value = ''; }).catch(() => {});
   await guard(`type into ${selector}`, () => el.type(value, { delay: 1 }));
   return true;
 }
@@ -390,7 +407,58 @@ async function openDetails(page, summaryText, { scope = '' } = {}) {
   return opened;
 }
 
+/** Types into the first field matching `selector` inside the card that contains `text`. */
+async function typeInCard(page, cardSelector, text, fieldSelector, value) {
+  const marked = await page.evaluate(
+    (cardSel, want, fieldSel) => {
+      const cards = [...document.querySelectorAll(cardSel)];
+      const card = cards.find((c) => (c.textContent || '').toLowerCase().includes(want.toLowerCase()));
+      const field = card?.querySelector(fieldSel);
+      if (!field) return false;
+      field.setAttribute('data-journey-field', '1');
+      return true;
+    },
+    cardSelector,
+    text,
+    fieldSelector,
+  );
+  if (!marked) {
+    record(`no ${fieldSelector} in the ${cardSelector} containing "${text}" on ${page.url()}`);
+    return false;
+  }
+  const typed = await typeInto(page, '[data-journey-field]', value);
+  await page.evaluate(() => document.querySelector('[data-journey-field]')?.removeAttribute('data-journey-field')).catch(() => {});
+  return typed;
+}
+
 /* --------------------------------------------------------------- journeys */
+
+/**
+ * One category hierarchy for the whole party (SimulationScenarios.md, A.2). The debates are
+ * Italian ones; their labels are English so the captures read for an English-language
+ * reviewer. Every discussion, proposal, group, election and delegation below files into
+ * this tree, so a delegation on a parent category visibly reaches its subcategories and the
+ * group directory has one row per subject rather than a flat id beside a path.
+ */
+const TOPIC = {
+  waitingLists: 'Healthcare / Waiting lists',
+  primaryCare: 'Healthcare / Primary care',
+  minimumWage: 'Labour / Minimum wage',
+  autonomy: 'Institutions / Differentiated autonomy',
+  iusScholae: 'Citizenship / Ius scholae',
+  landUse: 'Environment / Land consumption',
+};
+const CATEGORY = {
+  health: 'Healthcare',
+  labour: 'Labour',
+  waitingLists: TOPIC.waitingLists,
+};
+const EVIDENCE = {
+  survey: 'https://example.rcn.it/waiting-lists/survey-2026',
+  method: 'https://example.rcn.it/waiting-lists/survey-method',
+};
+const CIRCLE_NAME = 'Public Healthcare Circle';
+const BRANCH_NAME = 'Waiting Lists Workshop';
 
 /** A1 — Members arrive, claim handles, and are given their (visible) roles by the provider. */
 async function journeyArrive(browser) {
@@ -414,161 +482,273 @@ async function journeyArrive(browser) {
     await submitNear(admin, 'input[name="sessionId"]');
     await expectText(admin, role, `@${handle} assigned ${role} (a provider act, and visible)`);
   }
+
+  // A.0 — the party's constitution defaults. The vote method stays `majority`: ballots
+  // are yes/no/abstain today, and publishing "condorcet" would claim a count that does
+  // not happen (multi-method ballots are Phase 3).
+  await visit(admin, '/admin');
+  const configured = await admin.evaluate(() => {
+    const form = [...document.querySelectorAll('form[action="/admin"]')].find((f) =>
+      f.querySelector('input[name="intent"][value="governance"]'),
+    );
+    if (!form) return false;
+    const set = (name, value) => {
+      const field = form.querySelector(`[name="${name}"]`);
+      if (field) field.value = value;
+    };
+    set('governanceQuorumDefault', '250');
+    set('governanceVoteMethod', 'majority');
+    set('governanceDiscussionWindowDays', '14');
+    set('governanceVoteWindowDays', '7');
+    set('governanceDelegationDecayDays', '180');
+    set('governanceDelegateVoteWindowDays', '5');
+    form.querySelector('button[type="submit"], button:not([type])')?.click();
+    return true;
+  });
+  if (!configured) record('the provider has no governance-defaults form in /admin');
+
+  // A1.3 — delegates publish a bio. The field is provider-local (it never gossips), so the
+  // provider declares it in the structure manager before anyone can fill it.
+  await visit(admin, '/admin');
+  await typeInto(admin, 'textarea[name="providerFields"]', 'publicBio:string:Public bio (shown on your delegate profile)');
+  await submitNear(admin, 'textarea[name="providerFields"]');
+  const bios = [
+    ['marco.deluca', 'Health economist, Bologna. I work on CUP data and the economics of waiting lists; I publish my models before I vote on them.'],
+    ['sofia.bianchi', 'Constitutional lawyer, Rome. Delegate on institutional questions only — Title V, autonomy, the free mandate.'],
+    ['irene.fabbri', 'Municipal councillor, Florence. I run the Public Healthcare Circle and report back after every council vote.'],
+  ];
+  for (const [handle, bio] of bios) {
+    const page = await member(browser, handle);
+    await visit(page, '/profile');
+    if (await typeInto(page, 'input[name="profile_publicbio" i]', bio)) {
+      await page_check(page, 'input[name="profileConsent"]');
+      await submitNear(page, 'input[name="profile_publicbio" i]');
+    }
+  }
+  await settle(admin);
+  await visit(admin, '/governance');
+  await expectText(admin, 'Default quorum: 250', 'the party constitution publishes its Scenario A defaults');
 }
 
-/** A2 — Conversation before any vote: three live threads, in Italian. */
+/** A2 — Conversation before any vote: live threads, a fact-check loop, a public concession. */
 async function journeyDiscussion(browser) {
   console.log('\n— discussion: deliberation before any vote');
 
-  // The waiting-list thread: lived experience, corroborated by data, checked.
+  // A2.1/A2.2/A2.6/A2.11/A2.12 — the waiting-list thread: lived experience,
+  // corroborated by data, questioned, and answered with a method.
   const giulia = await member(browser, 'giulia.ferrero');
   await post(giulia, {
-    topic: 'liste-attesa',
+    topic: TOPIC.waitingLists,
     stance: 'concern',
     content:
-      'Nel mio reparto la prima disponibilità per una visita cardiologica non urgente è a 14 mesi. Chi può permetterselo va in intramoenia e viene visitato in due settimane. Stessa struttura, stessi medici, stesso giorno.',
-    evidence: 'https://esempio.rcn.it/liste-attesa/rilevazione-2026',
+      'In my department, the first available non-urgent cardiology appointment is 14 months away. Patients who can afford it use intramoenia and are seen within two weeks. Same building, same doctors, same day.',
+    evidence: EVIDENCE.survey,
   });
-  await expectText(giulia, '14 mesi', 'a concrete, attributed claim opens the thread');
+  await expectText(giulia, '14 months', 'a concrete, attributed claim opens the thread');
 
   const marco = await member(browser, 'marco.deluca');
   await post(marco, {
-    topic: 'liste-attesa',
+    topic: TOPIC.waitingLists,
     stance: 'support',
     content:
-      'I dati CUP che ho aggregato su tre regioni confermano: per le classi D e P lo sforamento dei tempi PNGLA è la norma, non l’eccezione. Dove l’istituzionale sfora, l’intramoenia della stessa branca è puntuale. Non è un’anomalia locale: è un equilibrio economico.',
+      'The CUP data I aggregated across three regions confirm it: for priority classes D and P, exceeding PNGLA waiting times is the rule, not the exception. And where the public service runs late, intramoenia in the same specialty runs on time. This is not a local anomaly; it is an economic equilibrium.',
   });
 
   const valentina = await member(browser, 'valentina.sanna');
   await post(valentina, {
-    topic: 'liste-attesa',
+    topic: TOPIC.waitingLists,
     stance: 'neutral',
     content:
-      'Il dato dei 14 mesi è una mediana o un caso peggiore? Cambia tutto: la mediana descrive il sistema, il caso peggiore descrive una coda. Prima di costruirci una proposta serve la distribuzione, non un aneddoto.',
+      'Is the 14-month figure a median or a worst case? That changes everything: a median describes the system, while a worst case describes a queue. Before we build a proposal on it, we need the distribution, not an anecdote.',
   });
 
   const nadia = await member(browser, 'nadia.hamdi');
   await post(nadia, {
-    topic: 'liste-attesa',
+    topic: TOPIC.waitingLists,
     stance: 'concern',
     content:
-      'Dalla medicina generale: prescrivo in classe di priorità B, che per il PNGLA significa 10 giorni. Il CUP mi propone 96 giorni, oppure il percorso a pagamento della stessa struttura. La classe di priorità è diventata una dichiarazione di intenti.',
+      'From general practice: I prescribe priority class B, which means 10 days under the PNGLA. The CUP offers me 96 days, or the paid pathway in the same building. The priority class has become a statement of intent.',
   });
 
   await post(giulia, {
-    topic: 'liste-attesa',
+    topic: TOPIC.waitingLists,
     stance: 'neutral',
     content:
-      '@valentina.sanna mediana, non caso peggiore: rilevazione interna su 14 aziende, marzo 2026, metodo in allegato. I casi peggiori sono molto oltre.',
-    evidence: 'https://esempio.rcn.it/liste-attesa/metodo-rilevazione',
+      '@valentina.sanna Median, not worst case: an internal survey of 14 health authorities, March 2026, with the method attached. The worst cases are far beyond that.',
+    evidence: EVIDENCE.method,
   });
 
   await visit(giulia, '/discussion');
-  await expectText(giulia, 'liste-attesa', 'the waiting-list thread carries five attributed notes');
+  await expectText(giulia, TOPIC.waitingLists, 'the waiting-list thread carries five attributed notes');
   await shot(giulia, 'party-discussion', 'Deliberation before any vote: lived experience, corroborated by data and checked — each note stance-tagged and attributed to a verified person.', {
     focus: '.discussion-list',
   });
 
-  // The minimum-wage thread: the dissent has to be reasonable.
+  // A2.3/A2.4/A2.9/A2.10 — the minimum-wage thread: the dissent has to be reasonable,
+  // and evidence reframes what any proposal will have to answer.
   const luca = await member(browser, 'luca.esposito');
   await post(luca, {
-    topic: 'salario-minimo',
+    topic: TOPIC.minimumWage,
     stance: 'concern',
     content:
-      'Nove euro l’ora lordi per un locale con quattro stagionali significa o alzare i prezzi del 12% o chiudere a novembre. Non sono contrario al salario minimo: sono contrario a farlo senza guardare i margini reali della ristorazione.',
+      "Nine euros gross per hour for a restaurant with four seasonal employees means either raising prices by 12% or closing in November. I am not against a minimum wage; I am against doing it without looking at hospitality's real margins.",
   });
   const ahmed = await member(browser, 'ahmed.ben.salah');
   await post(ahmed, {
-    topic: 'salario-minimo',
+    topic: TOPIC.minimumWage,
     stance: 'support',
     content:
-      'Nel mio magazzino il contratto pirata paga 6,40 €/ora. Non è concorrenza sui margini, è concorrenza su chi accetta meno. Il salario minimo non chiude le imprese oneste: chiude quelle che campano così.',
+      'At my warehouse, the pirate contract pays €6.40 an hour. That is not competition on margins; it is competition over who will accept less. The minimum wage does not close honest businesses; it closes the ones that survive like this.',
   });
-
-  // The split that isn't left-right: a member concedes a point in public.
-  const tommaso = await member(browser, 'tommaso.ricci');
-  await post(tommaso, {
-    topic: 'autonomia-differenziata',
-    stance: 'support',
-    content:
-      'La gestione delle autonomie speciali dimostra che la responsabilità fiscale locale può funzionare. Il problema non è l’autonomia: è farla senza LEP finanziati.',
-  });
-  await post(nadia, {
-    topic: 'autonomia-differenziata',
-    stance: 'concern',
-    content:
-      'Senza LEP finanziati l’autonomia cristallizza la spesa storica: chi ha sempre avuto meno continua ad avere meno, ma stavolta per contratto. La Consulta lo ha detto chiaramente (sent. 192/2024).',
-  });
-  await post(tommaso, {
-    topic: 'autonomia-differenziata',
+  await post(valentina, {
+    topic: TOPIC.minimumWage,
     stance: 'neutral',
     content:
-      'Sui LEP hai ragione, e lo ammetto: senza quelli finanziati la mia posizione non sta in piedi. Ma allora la battaglia è sui LEP, non contro l’autonomia in sé.',
+      'CNEL figures, 2023 review: more than 900 CCNL agreements are filed, but the 20 most used cover the vast majority of employees. The problem is not the number of contracts; it is renewals expired for years and pay scales below €7 in security, multiservices, and parts of the tertiary sector. Any proposal must say what it does about THIS.',
+  });
+  await post(marco, {
+    topic: TOPIC.minimumWage,
+    stance: 'neutral',
+    content:
+      'EU context: Directive 2022/2041 does not require a statutory minimum where collective-agreement coverage is high. The real question is whether our EFFECTIVE coverage — weighted for expired renewals — meets that standard. If it does not, a statutory minimum is not ideology; it is compliance.',
+  });
+
+  // A2.5 — the split that isn't left-right: a member concedes a point in public.
+  const tommaso = await member(browser, 'tommaso.ricci');
+  await post(tommaso, {
+    topic: TOPIC.autonomy,
+    stance: 'support',
+    content:
+      'Healthcare administration in the special-autonomy and benchmark regions shows that local fiscal responsibility can work. The problem is not autonomy; it is doing it without LEP.',
+  });
+  await post(nadia, {
+    topic: TOPIC.autonomy,
+    stance: 'concern',
+    content:
+      'Without funded LEP, autonomy locks in historic spending: those who have always had less continue to have less, only this time by contract. The Constitutional Court said this clearly in judgment 192/2024 — it is not a technical detail.',
+  });
+  await post(tommaso, {
+    topic: TOPIC.autonomy,
+    stance: 'neutral',
+    content:
+      'You are right about LEP, and I admit it: without funding, my position does not stand up. But that means the fight is for LEP, not against autonomy itself.',
   });
   await visit(tommaso, '/discussion');
+  await expectText(tommaso, 'I admit it', 'the concession is on the record, in the same thread');
   await shot(tommaso, 'party-discussion-concession', 'The split that is not left-right: a member concedes a point in public and the thread survives it.', {
     focus: '.discussion-list',
   });
 
-  // The long tail: one member, one post, a real stake.
+  // A2.16 — the topic that resists delegation: values, not parameters.
+  const anna = await member(browser, 'anna.conti');
+  await post(anna, {
+    topic: TOPIC.iusScholae,
+    stance: 'proposal',
+    content:
+      'The June 2025 referendum on reducing the residency requirement from 10 to 5 years missed quorum with about 30% turnout — but about 65% of those who voted said yes. And ius scholae was not even on the ballot: under Law 91/1992, five years of schooling in Italy count for nothing. I propose that we take this to the assembly.',
+  });
+
+  // A2.17 — the long tail: one member, one post, a real stake.
   const davide = await member(browser, 'davide.villa');
   await post(davide, {
-    topic: 'consumo-suolo',
+    topic: TOPIC.landUse,
     stance: 'concern',
     content:
-      'ISPRA dice ~20 ettari al giorno di suolo consumato, 2,3 metri quadri al secondo. La legge nazionale è ferma da più di dieci anni. Nel mio comune si impermeabilizza l’ennesima area agricola per logistica. Qualcuno oltre a me ci lavora?',
+      'ISPRA reports about 20 hectares of land consumed per day, 2.3 square metres per second. The national law has been stalled for more than ten years. Meanwhile, my municipality is sealing yet another agricultural area for logistics. Does anyone besides me work on this?',
   });
 }
 
-/** A3 — A proposal earns its way to a vote: outline, revision, quorum, argument map. */
+/**
+ * A2.8 — the long-form lane. The constitutional lawyer writes the argument the whole
+ * platform rests on (the free mandate, art. 67 Cost.), a member pushes back on it, and
+ * she answers — the forum is where a party argues with itself at length.
+ */
+async function journeyForum(browser) {
+  console.log('\n— forum: the free-mandate argument, and a member pushing back');
+  const title = 'Why software cannot engineer around the free-mandate rule';
+  const sofia = await member(browser, 'sofia.bianchi');
+  await visit(sofia, '/forum');
+  await typeInto(sofia, '#forum-compose input[name="title"]', title);
+  await typeInto(
+    sofia,
+    '#forum-compose textarea[name="content"]',
+    'Article 67 of the Constitution says every member of Parliament represents the Nation and serves without a binding mandate. No platform can change that, and none should try. We have already watched a party try to bind its elected members through online votes and contractual penalties: it produced expulsions and litigation, not accountability. What software can do is make the record impossible to rewrite — who proposed what, how the text changed, how the members voted, and how the representative voted afterwards. A representative who diverges keeps the seat and owes an explanation. That is soft power, and it is the only constitutional path open to us.',
+  );
+  await submitNear(sofia, '#forum-compose input[name="title"]');
+  if (!(await expectText(sofia, title, 'the article is published under a verified byline'))) return;
+
+  const tommaso = await member(browser, 'tommaso.ricci');
+  await visit(tommaso, '/forum');
+  if (await typeInCard(tommaso, 'article', title, 'textarea[name="content"]',
+    'How is the ethical pact different from a party whip? If diverging costs you re-selection, is that not a mandate by other means?')) {
+    await submitNear(tommaso, 'form[action="/forum/comment"] textarea[name="content"]');
+  }
+
+  await visit(sofia, '/forum');
+  if (await typeInCard(sofia, 'article', title, 'textarea[name="content"]',
+    'The difference is who can compel. A whip can throw you out of the group mid-term; the pact can only publish your vote next to ours and ask for your reasons. The seat stays yours either way — the members decide at re-selection, in the open.')) {
+    await submitNear(sofia, 'form[action="/forum/comment"] textarea[name="content"]');
+  }
+
+  await visit(tommaso, '/forum');
+  await expectText(tommaso, 'mandate by other means', 'the member’s objection sits under the article');
+  await expectText(tommaso, 'who can compel', 'the author answers in the same thread');
+  await shot(tommaso, 'party-forum', 'The long-form lane: the constitutional lawyer’s case for the free mandate (art. 67 Cost.), a member asking whether the ethical pact is a whip by another name, and the answer — argued in the open, attributed on both sides.', {
+    focus: '#forum-threads',
+  });
+}
+
+/** A3 — A proposal earns its way to a vote: outline, revision, quorum, argument map, a revised text. */
 async function journeyProposal(browser) {
-  console.log('\n— proposal: draft → revise → sign to quorum → deliberate');
+  console.log('\n— proposal: draft → revise → sign to quorum → deliberate → revise again');
   const giulia = await member(browser, 'giulia.ferrero');
+  const title = 'Conditional intramoenia: an ALPI cap wherever PNGLA windows are missed';
 
   await visit(giulia, '/petitions');
-  await typeInto(giulia, '#petitions-compose input[name="title"]', 'Intramoenia condizionata: tetto ALPI dove saltano i tempi PNGLA');
+  await typeInto(giulia, '#petitions-compose input[name="title"]', title);
+  await typeInto(giulia, '#petitions-compose input[name="topic"]', CATEGORY.waitingLists);
   await typeInto(giulia, '#petitions-compose input[name="quorum"]', '6');
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="summary"]',
-    'Nelle branche in cui i tempi istituzionali sforano le classi di priorità PNGLA, l’attività intramoenia della stessa branca scende al 15% dei volumi istituzionali finché i tempi non rientrano.',
+    'In specialties where public-service waiting times exceed PNGLA priority classes, intramoenia activity in the same specialty falls to 15% of public-service volumes until those times return to compliance.',
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="problem"]',
-    'La legge 120/2007 già vieta che l’ALPI superi i volumi istituzionali, ma il vincolo è aggregato e verificato debolmente. Risultato: la stessa struttura eroga in due settimane a pagamento ciò che eroga in quattordici mesi gratuitamente. Non è una lista d’attesa: è un meccanismo di prezzo.',
+    'Law 120/2007 already prohibits ALPI from exceeding public-service volumes, but the constraint is aggregated and weakly checked. The result: the same facility delivers in two weeks, for payment, what it delivers free of charge in fourteen months. This is not a waiting list; it is a pricing mechanism.',
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="proposedAction"]',
-    'Tetto del 15% per branca, agganciato al monitoraggio della piattaforma nazionale (L. 107/2024), con sospensione automatica del tetto quando i tempi rientrano nelle classi U/B/D/P.',
+    "A 15% cap per specialty, tied to the national platform's monitoring (Law 107/2024), with automatic suspension once waiting times return to the U/B/D/P priority classes.",
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="impact"]',
-    'I pazienti senza disponibilità economica recuperano l’accesso nei tempi di legge; il vincolo già esistente diventa verificabile per branca.',
+    'Patients without the means to pay regain access within statutory time limits; the existing constraint becomes verifiable by specialty.',
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="risks"]',
-    'Fuga di specialisti verso il privato puro; il tetto va accompagnato da incentivi sull’attività istituzionale, non da sole sanzioni.',
+    'Specialists may leave for the fully private sector; the cap must be paired with incentives for public-service activity, not sanctions alone.',
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="implementationPlan"]',
-    'Rilevazione a 3 mesi sulla piattaforma nazionale; tetto sperimentale in 2 aziende pilota a 6 mesi; revisione a 12.',
+    'Measure at three months on the national platform; trial the cap in two pilot health authorities at six months; review at twelve.',
   );
   await typeInto(
     giulia,
     '#petitions-compose textarea[name="evidenceSummary"]',
-    'Rilevazione RCN su 14 aziende (marzo 2026); istruttoria sui monitoraggi AGENAS; quadro normativo L. 120/2007 e L. 107/2024.',
+    'RCN survey of 14 health authorities (March 2026); review of AGENAS monitoring; legal framework: Laws 120/2007 and 107/2024.',
   );
-  await typeInto(giulia, '#petitions-compose textarea[name="evidenceLinks"]', 'https://esempio.rcn.it/liste-attesa/rilevazione-2026');
+  await typeInto(giulia, '#petitions-compose textarea[name="evidenceLinks"]', EVIDENCE.survey);
   await submitNear(giulia, '#petitions-compose input[name="title"]');
-  const drafted = await expectText(giulia, 'Intramoenia condizionata', 'the structured proposal appears in the list');
+  const drafted = await expectText(giulia, 'Conditional intramoenia', 'the structured proposal appears in the list');
   if (!drafted) return null;
 
-  const petitionId = await findPetitionId(giulia, 'Intramoenia condizionata');
+  const petitionId = await findPetitionId(giulia, 'Conditional intramoenia');
   if (!petitionId) {
     record('could not find the intramoenia proposal id');
     return null;
@@ -578,19 +758,21 @@ async function journeyProposal(browser) {
     focus: `#petition-${petitionId}`,
   });
 
-  // The economist revises the cap; the change and its author go on the record.
+  // A3.2 — the economist revises the cap; the change and its author go on the record.
   const marco = await member(browser, 'marco.deluca');
   await visit(marco, '/petitions');
-  await typeInto(marco, `#petition-${petitionId} textarea[name="summary"], form[action="/petitions/update"] textarea[name="summary"]`,
-    'Tetto portato al 20% per branca dopo modellazione sulla retention degli specialisti; sospensione automatica quando i tempi PNGLA rientrano.');
-  await submitNear(marco, 'form[action="/petitions/update"] textarea[name="summary"]');
+  await typeInto(marco, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="summary"]`,
+    'In specialties where public-service waiting times exceed PNGLA priority classes, intramoenia activity in the same specialty falls to 20% of public-service volumes until those times return to compliance.');
+  await typeInto(marco, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`,
+    'Cap raised from 15% to 20% after modelling specialist retention.');
+  await submitNear(marco, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`);
 
-  // Signatures from distinct members carry it across quorum, on their own.
-  await signPetition(giulia, 'Intramoenia condizionata');
+  // A3.3 — signatures from distinct members carry it across quorum, on their own.
+  await signPetition(giulia, 'Conditional intramoenia');
   const signers = ['marco.deluca', 'nadia.hamdi', 'valentina.sanna', 'ahmed.ben.salah', 'anna.conti', 'tommaso.ricci'];
   for (const handle of signers) {
     const page = await member(browser, handle);
-    await signPetition(page, 'Intramoenia condizionata');
+    await signPetition(page, 'Conditional intramoenia');
   }
 
   await visit(giulia, '/petitions');
@@ -598,34 +780,82 @@ async function journeyProposal(browser) {
     focus: '#petitions-active',
   });
 
-  // Deliberation with an argument map: a lawyer's node, and a rebuttal under it.
+  // A3.4 — the reasonable dissent lands on the text itself.
+  const luca = await member(browser, 'luca.esposito');
+  await visit(luca, '/petitions');
+  await selectOption(luca, `#petition-${petitionId} select[name="stance"]`, 'concern');
+  await typeInto(
+    luca,
+    `#petition-${petitionId} textarea[name="content"]`,
+    'If the cap bites, specialists will move to accredited private providers and public-service waits will worsen. The risk is written into the proposal itself: what concretely offsets it?',
+  );
+  await submitNear(luca, `#petition-${petitionId} textarea[name="content"]`);
+
+  // A3.6 — the constitutional lawyer's argument-map node.
   const sofia = await member(browser, 'sofia.bianchi');
   await visit(sofia, '/petitions');
   await selectOption(sofia, `#petition-${petitionId} select[name="stance"]`, 'concern');
-  await typeInto(sofia, `#petition-${petitionId} input[name="argumentTitle"]`, 'Competenza regionale');
+  await typeInto(sofia, `#petition-${petitionId} input[name="argumentTitle"]`, 'Regional competence');
   await typeInto(
     sofia,
     `#petition-${petitionId} textarea[name="content"]`,
-    'L’organizzazione sanitaria è competenza regionale (Titolo V): un tetto nazionale per branca rischia il conflitto di attribuzione. La leva realistica è il monitoraggio nazionale più i piani di rientro.',
+    'Healthcare organization is a regional competence under Title V: a national cap by specialty risks a conflict of competences. The realistic lever is national monitoring plus recovery plans, not a uniform constraint.',
   );
   await submitNear(sofia, `#petition-${petitionId} textarea[name="content"]`);
-  await expectText(sofia, 'Competenza regionale', "the constitutional lawyer's argument-map node is recorded");
+  await expectText(sofia, 'Regional competence', "the constitutional lawyer's argument-map node is recorded");
 
-  // Valentina files a fact-check request against a specific claim.
+  // A3.9 — a rebuttal in the tree, not a new thread: Marco picks her node from the map.
+  await visit(marco, '/petitions');
+  const parentNode = await marco.evaluate((id) => {
+    const options = [...document.querySelectorAll(`#argument-map-${id} option`)];
+    return options.find((o) => (o.textContent || '').includes('Regional competence'))?.value || null;
+  }, petitionId);
+  if (!parentNode) {
+    record('the argument map does not offer the "Regional competence" node to build on');
+  } else {
+    await selectOption(marco, `#petition-${petitionId} select[name="stance"]`, 'support');
+    await typeInto(marco, `#petition-${petitionId} input[name="argumentParentId"]`, parentNode);
+    await typeInto(
+      marco,
+      `#petition-${petitionId} textarea[name="content"]`,
+      "That is why the proposal attaches to the existing national platform under Law 107/2024: no new competence, only conditions tied to monitoring already in place.",
+    );
+    await submitNear(marco, `#petition-${petitionId} textarea[name="content"]`);
+  }
+
+  // A3.5 — a fact-check request against a specific claim.
   const valentina = await member(browser, 'valentina.sanna');
   await visit(valentina, '/petitions');
   await selectOption(valentina, `#petition-${petitionId} select[name="stance"]`, 'question');
   await typeInto(
     valentina,
     `#petition-${petitionId} textarea[name="content"]`,
-    'La rilevazione copre 14 aziende su oltre 100: campione sufficiente per un tetto nazionale? Chiedo verifica sul metodo di campionamento.',
+    'The survey covers 14 health authorities out of more than 100: is that a sufficient sample for a national cap? I request a review of the sampling method.',
   );
   await page_check(valentina, `#petition-${petitionId} input[name="factCheck"]`);
   await submitNear(valentina, `#petition-${petitionId} textarea[name="content"]`);
 
   await visit(giulia, '/petitions');
   await openDetails(giulia, 'Discussion', { scope: `#petition-${petitionId}` });
-  await shot(giulia, 'party-deliberation', 'Deliberation is stance-tagged and mapped: a constitutional-law objection as an argument node, a fact-check request on a specific claim — the shape of the disagreement, not a flat thread.', {
+  await openDetails(giulia, 'Argument map (', { scope: `#petition-${petitionId}` });
+  await shot(giulia, 'party-deliberation', 'Deliberation is stance-tagged and mapped: a constitutional-law objection as an argument node with the economist’s rebuttal under it, the restaurateur’s concern, and a fact-check request on a specific claim — the shape of the disagreement, not a flat thread.', {
+    focus: `#petition-${petitionId}`,
+  });
+
+  // A3.11 — the author answers the concerns in the text itself.
+  await visit(giulia, '/petitions');
+  await typeInto(giulia, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="risks"]`,
+    'Specialists may leave for accredited private providers (raised by @luca.esposito). The cap only bites after incentives for public-service activity are funded, so capacity is added before it is constrained.');
+  await typeInto(giulia, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="implementationPlan"]`,
+    'Fund public-service incentives first; measure at three months on the national platform; trial the cap in two pilot health authorities at six months; review at twelve. The sampling method of the 14-authority survey is annexed (requested by @valentina.sanna).');
+  await typeInto(giulia, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`,
+    'Answers the retention concern and the sampling fact-check: incentives funded before the cap bites; method annexed.');
+  await submitNear(giulia, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`);
+
+  await visit(giulia, '/petitions');
+  await openDetails(giulia, 'Version history', { scope: `#petition-${petitionId}` });
+  await expectText(giulia, 'incentives funded before the cap bites', 'the revision note records why the text changed');
+  await shot(giulia, 'party-revisions', 'Deliberation visibly changed the text: the version history runs draft → the economist’s cap revision → the author’s answer to the concerns, each revision attributed and diffable.', {
     focus: `#petition-${petitionId}`,
   });
 
@@ -643,28 +873,33 @@ async function page_check(page, selector) {
   }, selector);
 }
 
-/** The long-tail proposal that stays below quorum on purpose (A5 fixture target). */
+/** A3.15 — The long-tail proposal that stays below quorum on purpose. */
 async function journeyLongTail(browser) {
   console.log('\n— long tail: a proposal below quorum, visible and pending');
   const davide = await member(browser, 'davide.villa');
   await visit(davide, '/petitions');
-  await typeInto(davide, '#petitions-compose input[name="title"]', 'Stop al consumo di suolo agricolo per logistica nel mio comune');
+  await typeInto(davide, '#petitions-compose input[name="title"]', 'Stop net land consumption around the Cuneo logistics corridor');
+  await typeInto(davide, '#petitions-compose input[name="topic"]', TOPIC.landUse);
   await typeInto(davide, '#petitions-compose input[name="quorum"]', '12');
   await typeInto(
     davide,
     '#petitions-compose textarea[name="summary"]',
-    'Moratoria comunale sull’impermeabilizzazione di aree agricole per poli logistici finché non esiste una legge nazionale sul consumo di suolo.',
+    'A municipal moratorium on sealing agricultural land for logistics hubs until a national land-consumption law exists.',
   );
-  await typeInto(davide, '#petitions-compose textarea[name="problem"]', 'ISPRA: ~20 ettari al giorno consumati; la legge quadro è ferma da oltre dieci anni.');
+  await typeInto(
+    davide,
+    '#petitions-compose textarea[name="problem"]',
+    'ISPRA: about 20 hectares consumed per day; the national framework bill has been stalled for more than ten years.',
+  );
   await submitNear(davide, '#petitions-compose input[name="title"]');
-  await expectText(davide, 'consumo di suolo', 'the long-tail proposal is drafted');
+  await expectText(davide, 'land consumption', 'the long-tail proposal is drafted');
   // A couple of signatures, deliberately short of quorum.
-  await signPetition(davide, 'consumo di suolo');
+  await signPetition(davide, 'Cuneo logistics corridor');
   const paolo = await member(browser, 'paolo.greco');
-  await signPetition(paolo, 'consumo di suolo');
+  await signPetition(paolo, 'Cuneo logistics corridor');
 }
 
-/** A8 — Opening a vote is an attributed act; the tally shows the dissent. */
+/** A3.7/A3.8 — Opening a vote is an attributed act; the tally shows the dissent. */
 async function journeyVote(browser, petitionId) {
   console.log('\n— vote: an attributed freeze, then a tally that shows the no');
   if (!petitionId) {
@@ -736,13 +971,13 @@ async function journeyDelegation(browser) {
   // giulia -> marco, then paolo -> giulia, forming paolo -> giulia -> marco.
   const giulia = await member(browser, 'giulia.ferrero');
   await visit(giulia, '/delegation');
-  await typeInto(giulia, 'form[data-enhance="delegation"] input[name="topic"]', 'liste-attesa');
+  await typeInto(giulia, 'form[data-enhance="delegation"] input[name="topic"]', TOPIC.waitingLists);
   await typeInto(giulia, 'form[data-enhance="delegation"] input[name="delegateHash"]', 'marco.deluca');
   await submitNear(giulia, 'form[data-enhance="delegation"] input[name="delegateHash"]');
 
   const paolo = await member(browser, 'paolo.greco');
   await visit(paolo, '/delegation');
-  await typeInto(paolo, 'form[data-enhance="delegation"] input[name="topic"]', 'liste-attesa');
+  await typeInto(paolo, 'form[data-enhance="delegation"] input[name="topic"]', TOPIC.waitingLists);
   await typeInto(paolo, 'form[data-enhance="delegation"] input[name="delegateHash"]', 'giulia.ferrero');
   await submitNear(paolo, 'form[data-enhance="delegation"] input[name="delegateHash"]');
   await expectText(paolo, 'marco.deluca', 'the transitive chain resolves through to the end delegate');
@@ -751,16 +986,18 @@ async function journeyDelegation(browser) {
   });
 }
 
-/** A5/A6 — A ranked group election, won on transfers against the first-preference leader. */
+/** A5 — A ranked group election, won on transfers against the first-preference leader. */
 async function journeyElection(browser) {
   console.log('\n— groups: a ranked election won on transfers');
   const irene = await member(browser, 'irene.fabbri');
   await visit(irene, '/groups');
-  await typeInto(irene, 'input[name="name"]', 'Circolo Sanità Pubblica');
-  await typeInto(irene, 'input[name="topics"]', 'liste-attesa,salario-minimo');
-  await typeInto(irene, 'textarea[name="description"]', 'Delegati e priorità sui tempi di attesa e sul lavoro sanitario.');
-  await submitNear(irene, 'input[name="name"]');
-  const created = await expectText(irene, 'Circolo Sanità Pubblica', 'the group is created');
+  // Scoped to the create panel: once groups exist, each card carries its own categories
+  // form, and an unscoped selector types into the first group's instead.
+  await typeInto(irene, '[data-composer-section="groups-create"] input[name="name"]', CIRCLE_NAME);
+  await typeInto(irene, '[data-composer-section="groups-create"] input[name="topics"]', `${TOPIC.waitingLists},${TOPIC.minimumWage}`);
+  await typeInto(irene, '[data-composer-section="groups-create"] textarea[name="description"]', 'Delegates and priorities on waiting times and healthcare work.');
+  await submitNear(irene, '[data-composer-section="groups-create"] input[name="name"]');
+  const created = await expectText(irene, CIRCLE_NAME, 'the group is created');
   if (!created) return;
 
   const groupId = await irene.evaluate(() => {
@@ -784,34 +1021,26 @@ async function journeyElection(browser) {
   }, groupId);
   await settle(irene);
 
-  // Nine members join so the ballots below are cast by genuinely distinct sessions.
+  // Members join so the ballots below are cast by genuinely distinct sessions.
   const voters = ['marco.deluca', 'giulia.ferrero', 'valentina.sanna', 'tommaso.ricci', 'davide.villa', 'ahmed.ben.salah', 'luca.esposito', 'nadia.hamdi', 'anna.conti', 'paolo.greco'];
   for (const handle of voters) {
-    const page = await member(browser, handle);
-    await visit(page, '/groups');
-    await page.evaluate((id) => {
-      const form = [...document.querySelectorAll('form[action="/groups"]')].find(
-        (f) => f.querySelector('input[name="action"][value="join"]') && f.querySelector(`input[name="groupId"][value="${id}"]`),
-      );
-      form?.querySelector('button[type="submit"]')?.click();
-    }, groupId);
-    await settle(page);
+    await joinGroup(await member(browser, handle), groupId);
   }
 
   // irene starts the election by @handle (the controller resolves to hashes).
   await visit(irene, '/groups');
-  await irene.evaluate((id) => {
+  await irene.evaluate((id, topic) => {
     const form = [...document.querySelectorAll('form[action="/groups"]')].find((f) => f.querySelector('input[name="action"][value="startElection"]') && f.querySelector(`input[name="groupId"][value="${id}"]`));
     form?.closest('details')?.setAttribute('open', 'open');
     if (form) {
-      form.querySelector('input[name="topic"]').value = 'liste-attesa';
+      form.querySelector('input[name="topic"]').value = topic;
       form.querySelector('input[name="candidates"]').value = 'giulia.ferrero, marco.deluca, valentina.sanna';
       form.querySelector('button[type="submit"]').click();
     }
-  }, groupId);
+  }, groupId, TOPIC.waitingLists);
   await settle(irene);
 
-  // The canonical ballots: 4 marco, 3 giulia>valentina, 2 valentina>giulia.
+  // The canonical ballots (A5.5): 4 marco, 3 giulia>valentina, 2 valentina>giulia.
   const ballots = [
     ['tommaso.ricci', 'marco.deluca', null],
     ['davide.villa', 'marco.deluca', null],
@@ -899,81 +1128,87 @@ async function setGroupPolicy(page, groupId, patch) {
 }
 
 /**
- * A9 — Structure that grows a branch. A party circle gains a topic-focused think tank
+ * A9 — Structure that grows a branch. A party circle gains a topic-focused workshop
  * beneath it, both declare the categories they work on, and the directory turns that into
  * an answer to "who do I delegate this to?" — the question topic-scoped delegation asks of
  * every member and, before this, left them to answer alone.
  */
 async function journeyBranchGroups(browser) {
-  console.log('\n— branches: a think tank inside the party, and a category directory');
+  console.log('\n— branches: a workshop inside the party, and a category directory');
   const irene = await member(browser, 'irene.fabbri');
   await visit(irene, '/groups');
 
-  const parentId = await findGroupIdByName(irene, 'Circolo Sanità Pubblica');
+  const parentId = await findGroupIdByName(irene, CIRCLE_NAME);
   if (!parentId) {
     record('the parent circle from the election journey is missing');
     return null;
   }
 
   // The parent declares the broad categories it covers.
-  await irene.evaluate((id) => {
+  await irene.evaluate((id, topics) => {
     const form = [...document.querySelectorAll('form[action="/groups/topics"]')].find((f) =>
       f.querySelector(`input[name="groupId"][value="${id}"]`),
     );
     if (form) {
       form.closest('details')?.setAttribute('open', 'open');
-      form.querySelector('input[name="topics"]').value = 'Sanità, Lavoro';
+      form.querySelector('input[name="topics"]').value = topics;
       form.querySelector('button[type="submit"]').click();
     }
-  }, parentId);
+  }, parentId, `${CATEGORY.health}, ${CATEGORY.labour}`);
   await settle(irene);
 
   // The branch: narrower, with its own subcategory and its own membership.
   await visit(irene, '/groups');
-  await typeInto(irene, 'form[data-enhance="groups"] input[name="name"]', 'Officina Liste d’Attesa');
-  await typeInto(irene, 'form[data-enhance="groups"] input[name="topics"]', 'Sanità / Liste di attesa');
-  await selectOptionByLabel(irene, 'form[data-enhance="groups"] select[name="parentId"]', 'Circolo Sanità Pubblica');
+  await typeInto(irene, '[data-composer-section="groups-create"] input[name="name"]', BRANCH_NAME);
+  await typeInto(irene, '[data-composer-section="groups-create"] input[name="topics"]', CATEGORY.waitingLists);
+  await selectOptionByLabel(irene, '[data-composer-section="groups-create"] select[name="parentId"]', CIRCLE_NAME);
   await typeInto(
     irene,
-    'form[data-enhance="groups"] textarea[name="description"]',
-    'Ramo tematico del Circolo: lavora solo sui tempi di attesa e sull’intramoenia.',
+    '[data-composer-section="groups-create"] textarea[name="description"]',
+    'A topic branch of the Circle: works only on waiting times and intramoenia.',
   );
-  await submitNear(irene, 'form[data-enhance="groups"] input[name="name"]');
+  await submitNear(irene, '[data-composer-section="groups-create"] input[name="name"]');
 
   await visit(irene, '/groups');
-  const branchId = await findGroupIdByName(irene, 'Officina Liste');
+  const branchId = await findGroupIdByName(irene, BRANCH_NAME);
   if (!branchId) {
     record('the branch group was not created');
     return null;
   }
-  await expectText(irene, 'Branch of Circolo Sanità Pubblica', 'the branch shows its lineage, not just a name');
-  await expectText(irene, 'Branches: Officina', 'the parent lists its branches');
+  await expectText(irene, `Branch of ${CIRCLE_NAME}`, 'the branch shows its lineage, not just a name');
+  await expectText(irene, `Branches: ${BRANCH_NAME}`, 'the parent lists its branches');
+  const branchCategories = await irene.evaluate((want) => {
+    const card = [...document.querySelectorAll('article')].find((c) => (c.querySelector('h3')?.textContent || '').includes(want));
+    return card?.querySelector('form[action="/groups/topics"] input[name="topics"]')?.value || '';
+  }, BRANCH_NAME);
+  if (branchCategories.includes(CATEGORY.waitingLists)) ok('the branch declares its own subcategory at creation');
+  else record(`the branch declared "${branchCategories}" instead of ${CATEGORY.waitingLists}`);
 
   // The branch puts the elected nurse forward on its own subcategory.
   await visit(irene, '/groups');
-  await irene.evaluate((id) => {
+  await irene.evaluate((id, topic) => {
     const form = [...document.querySelectorAll('form[action="/groups/delegate"]')].find((f) =>
       f.querySelector(`input[name="groupId"][value="${id}"]`),
     );
     if (form) {
       form.closest('details')?.setAttribute('open', 'open');
-      form.querySelector('input[name="topic"]').value = 'Sanità / Liste di attesa';
+      form.querySelector('input[name="topic"]').value = topic;
       form.querySelector('input[name="delegateHash"]').value = 'giulia.ferrero';
       form.querySelector('input[name="priority"]').value = '1';
       form.querySelector('button[type="submit"]').click();
     }
-  }, branchId);
+  }, branchId, CATEGORY.waitingLists);
   await settle(irene);
 
   await visit(irene, '/groups');
   await shot(
     irene,
     'party-branch-groups',
-    'Structure grows a branch: a topic-focused think tank sits under the party circle, indented and labelled “Branch of”. Nesting is structural, not authority — the branch keeps its own membership and its own delegate cachets.',
+    'Structure grows a branch: a topic-focused workshop sits under the party circle, indented and labelled “Branch of”. Nesting is structural, not authority — the branch keeps its own membership and its own delegate cachets.',
     { focus: '[data-composer-section="groups-list"]' },
   );
 
-  await expectText(irene, 'Sanità / Liste di attesa', 'the branch subcategory reaches the directory');
+  await expectText(irene, CATEGORY.waitingLists, 'the branch subcategory reaches the directory');
   await shot(
     irene,
     'party-categories',
@@ -997,6 +1232,7 @@ async function journeyGroupLane(browser, ids) {
   }
   const { parentId, branchId } = ids;
   const irene = await member(browser, 'irene.fabbri');
+  const noteNeedle = 'branch working note';
 
   // Both levels open their internal discussion lane, members-only.
   await setGroupPolicy(irene, branchId, {
@@ -1040,18 +1276,18 @@ async function journeyGroupLane(browser, ids) {
   // A working note that belongs to the branch, not yet to the party.
   const nadia = await member(browser, 'nadia.hamdi');
   await visit(nadia, `/discussion?group=${branchId}`);
-  await typeInto(nadia, '#discussion-compose input[name="topic"]', 'Sanità / Liste di attesa');
-  await selectOptionByLabel(nadia, '#discussion-compose select[name="groupId"]', 'Officina Liste');
+  await typeInto(nadia, '#discussion-compose input[name="topic"]', CATEGORY.waitingLists);
+  await selectOptionByLabel(nadia, '#discussion-compose select[name="groupId"]', BRANCH_NAME);
   await selectOption(nadia, '#discussion-compose select[name="stance"]', 'proposal');
   await typeInto(
     nadia,
     '#discussion-compose textarea[name="content"]',
-    'Nota di lavoro del ramo: sui codici B il CUP di Palermo sfora del 41%. Prima di portarlo al Circolo verifichiamo i dati di altre tre ASP.',
+    'Branch working note: for priority class B, the Palermo CUP overshoots the PNGLA limit by 41%. Before we take this to the Circle, let us check the data from three other health authorities.',
   );
   await submitNear(nadia, '#discussion-compose textarea[name="content"]');
 
   await visit(nadia, `/discussion?group=${branchId}`);
-  await expectText(nadia, 'Nota di lavoro del ramo', 'the branch lane carries the working note');
+  await expectText(nadia, noteNeedle, 'the branch lane carries the working note');
   await shot(
     nadia,
     'party-group-lane',
@@ -1061,7 +1297,7 @@ async function journeyGroupLane(browser, ids) {
 
   // A note posted in a branch lane must not leak into the Circle-wide feed.
   await visit(nadia, '/discussion');
-  const leaked = (await pageText(nadia)).toLowerCase().includes('nota di lavoro del ramo');
+  const leaked = (await pageText(nadia)).toLowerCase().includes(noteNeedle);
   if (leaked) record('a branch-lane note leaked into the Circle-wide discussion feed');
   else ok('the branch note stays out of the Circle-wide feed');
 
@@ -1071,7 +1307,7 @@ async function journeyGroupLane(browser, ids) {
   await typeInto(
     tommaso,
     'form[data-enhance="promotion-request"] input[name="note"]',
-    'I dati reggono: questa riguarda tutto il Circolo, non solo il ramo.',
+    'The data holds up: this concerns the whole Circle, not just the branch.',
   );
   await submitNear(tommaso, 'form[data-enhance="promotion-request"] input[name="note"]');
   await visit(tommaso, `/discussion?group=${branchId}`);
@@ -1093,13 +1329,13 @@ async function journeyGroupLane(browser, ids) {
   // First verify the boundary: sofia moderates the branch but never joined the parent,
   // and the parent's lane is members-only — so she should not be able to read it.
   await visit(sofia, `/discussion?group=${parentId}`);
-  const moderatorCanRead = (await pageText(sofia)).toLowerCase().includes('nota di lavoro del ramo');
+  const moderatorCanRead = (await pageText(sofia)).toLowerCase().includes(noteNeedle);
   if (moderatorCanRead) record('a branch moderator can read the parent circle’s members-only lane');
   else ok('the parent circle’s lane stays closed to a non-member, even a branch moderator');
 
   // Then read the result as someone who is actually in the parent circle.
   await visit(irene, `/discussion?group=${parentId}`);
-  await expectText(irene, 'Nota di lavoro del ramo', 'the approved note now sits in the parent circle’s lane');
+  await expectText(irene, noteNeedle, 'the approved note now sits in the parent circle’s lane');
   await expectText(irene, 'Promoted from', 'the move is stamped on the item, not silent');
   await shot(
     irene,
@@ -1120,30 +1356,33 @@ async function journeyDelegatedBallot(browser) {
   // davide delegates the broad category; the proposal below is filed under a subcategory of it.
   const davide = await member(browser, 'davide.villa');
   await visit(davide, '/delegation');
-  await typeInto(davide, 'form[data-enhance="delegation"] input[name="topic"]', 'Sanità');
+  await typeInto(davide, 'form[data-enhance="delegation"] input[name="topic"]', CATEGORY.health);
   await typeInto(davide, 'form[data-enhance="delegation"] input[name="delegateHash"]', 'giulia.ferrero');
   await submitNear(davide, 'form[data-enhance="delegation"] input[name="delegateHash"]');
 
   // A proposal whose category the author chooses — narrower than the delegation above.
   const nadia = await member(browser, 'nadia.hamdi');
   await visit(nadia, '/petitions');
-  await typeInto(nadia, '#petitions-compose input[name="title"]', 'Tetto ai tempi CUP per i codici B nelle ASP siciliane');
-  await typeInto(nadia, '#petitions-compose input[name="topic"]', 'Sanità / Liste di attesa');
+  await typeInto(nadia, '#petitions-compose input[name="title"]', 'Enforce the 10-day limit for class B referrals in Sicilian health authorities');
+  // Filed under primary care, a sibling of the waiting-list subcategory: davide's parent
+  // delegation reaches it, while giulia's own waiting-list delegation (to marco) does not,
+  // so the ballot stops with her and her inbox shows it.
+  await typeInto(nadia, '#petitions-compose input[name="topic"]', TOPIC.primaryCare);
   await typeInto(nadia, '#petitions-compose input[name="quorum"]', '1');
   await typeInto(
     nadia,
     '#petitions-compose textarea[name="summary"]',
-    'Applicare il tetto PNGLA di 10 giorni ai codici B con pubblicazione mensile degli scostamenti per ogni ASP.',
+    'Apply the PNGLA 10-day limit to class B referrals and publish each health authority’s monthly overshoot.',
   );
   await submitNear(nadia, '#petitions-compose input[name="title"]');
-  await expectText(nadia, 'Sanità / Liste di attesa', 'the proposal keeps the category its author chose');
+  await expectText(nadia, TOPIC.primaryCare, 'the proposal keeps the category its author chose');
 
-  const petitionId = await findPetitionId(nadia, 'codici B');
+  const petitionId = await findPetitionId(nadia, 'class B referrals');
   if (!petitionId) {
     record('could not locate the subcategory proposal');
     return;
   }
-  await signPetition(nadia, 'codici B');
+  await signPetition(nadia, 'class B referrals');
 
   // The party secretary freezes and opens it.
   const elena = await member(browser, 'elena.rossi');
@@ -1173,14 +1412,14 @@ async function journeyDelegatedBallot(browser) {
   await shot(
     davide,
     'party-delegated-ballot',
-    'A delegated vote is a real ballot, not an abstention: davide delegated the broad category “Sanità”, and it reaches a proposal filed under “Sanità / Liste di attesa”. Until @giulia.ferrero votes it is counted as nothing — shown as “awaiting delegates”, never folded into the abstentions — and he can override it himself at any time.',
+    'A delegated vote is a real ballot, not an abstention: davide delegated the broad category “Healthcare”, and it reaches a proposal filed under “Healthcare / Primary care”. Until @giulia.ferrero votes it is counted as nothing — shown as “awaiting delegates”, never folded into the abstentions — and he can override it himself at any time.',
     { focus: `#petition-${petitionId}` },
   );
 
   // The other side of the contract: the delegate can see what is riding on her.
   const giulia = await member(browser, 'giulia.ferrero');
   await visit(giulia, '/delegation');
-  await expectText(giulia, 'codici B', 'the delegate sees the ballot handed to her');
+  await expectText(giulia, 'class B referrals', 'the delegate sees the ballot handed to her');
   await expectText(giulia, 'left', 'the delegate sees how long she has to act');
   await shot(
     giulia,
@@ -1211,6 +1450,7 @@ async function journeyAccountability(browser) {
   if (href) {
     await visit(marco, href);
     await expectText(marco, 'Delegations received', 'the delegate profile is the soft-power accountability dashboard');
+    await expectText(marco, 'I publish my models', 'the delegate’s provider-local public bio is on the dashboard');
     await shot(marco, 'party-delegate-profile', 'Soft-power accountability, not compulsion: a delegate’s public dashboard — delegations received and set, vote history, group endorsements, and an advisory (never binding) deliberation score.', {
       focus: 'main',
     });
@@ -1220,25 +1460,73 @@ async function journeyAccountability(browser) {
 }
 
 /**
- * A2.7/A2.13/A2.14 — the social lane stays social. Short attributed updates,
- * typed follow edges, and a reshare-with-comment, so the "small talk + info"
- * lane is populated and a screenshot can show at a glance that a social post is
- * not a vote. The feed is scoped to followed handles, so one member (Anna, the
- * high-activity student) follows the active posters and we shoot *her* wall.
+ * A9 — Governance changes itself. A member proposes a change to the digital constitution,
+ * motivated by the long-tail proposal the uniform quorum is starving; the provider decides
+ * it in /admin, and the decision enters public history. The fixture keeps the tension
+ * visible: today that decision is an operator act, not a member vote.
+ */
+async function journeyGovernance(browser) {
+  console.log('\n— governance: a member proposes a constitutional change');
+  const title = 'Reduced quorum for proposals with regional impact';
+  const tommaso = await member(browser, 'tommaso.ricci');
+  await visit(tommaso, '/governance');
+  await typeInto(tommaso, 'input[name="governanceProposalTitle"]', title);
+  await typeInto(tommaso, 'input[name="governanceProposalQuorumDefault"]', '120');
+  await typeInto(
+    tommaso,
+    'textarea[name="governanceProposalReason"]',
+    'A land-consumption proposal in one municipality cannot reasonably collect 250 national signatures: a uniform quorum kills the long tail.',
+  );
+  await submitNear(tommaso, 'input[name="governanceProposalTitle"]');
+  await visit(tommaso, '/governance');
+  if (!(await expectText(tommaso, title, 'the change proposal is open and public'))) return;
+
+  const admin = await providerAdmin(browser);
+  await visit(admin, '/admin');
+  const decided = await admin.evaluate((want) => {
+    const forms = [...document.querySelectorAll('form')].filter((f) =>
+      f.querySelector('input[name="intent"][value="governance-proposal-decision"]'),
+    );
+    const form = forms.find((f) => (f.closest('li')?.textContent || '').includes(want));
+    const button = form && [...form.querySelectorAll('button')].find((b) => b.value === 'approve');
+    if (!button) return false;
+    button.scrollIntoView({ block: 'center' });
+    button.click();
+    return true;
+  }, title);
+  if (!decided) {
+    record('the provider was not offered an approve control for the governance proposal');
+    return;
+  }
+  await settle(admin);
+
+  await visit(tommaso, '/governance');
+  await expectText(tommaso, 'Default quorum: 120', 'the accepted proposal updates the constitution defaults');
+  await shot(tommaso, 'party-governance', 'Governance changes itself: a member proposes lowering the default quorum because the uniform one starves the long tail; the decision and its reason enter public history. The tension stays visible — today the provider decides, and whether that should become a member vote is an open design question.', {
+    focus: 'main',
+  });
+}
+
+/**
+ * A2.7/A2.14 — the social lane stays social. Short attributed updates, typed follow
+ * edges, and a reshare-with-comment, so the "small talk + info" lane is populated and a
+ * screenshot can show at a glance that a social post is not a vote. The feed is scoped to
+ * followed handles, so one member (Anna, the high-activity student) follows the active
+ * posters and we shoot *her* wall.
  */
 async function journeySocial(browser) {
   console.log('\n— social: the lane stays social (posts, typed follows, a reshare)');
   const posts = [
-    ['anna.conti', 'Serata referendum ai banchetti: affluenza bassa ma tanti under-30 che chiedevano dello ius scholae. Il tema c’è, manca la legge.'],
-    ['giulia.ferrero', 'Reparto pieno anche oggi. La proposta sull’intramoenia è però in dirittura: se avete firme da raccogliere in circolo, è il momento.'],
-    ['valentina.sanna', 'Nota per chi mi chiede i numeri liste d’attesa: la fonte è la rilevazione interna su 14 aziende, non i portali regionali. Confronto la settimana prossima.'],
-    ['tommaso.ricci', 'Da Trento: incontro di circolo giovedì sull’autonomia. Porto i dati sui LEP, non gli slogan.'],
-    ['nadia.hamdi', 'Dalla Sicilia: stessi tempi CUP che si raccontano al Nord. Non è un’emergenza locale, è il sistema.'],
-    ['ahmed.ben.salah', 'Turno finito. Grazie a chi è passato al presidio stamattina, eravamo in tanti.'],
-    ['paolo.greco', 'Verificato allo sportello del circolo, con l’aiuto dei ragazzi. Ci sono anch’io.'],
-    ['anna.conti', 'Promemoria: assemblea sullo ius scholae mercoledì, anche da remoto. Portate domande, non bandiere.'],
-    ['valentina.sanna', 'Grafico dei tempi PNGLA per classe di priorità in arrivo. Chi lo vuole in anteprima, mi segua su “interesse”.'],
-    ['luca.esposito', 'Non sono d’accordo su tutto, ma il livello del dibattito qui è un’altra cosa rispetto ai gruppi social. Si discute davvero.'],
+    ['anna.conti', 'Referendum night at the stalls: low turnout, but plenty of under-30s asking about ius scholae. The issue is there; the law is not.'],
+    ['giulia.ferrero', 'Ward full again today. The intramoenia proposal is almost ready, though — if your circle still has signatures to collect, now is the time.'],
+    ['valentina.sanna', 'For everyone asking where the waiting-list numbers come from: the internal survey of 14 health authorities, not the regional portals. Comparison next week.'],
+    ['tommaso.ricci', 'From Trento: circle meeting on Thursday about autonomy. I am bringing the LEP data, not slogans.'],
+    ['nadia.hamdi', 'From Sicily: the same CUP waiting times people describe in the North. It is not a local emergency; it is the system.'],
+    ['ahmed.ben.salah', 'Shift over. Thanks to everyone who came to the picket this morning — there were a lot of us.'],
+    ['paolo.greco', 'Verified at the circle office, with some help from the young ones. Count me in.'],
+    ['anna.conti', 'Reminder: ius scholae assembly on Wednesday, remote attendance too. Bring questions, not flags.'],
+    ['valentina.sanna', 'Chart of PNGLA waiting times by priority class coming soon. Follow me on “interest” if you want the preview.'],
+    ['luca.esposito', 'I do not agree with everything here, but the level of debate is something else compared with the usual social groups. People actually argue.'],
   ];
   for (const [handle, content] of posts) {
     const page = await member(browser, handle);
@@ -1264,13 +1552,13 @@ async function journeySocial(browser) {
   await visit(anna, '/social/feed');
   await anna.evaluate(() => {
     const cards = [...document.querySelectorAll('.social-post')];
-    const card = cards.find((c) => (c.textContent || '').includes('tempi PNGLA per classe'));
+    const card = cards.find((c) => (c.textContent || '').includes('waiting times by priority class'));
     const details = card && [...card.querySelectorAll('details')].find((d) => /reshare/i.test(d.querySelector('summary')?.textContent || ''));
     if (!details) return;
     details.open = true;
     const form = details.querySelector('form');
     const ta = form?.querySelector('textarea[name="content"]');
-    if (ta) ta.value = 'Da leggere prima di parlare di “vincolo di mandato” al bar.';
+    if (ta) ta.value = 'Read this before talking about an “imperative mandate” at the bar.';
     const btn = form?.querySelector('button[type="submit"], button:not([type])');
     if (btn) btn.click();
   });
@@ -1296,6 +1584,7 @@ async function main() {
   try {
     if (wanted('arrive')) await journeyArrive(browser);
     if (wanted('discussion')) await journeyDiscussion(browser);
+    if (wanted('forum')) await journeyForum(browser);
     if (wanted('social')) await journeySocial(browser);
     // The long-tail draft is seeded first so it sits, below quorum, beneath the
     // proposal that does reach quorum in the signatures shot.
@@ -1312,6 +1601,7 @@ async function main() {
     if (wanted('lanes')) await journeyGroupLane(browser, groupIds);
     if (wanted('ballots')) await journeyDelegatedBallot(browser);
     if (wanted('accountability')) await journeyAccountability(browser);
+    if (wanted('governance')) await journeyGovernance(browser);
   } finally {
     if (process.env.KEEP !== '1') await browser.close();
   }

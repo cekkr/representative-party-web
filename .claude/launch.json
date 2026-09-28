@@ -7,6 +7,24 @@
       "runtimeArgs": [],
       "port": 3000,
       "autoPort": true
+    },
+    {
+      "name": "scenario-a",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.21.0/bin:$PATH\"; rm -rf .local/scenario-a && STANDALONE_DIR=.local/scenario-a ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME='Rete Civica Nazionale' DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false PORT=3000 ./run-standalone.sh"
+      ],
+      "port": 3000
+    },
+    {
+      "name": "org-regression",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": [
+        "-c",
+        "export PATH=\"$HOME/.nvm/versions/node/v24.21.0/bin:$PATH\"; rm -rf .local/org-regression && STANDALONE_DIR=.local/org-regression PORT=3000 ./run-standalone.sh"
+      ],
+      "port": 3000
     }
   ]
 }
