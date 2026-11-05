@@ -11,7 +11,7 @@ Use these sources in this order:
 1. This file defines day-to-day implementation rules, invariants, ownership, and where code lives.
 2. [README.md](README.md) defines the public product description, operator workflow, configuration, and current capabilities.
 3. [ROADMAP.md](ROADMAP.md) distinguishes shipped behavior from planned work and sets implementation priorities.
-4. [UI_ROADMAP.md](UI_ROADMAP.md) is the UI reference: the target design language (the two CodeCanyon templates cannot be vendored), per-surface HTML structure/section order, the section/modularity inventory, and implemented-vs-todo style and functionality. Read it before touching presentation and update it in the same task.
+4. [UI_ROADMAP.md](UI_ROADMAP.md) defines the target shell, collections, focused workspaces, semantic HTML, visual system, and acceptance criteria using the pinned Citizen OS frontend as the design reference. Read it before touching presentation and update it in the same task. Initialize the optional reference checkout with `git submodule update --init -- thirds/citizenos-fe`.
 5. [OPTIMIZATIONS.md](OPTIMIZATIONS.md) records performance, redundancy, UX-consistency, observability, security, and storage/IO work.
 6. The linked principle documents below define the product philosophy and domain constraints. Do not silently reinterpret them in code.
 
@@ -260,6 +260,7 @@ Circle/vote/transaction controller → envelope verification and replication pol
 - [`scripts/agent-viewport.js`](scripts/agent-viewport.js) and its [usage guide](scripts/agent-viewport.md) help agents inspect the live SSR UI.
 - [`scripts/db-check.js`](scripts/db-check.js) reports adapter/storage health; [`scripts/circle-keygen.js`](scripts/circle-keygen.js) generates Circle signing/ring identity material.
 - [`dev-samples/`](dev-samples/) contains Composer and social/forum template references. [`md-assets/`](md-assets/) contains README media, not runtime assets.
+- [`thirds/citizenos-fe`](thirds/citizenos-fe) pins the upstream Citizen OS frontend for UI research. Keep it outside runtime, build inputs, and test discovery. Implement local UI work in the module templates, shared helpers, and first-party assets.
 
 ## Route Ownership Map
 
@@ -295,7 +296,7 @@ DATA_ADAPTER=memory DATA_MODE=centralized npm start
 Validation commands:
 
 ```bash
-npm test          # full node:test suite, including Puppeteer UI flows
+npm test          # first-party tests/*.test.js, including Puppeteer UI flows
 npm run test:ui   # stable UI-only entry point
 npm run db:check  # adapter report
 npm run keys:circle
@@ -342,7 +343,7 @@ Keep this section aligned with [ROADMAP.md](ROADMAP.md); that document is author
 2. Design and implement the separate audited protected-voice path before making anonymity claims.
 3. Add lazy, versioned stores for commitments, flow edges, authority, funds, sectors, mediation, pressure observations, and impact reviews.
 4. Introduce explainable aggregate pressure analytics with cohort suppression and no automated sanctions.
-5. Continue Composer component operations and template decomposition into module partials.
+5. Apply the Citizen OS patterns through the shared shell, conversation collections, and focused workspaces. Continue Composer component work after establishing the shared variants. [UI roadmap](UI_ROADMAP.md#8-delivery-order-and-acceptance)
 6. Harden federation, cross-provider civic visibility, replication tests, provider-blind signatures/escrow/reveal governance, and eventual Claim & Seize migration.
 7. Evaluate libp2p gossipsub for bounded, signed social-lane replication while preserving audit-grade civic envelopes.
 

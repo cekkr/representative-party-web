@@ -569,6 +569,7 @@ npm run db:check # prints adapter/profile + record counts for the current DATA_A
 
 - The app is SSR‑first with a vanilla router interceptor: set `X-Requested-With: partial` to fetch partial HTML for app‑like navigation.
 - Static assets live in `src/public`; keep new templates under `src/modules/<module>/templates/`.
+- For UI work, initialize the optional Citizen OS design reference with `git submodule update --init -- thirds/citizenos-fe`. The roadmap maps its templates and styles to our server-rendered shell, collections, and focused workspaces. [UI roadmap](UI_ROADMAP.md)
 
 ---
 

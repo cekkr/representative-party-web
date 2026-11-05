@@ -1,342 +1,494 @@
-# UI Roadmap & Reference
+# UI Roadmap
 
-This is the standing UI reference for the **Web Organization Framework**: the design
-language it targets, what is implemented, and what remains — across **HTML structure**,
-**section order**, **functionality**, and **style**. It exists because the two commercial
-templates the owner uses as visual references are licensed CodeCanyon products that
-**cannot be vendored into this GPL repo**, so their design language is distilled here
-instead.
+Citizen OS is the design reference for the Web Organization Framework. Follow its
+division into an application shell, browseable collections, focused workspaces,
+and task-specific forms. Use its visual hierarchy to make it obvious where to read,
+where to act, and which details belong to the current record. The framework's
+communication kernel remains useful with Discussion, Forum, and Notifications alone.
+Optional modules add destinations and actions according to their existing gates.
 
-Keep it synchronized with [ROADMAP.md](ROADMAP.md) (overall product phases),
-[AGENTS.md](AGENTS.md) (implementation contracts), [OPTIMIZATIONS.md](OPTIMIZATIONS.md)
-(follow-up backlog), and the standing [principle-docs/UIReview.md](principle-docs/UIReview.md)
-review procedure. When presentation changes, update this file in the same task.
+**Current** means the behavior and HTML already shipped. **Target** describes work
+to implement. The product roadmap owns feature sequencing, and the agent handbook
+owns implementation invariants. [Product roadmap](ROADMAP.md) · [AGENTS.md](AGENTS.md)
 
-Legend: **[done]** shipped and verified · **[partial]** present but incomplete ·
-**[todo]** not started.
+## Reference checkout
 
----
+The [pinned Citizen OS frontend](https://github.com/citizenos/citizenos-fe/tree/36e44a5c22651586b39b72d5b2a6c971b0236cb5)
+lives in `thirds/citizenos-fe`. The links below point to templates and styles in
+that checkout. Refresh the source references when updating the pin.
 
-## 1. External style references (not vendored)
+```sh
+git submodule update --init -- thirds/citizenos-fe
+```
 
-Two local CodeCanyon apps are the visual/structural north star. They live on the owner's
-disk only — do not copy their code or assets into this repo.
+Use the source to inspect element order, layout variants, component states, and
+styling. Implement those patterns in the framework's SSR templates, shared view
+helpers, `app.css`, and optional `app.js` enhancements. Upstream Angular, APIs,
+assets, and CSS stay outside our build and runtime. Review upstream license terms
+before proposing any direct reuse.
 
-- **ForumLab — Community Discussion Platform** (`codecanyon-FXBzXFy2-…`). Use its **modern**
-  template — `Files/assets/templates/modern/css/main.css` — as the closest match: HSL
-  design-token scale on a `--base` hue ≈ 248, Space Grotesk headings + Inter body, rounded
-  cards, forum/thread list structure, sidebar + feed layout.
-- **Ultimate Project Manager CRM (Zisco ERP)** (`codecanyon-DjGLSU35-…`, CSS inside
-  `ZiscoERP.zip` at `assets/css/app.css`). Use its **shadcn-style token system**: HSL
-  semantic tokens (`--primary`, `--card`, `--muted`, `--border`, `--ring`, `--sidebar-*`),
-  light **and** dark palettes toggled by a class on the root, `--radius`, Geist typography,
-  and a persistent left **sidebar app-shell**.
-
-**Convergent takeaways** both share and this project adopts: one indigo/violet **primary
-hue** drives an HSL semantic-token system; neutral surfaces step up in lightness; rounding
-and soft elevation over glow; a sidebar + main-column app-shell; light+dark support.
-
-**Divergence we keep on purpose:** no external font/CDN requests (privacy/provider-local
-posture) — we use a system/Inter stack, not the references' Google-Fonts pulls.
-
----
-
-## 2. Design tokens (style) — [done]
-
-Implemented in [`src/public/app.css`](src/public/app.css) `:root`. **Dark-first**, with a
-full light palette.
-
-- **Accent engine:** `--primary-h/s/l` → `--primary`, `--primary-strong`,
-  `--primary-foreground`, `--primary-soft`, `--primary-two` (gradient companion), `--ring`.
-  One hue knob (`--primary-h`) re-tints the whole system.
-- **Accent ink:** `--primary-ink` — text that sits *on* an accent-tinted chip. `--primary`
-  is tuned as a fill; at L66% on its own 14% tint it only reaches 3.5:1, so tinted chips
-  take this instead. Follows the live hue/saturation, so accent presets keep working.
-- **Neutrals:** `--background`, `--surface`, `--surface-2/3`, `--card`, `--foreground`,
-  `--muted-foreground`, `--border`, `--border-strong`, `--nav-surface`.
-- **Status:** `--success`, `--warning`, `--danger`, `--info`, each backed by an
-  `-hsl` channel triplet (`--warning-hsl`, …) so a component can take the same colour at
-  its own alpha rather than hardcoding a second, theme-blind `rgba()` of the same hue.
-- **Neutral families** (also triplets, same reason — dozens of rules take them at a dozen
-  alphas): `--hairline-hsl` (rules, dashed guides, gridlines), `--inset-hsl` /
-  `--inset-2/3/4-hsl` (recessed wells and popover backdrops, deepest first),
-  `--marker-hsl` (the mint "active / selected / audited" marker), plus `--on-accent`
-  (ink on an accent-filled shape) and `--code-surface`. **The inset family flips from
-  near-black to near-white in the light palette** — without it every recessed panel would
-  render as a black hole on a white page.
-- **Overlay tints:** `--overlay-softer`, `--overlay-soft`, `--overlay-strong` — the
-  "subtle lift" washes on top of a surface. They invert with the theme; a white wash is
-  invisible on a light background.
-- **Radius scale:** `--radius-sm`, `--radius`, `--radius-lg`, `--radius-pill`.
-- **Elevation:** `--shadow`, `--shadow-soft`.
-- **Density:** `--density-scale` → `--pad-card`, `--gap-stack`.
-- **Back-compat aliases:** legacy hex names (`--bg`, `--text`, `--muted`, `--highlight`,
-  `--accent`, …) resolve onto the tokens so all component CSS works unchanged. **Do not
-  reintroduce raw hex in components.**
-
-**Scope rule (critical):** accent/density/theme attributes live on the **`<html>`**
-element (`data-ui-accent` / `data-ui-density` / `data-theme`), never `<body>`. The token
-layer is declared on `:root` and resolves its nested `var(--primary-h)` there; a
-`<body>`-level override is silently ignored by the derived tokens. Preset rules are scoped
-`:root[data-ui-accent="…"]` / `:root[data-ui-density="…"]`.
-
-Accent presets: `violet` (default), `blue`, `teal`, `green`, `rose`, `amber`.
-Density presets: `comfortable` (cozy, default), `compact`, `relaxed`.
-Themes: `dark` (default), `light`, `system`.
-
-**Light palette — [done].** `:root[data-theme="light"]` re-declares only the
-neutral/status/overlay block; the accent engine still derives from `--primary-h`, so every
-preset works in both themes (the primary is darkened to L52% because a 66%-lightness
-violet fails contrast on a near-white surface). `color-scheme` is declared per theme so
-native widgets (scrollbars, date pickers) match.
-
-**`system` is resolved by CSS, not JavaScript** — `data-theme="system"` plus a
-`prefers-color-scheme` media query — so it holds on the first paint and with JS disabled:
-no theme flash, no client round trip. Plain CSS cannot share one declaration body between
-a bare selector and a media-query-scoped one, so the light palette is written **twice**.
-`tests/interface-settings.test.js` asserts the two bodies stay identical — **edit both**.
-
-**Contrast is verified, not assumed:** every member-facing route was audited in both
-themes against WCAG AA (4.5:1 body, 3:1 large). The pass also fixed three pre-existing
-dark-mode failures — avatar discs (62%→66% lightness, blue hues were at 4.08:1), the
-`stance--question`/`--neutral` chips (3.5:1, now on `--primary-ink`), and the
-`stance--proposal` chip, which was pinned to a fixed violet and stopped matching once a
-member repicked their accent.
-
-**[todo]** optionally self-host a variable font (Inter / Space Grotesk / Geist) under
-`/public` to match the reference type exactly with no external request.
-
----
-
-## 3. Components (style + structure) — [done], polish ongoing
-
-Re-skinned in [`src/public/app.css`](src/public/app.css), reusing existing class names so
-all 37 templates inherit at once. Token-driven, focus rings via `--ring`.
-
-- **[done]** Buttons (`.cta` primary gradient, `.ghost` secondary), panels/cards (`.panel`
-  with density padding + `--radius-lg`), side-nav app-shell, topbar, pills/chips
-  (`.pill`, stance/stage variants), fields/inputs, avatars, callouts, stat tiles,
-  segmented control, accent swatches, global `:focus-visible` ring.
-- **[partial]** Composer tool + Interface panel chrome modernized; the admin composer bar
-  can overlap the status strip on very narrow widths (admin-only) — see
-  [OPTIMIZATIONS.md](OPTIMIZATIONS.md).
-- **[todo]** A documented component palette (see §7 rollout): thread/list rows, feed cards,
-  empty states, and table styles hardened to the reference "modern" bar on every surface.
-
----
-
-## 4. Ad-hoc modularity (functionality) — [done]
-
-Two distinct, coexisting customization surfaces. See the AGENTS contract *"Member appearance
-and modularity"* for invariants.
-
-- **Member Interface panel** ([`topbar.html`](src/modules/core/templates/partials/topbar.html),
-  driven by [`app.js`](src/public/app.js)) — per-member, per-view, non-binding on anyone else:
-  - **Appearance:** accent-hue swatches, theme (dark/light/system) and density segmented
-    controls. **[done]**
-  - **Sections:** per-page show/hide list of the current page's module panels. **[done]**
-    Lists only panels that opted in from their template. The admin Composer synthesizes
-    an index-derived key (`panel-N`) for untagged panels; those are flagged
-    `data-composer-synthetic` and excluded, because such a key shifts when the page
-    changes shape and the server knows nothing about it — hiding one would not survive
-    SSR.
-  - **Interface settings:** large text, reduced motion, compact nav, keep-composer-open,
-    fast partial navigation. **[done]**
-  - Persistence: dynamic in `localStorage`, permanent via *Save as session defaults* →
-    `person.uiSettings` (session store). Rendered on `<html>` at SSR time so it holds
-    **without JavaScript**. Vocabulary is centralized in
-    [`interfaceSettings.js`](src/interfaces/http/views/interfaceSettings.js) and shipped to
-    the browser on `data-ui-vocabulary`, so there is no hand-maintained mirror to drift.
-- **Admin Composer** ([`buildComposerControls`](src/interfaces/http/views/templates.js) +
-  `app.js`) — deployment-wide brand/layout defaults: inline text/style overrides, drag
-  reorder, panel hide/show, theme CSS. Admin-gated (`composerAllowed = isAdmin`). **[done]**
-
-**Shared contract:** a panel becomes reorderable/hideable by carrying
-`data-composer-section="<stable-key>"` (and a friendly `data-section-label`) in its template.
-Server-side, `applyMemberHiddenSections` in [`templates.js`](src/interfaces/http/views/templates.js)
-stamps `data-member-hidden="true"`; `app.js` re-applies live and never fights an open
-Composer.
-
----
-
-## 5. Section / modularity inventory
-
-70 panels are section-tagged across modules. **All 65 chrome-bearing panels carry a
-friendly `data-section-label`** — **[done]**. The 5 auth/core pages render no shell, so
-the member Sections control never lists them and a label there would be dead markup.
-`tests/interface-settings.test.js` enforces the rule, so a new panel cannot ship unlabeled.
-
-Without a label the control falls back to heading text, which reads as page copy rather
-than a control — that is what the label pass removed.
-
-| Module | Section keys | Labels |
-| --- | --- | --- |
-| home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops` | **[done]** all 5 |
-| social | `social-wall`, `social-compose`, `social-controls`, `social-follows` | **[done]** all 4 |
-| forum | `forum-threads`, `forum-compose` | **[done]** both |
-| discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics` | **[done]** all 4 |
-| petitions | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` | **[done]** all 5 |
-| organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[done]** all 6 |
-| delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[done]** all 7 |
-| delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[done]** all 7 |
-| governance | `governance-overview`, `governance-proposals` | **[done]** both |
-| groups | `groups-create`, `groups-list`, `groups-categories` | **[done]** all 3 |
-| notifications | `notifications-inbox`, `notifications-preferences` | **[done]** both |
-| profile | `profile-summary`, `profile-interface`, `profile-fields` | **[done]** all 3 |
-| governance | + `governance-propose` | **[done]** all 3 |
-| delegates | + `delegate-directory` reused for search | **[done]** |
-| admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` | **[done]** all 20 |
-| auth/core | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required` | n/a (chromeless) |
-
-Two notes from the label pass:
-
-- **`notifications-preferences` was untagged.** It is rendered from a controller string
-  (`renderPreferencesPanel` in [notifications.js](src/modules/notifications/http/notifications.js)),
-  not a template, so it never opted in. It now carries a key and a label.
-- **Labels describe the panel's visible content, not its key.** In
-  [profile.html](src/modules/profile/templates/profile.html) and
-  [delegate-profile.html](src/modules/delegates/templates/delegate-profile.html) the keys
-  are rotated one position out of step with the panels they sit on (`profile-summary`
-  wraps the *attributes* panel; `delegate-profile-delegations` wraps *vote history*).
-  Renaming them would invalidate members' stored `hiddenSections` and any saved Composer
-  layout, so it needs a migration — logged in [OPTIMIZATIONS.md](OPTIMIZATIONS.md).
-
----
-
-## 6. Per-surface structure map
-
-Each member-facing route: owning template, current top-level section order, and the target
-structure/order pulled from the references. The token/component refresh (§2–3) reaches
-every surface, and every panel is now section-tagged and labelled (§5); **[todo]** below
-means the HTML *structure* still needs the modern card/feed rework.
-
-**The exemplar shape** (home/social/forum, now also discussion/petitions): a
-`.page-grid` with the *content* in `.page-main` and short controls in the `.page-aside`
-rail. Content leads — a compose form never sits above the feed it contributes to.
-
-| Route | Template | Current top-level order | Target (reference) | Status |
-| --- | --- | --- | --- | --- |
-| `/` | [home.html](src/modules/home/templates/home.html) | overview → lanes (conversation/decision/audit) → ops | dashboard hero strip + stat row + activity lanes as cards | **[done]** exemplar |
-| `/social/feed` | [social.html](src/modules/social/templates/social.html) | main: wall · aside: composer/filters/follows | two-column feed: sticky composer + card wall + right rail | **[done]** exemplar |
-| `/forum` | [forum.html](src/modules/forum/templates/forum.html) | main: threads · aside: compose | thread list rows + right compose rail | **[done]** exemplar |
-| `/discussion` | [discussion.html](src/modules/discussion/templates/discussion.html) + partials | main: feed · aside: compose/filters/topics | modern list rows + right rail | **[done]** |
-| `/petitions` | [petitions.html](src/modules/petitions/templates/petitions.html) + partials | main: active proposals/deliberations · aside: compose/stage filter/delegates | proposal cards, stage chips, argument map | **[done]** structure; argument-map polish outstanding |
-| `/organization` | [organization-cases.html](src/modules/organization/templates/organization-cases.html) | main: case details, source post, acknowledgement or promotion form · aside: searchable queue and preview link | attributed source card with evidence, voice type and review date | **[done]** live case workflow |
-| `/organization?view=preview` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → illustrative pressure inbox → organizational mirror → operating map | source email fixture, layer tabs, operating map, pressure views | **[done]** labelled preview |
-| `/governance` | [governance.html](src/modules/governance/templates/governance.html) | main: constitution → change proposals · aside: propose a change | settings cards + change-proposal list | **[done]** |
-| `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | main: overview → delegated-ballot inbox → your delegated ballots → current → effective chains · aside: set a delegate/recommendations | delegate cards + chain view + ballot inbox | **[done]** |
-| `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory — main: people list · aside: search. profile — main: summary/coverage/votes/activity · aside: endorsements | searchable people grid + profile dashboard | **[done]** |
-| `/groups` | [groups.html](src/modules/groups/templates/groups.html) | main: group tree (branches indented under parents) → category directory · aside: create a group | group cards + election panels + category directory | **[done]** |
-| `/notifications` | [notifications.html](src/modules/notifications/templates/notifications.html) | main: alerts inbox · aside: alert preferences | notification list rows | **[done]** |
-| `/profile` | [profile.html](src/modules/profile/templates/profile.html) | main: session/handle → provider-local attributes · aside: interface controls | account cards + preferences | **[done]** |
-| `/admin` | [admin.html](src/modules/admin/templates/admin.html) + partials | 20 anchored panels, single column | admin dashboard shell | **[done]** decomposed into 7 partials; single column on purpose (see below) |
-
-**`/admin` stays a single column deliberately.** The reference "dashboard shell" is a
-persistent left sidebar plus a main content column — which the app already has, in the
-shared side-nav. A settings page whose 20 panels are each a jump target reads better as
-one column than split across a rail, and every panel is now section-tagged so a member
-can hide the ones they don't operate. What it did need was decomposition: `admin.html`
-was a single 742-line template and is now 7 grouped partials
-([setup](src/modules/admin/templates/partials/admin-setup.html), modules, policy,
-structure, federation, observability, operations), which also closes the ROADMAP
-template-hygiene item.
-
-### Layout rules the rollout established
-
-- **The rail is a plain column.** `.page-aside` is not sticky, has no `max-height`, and
-  does not scroll internally. Both alternatives break once a panel outgrows the viewport:
-  `overflow: auto` clips an expanded compose form so its own submit button sits outside
-  the rail's visible box, and `position: sticky` is worse — a sticky element taller than
-  the viewport pins at `top` and then stops moving, so nothing below the fold can be
-  scrolled to at all. In both cases the member simply cannot submit. Only a genuinely
-  short, fixed-height panel may pin itself (`.sticky-composer` on the social composer).
-  `tests/ui.test.js` → *compose forms stay reachable at a short viewport* guards this.
-- **The grid collapses on its own width, not the viewport's.** `.shell main` declares
-  `container-type: inline-size`, and `.page-grid` collapses via
-  `@container shell-main (max-width: 700px)`. A viewport-keyed breakpoint ignored the
-  ~240px side-nav and left the main column at ~160px on a ~850px screen while the aside
-  kept its full 360px. The old `@media (max-width: 720px)` rule stays as a fallback.
-- On the live case workspace, the source and case details precede the queue when
-  the grid collapses. `tests/ui.test.js` checks the order and width at 390px.
-
----
-
-## 7. Functionality checklist
-
-| Capability | State |
+| Upstream reference | Pattern to follow |
 | --- | --- |
-| SSR renders fully without JS; full vs partial parity | **[done]** invariant |
-| Partial navigation (`data-partial`) + enhanced forms | **[done]** |
-| Verbosity (compact/full: default, per-session, per-page presets) | **[done]** |
-| Appearance: accent hue | **[done]** |
-| Appearance: density | **[done]** |
-| Appearance: light/dark/system toggle | **[done]** (`system` resolved by CSS, holds without JS) |
-| Sections: member per-page show/hide (SSR + live) | **[done]** |
-| Admin Composer: text/style/reorder/hide/theme defaults | **[done]** |
-| Side-nav jump filter (`Ctrl/Cmd+K`, `/`, `Esc`) | **[done]** |
-| Sticky social composer auto-collapse | **[done]** |
-| Delegated-ballot state on `/petitions` (holder, countdown, override) | **[done]** |
-| Delegate ballot inbox + member ballot list on `/delegation` | **[done]** |
-| Group tree: branches indented under their parent, lineage on the card | **[done]** |
-| Category directory (`/groups`): who works on what, one-click delegate | **[done]** |
-| Group lane tabs + destination picker on `/discussion` and `/petitions` | **[done]** |
-| Promote-to-upper-level control (shown only when it would succeed) | **[done]** |
-| Promotion request + approve/decline controls (both lanes) | **[done]** |
-| Group members-and-roles panel (lane moderator assignment) | **[done]** |
-| Scenario A README coverage, all English copy: discussion, forum, proposal/revisions/deliberation/vote, delegation, election, branch tree, category directory, internal lane, promotion, delegated ballot + delegate inbox, People, delegate dashboard, governance change, social (`party-journeys.js`, 20 captures). The README carries no non-political walkthrough | **[done]** |
-| Thread order: forum replies and proposal discussion read oldest-first; the comment form follows the notes; rebuttals name the claim they build on | **[done]** |
-| Ballot select starts on the member's current vote ("Change vote"), never back on abstain | **[done]** |
-| Group election panel leads with results; "start a new election" follows | **[done]** |
-| Governance history reads as decisions ("Approved — …", proposer vs decider) instead of event types | **[done]** |
-| Cachet / delegation-topic labels in the member's casing (`Healthcare / Waiting lists`, not the normalised key) | **[todo]** (see OPTIMIZATIONS) |
-| Proposal Category field (compose + draft edit) with topic datalist | **[done]** |
-| Shared self-hosted favicon with a `/favicon.ico` fallback | **[done]** |
-| Open an attributed case from Discussion, acknowledge with a review date, and search the case queue | **[done]** |
-| Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |
+| [App root](thirds/citizenos-fe/src/app/app.component.html), [desktop nav](thirds/citizenos-fe/src/app/core/components/nav/nav.component.html), [mobile nav](thirds/citizenos-fe/src/app/core/components/nav-mobile/nav-mobile.component.html) | One shell around changing route content. Create, personal work, discovery, and account utilities have different positions. Phone navigation emphasizes frequent destinations and separates contextual actions. |
+| [Dashboard](thirds/citizenos-fe/src/app/core/components/dashboard/dashboard.component.html), [My Topics](thirds/citizenos-fe/src/app/my-topics/my-topics.component.html), [topic card](thirds/citizenos-fe/src/app/public-topics/components/topicbox/topicbox.component.html) | Short collections with headings and View all links on Home. The full list adds search and filters. Cards have a linked title, compact context, and a separate activity footer. |
+| [Topic workspace](thirds/citizenos-fe/src/app/topic/topic.component.html), [topic tabs](thirds/citizenos-fe/src/app/topic/components/topic-tabs/topic-tabs.component.html), [group workspace](thirds/citizenos-fe/src/app/group/group.component.html) | Stable record context, a narrow section switcher, one active task, and separate supporting information. A group keeps its identity and visibility above its Topics and Members views. |
+| [Arguments](thirds/citizenos-fe/src/app/topic/components/topic-arguments/topic-arguments.component.html), [argument card](thirds/citizenos-fe/src/app/topic/components/argument/argument.component.html), [argument form](thirds/citizenos-fe/src/app/topic/components/post-argument/post-argument.component.html) | Discussion header and filters precede typed, authored entries. Replies stay with their parent. The form asks for the kind of contribution, then subject and text. |
+| [Ballot](thirds/citizenos-fe/src/app/topic/components/topic-vote-cast/topic-vote-cast.component.html), [activity](thirds/citizenos-fe/src/app/core/components/activity-feed/activity-feed.component.html) | Deadline and voting context, an editable ballot or a readback, then outcomes where available. Activity can be tied to a specific group or topic. |
 
----
+## 1. Shell, navigation, and page header
 
-## 8. To-implement backlog (ordered)
+**Current.** The topbar, searchable sidebar, and status strip surround a single
+`<main data-shell>`. Module- and role-aware navigation and page-level compose
+links already exist. The mobile sidebar has a height cap.
+[Shell template](src/modules/core/templates/partials/shell.html) ·
+[Navigation model](src/interfaces/http/views/navigation.js)
 
-1. ~~**Light palette + toggle**~~ — **[done]**, see §2.
-2. ~~**Label the remaining sections**~~ — **[done]**, see §5, test-enforced.
-3. ~~**De-duplicate the accent/density vocabulary**~~ — **[done]**. The layout ships
-   `data-ui-vocabulary` from [`interfaceVocabulary()`](src/interfaces/http/views/interfaceSettings.js);
-   `app.js` reads it and keeps its literals only as a fallback for a pre-deploy body, so
-   adding a key server-side needs no second edit.
-4. ~~**Roll the modern structure out** beyond the exemplar~~ — **[done]**. Every
-   member-facing route now uses the `.page-grid` shape (§6), `/admin` is decomposed into
-   partials, and the whole set is verified per
-   [UIReview.md](principle-docs/UIReview.md): 13 routes × 2 themes, zero contrast
-   failures, zero horizontal overflow, every panel labelled.
-5. **Self-host a variable font** under `/public` (no external request) for exact reference
-   typography.
-6. **Composer palette** — component insert/delete/wrap + richer property groups (already a
-   ROADMAP Phase-2 item).
-7. **Chrome fixes** — admin composer-bar/status-strip overlap on narrow widths and mobile side-nav disclosure. The favicon is shipped.
-8. **Rename the rotated section keys** in `profile.html` / `delegate-profile.html` behind a
-   migration for stored `hiddenSections` and Composer layouts (§5).
+**Target.** Keep a single gated navigation model and give it the organization of
+Citizen OS. A desktop rail starts with deployment identity and a contextual Create
+entry, followed by grouped work destinations and then profile and operator utilities.
+Group destinations by the work a member recognizes, with Conversation, Organization,
+Civic governance, and Federation/operations where enabled. Keep Discussion, Forum,
+and Notifications easy to find regardless of civic configuration. The current
+destination uses a visible label and `aria-current="page"`, with keyboard jump
+search as a second way to reach destinations and existing anchors.
 
-Performance/redundancy follow-ups (e.g. `applyMemberHiddenSections` per-key rescan) live in
-[OPTIMIZATIONS.md](OPTIMIZATIONS.md).
+On phones, put the deployment label, current location, and navigation disclosure
+in a compact top row. Surface only the high-frequency actions that fit there,
+such as Inbox and a route-specific Create link. The disclosure exposes the full
+gated navigation in normal focus order. Use a labelled native disclosure or a
+button with an associated region. The links remain reachable with JavaScript off.
+Reuse the same account, module, and role filtering for every entry point.
 
----
+The shell owns skip-to-content, one main landmark, and a compact status surface.
+Retain Circle enforcement, validation/preview, handle, ledger/actor/discussion
+counts, and gossip ingest. The route owns the following order inside main.
 
-## 9. Invariants (see AGENTS.md for the authoritative contract)
+1. Optional backlink or lineage breadcrumb.
+2. One `<h1>`, with scope, visibility, or lifecycle state where it changes the
+   meaning of the page.
+3. One primary action for the current task and viewer, then secondary actions in
+   a short row or labelled disclosure. Create links jump to or open the existing
+   compose form.
+4. Section links or filters when needed, followed by the selected content.
+   Secondary context follows content in source order.
 
-- Preserve every `data-composer-key/-default/-section/-role/-section-label`, `data-partial`,
-  `data-ui-setting`, `data-verbosity*`, and `data-member-hidden` hook.
-- SSR must work without JS; full and partial HTML must stay consistent.
-- No external network requests (fonts/CDN). System/Inter stack only.
-- Reuse shared view helpers ([actorLabel](src/interfaces/http/views/actorLabel.js),
-  [contextPanel](src/interfaces/http/views/contextPanel.js),
-  [status](src/interfaces/http/views/status.js), pagination) — no local dupes.
-- Accent/density/theme belong on `<html>`, not `<body>` (§2 scope rule).
-- Member customization → `person.uiSettings`; deployment defaults → admin Composer. Never
-  merge the two persistence paths.
-- Components stay theme-agnostic: they resolve through token names only. Never add a
-  `:root[data-theme="…"]` override to a component rule — retune the token instead.
-- The two light-palette blocks (`[data-theme="light"]` and the `system` media query) must
-  stay identical; a test enforces it.
-- New panels ship with **both** `data-composer-section` (a stable, meaningful key — never
-  index-derived) and `data-section-label`; a test enforces the label.
+Keep the `.page-grid`, `.page-main`, and `.page-aside` contract. The shell's
+available inline width determines when the aside stacks beneath the content.
+Keep the existing 700 px `shell-main` container rule and viewport fallback until
+a replacement passes the same reachability checks. Use normal page scroll. A
+fixed-height affordance can pin itself, and the expanded compose form scrolls
+with the document. Use `minmax(0, 1fr)` for flexible columns and wrap long titles,
+handles, and evidence URLs. Avoid CSS order changes that put keyboard focus in a
+different sequence from the visible layout. [Current grid](src/public/app.css) ·
+[Compose reachability test](tests/ui.test.js)
+
+## 2. Home, collections, and discovery
+
+**Current.** Home has an overview, enabled work lanes, and an operations section.
+Most member routes use a primary collection and a rail for compose or supporting
+controls. [Home partials](src/modules/home/templates/partials) ·
+[Discussion partials](src/modules/discussion/templates/partials)
+
+**Target.** Follow Citizen OS's collection pattern. Home begins with a short
+workspace header, then small named collections with a few real entries and a
+link to the full destination. Use Conversation first and enabled group or civic
+work next. Each entry has a stable link. Use a meaningful first-use action when
+there is no activity. Keep diagnostics compact and below the member's work.
+
+A full collection reads **title and scope → available create action → search,
+filters and active selections → result list → pagination**. Use native GET
+forms and carry the active query and group through paging, refresh, and browser
+Back. Use compact filter disclosure on phones. Distinguish the empty workspace
+from zero matches and offer a different recovery for each. Give cards a common
+reading order with a title link, state and scope text, a short excerpt when
+useful, and a footer for activity and counts.
+
+| Collection | Layout and entry anatomy |
+| --- | --- |
+| Home, proposal browse, People, and group browse | A grid of summary cards when their titles and metadata fit. Use two or three columns only where the container has room, and one column on phones. Each card has one title link. Secondary actions are separate controls. |
+| Discussion and Forum | Single-column feed or row list, newest thread first. Title or content preview, shared avatar and byline, date, topic, and meaningful state. Place reply/activity counts on the trailing edge when there is room. |
+| Social | Single-column wall. Byline, audience and time, body and media, then item actions. Keep locked media and request/report controls adjacent to the media. Show destination beside Send. |
+| Notifications and delegate work queues | One readable row per event or task. Lead with what happened or needs action, then record link, scope, time/deadline, and a text cue for unread or pending. Return to the same place after marking a row read. |
+
+Keep filters that change collection membership near the result list. The rail
+holds supporting topics, follows, or short compose controls. An expanded,
+multi-section create/edit task can use the normal main flow with a return
+link to its collection. Member-facing seeded pages use real Scenario A content
+for every displayed count and card.
+
+Use a list even when cards render as a grid. Each item has one title link and
+an independent footer. This is the proposal variant of the collection card.
+
+```html
+<ul class="collection-grid">
+  <li>
+    <article class="record-card">
+      <header>
+        <p class="record-stage">Open for deliberation</p>
+        <h2><a href="/petitions?proposal=42">Conditional intramoenia</a></h2>
+        <p>Healthcare / Waiting lists</p>
+      </header>
+      <!-- Short description or evidence summary -->
+      <footer><!-- Attributed activity and permitted counts --></footer>
+    </article>
+  </li>
+</ul>
+```
+
+## 3. Focused workspaces
+
+Citizen OS separates the topic's identity and context from its selected work area.
+Use that hierarchy for a proposal and a group first. A workspace has a stable
+header, a labelled navigation strip, a selected content area, and optional
+supporting facts. At narrow widths the same sections are reachable from wrapping
+links. Keep the action and facts needed to complete the selected task in its main
+content. Place additional context after it or in an ordinary disclosure.
+
+Treat navigation and lifecycle as separate data. A member may read Discussion
+while the proposal is in Voting. Render the current view using a labelled
+`<nav>` and `aria-current="page"` on its selected GET link. Render stage as text in
+the persistent header. Use a fragment for movement within a document. Use a GET
+view when switching the server-rendered workspace. Browser Back restores the
+previous view and scope. Keep existing anchor links and bookmarks working.
+
+### Proposals
+
+**Current.** `/petitions` serves a scoped, stage-filtered and paginated list with
+full proposal cards, plus a deliberation feed and a compose/filter/delegate rail.
+Existing proposal cards carry evidence, votes, discussion, revisions, and
+moderation controls. [Controller](src/modules/petitions/http/petitions.js) ·
+[Template](src/modules/petitions/templates/petitions.html) ·
+[Proposal view](src/interfaces/http/views/petitionView.js)
+
+**Target.** Let `/petitions` browse summary cards. A proposal title opens its
+focused workspace in the same module. Use an explicit read URL such as
+`/petitions?proposal=<id>&view=discussion` as the implementation starting point.
+In a group lane carry `group=<id>`, and keep existing POST endpoints and
+authorization. Implement lookup by stable record id after resolving the viewer's
+scope. Reuse the read gate on every selected view and its partial equivalent.
+A scoped record must stay inaccessible outside its permitted lane. Preserve
+existing fragment links and keep a return link to the filtered list. Build
+the return link from recognized scope and filter fields.
+
+| Region | Required order and contents |
+| --- | --- |
+| Persistent header | Back to scoped proposals → topic breadcrumb → title → Circle/group and visibility → actual stage → one eligible next action. Show a compact primary cue for quorum, open discussion, ballot status, or outcome as applicable. |
+| Overview | Summary → problem, proposed action, impact, risks, and implementation → canonical evidence → quorum progress and eligible signing action → link to history. |
+| Discussion | Deliberation state and any explanatory notice → compact stance/filter summary → oldest-first notes and argument branches → contribution form when allowed. |
+| History | Attributed revisions and meaningful diffs → selected/frozen revision metadata → link to the corresponding evidence or ballot. |
+| Ballot | Frozen text or exact revision link and deadline if set → personal ballot state and eligible action → aggregate result when permitted. |
+| Details rail | Author/date, topic, group scope, provenance, and supporting links. Keep relevant ballot/delegation facts inside the Ballot view too. |
+
+Use the existing draft, deliberation, vote, and terminal states when selecting
+visible links and actions. Use a status explanation for an unavailable task
+where members benefit from understanding its prerequisite. Authority to sign,
+edit, moderate, freeze, or vote comes from the server's existing gates. Scenario A
+should make it easy to see why a proposal moved from the first draft, through a
+reply-driven revision, to the exact text put to a vote.
+
+Illustrative SSR structure for a selected view. The shell supplies main and the
+status strip. Reuse the existing opt-in key on the corresponding logical panel.
+
+```html
+<header class="workspace-heading">
+  <a href="/petitions">Back to proposals</a>
+  <p>Healthcare / Waiting lists</p>
+  <h1>Conditional intramoenia</h1>
+  <p>Circle proposal · Open for deliberation</p>
+  <a href="#proposal-comment">Add a contribution</a>
+</header>
+<nav aria-label="Proposal sections">
+  <a href="?proposal=42&amp;view=overview">Overview</a>
+  <a href="?proposal=42&amp;view=discussion" aria-current="page">Discussion</a>
+  <a href="?proposal=42&amp;view=history">History</a>
+</nav>
+<div class="page-grid">
+  <div class="page-main">
+    <section class="panel" id="petitions-discussion"
+             aria-labelledby="proposal-discussion-title"
+             data-composer-section="petitions-discussion"
+             data-section-label="Proposal discussion">
+      <h2 id="proposal-discussion-title">Deliberation</h2>
+      <!-- Chronological notes and reply branches -->
+      <form id="proposal-comment" method="post" action="/petitions/comment">
+        <input type="hidden" name="petitionId" value="42">
+        <!-- Stance, related claim, and evidence fields -->
+        <label for="comment-content">Contribution</label>
+        <textarea id="comment-content" name="content" required></textarea>
+        <button type="submit">Post contribution</button>
+      </form>
+    </section>
+  </div>
+  <aside class="page-aside" aria-label="Proposal details">
+    <!-- Authorship, scope, and supporting links -->
+  </aside>
+</div>
+```
+
+### Groups
+
+**Current.** `/groups` combines a branch tree, category directory, creation,
+elections, and policy controls. Discussion and proposal lanes reuse their own
+routes with `?group=` when enabled. [Group template](src/modules/groups/templates/groups.html) ·
+[Scope resolver](src/modules/groups/groupScope.js)
+
+**Target.** Keep the tree and category directory as discovery views. On opening
+a group, show **parent lineage → group name/description → membership, visibility
+and viewer role → available join or manage action → workspace links**. Follow
+the Citizen OS split between group content and people. Link to the existing
+scoped Discussion and Proposals lanes. Give Members and Decisions distinct
+areas within the group, and show governance settings only to eligible viewers.
+Retain contextual requests in the source scope, name the destination before a
+promotion is confirmed, and preserve the item, history, and audit trail after
+the move. Group lineage describes structure. The UI derives membership and
+authority separately for every group.
+
+### Other record pages
+
+Use the same header–workspace–context hierarchy where it shortens the path
+through a record. A People profile leads with identity and role, followed by
+delegation coverage, votes, and activity. A governance change shows the
+current rule alongside the proposed change and gives the decision its own
+attributed entry. A live organization case leads with its state, review date,
+and original attributed source, then acknowledgement and case history. The
+searchable case queue is secondary. The organization preview has a persistent
+preview label and its own navigation context.
+
+
+## 4. Participation, ballots, and activity
+
+### Contributions and replies
+
+Follow the Citizen OS discussion panel with a tinted heading, a short state
+summary, and the list immediately below. Put the first available action in the
+header as a jump link. Read discussion notes and replies oldest-first, with the
+form after the notes. A note or argument has a stable id and the following order.
+
+1. Shared avatar, `@handle`, short blinded-hash cue, and semantic
+   `<time datetime="…">`. Show a small Edited link when there is an attributable
+   edit history. Use deterministic `dd/mm/yyyy` display in Scenario A.
+2. Labelled stance and a short heading when supplied. Use “In reply to” with
+   the parent claim's title or excerpt and a link to that claim.
+3. Claim text and its evidence. Keep links close to the text they support.
+4. Permalink, reply action, and eligible item actions. Keep expanded replies
+   with their parent in a nested list and cap visual indentation on phones.
+
+Citizen OS uses different alignments for pro and con. Use aligned cards with a
+quiet edge or tint and a visible stance label, so chronology and relationships
+stay readable when the cards stack. Keep the argument map as another way to read
+the same deliberation. Present reactions and stance counts as discussion
+signals. Use the shared actor, evidence, topic, and provenance renderers.
+[Argument styling](thirds/citizenos-fe/src/assets/styles/_arguments.scss) ·
+[Shared view helpers](src/interfaces/http/views/shared.js)
+
+Use the upstream form's progression from contribution type to text. Group
+existing stance choices in a labelled `<fieldset>` where appropriate, then show
+the claim title, response text, related claim, and evidence fields that the
+current task supports. Show the destination before Submit. If a submission is
+rejected, preserve safe inputs and associate the error with the field or the
+form summary. Closed discussion is a readable state with a reason.
+
+### Ballot states
+
+Use Citizen OS's separate casting, submitted, and outcome blocks as the
+presentation model. A single ballot workspace keeps the proposal title,
+frozen revision, and timing context above the applicable personal state.
+A separately labelled outcome block uses the existing tally and its visibility
+policy. A chart may accompany exact counts and accessible labels.
+
+| Member's state | Personal block and action |
+| --- | --- |
+| Voting open, eligible, no existing choice | Explain the decision and show the existing ballot choices as labelled native controls. Show when a delegation would apply. |
+| Direct vote recorded | Read back the actual vote. Where a change is allowed, preselect the current choice in the edit form. |
+| Delegated and pending | Show the named holder, matching topic and deadline if any, with the direct override available under the existing policy. Keep pending outside yes, no, and abstain. |
+| Delegated and resolved | Explain the chain and resulting choice or lapse. Apply the shared ballot resolution, including the rules for an unresolvable or lapsed ballot. |
+| Voting closed or member ineligible | Show the reason and the outcome or next step the viewer is allowed to see. Render read-only state without actionable ballot controls. |
+
+Keep the signed ballot envelope, validation, and tally logic in the domain
+layer. Distinguish a recommendation from a delegated ballot and a pending
+delegated ballot from a counted abstention. Read back an override from the
+server and give the member a link to the same record after the POST.
+[Vote template reference](thirds/citizenos-fe/src/app/topic/components/topic-vote-cast/topic-vote-cast.component.html) ·
+[Ballot resolution](src/modules/delegation/delegatedBallots.js)
+
+### Activity and recovery
+
+**Current.** Notifications has an inbox and local preferences, with a Mark all
+read action and proposal links where available. **Target.** Follow Citizen OS's
+activity rows with a timestamp, scope, a clear unread cue, and a short event
+description. Preserve Mark all read. Resolve authorized target links through the
+owning module, including a proposal's actual scope and record view. A notification
+can remain readable after its source becomes inaccessible, using only the
+permitted event details. Offer explicit paging or a load-more link with a real
+GET destination. [Activity row reference](thirds/citizenos-fe/src/app/shared/components/activity/activity.component.html) ·
+[Notification controller](src/modules/notifications/http/notifications.js)
+
+| Interaction | SSR and enhanced behavior |
+| --- | --- |
+| Switch views or filter | Use a real link or GET form. Keep ordinary navigation, history, and link behavior. Keep selected view, current scope, and active filters visible. On a partial swap, focus the destination heading or requested anchor. |
+| Submit a change | Use a real POST form with the clicked button's name and value, including `event.submitter` in enhancement. Show progress without obscuring context and prevent repeated activation while pending. |
+| Mutation succeeds | Return the canonical GET location, with permitted scope and an item anchor as applicable. Full and partial flows resolve to the same page. Keep focus at the changed record or confirmation. |
+| Validation or transport failure | Keep safe entered values and explain how to recover. If the write outcome is uncertain, check the record through GET before offering a retry. Announce errors and keep them beside the relevant controls. |
+| Sign-in required, forbidden, or module off | Render the applicable server gate and a safe next action. Keep permission and lane checks authoritative for reads and writes. |
+
+Keep `data-partial` and enhanced HTML navigation scoped to HTML destinations.
+Use `<button>` for mutations and disclosures, `<a href>` for destinations,
+and `<details>` for optional context where it fits. Handle focus and expanded
+state when a disclosure is enhanced. The accessible result should be available
+with the ordinary server-rendered link or form. [Browser enhancements](src/public/app.js) ·
+[Module gates](src/interfaces/http/views/moduleGate.js)
+
+## 5. Visual system
+
+Use Citizen OS's pale canvas, white working panels, slate text, and blue links
+as the target for the light palette. Use the same relationships in dark mode
+with a cool dark canvas, stepped surfaces, legible blue links, and restrained
+borders. Work within the framework's existing accent, theme, and density
+preferences. Use the existing blue preset for reference captures, and check
+the default accent and other presets as part of the change.
+
+The values below describe the pinned reference and a starting point for
+implementation. Express the target using semantic tokens and verify the
+rendered result in both themes.
+
+| Element | Citizen OS source values | Framework target |
+| --- | --- | --- |
+| Canvas and text | Light canvas `#f1f7fc`, working surface `#fff`, inset `#f9fbfd`, slate text `#2c3b47`, rule `#e1e7ee`, link `#1168a8`. [Theme maps](thirds/citizenos-fe/src/assets/styles/_themes.scss) | Give the working panel one step of contrast against the canvas. Use the border and spacing to group information. Use a subdued inset for background facts. Blue link treatment should be distinguishable from body text and stay visible in both themes. |
+| Page frame and panels | 24 px outer gutter, 16 px at tablet width. 16 px panel radius, 24 px typical inset, 16 px internal gap. [Global styles](thirds/citizenos-fe/src/styles.scss) | Start with an 8/16/24/32 px spacing rhythm. Use a 16 px panel radius, 8 px for nested cards, and 16 px narrow padding. Apply member density to chrome and spacing while preserving readable type and controls. |
+| Type | Noto Sans. 14/20 px UI text, 28/32 and 24/28 px headings, 16/32 px long-form topic text. [Global styles](thirds/citizenos-fe/src/styles.scss) | Use the provider-local system stack at comparable sizes. Compact metadata remains secondary. Use roomier leading and a readable measure of about 65–75 characters for proposal and forum prose. Let headings, translated labels, and large text wrap. |
+| Action hierarchy | Rounded 48/40/32 px button families, with filled, outlined, soft, and quiet treatments. Default filled action is dark slate with blue hover. [Button styles](thirds/citizenos-fe/src/assets/styles/_buttons_new.scss) · [Theme maps](thirds/citizenos-fe/src/assets/styles/_themes.scss) | Use a solid primary treatment, outlined secondary actions, and quiet text or icon utilities with accessible names. Target 44–48 px hit areas for prominent touch controls and flexible height for long labels. Keep focus visible on every variant. |
+| Desktop work area | 200 px desktop nav. Topic uses a reading column capped at 872 px, a 288 px supporting rail, and 32 px between them. [Nav styles](thirds/citizenos-fe/src/app/core/components/nav/nav.component.scss) · [Topic layout](thirds/citizenos-fe/src/app/topic/topic.component.scss) | Start at 24–32 px between the reading column and a context rail around 288 px where the content container can fit it. Use 16 px between rail blocks. Keep the existing container-driven stack for narrower work areas. |
+| Responsive navigation | Desktop starts at 1025 px. Phone styles apply through 560 px, with a 56 px bottom navigation variant. [Media mixins](thirds/citizenos-fe/src/assets/styles/_mixins.scss) · [Mobile nav styles](thirds/citizenos-fe/src/app/core/components/nav-mobile/nav-mobile.component.scss) | Use compact navigation and a short set of frequent destinations. Keep the section switcher in flow and labelled. Choose the collapse point by actual available width and test short viewports before adopting fixed navigation. |
+| Stage and stance | Discussion blue, voting green, ideation amber, follow-up pink. Topic tabs use a thin active underline. Discussion and voting use tinted heading bands. [Topic tabs](thirds/citizenos-fe/src/app/topic/components/topic-tabs/topic-tabs.component.scss) · [Argument panel](thirds/citizenos-fe/src/app/topic/components/topic-arguments/topic-arguments.component.scss) · [Ballot panel](thirds/citizenos-fe/src/app/topic/components/topic-vote-cast/topic-vote-cast.component.scss) | Map draft to a quiet neutral or amber cue, deliberation to blue, voting to green, and closed to neutral. Use coloured edges, tint, or underline with an explicit label and readable ink. Keep warning, denied, provenance, and workflow meanings distinct. |
+| Summary cards | Topic cards separate a state band, title/summary area, and activity footer. Group cards lead with their identity and summary. [Topic card styles](thirds/citizenos-fe/src/app/public-topics/components/topicbox/topicbox.component.scss) · [Group card styles](thirds/citizenos-fe/src/app/my-groups/components/groupbox/groupbox.component.scss) | Adopt the repeated anatomy and allow height to follow content. Media is optional. Use a bounded title/summary preview with the full content in the linked view. Keep primary links and secondary controls in a predictable order. |
+
+Retune the HSL semantic layer in `:root` and keep components theme-agnostic.
+Use `--primary-ink` on tinted accent surfaces and the channel tokens for
+alpha variants. Match the light and system-light blocks. Preserve the current
+dark default and apply `data-theme`, `data-ui-accent`, and `data-ui-density` to
+`<html>` on first paint. Use text or shape as well as colour for active,
+selected, unread, locked, and lifecycle states. Check WCAG AA contrast with
+the rendered ink and background. Retain visible focus rings, reduced-motion
+support, and large-text reflow. [Theme and component CSS](src/public/app.css) ·
+[Appearance vocabulary](src/interfaces/http/views/interfaceSettings.js)
+
+## 6. Surface and template map
+
+New views are targets. Existing paths, module gates, and stable ids are the
+starting point for implementation.
+
+| Owner | Current | Target |
+| --- | --- | --- |
+| [Core shell and topbar](src/modules/core/templates/partials) | Shared topbar, searchable sidebar, status strip. | Desktop work navigation, compact phone disclosure, current page heading, and skip target. |
+| [Home](src/modules/home/templates/home.html) `/` | Overview, activity lanes, and operations. | Citizen OS-style named collections with small real previews and direct links to their full views. |
+| [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Feed with compose, filters, and topics. Optional group lane. | Scope header and nearby filter controls, authored items with evidence and stable links, and a jump to compose. |
+| [Forum](src/modules/forum/templates/forum.html) `/forum` | Thread list, reply forms, and compose rail. | Compact list rows and a focused reading order. Keep replies chronological and restore the reply target after posting. |
+| [Social](src/modules/social/templates/social.html) `/social/feed` | Wall, typed follows and filters, compose, and media controls. | Distinct post and media states, visible audience, and accessible compose with one scroll path. |
+| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Rich cards, deliberation feed, compose and filters. | Summary collection plus selected proposal workspace with Overview, Discussion, History, and Ballot as applicable. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Group tree, categories, elections, roles, and settings. | Browse plus focused group identity, links to scoped lanes, Members and Decisions views, and contextual management. |
+| [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballots, preferences, effective chains, and recommendations. | Task rows with topic, named holder, deadline/resolution, and scoped proposal link. Put recommendations and chain explanations in supporting sections. |
+| [People](src/modules/delegates/templates) `/delegates` | Searchable directory and profile with coverage, votes, and activity. | Summary cards or rows, then a record header with readable accountability sections and separate endorsement context. |
+| [Governance](src/modules/governance/templates/governance.html) `/governance` | Constitution, change proposals, decisions, and propose rail. | State the current rule and proposed change together, then show the attributed decision and its effect. |
+| [Notifications](src/modules/notifications/templates/notifications.html) `/notifications` | Inbox and local preferences. | Activity rows with explicit unread state and permitted destination, with preferences in supporting context. |
+| [Profile](src/modules/profile/templates/profile.html) `/profile` | Session and handle, provider-local fields, and Interface controls. | Identity summary followed by clearly separated, labelled settings sections and inline feedback. |
+| [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Linked source, case and acknowledgement workflow, searchable queue. | Case header, original source and evidence, acknowledgement/history, and a secondary queue. Retain provider-local scope. |
+| [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Labelled illustrative inbox, pressure map, and operating map. | Persistent preview identity, Scenario B examples, and a clear return to the live case workspace. |
+| [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. | Keep the settings workspace single-column. Apply visual hierarchy and fix narrow Composer overlap while retaining gates and anchor links. |
+| [Wallet handoff and result](src/modules/auth/templates) | Chromeless offer and result pages. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
+
+
+## 7. Implementation and section compatibility
+
+- Shared shell and navigation own the frame and links. Route controllers derive
+  authorized state and the selected view. Module-owned templates and partials
+  own markup and reading order. Use existing shared helpers for actor identity,
+  status, context gates, topic breadcrumbs, evidence, pagination, preview, and
+  provenance. Use browser enhancements after the ordinary HTML flow works.
+  [Template renderer](src/interfaces/http/views/templates.js) ·
+  [Context panels](src/interfaces/http/views/contextPanel.js) ·
+  [Actor labels](src/interfaces/http/views/actorLabel.js)
+- Preserve existing `data-composer-*`, `data-verbosity*`, `data-ui-setting`,
+  `data-member-hidden`, and `data-partial` hooks. Member Interface settings
+  remain in `person.uiSettings` when saved, with a browser-local overlay.
+  Deployment defaults remain in admin Composer. Keep public anchors and the
+  stable key for each existing logical panel. If a key changes, migrate both
+  saved member and deployment layout preferences.
+- A panel opts into Sections with a stable `data-composer-section` and a
+  friendly `data-section-label`. Keep synthetic `panel-N` keys outside member
+  Sections. Keep critical scope and page headings in persistent markup that
+  remains visible when optional panels are hidden. Preserve SSR section
+  visibility and let the active Composer manage the editing layout.
+- Establish each layout on a real route before creating a reusable component.
+  Share page headers, collections, status labels, and action anatomy when they
+  have the same meaning. Keep workflow-specific evidence, voting, permissions,
+  and moderation controls with their module.
+
+### Current section inventory
+
+The keys below are persisted identifiers. Some Profile and delegate-profile
+keys have historical names, while their labels identify the content.
+
+| Module | Explicit section keys |
+| --- | --- |
+| Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops` |
+| Social | `social-wall`, `social-compose`, `social-controls`, `social-follows` |
+| Forum | `forum-threads`, `forum-compose` |
+| Discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics` |
+| Proposals | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` |
+| Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
+| Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
+| People | `delegate-directory-list`, `delegate-directory`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` |
+| Groups | `groups-list`, `groups-categories`, `groups-create` |
+| Governance | `governance-overview`, `governance-proposals`, `governance-propose` |
+| Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
+| Profile | `profile-interface`, `profile-summary`, `profile-fields` |
+| Admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
+| Chromeless auth/core | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. Chromeless pages sit outside member Sections. |
+
+## 8. Delivery order and acceptance
+
+| Slice | Implementation boundary | Acceptance |
+| --- | --- | --- |
+| 1. Shell and visual foundations | Shared shell/header, semantic tokens, responsive nav and base panel/button styles. Pilot on Home and Discussion. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
+| 2. Conversation and collections | Home previews, list/row/card variants, search and filter placement, contribution and reply anatomy. Carry to Forum and Social. | In Scenario A, find the waiting-list evidence and open an attributed forum discussion from the list. Follow the replies in order and post one with and without enhancement. Retain the active search/scope through refresh and Back. |
+| 3. Proposal browse and workspace | Authorize focused reads and direct writes against the stored group scope first. Resolve a canonical, scope-aware GET URL for full and partial paths. Then split browse, overview, deliberation, history, and ballot presentation. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
+| 4. Groups, activity, and other records | Focused group sections and lane links, activity deep links, People and delegation, then governance and cases. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
+| 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
+
+For a scoped proposal implementation, check the stored group's lane and
+permission before each item-id mutation, including draft edit, sign, comment,
+stage change, and vote. Keep any stricter action gate. A submitted query or
+form value cannot establish membership. Following a successful action, resolve
+the record's canonical GET location from its resulting scope. On a move, the
+old scope must be checked again if someone opens the old link. Carry out the
+scope checks before wiring the new view to activity or delegation links.
+[Group scope](src/modules/groups/groupScope.js) ·
+[Proposal controller](src/modules/petitions/http/petitions.js) ·
+[Optimization backlog](OPTIMIZATIONS.md)
+
+### Review checklist for presentation changes
+
+- [ ] Drive Scenario A using an isolated, seeded strict-Circle deployment. Walk
+  the affected member surfaces as the relevant actors. Use English copy, Italian
+  names and handles, and the canonical topics and evidence. Use a separate store
+  and the Scenario B lens for `/organization`. Preserve each scenario's
+  `[drive]`, `[fixture]`, and `[design]` status.
+  [Standing UI review](principle-docs/UIReview.md) ·
+  [Scenarios](principle-docs/SimulationScenarios.md) ·
+  [Scenario A driver](scripts/party-journeys.js)
+- [ ] Check wide desktop, 800 × 600, 390 px, and 320 px or equivalent zoom.
+  Compare the reference composition with the implemented surface in light/blue
+  and dark, then check default and saved accent/density, large text, and reduced
+  motion. Inspect contrast, heading order, reflow, overflow, and visible focus.
+- [ ] Operate navigation, disclosures, filters, compose, and the changed task by
+  keyboard. Repeat core actions with partial navigation and with JavaScript off.
+  Check permission refusals, disabled modules, stable deep links, a regular
+  empty view, a filtered empty view, and failure/retry behavior where relevant.
+- [ ] Run `npm run test:ui` and the nearest targeted tests. Update this file's
+  current/target entry and inventory in the same task. Record open optimizations.
+  [Browser suite](tests/ui.test.js) ·
+  [Interface preferences](tests/interface-settings.test.js) ·
+  [Deliberation order](tests/deliberation-order.test.js) ·
+  [Delegated ballots](tests/delegated-ballots.test.js) ·
+  [Group scope and promotion](tests/group-structure.test.js) ·
+  [Case workflow](tests/organization-cases.test.js)
