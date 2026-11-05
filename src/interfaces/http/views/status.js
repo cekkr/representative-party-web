@@ -39,7 +39,7 @@ export function deriveStatusMeta(state) {
   };
 }
 
-export function renderStatusStrip(meta = {}) {
+export function renderStatusStrip(meta = {}, actorLabel = '') {
   const {
     accountabilityStatus = '',
     gossipStatus = '',
@@ -47,9 +47,10 @@ export function renderStatusStrip(meta = {}) {
     validationStatus = '',
     previewStatus = '',
   } = meta;
-  if (!accountabilityStatus && !gossipStatus && !policyStatus && !validationStatus && !previewStatus) return '';
+  if (!accountabilityStatus && !gossipStatus && !policyStatus && !validationStatus && !previewStatus && !actorLabel) return '';
   return `
     <div class="status-strip">
+      ${actorLabel ? `<span class="pill ghost">${actorLabel}</span>` : ''}
       ${accountabilityStatus ? `<span class="pill">${accountabilityStatus}</span>` : ''}
       ${gossipStatus ? `<span class="pill">${gossipStatus}</span>` : ''}
       ${policyStatus ? `<span class="pill ghost">${policyStatus}</span>` : ''}

@@ -155,6 +155,7 @@ async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
   const postGate = evaluateAction(state, activePerson, 'post');
   const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId, page, postGate });
   forumData.person = activePerson;
+  forumData.workspaceCreateHref = postGate.allowed ? '/forum?compose=thread#forum-compose' : '';
   const html = await renderPage('forum', forumData, { wantsPartial, title: 'Forum', state });
   return sendHtml(res, html);
 }

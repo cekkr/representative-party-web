@@ -80,32 +80,28 @@ function renderPromoteControl(entry, options = {}) {
   `;
 }
 
-function renderDiscussionOnboarding(options = {}) {
-  if (options.groupId) {
+function renderDiscussionOnboarding({ groupId, createHref, clearFilterHref }) {
+  if (clearFilterHref) {
     return `
       <div class="onboarding-card">
-        <p class="eyebrow">Group discussion</p>
-        <h3>No posts in this group's lane yet</h3>
-        <p class="muted small">This lane is internal to the group. Posts here stay out of the Circle feed until they are moved up a level.</p>
+        <h3>No posts match this topic</h3>
         <div class="onboarding-actions">
-          <a class="cta" href="#discussion-compose">Start a post</a>
+          <a class="ghost" href="${escapeHtml(clearFilterHref)}" data-partial>Clear topic filter</a>
         </div>
       </div>
     `;
   }
+  const title = groupId ? "No posts in this group's lane yet" : 'No discussion posts yet';
+  const guidance = groupId
+    ? 'Posts here stay in the group lane until they are moved up a level.'
+    : 'Share an update or question and add evidence links when available.';
   return `
     <div class="onboarding-card">
-      <p class="eyebrow">Discussion</p>
-      <h3>No discussion posts yet</h3>
-      <ul class="plain small">
-        <li>Pick a topic that needs input.</li>
-        <li>Post a concise update or question.</li>
-        <li>Add evidence links when available.</li>
-      </ul>
-      <div class="onboarding-actions">
-        <a class="cta" href="#discussion-compose">Start a post</a>
-        <a class="ghost" href="#discussion-topics">Set top topics</a>
-      </div>
+      <h3>${title}</h3>
+      ${createHref ? `<p class="muted small">${guidance}</p>
+        <div class="onboarding-actions">
+          <a class="ghost" href="${escapeHtml(createHref)}" data-discussion-compose-link data-partial>Start a post</a>
+        </div>` : ''}
     </div>
   `;
 }

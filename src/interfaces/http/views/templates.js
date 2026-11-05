@@ -2,9 +2,10 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { DEFAULT_PAGE_TITLE, PATHS } from '../../../config.js';
+import { canAdministerProvider } from '../../../modules/identity/privileges.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { normalizeVerbosityMode } from '../../../shared/utils/parse.js';
-import { getActorLabels } from './actorLabel.js';
+import { getActorLabels, renderActorLabel } from './actorLabel.js';
 import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
 import {
   DEFAULT_ACCENT,
@@ -50,12 +51,17 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   const bodyTemplate = await loadTemplate(templateName);
   const actorLabels = getActorLabels(state);
   const renderedBody = applyTemplate(bodyTemplate, { ...actorLabels, ...data });
-  const statusStrip = data.statusStrip !== undefined ? data.statusStrip : renderStatusStrip(deriveStatusMeta(state));
+  const actorLabel = data.person?.pidHash ? renderActorLabel(state, data.person.pidHash) : '';
+  const statusStrip = data.statusStrip ?? renderStatusStrip(deriveStatusMeta(state), actorLabel);
   const pageKey = data.pageKey || templateName;
   const memberUi = normalizeInterfaceSettings(data.person?.uiSettings || {});
   // Members can hide module panels for their own view. Honor it server-side so the
   // choice holds without JavaScript; app.js re-applies it live after partial nav.
-  const body = applyMemberHiddenSections(renderedBody, memberUi.hiddenSections?.[pageKey]);
+  const pageBody = applyMemberHiddenSections(renderedBody, memberUi.hiddenSections?.[pageKey]);
+  const body = /<h1\b/i.test(renderedBody) ? pageBody : `
+    <header class="workspace-heading shell-page-heading">
+      <h1>${escapeHtml(title)}</h1>
+    </header>${pageBody}`;
   const composerSettings = state?.settings?.composer || {};
   const pages = composerSettings.pages && typeof composerSettings.pages === 'object' ? composerSettings.pages : {};
   const pageOverrides = pages[pageKey] && typeof pages[pageKey] === 'object' ? pages[pageKey] : {};
@@ -96,30 +102,32 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
     },
   };
   const composerSettingsAttr = escapeHtml(JSON.stringify(composerPayload));
-  const roleLabel = data.roleLabel || data.person?.role || '';
-  const isAdmin = String(roleLabel || '').toLowerCase() === 'admin';
+  const isAdmin = data.person?.role === 'admin' && canAdministerProvider(data.person, state);
   const uiSettingsServer = resolveInterfaceSettingsMeta(data.person);
   const verbosityMeta = resolveVerbosityMeta({ state, person: data.person, explicit: data.verbosityMode, pageKey });
+  const nav = renderNav(state, {
+    ...data,
+    pageKey,
+    title,
+    textOverrides: composerTextOverrides,
+    styleOverrides: composerStyleOverrides,
+  });
   if (wantsPartial) {
     const pageMeta = renderPageMeta({
       pageKey,
+      title,
       composerSettingsAttr,
       composerAllowed: isAdmin ? 'true' : '',
       uiSettingsServer,
       ...verbosityMeta,
     });
-    return `${pageMeta}${statusStrip}${body}`;
+    return `${pageMeta}${renderPartialNavigation(nav)}${statusStrip}${body}`;
   }
   const layout = await loadTemplate('layout');
-  const layoutData = { ...actorLabels, ...data, body, title, statusStrip };
+  const layoutData = { ...actorLabels, ...data, ...nav, body, title, statusStrip };
   layoutData.pageKey = pageKey;
   if (!layoutData.personHandle) {
     layoutData.personHandle = 'Guest session';
-  }
-  if (!layoutData.quickLinks || !layoutData.sideNav) {
-    const nav = renderNav(state, layoutData);
-    layoutData.quickLinks = layoutData.quickLinks || nav.quickLinks;
-    layoutData.sideNav = layoutData.sideNav || nav.sideNav;
   }
   layoutData.verbosityMode = verbosityMeta.verbosityMode;
   layoutData.verbosityDefault = verbosityMeta.verbosityDefault;
@@ -292,6 +300,7 @@ function renderPageMeta(meta = {}) {
   const attrs = [
     'data-page-meta',
     meta.pageKey ? `data-page-key="${escapeHtml(meta.pageKey)}"` : '',
+    `data-page-title="${escapeHtml(meta.title)}"`,
     `data-verbosity="${escapeHtml(meta.verbosityMode || '')}"`,
     `data-verbosity-default="${escapeHtml(meta.verbosityDefault || '')}"`,
     `data-verbosity-override="${escapeHtml(meta.verbosityOverride || '')}"`,
@@ -304,6 +313,15 @@ function renderPageMeta(meta = {}) {
     .filter(Boolean)
     .join(' ');
   return `<div ${attrs} hidden></div>`;
+}
+
+function renderPartialNavigation({ sideNav, quickLinks, navCreate, navLocation }) {
+  return `<template data-page-navigation>
+    <div data-nav-destinations>${sideNav}</div>
+    <div data-nav-create>${navCreate}</div>
+    <div data-nav-location>${navLocation}</div>
+    <div class="quick-nav">${quickLinks}</div>
+  </template>`;
 }
 
 function resolveInterfaceSettingsMeta(person = {}) {

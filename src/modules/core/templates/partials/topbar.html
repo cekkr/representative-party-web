@@ -1,6 +1,6 @@
 <header class="topbar">
   <div class="topbar__brand">
-    <div class="orb"></div>
+    <div class="orb" aria-hidden="true"></div>
     <div>
       <p
         class="eyebrow"
@@ -8,23 +8,29 @@
         data-composer-default="{{brandEyebrowDefault}}"
         style="{{brandEyebrowStyle}}"
       >{{brandEyebrow}}</p>
-      <h1 data-composer-key="layout.brandTitle" data-composer-default="{{brandTitleDefault}}" style="{{brandTitleStyle}}">
+      <p class="topbar__title" data-composer-key="layout.brandTitle" data-composer-default="{{brandTitleDefault}}" style="{{brandTitleStyle}}">
         {{brandTitle}}
-      </h1>
+      </p>
       <p
         class="tagline"
         data-composer-key="layout.brandTagline"
         data-composer-default="{{brandTaglineDefault}}"
         style="{{brandTaglineStyle}}"
       >{{brandTagline}}</p>
-      <p class="muted small is-verbose">{{personHandle}}</p>
+      <p class="topbar__location" data-nav-location>{{navLocation}}</p>
     </div>
   </div>
-  <nav class="topbar__actions">
-    <button class="ghost verbosity-toggle" type="button" data-verbosity-toggle title="Verbosity: {{verbosityToggleSource}}">
+  <details class="shell-menu" data-nav-disclosure>
+    <summary class="shell-menu__toggle">Menu</summary>
+    <nav class="side-nav side-nav--mobile" aria-label="Workspace navigation" data-nav-shell>
+      {{> workspace-nav}}
+    </nav>
+  </details>
+  <div class="topbar__actions">
+    <button class="ghost verbosity-toggle" type="button" data-verbosity-toggle title="Verbosity: {{verbosityToggleSource}}" hidden>
       Verbosity: {{verbosityToggleLabel}}
     </button>
-    <button class="ghost ui-settings-toggle" type="button" data-ui-settings-toggle aria-expanded="false" aria-controls="ui-settings-panel">
+    <button class="ghost ui-settings-toggle" type="button" data-ui-settings-toggle aria-expanded="false" aria-controls="ui-settings-panel" hidden>
       Interface
     </button>
     <span class="muted tiny topbar__sync" data-ui-sync-indicator hidden>Syncing…</span>
@@ -120,8 +126,8 @@
         <button class="ghost tiny" type="button" data-ui-settings-close>Close</button>
       </div>
     </section>
-    <div class="quick-nav">
+    <nav class="quick-nav" aria-label="Quick links">
       {{quickLinks}}
-    </div>
-  </nav>
+    </nav>
+  </div>
 </header>

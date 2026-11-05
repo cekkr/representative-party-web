@@ -42,17 +42,6 @@ function deriveHandle(pidHash, role = 'user') {
   return `${prefix}-${pidHash.slice(0, 8)}`;
 }
 
-async function expectDialog(page, action, matcher) {
-  let message = '';
-  page.once('dialog', async (dialog) => {
-    message = dialog.message();
-    await dialog.dismiss();
-  });
-  await action();
-  await new Promise((resolve) => setTimeout(resolve, 200));
-  assert.match(message, matcher);
-}
-
 async function getAdminForm(page, intent) {
   const intentSelector = `form[action="/admin"] input[name="intent"][value="${intent}"]`;
   const intentField = await page.$(intentSelector);
@@ -292,13 +281,11 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   );
 
   await guestPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
-  await guestPage.type('input[name="topic"]', 'Access');
-  await guestPage.type('textarea[name="content"]', 'Guest post attempt');
-  await expectDialog(
-    guestPage,
-    () => guestPage.click('form[action="/discussion"] button[type="submit"]'),
-    /verification|required|blocked/i,
-  );
+  await guestPage.waitForSelector('main a[href="/auth/eudi"]', { visible: true });
+  await guestPage.waitForSelector('#discussion-compose form', { hidden: true });
+  const guestPost = await postForm(`${server.baseUrl}/discussion`, { content: 'Guest post attempt' });
+  assert.equal(guestPost.status, 401);
+  assert.equal((await guestPost.json()).error, 'verification_required');
 
   const personPage = await personContext.newPage();
   await configurePage(personPage, server.baseUrl);
@@ -306,7 +293,7 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   await personPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="topic"]', 'Energy');
   await personPage.type('textarea[name="content"]', 'Person post');
-  await personPage.click('form[action="/discussion"] button[type="submit"]');
+  await personPage.click('#discussion-compose button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('Person post'));
 
   await personPage.goto(`${server.baseUrl}/petitions?compose=proposal`, { waitUntil: 'networkidle0' });
@@ -329,13 +316,11 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   await configurePage(bannedPage, server.baseUrl);
   await setSessionCookie(bannedPage, server.baseUrl, bannedSession.sessionId);
   await bannedPage.goto(`${server.baseUrl}/discussion?compose=post`, { waitUntil: 'networkidle0' });
-  await bannedPage.type('input[name="topic"]', 'Ban');
-  await bannedPage.type('textarea[name="content"]', 'Banned post attempt');
-  await expectDialog(
-    bannedPage,
-    () => bannedPage.click('form[action="/discussion"] button[type="submit"]'),
-    /banned/i,
-  );
+  await bannedPage.waitForSelector('#discussion-compose form', { hidden: true });
+  assert.match(await bannedPage.$eval('#discussion-compose', (el) => el.innerText), /banned/i);
+  const bannedPost = await postForm(`${server.baseUrl}/discussion`, { content: 'Banned post attempt' }, bannedSession);
+  assert.equal(bannedPost.status, 401);
+  assert.equal((await bannedPost.json()).error, 'banned');
 
   await postForm(
     `${server.baseUrl}/admin`,
@@ -353,6 +338,112 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
 
   await guestPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
   assert.ok(await guestPage.$('[data-module-disabled="petitions"]'));
+});
+
+test('workspace shell supports keyboard navigation with or without enhancement', { timeout: 60000 }, async (t) => {
+  const server = await startServer({
+    port: await getAvailablePort(),
+    extraEnv: { ENFORCE_CIRCLE: 'true', CIRCLE_NAME: 'Rete Civica Nazionale' },
+  });
+  t.after(async () => server.stop());
+  const { baseUrl } = server;
+  const member = await createVerifiedSession(baseUrl, { pidHash: 'giulia-ferrero-shell-ui' });
+  const admin = await createVerifiedSession(baseUrl, { pidHash: 'provider-admin-shell-ui' });
+  assert.equal((await postForm(baseUrl + '/profile', {
+    intent: 'handle', handle: 'giulia.ferrero',
+  }, member)).status, 200);
+  assert.equal((await postForm(baseUrl + '/admin', { intent: 'modules' })).status, 200);
+  assert.equal((await postForm(baseUrl + '/admin', {
+    intent: 'session', sessionId: admin.sessionId, sessionRole: 'admin',
+  })).status, 200);
+
+  const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox', '--disable-setuid-sandbox'] });
+  t.after(async () => browser.close());
+  const page = await browser.newPage();
+  await setSessionCookie(page, baseUrl, member.sessionId);
+  const nav = '.side-nav--mobile';
+  const menuToggle = 'details[data-nav-disclosure] > summary';
+  const navLink = (href) => `${nav} [data-nav-link][href="${href}"]`;
+
+  const tabTo = async (selector) => {
+    for (let step = 0; step < 30; step += 1) {
+      await page.keyboard.press('Tab');
+      if (await page.evaluate((target) => document.activeElement.matches(target), selector)) return;
+    }
+    assert.fail(`could not reach ${selector} by keyboard`);
+  };
+  const openMenu = async () => {
+    await tabTo(menuToggle);
+    await page.keyboard.press('Enter');
+    assert.ok(await page.$('details[data-nav-disclosure][open]'));
+  };
+
+  await page.setJavaScriptEnabled(false);
+  for (const { width, height, theme } of [
+    { width: 390, height: 844, theme: 'dark' },
+    { width: 800, height: 600, theme: 'light' },
+  ]) {
+    assert.equal((await postForm(baseUrl + '/profile', {
+      intent: 'ui-preferences', uiTheme: theme, uiAccent: 'blue',
+    }, member)).status, 200);
+    await page.setViewport({ width, height });
+    await page.goto(baseUrl, { waitUntil: 'load' });
+    assert.equal(await page.$eval('html', (el) => el.dataset.theme), theme);
+    assert.equal((await page.$$('h1')).length, 1);
+    assert.equal((await page.$$('main')).length, 1);
+    const status = await page.$eval('.status-strip', (el) => el.innerText);
+    assert.match(status, /Circle enforcement:\s*strict/i);
+    assert.match(status, /Validation:\s*strict\s*\(previews hidden\)/i);
+    assert.match(status, /Gossip ingest:\s*off/i);
+    assert.match(status, /Ledger\s+\d+.*Actors\s+\d+.*Discussions\s+\d+/i);
+    assert.match(status, /@giulia\.ferrero/);
+
+    for (const href of ['/discussion', '/forum', '/notifications']) {
+      await openMenu();
+      assert.equal(await page.$(`${nav} a:is([href="/petitions"], [href="/delegation"], [href="/delegates"], [href="/groups"], [href="/admin"])`), null);
+      await tabTo(navLink(href));
+      const [response] = await Promise.all([
+        page.waitForNavigation({ waitUntil: 'load' }),
+        page.keyboard.press('Enter'),
+      ]);
+      assert.equal(response.status(), 200);
+      assert.equal(new URL(page.url()).pathname, href);
+      const current = await page.$eval(`${navLink(href)}[aria-current="page"]`, (el) => el.textContent.trim());
+      assert.equal(await page.$eval('[data-nav-location]', (el) => el.innerText.trim()), current);
+
+      if (href === '/discussion') {
+        await tabTo('main a[href$="#discussion-compose"]');
+        await Promise.all([page.waitForNavigation({ waitUntil: 'load' }), page.keyboard.press('Enter')]);
+        assert.equal(new URL(page.url()).hash, '#discussion-compose');
+        await page.keyboard.press('Tab');
+        assert.ok(await page.evaluate(() => document.activeElement.closest('#discussion-compose') !== null));
+        assert.ok(await page.waitForSelector('#discussion-compose textarea[name="content"]', { visible: true }));
+      }
+      await page.goto(baseUrl, { waitUntil: 'load' });
+    }
+
+    await page.keyboard.press('Tab');
+    assert.equal(await page.evaluate(() => document.activeElement.getAttribute('href')), '#main-content');
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'main-content');
+    await page.goto('about:blank');
+  }
+
+  await page.setJavaScriptEnabled(true);
+  await page.goto(baseUrl, { waitUntil: 'load' });
+  await page.evaluate(() => { document.body.dataset.shellTest = 'same-document'; });
+  await openMenu();
+  await tabTo(navLink('/discussion'));
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => location.pathname === '/discussion');
+  assert.equal(await page.$eval('body', (el) => el.dataset.shellTest), 'same-document');
+  assert.equal(await page.evaluate(() => document.activeElement === document.querySelector('main h1')), true);
+  assert.ok(await page.$(`${navLink('/discussion')}[aria-current="page"]`));
+  assert.equal(await page.$eval('[data-nav-location]', (el) => el.innerText.trim()), 'Discussion');
+  assert.equal(await page.$('details[data-nav-disclosure][open]'), null);
+  await tabTo('main a[href$="#discussion-compose"]');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.activeElement.id === 'discussion-compose');
 });
 
 test('UI shows gossip controls and preview/provenance pills', { timeout: 60000 }, async (t) => {
@@ -602,6 +693,7 @@ test('UI interface settings and nav filter improve practical navigation', { time
   t.after(async () => browser.close());
 
   const page = await browser.newPage();
+  await page.setViewport({ width: 1280, height: 800 });
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, session.sessionId);
   await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
@@ -643,14 +735,14 @@ test('UI interface settings and nav filter improve practical navigation', { time
   await page.keyboard.up('Control');
   await page.keyboard.type('governance');
   await page.waitForFunction(() => {
-    const home = document.querySelector('[data-nav-section="home"]');
-    const governance = document.querySelector('[data-nav-section="governance"]');
+    const home = document.querySelector('.side-nav--desktop [data-nav-section="home"]');
+    const governance = document.querySelector('.side-nav--desktop [data-nav-section="governance"]');
     return home && governance && home.hidden === true && governance.hidden === false;
   });
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => {
-    const home = document.querySelector('[data-nav-section="home"]');
-    const filter = document.querySelector('[data-nav-filter-input]');
+    const home = document.querySelector('.side-nav--desktop [data-nav-section="home"]');
+    const filter = document.querySelector('.side-nav--desktop [data-nav-filter-input]');
     return home && filter && home.hidden === false && !filter.value;
   });
 
@@ -666,7 +758,7 @@ test('UI interface settings and nav filter improve practical navigation', { time
   await page.waitForFunction(() => document.body.dataset.uiPartialNav === 'off');
 
   const navPromise = page.waitForNavigation({ waitUntil: 'networkidle0' });
-  await page.click('[data-nav-section="discussion"] [data-nav-link]');
+  await page.click('.side-nav--desktop [data-nav-section="discussion"] [data-nav-link]');
   await navPromise;
   assert.match(page.url(), /\/discussion$/);
 
@@ -1482,7 +1574,7 @@ test('compose forms stay reachable at a short viewport', { timeout: 60000 }, asy
   });
 
   const surfaces = [
-    { url: '/discussion?compose=post', form: 'form[action="/discussion"]' },
+    { url: '/discussion?compose=post', form: '#discussion-compose form' },
     { url: '/forum?compose=thread', form: 'form[action="/forum"]' },
     { url: '/petitions?compose=proposal', form: 'form[action="/petitions"]' },
   ];

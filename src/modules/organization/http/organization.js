@@ -24,7 +24,7 @@ import {
 
 export async function renderCoordination({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'coordination')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'coordination' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'coordination' });
   }
 
   const person = getPerson(req, state);
@@ -39,7 +39,7 @@ const caseWrites = new WeakMap();
 
 export async function updateCoordination({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'coordination')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'coordination' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'coordination' });
   }
 
   const body = await readRequestBody(req);
@@ -84,7 +84,7 @@ export async function updateCoordination({ req, res, state, wantsPartial, url })
   caseWrites.set(state, write.catch(() => {}));
 
   const result = await write;
-  if (result.disabled) return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'coordination' });
+  if (result.disabled) return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'coordination' });
   if (!result.entry) {
     return renderLiveCases({
       res, state, wantsPartial, person: getPerson(req, state), query: url.searchParams,

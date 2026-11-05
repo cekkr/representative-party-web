@@ -37,9 +37,12 @@ before proposing any direct reuse.
 
 ## 1. Shell, navigation, and page header
 
-**Current.** The topbar, searchable sidebar, and status strip surround a single
-`<main data-shell>`. Module- and role-aware navigation and page-level compose
-links already exist. The mobile sidebar has a height cap.
+**Current.** The shell has a skip link to one main landmark, a compact status
+strip, and a grouped 200 px desktop rail with jump search. At 900 px and below,
+the topbar shows the current location, frequent actions, and a native Menu
+disclosure. The same gated navigation model feeds both layouts. Home and
+Discussion have persistent page headings and contextual actions. Enhanced
+navigation updates the shell and focuses the destination heading or anchor.
 [Shell template](src/modules/core/templates/partials/shell.html) ·
 [Navigation model](src/interfaces/http/views/navigation.js)
 
@@ -84,9 +87,12 @@ different sequence from the visible layout. [Current grid](src/public/app.css) �
 
 ## 2. Home, collections, and discovery
 
-**Current.** Home has an overview, enabled work lanes, and an operations section.
-Most member routes use a primary collection and a rail for compose or supporting
-controls. [Home partials](src/modules/home/templates/partials) ·
+**Current.** Home leads with its workspace heading and real conversation
+previews, followed by enabled work lanes and supporting context. Circle-wide
+discussion and proposal previews exclude group lanes. Discussion puts its
+scope and Create action before the feed, with the topic filter next to results
+and the compose form in the supporting rail. Other collections retain their
+existing layouts. [Home partials](src/modules/home/templates/partials) ·
 [Discussion partials](src/modules/discussion/templates/partials)
 
 **Target.** Follow Citizen OS's collection pattern. Home begins with a short
@@ -340,6 +346,12 @@ with the ordinary server-rendered link or form. [Browser enhancements](src/publi
 
 ## 5. Visual system
 
+**Current.** The shared shell and pilot pages use the revised slate and blue
+tokens, a pale light canvas with white panels, stepped dark surfaces, 16 px
+panel corners, and solid and outlined action treatments. The context rail
+defaults to 288 px where the available width permits two columns. The existing
+theme, accent, and density preferences apply to the new foundations.
+
 Use Citizen OS's pale canvas, white working panels, slate text, and blue links
 as the target for the light palette. Use the same relationships in dark mode
 with a cool dark canvas, stepped surfaces, legible blue links, and restrained
@@ -358,7 +370,7 @@ rendered result in both themes.
 | Type | Noto Sans. 14/20 px UI text, 28/32 and 24/28 px headings, 16/32 px long-form topic text. [Global styles](thirds/citizenos-fe/src/styles.scss) | Use the provider-local system stack at comparable sizes. Compact metadata remains secondary. Use roomier leading and a readable measure of about 65–75 characters for proposal and forum prose. Let headings, translated labels, and large text wrap. |
 | Action hierarchy | Rounded 48/40/32 px button families, with filled, outlined, soft, and quiet treatments. Default filled action is dark slate with blue hover. [Button styles](thirds/citizenos-fe/src/assets/styles/_buttons_new.scss) · [Theme maps](thirds/citizenos-fe/src/assets/styles/_themes.scss) | Use a solid primary treatment, outlined secondary actions, and quiet text or icon utilities with accessible names. Target 44–48 px hit areas for prominent touch controls and flexible height for long labels. Keep focus visible on every variant. |
 | Desktop work area | 200 px desktop nav. Topic uses a reading column capped at 872 px, a 288 px supporting rail, and 32 px between them. [Nav styles](thirds/citizenos-fe/src/app/core/components/nav/nav.component.scss) · [Topic layout](thirds/citizenos-fe/src/app/topic/topic.component.scss) | Start at 24–32 px between the reading column and a context rail around 288 px where the content container can fit it. Use 16 px between rail blocks. Keep the existing container-driven stack for narrower work areas. |
-| Responsive navigation | Desktop starts at 1025 px. Phone styles apply through 560 px, with a 56 px bottom navigation variant. [Media mixins](thirds/citizenos-fe/src/assets/styles/_mixins.scss) · [Mobile nav styles](thirds/citizenos-fe/src/app/core/components/nav-mobile/nav-mobile.component.scss) | Use compact navigation and a short set of frequent destinations. Keep the section switcher in flow and labelled. Choose the collapse point by actual available width and test short viewports before adopting fixed navigation. |
+| Responsive navigation | Desktop starts at 1025 px. Phone styles apply through 560 px, with a 56 px bottom navigation variant. [Media mixins](thirds/citizenos-fe/src/assets/styles/_mixins.scss) · [Mobile nav styles](thirds/citizenos-fe/src/app/core/components/nav-mobile/nav-mobile.component.scss) | Use compact navigation and a short set of frequent destinations. Keep the section switcher in flow and labelled. The shared Menu disclosure collapses the desktop rail at 900 px. The work area still stacks by available width. Check short viewports before adopting fixed navigation. |
 | Stage and stance | Discussion blue, voting green, ideation amber, follow-up pink. Topic tabs use a thin active underline. Discussion and voting use tinted heading bands. [Topic tabs](thirds/citizenos-fe/src/app/topic/components/topic-tabs/topic-tabs.component.scss) · [Argument panel](thirds/citizenos-fe/src/app/topic/components/topic-arguments/topic-arguments.component.scss) · [Ballot panel](thirds/citizenos-fe/src/app/topic/components/topic-vote-cast/topic-vote-cast.component.scss) | Map draft to a quiet neutral or amber cue, deliberation to blue, voting to green, and closed to neutral. Use coloured edges, tint, or underline with an explicit label and readable ink. Keep warning, denied, provenance, and workflow meanings distinct. |
 | Summary cards | Topic cards separate a state band, title/summary area, and activity footer. Group cards lead with their identity and summary. [Topic card styles](thirds/citizenos-fe/src/app/public-topics/components/topicbox/topicbox.component.scss) · [Group card styles](thirds/citizenos-fe/src/app/my-groups/components/groupbox/groupbox.component.scss) | Adopt the repeated anatomy and allow height to follow content. Media is optional. Use a bounded title/summary preview with the full content in the linked view. Keep primary links and secondary controls in a predictable order. |
 
@@ -379,9 +391,9 @@ starting point for implementation.
 
 | Owner | Current | Target |
 | --- | --- | --- |
-| [Core shell and topbar](src/modules/core/templates/partials) | Shared topbar, searchable sidebar, status strip. | Desktop work navigation, compact phone disclosure, current page heading, and skip target. |
-| [Home](src/modules/home/templates/home.html) `/` | Overview, activity lanes, and operations. | Citizen OS-style named collections with small real previews and direct links to their full views. |
-| [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Feed with compose, filters, and topics. Optional group lane. | Scope header and nearby filter controls, authored items with evidence and stable links, and a jump to compose. |
+| [Core shell and topbar](src/modules/core/templates/partials) | Grouped desktop rail, native compact Menu, current location, skip target, and shared status. | Extend the page-heading and contextual action pattern as each surface is converted. |
+| [Home](src/modules/home/templates/home.html) `/` | Persistent workspace heading, scoped conversation previews first, and supporting access and operator sections. | Refine previews into named destination collections with consistent cards and direct links to their full views. |
+| [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Persistent scope header and compose jump, topic filter beside the feed, scoped empty states, and a supporting compose rail. | Refine authored rows and stable links as part of the conversation slice. |
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Thread list, reply forms, and compose rail. | Compact list rows and a focused reading order. Keep replies chronological and restore the reply target after posting. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Wall, typed follows and filters, compose, and media controls. | Distinct post and media states, visible audience, and accessible compose with one scroll path. |
 | [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Rich cards, deliberation feed, compose and filters. | Summary collection plus selected proposal workspace with Overview, Discussion, History, and Ballot as applicable. |
@@ -394,7 +406,7 @@ starting point for implementation.
 | [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Linked source, case and acknowledgement workflow, searchable queue. | Case header, original source and evidence, acknowledgement/history, and a secondary queue. Retain provider-local scope. |
 | [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Labelled illustrative inbox, pressure map, and operating map. | Persistent preview identity, Scenario B examples, and a clear return to the live case workspace. |
 | [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. | Keep the settings workspace single-column. Apply visual hierarchy and fix narrow Composer overlap while retaining gates and anchor links. |
-| [Wallet handoff and result](src/modules/auth/templates) | Chromeless offer and result pages. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
+| [Wallet handoff and result](src/modules/auth/templates) | Offer and result panels in the shared shell. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
 
 
 ## 7. Implementation and section compatibility
@@ -430,10 +442,10 @@ keys have historical names, while their labels identify the content.
 
 | Module | Explicit section keys |
 | --- | --- |
-| Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops` |
+| Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops`. Workspace heading sits outside these panels. |
 | Social | `social-wall`, `social-compose`, `social-controls`, `social-follows` |
 | Forum | `forum-threads`, `forum-compose` |
-| Discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics` |
+| Discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. Scope and page heading sit outside these panels. |
 | Proposals | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` |
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
@@ -443,13 +455,13 @@ keys have historical names, while their labels identify the content.
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
 | Profile | `profile-interface`, `profile-summary`, `profile-fields` |
 | Admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
-| Chromeless auth/core | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. Chromeless pages sit outside member Sections. |
+| Auth/core task panels | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. These panels sit outside member Sections. |
 
 ## 8. Delivery order and acceptance
 
 | Slice | Implementation boundary | Acceptance |
 | --- | --- | --- |
-| 1. Shell and visual foundations | Shared shell/header, semantic tokens, responsive nav and base panel/button styles. Pilot on Home and Discussion. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
+| 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
 | 2. Conversation and collections | Home previews, list/row/card variants, search and filter placement, contribution and reply anatomy. Carry to Forum and Social. | In Scenario A, find the waiting-list evidence and open an attributed forum discussion from the list. Follow the replies in order and post one with and without enhancement. Retain the active search/scope through refresh and Back. |
 | 3. Proposal browse and workspace | Authorize focused reads and direct writes against the stored group scope first. Resolve a canonical, scope-aware GET URL for full and partial paths. Then split browse, overview, deliberation, history, and ballot presentation. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
 | 4. Groups, activity, and other records | Focused group sections and lane links, activity deep links, People and delegation, then governance and cases. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
@@ -465,6 +477,16 @@ scope checks before wiring the new view to activity or delegation links.
 [Group scope](src/modules/groups/groupScope.js) ·
 [Proposal controller](src/modules/petitions/http/petitions.js) ·
 [Optimization backlog](OPTIMIZATIONS.md)
+
+### Slice 1 verification
+
+The keyboard regression covers the compact shell at 390 px and 800 × 600
+with optional civic modules disabled. It checks the skip link, the route and
+compose destinations, the status facts, and focus after enhanced navigation.
+The Scenario A walkthrough passed and refreshed the README captures. The pilot
+pages were checked in light and dark at desktop, 800 px, 390 px, and 320 px,
+including large text and reduced motion. The separate Scenario B review
+covered the attributed source, acknowledged case, review date, and preview.
 
 ### Review checklist for presentation changes
 

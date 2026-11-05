@@ -52,7 +52,7 @@ function resolveActorHash(state, input) {
 
 export async function renderGroups({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'groups')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'groups' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'groups' });
   }
   const person = getPerson(req, state);
   const groups = listGroups(state).map((group) => ({

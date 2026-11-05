@@ -25,13 +25,18 @@ test('handle can be set and is used across directory, delegation, and author lin
 
   // People directory lists both with handles and supports search.
   const { text: dirText } = await fetchText(`${server.baseUrl}/delegates`, { headers: { Cookie: alice.cookie } });
-  assert.match(dirText, /@alice_h/);
-  assert.match(dirText, /@bob_h/);
+  const directoryList = /<section\b[^>]*data-composer-section="delegate-directory-list"[^>]*>([\s\S]*?)<\/section>/;
+  const people = dirText.match(directoryList)?.[1] || '';
+  assert.match(people, /@alice_h/);
+  assert.match(people, /@bob_h/);
   const { text: searchText } = await fetchText(`${server.baseUrl}/delegates?q=bob`, {
     headers: { Cookie: alice.cookie },
   });
-  assert.match(searchText, /@bob_h/);
-  assert.doesNotMatch(searchText, /@alice_h/);
+  const results = searchText.match(directoryList)?.[1] || '';
+  assert.match(results, /@bob_h/);
+  assert.doesNotMatch(results, /@alice_h/);
+  const status = searchText.match(/<div class="status-strip">([\s\S]*?)<\/div>/)?.[1] || '';
+  assert.match(status, /@alice_h/);
 
   // Delegation accepts a handle (picker value) and resolves it to bob's hash.
   const delegateResp = await postForm(

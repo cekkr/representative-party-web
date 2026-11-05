@@ -10,7 +10,7 @@ import { renderModuleDisabled } from '../../../interfaces/http/views/moduleGate.
 
 export async function renderDelegateDirectory({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'delegation')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'delegation' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'delegation' });
   }
   const person = getPerson(req, state);
   const query = sanitizeText(url?.searchParams?.get('q') || '', 64);
@@ -68,7 +68,7 @@ function renderDirectoryList(state, people = [], actorLabels = {}) {
 
 export async function renderDelegateProfile({ req, res, state, wantsPartial, params }) {
   if (!isModuleEnabled(state, 'delegation')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'delegation' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'delegation' });
   }
   const person = getPerson(req, state);
   const delegateHash = sanitizeText(params?.hash || '', 120);

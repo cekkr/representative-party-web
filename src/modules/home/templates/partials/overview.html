@@ -1,8 +1,7 @@
 <section class="panel home-overview" id="home-overview" data-composer-section="home-overview" data-section-label="Workspace overview">
   <div class="home-overview__hero">
     <div class="home-overview__intro">
-      <p class="eyebrow">Home workspace</p>
-      <h2>{{circleName}}</h2>
+      <h2>Workspace overview</h2>
       <p>{{summaryText}}</p>
       <div class="discussion__meta">
         {{overviewPills}}
@@ -12,8 +11,8 @@
         {{overviewActions}}
       </div>
     </div>
-    <aside class="home-access" id="home-access">
-      <p class="eyebrow">Current access</p>
+    <aside class="home-access" id="home-access" aria-labelledby="home-access-title">
+      <h3 id="home-access-title">Current access</h3>
       <div class="home-access__list">
         {{accessList}}
       </div>

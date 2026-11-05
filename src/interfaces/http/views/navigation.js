@@ -1,24 +1,22 @@
 import { resolveModuleSettings } from '../../../modules/circle/modules.js';
-import { getPrivilegesForPerson } from '../../../modules/identity/privileges.js';
+import { canAdministerProvider } from '../../../modules/identity/privileges.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { resolveComposerStyle, resolveComposerTextEscaped } from './composerView.js';
 
 const NAV_ITEMS = [
-  { key: 'home', label: 'Home', href: '/', partial: true, match: { path: '/', exact: true } },
+  { key: 'home', label: 'Home', href: '/', partial: true },
   {
     key: 'coordination',
     label: 'Coordination',
     href: '/organization',
     module: 'coordination',
     partial: true,
-    match: { prefix: '/organization' },
   },
   {
     key: 'auth',
     label: 'Wallet Login',
     href: '/auth/eudi',
     partial: true,
-    match: { prefix: '/auth' },
     hideWhenVerified: true,
   },
   {
@@ -27,22 +25,20 @@ const NAV_ITEMS = [
     href: '/social/feed',
     module: 'social',
     partial: true,
-    match: { prefix: '/social' },
     requiresVerified: true,
   },
-  { key: 'discussion', label: 'Discussion', href: '/discussion', partial: true, match: { prefix: '/discussion' } },
-  { key: 'forum', label: 'Forum', href: '/forum', partial: true, match: { prefix: '/forum' } },
-  { key: 'petitions', label: 'Proposals', href: '/petitions', module: 'petitions', partial: true, match: { prefix: '/petitions' } },
-  { key: 'governance', label: 'Governance', href: '/governance', partial: true, match: { prefix: '/governance' } },
-  { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true, match: { prefix: '/delegation' } },
-  { key: 'delegates', label: 'People', href: '/delegates', module: 'delegation', partial: true, match: { prefix: '/delegates' } },
-  { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true, match: { prefix: '/groups' } },
+  { key: 'discussion', label: 'Discussion', href: '/discussion', partial: true },
+  { key: 'forum', label: 'Forum', href: '/forum', partial: true },
+  { key: 'petitions', label: 'Proposals', href: '/petitions', module: 'petitions', partial: true },
+  { key: 'governance', label: 'Governance', href: '/governance', partial: true },
+  { key: 'delegation', label: 'Delegation', href: '/delegation', module: 'delegation', partial: true },
+  { key: 'delegates', label: 'People', href: '/delegates', module: 'delegation', partial: true },
+  { key: 'groups', label: 'Groups', href: '/groups', module: 'groups', partial: true },
   {
     key: 'notifications',
     label: 'Notifications',
     href: '/notifications',
     partial: true,
-    match: { prefix: '/notifications' },
     requiresVerified: true,
   },
   {
@@ -50,7 +46,6 @@ const NAV_ITEMS = [
     label: 'Profile',
     href: '/profile',
     partial: true,
-    match: { prefix: '/profile' },
     requiresVerified: true,
   },
   {
@@ -58,56 +53,43 @@ const NAV_ITEMS = [
     label: 'Admin',
     href: '/admin',
     partial: true,
-    match: { prefix: '/admin' },
-    requiresVerified: true,
+    requiresAdmin: true,
   },
-  { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer', partial: false, match: { prefix: '/health' } },
+  { key: 'health', label: 'Health', href: '/health', target: '_blank', rel: 'noreferrer' },
 ];
 
 const NAV_GROUPS = [
-  { key: 'start', label: 'Workspace', keys: ['home', 'coordination', 'auth', 'profile', 'notifications'] },
-  { key: 'conversation', label: 'Social/community', keys: ['social', 'discussion', 'forum'] },
+  { key: 'start', label: 'Workspace', keys: ['home'] },
+  { key: 'conversation', label: 'Conversation', keys: ['discussion', 'forum', 'notifications', 'social'] },
+  { key: 'organization', label: 'Organization', keys: ['coordination'] },
   { key: 'governance', label: 'Civic governance', keys: ['petitions', 'delegation', 'delegates', 'groups', 'governance'] },
+  { key: 'account', label: 'Account', keys: ['profile', 'auth'] },
   { key: 'operations', label: 'Operations', keys: ['admin', 'health'] },
 ];
 
-const QUICK_ACTIONS = [
-  { key: 'home', label: 'Home', href: '/', partial: true },
-  { key: 'coordination', label: 'Coordination', href: '/organization', module: 'coordination', partial: true },
-  { key: 'auth', label: 'Wallet Login', href: '/auth/eudi', partial: true, hideWhenVerified: true },
-  { key: 'social', label: 'Social', href: '/social/feed', module: 'social', partial: true, requiresVerified: true },
-  { key: 'forum', label: 'Forum', href: '/forum', partial: true },
-  { key: 'notifications', label: 'Alerts', href: '/notifications', partial: true, requiresVerified: true },
-  { key: 'profile', label: 'Profile', href: '/profile', partial: true, requiresVerified: true },
-];
+const QUICK_ACTIONS = new Map([
+  ['home', 'Home'],
+  ['coordination', 'Coordination'],
+  ['auth', 'Wallet Login'],
+  ['social', 'Social'],
+  ['forum', 'Forum'],
+  ['notifications', 'Alerts'],
+  ['profile', 'Profile'],
+]);
 
 const CONTEXT_ACTIONS = {
-  social: [
-    {
-      key: 'social-compose',
-      label: 'New Post',
-      href: '/social/feed?compose=post#social-compose',
-      partial: true,
-      module: 'social',
-      requiresVerified: true,
-    },
-  ],
-  discussion: [
-    { key: 'discussion-compose', label: 'New Post', href: '/discussion?compose=post#discussion-compose', partial: true },
-  ],
-  forum: [
-    { key: 'forum-compose', label: 'New Article', href: '/forum?compose=thread#forum-compose', partial: true },
-  ],
-  petitions: [
-    {
-      key: 'petitions-compose',
-      label: 'New Proposal',
-      href: '/petitions?compose=proposal#petitions-compose',
-      partial: true,
-      module: 'petitions',
-    },
-  ],
-  admin: [{ key: 'admin-modules', label: 'Modules', href: '/admin#modules', partial: true, requiresVerified: true }],
+  home: { key: 'discussion-compose', label: 'New post' },
+  discussion: { key: 'discussion-compose', label: 'New post' },
+  forum: { key: 'forum-compose', label: 'New article' },
+  social: { key: 'social-compose', label: 'New post' },
+  petitions: { key: 'petitions-compose', label: 'New proposal' },
+};
+
+const NAV_PAGE_KEYS = {
+  'auth-eudi': 'auth',
+  'verification-complete': 'auth',
+  'delegate-directory': 'delegates',
+  'delegate-profile': 'delegates',
 };
 
 const CHILD_SECTIONS = {
@@ -123,21 +105,17 @@ const CHILD_SECTIONS = {
     { label: 'Workspace preview', href: '/organization?view=preview#pressure-inbox', partial: true },
   ],
   social: [
-    { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },
     { label: 'Feed', href: '/social/feed#social-wall', partial: true },
     { label: 'Follows', href: '/social/feed#social-follows', partial: true },
   ],
   discussion: [
-    { label: 'New post', href: '/discussion?compose=post#discussion-compose', partial: true },
     { label: 'Latest contributions', href: '/discussion#discussion-feed', partial: true },
     { label: 'Topic preferences', href: '/discussion#discussion-topics', partial: true },
   ],
   forum: [
-    { label: 'New article', href: '/forum?compose=thread#forum-compose', partial: true },
     { label: 'Threads', href: '/forum#forum-threads', partial: true },
   ],
   petitions: [
-    { label: 'New proposal', href: '/petitions?compose=proposal#petitions-compose', partial: true },
     { label: 'Active deliberations', href: '/petitions#petitions-discussion', partial: true },
     { label: 'Active proposals', href: '/petitions#petitions-active', partial: true },
   ],
@@ -167,32 +145,48 @@ const CHILD_SECTIONS = {
 
 export function renderNav(state, context = {}) {
   const modules = resolveModuleSettings(state);
-  const composerSettings = resolveComposerSettings(state);
-  const navContext = resolveNavContext(state, context);
-  navContext.quickOrder = composerSettings.quickActionsOrder;
-  navContext.sideOrder = composerSettings.sideNavOrder;
-  navContext.textOverrides = composerSettings.textOverrides;
-  navContext.styleOverrides = composerSettings.styleOverrides;
-  const sideNav = renderSideNav(modules, navContext);
-  const quickLinks = renderQuickLinks(modules, navContext);
-  return { sideNav, quickLinks };
-}
-
-function renderSideNav(modules, navContext) {
-  const byKey = new Map(NAV_ITEMS.map((item) => [item.key, item]));
-  return NAV_GROUPS.map((group) => renderNavGroup(group, byKey, modules, navContext))
+  const composer = state?.settings?.composer || {};
+  const navContext = {
+    isVerified: Boolean(context.person || context.isVerified),
+    canAdminister: canAdministerProvider(context.person, state),
+    currentKey: NAV_PAGE_KEYS[context.pageKey] || context.pageKey,
+    quickOrder: Array.isArray(composer.quickActionsOrder) ? composer.quickActionsOrder : [],
+    sideOrder: Array.isArray(composer.sideNavOrder) ? composer.sideNavOrder : [],
+    textOverrides: context.textOverrides,
+    styleOverrides: context.styleOverrides,
+  };
+  const destinations = NAV_ITEMS.filter((item) => isItemAllowed(item, modules, navContext));
+  const byKey = new Map(destinations.map((item) => [item.key, item]));
+  const currentItem = byKey.get(navContext.currentKey);
+  const navLocation = currentItem
+    ? resolveComposerTextEscaped(navContext.textOverrides, `nav.item.${currentItem.key}`, currentItem.label)
+    : escapeHtml(context.title || '');
+  const sideNav = NAV_GROUPS.map((group) => renderNavGroup(group, byKey, navContext))
     .filter(Boolean)
     .join('\n');
+  const quickItems = destinations.filter((item) => QUICK_ACTIONS.has(item.key))
+    .map((item) => ({ ...item, label: QUICK_ACTIONS.get(item.key) }));
+  const createAction = context.workspaceCreateHref && currentItem && CONTEXT_ACTIONS[navContext.currentKey];
+  const renderCreate = (className) => {
+    if (!createAction) return '';
+    const extraAttrs = navContext.currentKey === 'discussion' ? ['data-discussion-compose-link'] : [];
+    return renderLink({ ...createAction, href: context.workspaceCreateHref, partial: true }, { className, extraAttrs, navContext });
+  };
+  const quickLinks = applyOrder(quickItems, navContext.quickOrder)
+    .map((item) => renderLink(item, { className: 'quick-link', navContext }))
+    .concat(renderCreate('quick-link quick-link--context'))
+    .filter(Boolean)
+    .join('\n');
+  const navCreate = renderCreate('quick-link side-nav__create');
+  return { sideNav, quickLinks, navCreate, navLocation };
 }
 
-function renderNavGroup(group, byKey, modules, navContext) {
-  const items = group.keys
-    .map((key) => byKey.get(key))
-    .filter((item) => item && isItemAllowed(item, modules, navContext));
+function renderNavGroup(group, byKey, navContext) {
+  const items = group.keys.map((key) => byKey.get(key)).filter(Boolean);
   const orderedItems = applyOrder(items, navContext.sideOrder);
   if (!orderedItems.length) return '';
-  const links = orderedItems.map((item) => renderSideItem(item, modules, navContext)).join('\n');
-  const groupKey = `nav.group.${group.key || group.label}`;
+  const links = orderedItems.map((item) => renderSideItem(item, navContext)).join('\n');
+  const groupKey = `nav.group.${group.key}`;
   const groupLabel = resolveComposerTextEscaped(navContext.textOverrides, groupKey, group.label);
   const groupStyle = resolveComposerStyle(navContext.styleOverrides, groupKey);
   const groupAttrs = [
@@ -204,44 +198,29 @@ function renderNavGroup(group, byKey, modules, navContext) {
     .join(' ');
   return `
     <div class="side-nav__group">
-      <p class="eyebrow" ${groupAttrs}>${groupLabel}</p>
+      <p class="eyebrow side-nav__group-title" ${groupAttrs}>${groupLabel}</p>
       ${links}
     </div>
   `;
 }
 
-function renderSideItem(item, modules, navContext) {
-  const childSections = (CHILD_SECTIONS[item.key] || []).filter((child) => isItemAllowed(child, modules, navContext));
-  const matchAttrs = buildMatchAttributes(item);
-  return `
-    <div class="side-nav__item" data-nav-section="${item.key}" ${matchAttrs}>
-      ${renderLink(item, { className: 'side-nav__link', extraAttrs: ['data-nav-link'], navContext })}
-      <div class="side-nav__children" data-nav-children="${item.key}" hidden>
+function renderSideItem(item, navContext) {
+  const childSections = CHILD_SECTIONS[item.key] || [];
+  const isActive = item.key === navContext.currentKey;
+  const link = renderLink(item, {
+    className: 'side-nav__link',
+    extraAttrs: ['data-nav-link', isActive ? 'aria-current="page"' : ''],
+    navContext,
+  });
+  const children = childSections.length ? `
+      <div class="side-nav__children" data-nav-children="${item.key}" ${isActive ? '' : 'hidden'}>
         ${childSections.map((child) => renderLink(child, { className: 'side-nav__child', navContext })).join('\n')}
-      </div>
+      </div>` : '';
+  return `
+    <div class="side-nav__item${isActive ? ' is-active' : ''}" data-nav-section="${item.key}">
+      ${link}${children}
     </div>
   `;
-}
-
-function renderQuickLinks(modules, navContext) {
-  const globalLinks = QUICK_ACTIONS.filter((item) => isItemAllowed(item, modules, navContext));
-  const orderedGlobal = applyOrder(globalLinks, navContext.quickOrder);
-  const contextLinks = Object.entries(CONTEXT_ACTIONS)
-    .flatMap(([section, items]) =>
-      items.filter((item) => isItemAllowed(item, modules, navContext)).map((item) => ({ ...item, section })),
-    );
-  const orderedContext = applyOrder(contextLinks, navContext.quickOrder);
-  const globalHtml = orderedGlobal.map((item) => renderLink(item, { className: 'quick-link', navContext })).join('\n');
-  const orderedContextHtml = orderedContext
-    .map((item) =>
-      renderLink(item, {
-        className: 'quick-link quick-link--context',
-        extraAttrs: [`data-quick-section="${item.section}"`, 'hidden'],
-        navContext,
-      }),
-    )
-    .join('\n');
-  return [globalHtml, orderedContextHtml].filter(Boolean).join('\n');
 }
 
 function renderLink(item, { className, extraAttrs = [], navContext } = {}) {
@@ -262,25 +241,14 @@ function renderLink(item, { className, extraAttrs = [], navContext } = {}) {
   if (style) {
     attributes.push(`style="${escapeHtml(style)}"`);
   }
-  return `<a href="${item.href}" ${attributes.concat(extraAttrs).join(' ')}>${label}</a>`;
-}
-
-function buildMatchAttributes(item) {
-  const match = item.match || {};
-  if (match.exact && match.path) {
-    return `data-nav-path="${match.path}" data-nav-exact="true"`;
-  }
-  if (match.prefix) {
-    return `data-nav-prefix="${match.prefix}"`;
-  }
-  return '';
+  return `<a href="${escapeHtml(item.href)}" ${attributes.concat(extraAttrs).filter(Boolean).join(' ')}>${label}</a>`;
 }
 
 function isItemAllowed(item, modules, navContext) {
   if (item.module && modules[item.module] === false) return false;
   if (item.requiresVerified && !navContext.isVerified) return false;
   if (item.hideWhenVerified && navContext.isVerified) return false;
-  if (item.requiresModerate && !navContext.canModerate) return false;
+  if (item.requiresAdmin && !navContext.canAdminister) return false;
   return true;
 }
 
@@ -302,51 +270,4 @@ function applyOrder(items, order = []) {
     }
   }
   return ordered;
-}
-
-function resolveComposerSettings(state) {
-  const composer = state?.settings?.composer || {};
-  return {
-    quickActionsOrder: Array.isArray(composer.quickActionsOrder) ? composer.quickActionsOrder : [],
-    sideNavOrder: Array.isArray(composer.sideNavOrder) ? composer.sideNavOrder : [],
-    textOverrides: composer.textOverrides && typeof composer.textOverrides === 'object' ? composer.textOverrides : {},
-    styleOverrides: composer.styleOverrides && typeof composer.styleOverrides === 'object' ? composer.styleOverrides : {},
-  };
-}
-
-function resolveNavContext(state, context = {}) {
-  if (context.person) {
-    const privileges = getPrivilegesForPerson(context.person, state);
-    return {
-      isVerified: privileges.role !== 'guest',
-      canModerate: privileges.canModerate,
-      role: privileges.role,
-    };
-  }
-
-  const roleLabel = context.roleLabel || context.role || '';
-  const normalizedRole = roleLabel ? String(roleLabel).toLowerCase() : '';
-  const explicitVerified = typeof context.isVerified === 'boolean';
-  const isVerified = explicitVerified ? context.isVerified : normalizedRole ? normalizedRole !== 'guest' : false;
-  if (normalizedRole) {
-    return {
-      isVerified,
-      canModerate: normalizedRole === 'admin' || normalizedRole === 'moderator',
-      role: normalizedRole,
-    };
-  }
-  if (explicitVerified) {
-    return {
-      isVerified,
-      canModerate: Boolean(context.canModerate),
-      role: isVerified ? 'user' : 'guest',
-    };
-  }
-  const handle = context.personHandle || '';
-  const handleVerified = Boolean(handle && handle !== 'Guest session');
-  return {
-    isVerified: handleVerified,
-    canModerate: false,
-    role: handleVerified ? 'user' : 'guest',
-  };
 }

@@ -1,18 +1,9 @@
 <div class="shell">
-  <aside class="side-nav" data-nav-shell>
-    <div class="side-nav__filter" data-nav-filter-block>
-      <label class="field">
-        <span class="tiny muted">Jump to section (Ctrl/Cmd+K)</span>
-        <input type="search" placeholder="Search pages and anchors" data-nav-filter-input />
-      </label>
-      <div class="cta-row">
-        <button class="ghost tiny" type="button" data-nav-filter-clear hidden>Clear</button>
-      </div>
-      <p class="muted tiny" data-nav-filter-empty hidden>No matching sections.</p>
-    </div>
-    {{sideNav}}
-  </aside>
-  <main data-shell>
+  <nav class="side-nav side-nav--desktop" aria-label="Workspace navigation" data-nav-shell>
+    <div data-nav-create>{{navCreate}}</div>
+    {{> workspace-nav}}
+  </nav>
+  <main id="main-content" data-shell tabindex="-1">
     {{statusStrip}}
     {{body}}
   </main>

@@ -483,7 +483,8 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 ## UI & templating (extension‑aware)
 
 - SSR‑first shell lives in `src/modules/<module>/templates/` with `src/modules/core/templates/layout.html` wrapping page templates; status strip surfaces Circle enforcement + validation/preview state so users see why content is gated. Styles/JS in `src/public/app.css` and `src/public/app.js`.
-- Navigation and panels stay modular: keep links visible only for enabled modules (discussion/forum/social/petitions/delegation/groups) to avoid dead ends; module toggles live in `/admin` and extension toggles (`/extensions` or `CIRCLE_EXTENSIONS`) drive policy badges and gate messages.
+- The Citizen OS-inspired shell has grouped desktop navigation, a keyboard jump search, and a native Menu on narrow screens. A skip link reaches the main landmark. Home leads with conversation previews, and Discussion keeps its scope, topic filter, and eligible compose link close to the feed. The dark, light, and system themes share the same panel and action styles. [UI roadmap](UI_ROADMAP.md)
+- Navigation and panels follow module and role gates. Module toggles live in `/admin`, and extension toggles (`/extensions` or `CIRCLE_EXTENSIONS`) drive policy badges and gate messages.
 - Verbosity controls: admin sets the default UI verbosity (full vs compact), verified users can override per session under `/profile` or from the top‑bar toggle, and admins can set per‑page presets via the Composer tool.
 - Composer mode: admin-only floating tool for inline text/style edits, DOM order tweaks for composer-keyed elements, nav ordering, per-page layout (drag panels between columns, hide panels), and per-page verbosity presets.
 - Composer overrides persist per template in `settings.composer.pages[pageKey]` (text/style/dom order), while layout + nav overrides remain global in `settings.composer`.

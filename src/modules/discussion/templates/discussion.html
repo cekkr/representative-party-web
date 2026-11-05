@@ -1,10 +1,22 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Discussion</h1>
+    <p class="workspace-heading__summary">{{discussionScopeLabel}}</p>
+  </div>
+  {{discussionPrimaryAction}}
+</header>
+{{discussionScopeNotice}}
+{{discussionScopeTabs}}
 <div class="page-grid page-grid--discussion">
   <div class="page-main">
+    {{> discussion-filters}}
     {{> discussion-feed}}
   </div>
   <aside class="page-aside">
     {{> discussion-compose}}
-    {{> discussion-filters}}
     {{> discussion-topics}}
   </aside>
 </div>
+<datalist id="topics-list">
+  {{topicDatalist}}
+</datalist>

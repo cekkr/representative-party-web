@@ -24,6 +24,7 @@ import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.
 import { isModuleEnabled } from '../../circle/modules.js';
 import { isCaseSource } from '../../organization/cases.js';
 import {
+  canPostToGroupLane,
   listPostableGroupLanes,
   listReadableGroupLanes,
   matchesGroupScope,
@@ -262,17 +263,17 @@ function listGroupDeciders(state, group) {
 }
 
 async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride }) {
-  const policy = getCirclePolicyState(state);
   const permission = evaluateAction(state, person, 'post');
   const actorLabels = getActorLabels(state);
-  const composeOpen = url?.searchParams?.get('compose') ? 'open' : '';
 
   const requestedGroup = scopeOverride !== undefined ? scopeOverride : readGroupScope(url?.searchParams);
   const scope = resolveGroupScope(state, person, requestedGroup, { lane: 'discussion' });
   // A refused scope falls back to the Circle feed with the reason stated, rather than
   // rendering an empty list that looks like the group simply has nothing to say.
-  const activeGroupId = scope.ok ? scope.groupId : null;
+  const activeGroup = scope.ok ? scope.group : null;
+  const activeGroupId = activeGroup?.id || null;
   const scopeNotice = scope.ok ? '' : scope.message;
+  const canPostHere = permission.allowed && canPostToGroupLane(state, person, activeGroup, 'discussion');
 
   const baseEntries = filterVisibleEntries(state.discussions, state, (entry) => {
     if (entry.petitionId) return false;
@@ -281,6 +282,12 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
     return matchesGroupScope(entry, activeGroupId);
   });
   const topicFilterKey = normalizeTopicFilter(url?.searchParams?.get('topic') || '');
+  const filterParams = new URLSearchParams();
+  if (activeGroupId) filterParams.set('group', activeGroupId);
+  const clearFilterHref = activeGroupId ? `/discussion?${filterParams}` : '/discussion';
+  if (topicFilterKey !== 'all') filterParams.set('topic', topicFilterKey);
+  filterParams.set('compose', 'post');
+  const workspaceCreateHref = canPostHere ? `/discussion?${filterParams}#discussion-compose` : '';
   const topicConfig = getTopicConfig(state);
   const topicPreferences = getTopicPreferences(state, person);
   const topicOptions = buildTopicOptions({
@@ -289,6 +296,8 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
     preferences: topicPreferences,
     entries: baseEntries,
   });
+  const hasSelectedTopic = topicOptions.some((topic) => normalizeTopicKey(topic) === topicFilterKey);
+  const filterOptions = topicFilterKey === 'all' || hasSelectedTopic ? topicOptions : [topicFilterKey, ...topicOptions];
   const discussionEntries =
     topicFilterKey === 'all'
       ? baseEntries
@@ -317,36 +326,30 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
     {
       person,
       personHandle: resolvePersonHandle(person),
+      workspaceCreateHref,
+      discussionScopeLabel: activeGroup
+        ? `${escapeHtml(activeGroup.name || 'Group')} · ${scope.policy.lanesVisibility === 'public' ? 'Public to read' : 'Members only'}`
+        : 'Whole Circle',
+      discussionPrimaryAction: renderPrimaryAction(workspaceCreateHref, permission),
       discussionContext: renderContextPanel({
-        gates: [
+        gates: canPostHere ? [] : [
           {
             label: 'Post to discussion',
-            status: permission.allowed ? 'Allowed' : 'Blocked',
-            allowed: permission.allowed,
-            reason: permission.allowed ? '' : permission.message || permission.reason || '',
+            status: 'Blocked',
+            allowed: false,
+            reason: permission.allowed
+              ? 'Join the group to post in its internal discussion.'
+              : permission.message || permission.reason || '',
           },
         ],
-        facts: [
-          { term: 'Role', value: person?.role || 'guest' },
-          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
-          {
-            term: 'Circle',
-            value: policy.enforcement === 'strict'
-              ? 'Strict — verified only'
-              : 'Observing — verification recommended',
-          },
-          { term: 'Ledger', value: `${state.uniquenessLedger.size} verified` },
-          { term: 'Policy', value: `${policy.id} v${policy.version}` },
-        ],
-        guidance: [
-          person
-            ? `Posts inherit your blinded PID hash for accountability; only salted hashes link posts to ${actorLabels.actorLabelPlural}.`
-            : 'Verify your wallet to post with accountability.',
-          'Use discussion for exploration; move decisions to proposals and votes when they are needed.',
-        ],
+        guidance: canPostHere && person
+          ? [`Only a blinded identity hash links posts to ${actorLabels.actorLabelPlural}.`]
+          : [],
       }),
       discussionList: renderDiscussionList(pageInfo.items, state, {
         groupId: activeGroupId,
+        createHref: workspaceCreateHref,
+        clearFilterHref: topicFilterKey === 'all' ? '' : clearFilterHref,
         caseAction,
         promotable: (entry) => evaluatePromotion(state, person, { kind: 'discussion', entry }),
         requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'discussion', entry }),
@@ -355,18 +358,30 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
       discussionPager,
       discussionScopeTabs: renderScopeTabs({ state, person, activeGroupId, lane: 'discussion', baseHref: '/discussion' }),
       discussionScopeNotice: scopeNotice ? `<p class="muted small">${escapeHtml(scopeNotice)}</p>` : '',
-      discussionScopeValue: escapeHtml(activeGroupId || ''),
+      discussionFilterScope: activeGroupId
+        ? `<input type="hidden" name="group" value="${escapeHtml(activeGroupId)}">`
+        : '',
       discussionGroupPicker: renderGroupLanePicker(state, person, 'discussion', activeGroupId),
-      topicFilterOptions: renderTopicFilterOptions(topicOptions, topicFilterKey),
+      topicFilterOptions: renderTopicFilterOptions(filterOptions, topicFilterKey),
       topicFilterSelectedAll: topicFilterKey === 'all' ? 'selected' : '',
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences),
       topicAnchors: formatTopicList(topicConfig.anchors || []),
       topicPinned: formatTopicList(topicConfig.pinned || []) || 'none',
-      composeOpen,
+      composeState: canPostHere ? (url?.searchParams?.get('compose') ? 'open' : '') : 'hidden',
     },
     { wantsPartial, title: 'Discussion', state },
   );
+}
+
+function renderPrimaryAction(createHref, permission) {
+  if (createHref) {
+    return `<div class="workspace-heading__actions"><a class="cta" href="${escapeHtml(createHref)}" data-discussion-compose-link data-partial>New discussion post</a></div>`;
+  }
+  if (permission.reason === 'verification_required') {
+    return '<div class="workspace-heading__actions"><a class="cta" href="/auth/eudi" data-partial>Verify to post</a></div>';
+  }
+  return '';
 }
 
 // Lane tabs: the Circle feed plus every group lane this member can read. Rendered as links
@@ -375,14 +390,14 @@ function renderScopeTabs({ state, person, activeGroupId, lane, baseHref }) {
   const groups = listReadableGroupLanes(state, person, lane);
   if (!groups.length) return '';
   const tab = (href, label, active) =>
-    `<a class="pill ${active ? '' : 'ghost'}" href="${escapeHtml(href)}" data-partial>${escapeHtml(label)}</a>`;
+    `<a class="pill${active ? '' : ' ghost'}" href="${escapeHtml(href)}"${active ? ' aria-current="page"' : ''} data-partial>${escapeHtml(label)}</a>`;
   const tabs = [tab(baseHref, 'Whole Circle', !activeGroupId)];
   for (const group of groups) {
     tabs.push(
       tab(`${baseHref}?group=${encodeURIComponent(group.id)}`, group.name || 'Group', activeGroupId === group.id),
     );
   }
-  return `<div class="discussion__meta">${tabs.join('')}</div>`;
+  return `<nav class="workspace-switcher discussion__meta" aria-label="Discussion scopes">${tabs.join('')}</nav>`;
 }
 
 // Only rendered when the member actually belongs to a group with an open lane — otherwise

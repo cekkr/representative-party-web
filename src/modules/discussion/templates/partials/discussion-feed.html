@@ -1,10 +1,5 @@
-<section class="panel" id="discussion-feed" data-composer-section="discussion-feed" data-section-label="Feed">
-  <p class="eyebrow">Discussion</p>
-  <h2>Topic discussions</h2>
-  <p class="is-verbose">Topic-based conversations tied to verified sessions. Posts inherit the blinded PID hash of the {{actorLabel}} for accountability.</p>
-  {{discussionScopeTabs}}
-  {{discussionScopeNotice}}
-  {{discussionContext}}
+<section class="panel" id="discussion-feed" aria-labelledby="discussion-feed-title" data-composer-section="discussion-feed" data-section-label="Feed">
+  <h2 id="discussion-feed-title">Latest contributions</h2>
   <div class="discussion-list">
     {{discussionList}}
   </div>

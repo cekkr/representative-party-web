@@ -45,3 +45,51 @@ test('home renders an operational workspace for verified sessions', async (t) =>
   assert.match(text, /Discussion seeded from the home test/i);
   assert.match(text, /Home Petition/i);
 });
+
+test('Home previews keep group-lane activity out of the Circle workspace', async (t) => {
+  const port = await getAvailablePort();
+  const { baseUrl, stop } = await startServer({ port, extraEnv: { ENFORCE_CIRCLE: 'true' } });
+  t.after(stop);
+
+  const irene = await createVerifiedSession(baseUrl, { pidHash: 'irene-fabbri' });
+  const create = await postForm(`${baseUrl}/groups`, { name: 'Public Healthcare Circle' }, irene);
+  assert.equal(create.status, 200);
+  const groupId = (await create.text()).match(/name="groupId" value="([^"]+)"/)?.[1];
+  assert.ok(groupId);
+  const policy = await postForm(`${baseUrl}/groups/policy`, {
+    groupId, laneDiscussion: 'on', lanePetitions: 'on', lanesVisibility: 'members',
+  }, irene);
+  assert.equal(policy.status, 200);
+
+  const note = await postForm(`${baseUrl}/discussion`, {
+    groupId,
+    topic: 'Healthcare / Waiting lists',
+    content: 'Branch working note: for priority class B, the Palermo CUP overshoots the PNGLA limit by 41%.',
+  }, irene);
+  assert.equal(note.status, 200);
+  const proposal = await postForm(`${baseUrl}/petitions`, {
+    groupId,
+    topic: 'Healthcare / Waiting lists',
+    title: 'Conditional intramoenia',
+    summary: 'Review the public waiting time before accepting private appointments in the same specialty.',
+  }, irene);
+  assert.equal(proposal.status, 200);
+
+  const memberHeaders = { Cookie: irene.cookie };
+  const scoped = await fetchText(`${baseUrl}/discussion?group=${groupId}`, { headers: memberHeaders });
+  assert.match(scoped.text, /Branch working note/);
+  assert.match(scoped.text, /Public Healthcare Circle · Members only/);
+  assert.match(scoped.text, new RegExp(`name="group" value="${groupId}"`));
+
+  const filtered = await fetchText(`${baseUrl}/discussion?group=${groupId}&topic=energy`, {
+    headers: { ...memberHeaders, 'X-Requested-With': 'partial' },
+  });
+  assert.match(filtered.text, /No posts match this topic/);
+  assert.match(filtered.text, new RegExp(`href="/discussion\\?group=${groupId}"[^>]*>Clear topic filter`));
+  assert.match(filtered.text, new RegExp(`group=${groupId}&amp;topic=energy&amp;compose=post#discussion-compose`));
+
+  for (const headers of [{}, memberHeaders]) {
+    const { text } = await fetchText(`${baseUrl}/`, { headers });
+    assert.doesNotMatch(text, /Branch working note|Conditional intramoenia|Healthcare \/ Waiting lists/);
+  }
+});

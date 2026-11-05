@@ -2,6 +2,7 @@ import { getPerson } from '../../identity/person.js';
 import { canAdministerProvider } from '../../identity/privileges.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../circle/policy.js';
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
+import { matchesGroupScope } from '../../groups/groupScope.js';
 import {
   countVisibleEntries,
   describeProfile,
@@ -15,7 +16,9 @@ import { listNotificationsForPerson } from '../../messaging/notifications.js';
 import { listTransactions } from '../../transactions/registry.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
+import { escapeHtml } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
+import { normalizeInterfaceSettings } from '../../../interfaces/http/views/interfaceSettings.js';
 import { describeVerificationPolicy } from '../../../interfaces/http/views/status.js';
 import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import {
@@ -46,11 +49,12 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   const conversationEntries = listConversationEntries(state, person, { socialEnabled });
   const discussionCount = countVisibleEntries(state.discussions, state, (entry) => isDiscussionEntry(entry));
   const forumCount = countVisibleEntries(state.discussions, state, (entry) => isForumThread(entry));
-  const petitionEntries = filterVisibleEntries(state.petitions || [], state);
+  const petitionEntries = petitionsEnabled
+    ? filterVisibleEntries(state.petitions || [], state, (entry) => matchesGroupScope(entry, null))
+    : [];
   const publicSocialCount = filterVisibleEntries(state.socialPosts || [], state, (entry) => entry.visibility !== 'direct').length;
   const notifications = listNotificationsForPerson(state, person);
   const unreadNotifications = notifications.filter((entry) => !entry.read);
-  const transactionEntries = listTransactions(state, { limit: FEDERATION_LIMIT });
 
   const postGate = evaluateAction(state, person, 'post');
   const petitionGate = petitionsEnabled
@@ -58,12 +62,17 @@ export async function renderHome({ req, res, state, wantsPartial }) {
     : { allowed: false, message: 'Petitions module disabled.' };
   const voteGate = votesEnabled ? evaluateAction(state, person, 'vote') : { allowed: false, message: 'Votes module disabled.' };
   const canAdminister = canAdministerProvider(person, state);
+  // Audit payloads may include details of a group lane. Keep the public Home
+  // summary separate from the transaction preview available to signed-in admins.
+  const showAuditPreview = person?.role === 'admin' && canAdminister;
+  const transactionEntries = showAuditPreview ? listTransactions(state, { limit: FEDERATION_LIMIT }) : [];
+  const hiddenDiscussionSections = normalizeInterfaceSettings(person?.uiSettings).hiddenSections.discussion;
 
   const voteStageCount = petitionEntries.filter((entry) => normalizePetitionStage(entry?.status) === 'vote').length;
   const activePetitionCount = petitionEntries.filter((entry) => normalizePetitionStage(entry?.status) !== 'closed').length;
   const followStats = socialEnabled && person ? summarizeFollows(state, person.pidHash) : null;
 
-  const summaryText = buildSummaryText({ person, actorLabels, effective, postGate });
+  const summaryText = buildSummaryText({ person, actorLabels, postGate });
   const overviewPills = renderHomePills(
     [
       { label: `Role: ${person?.role || 'guest'}`, tone: 'plain' },
@@ -155,10 +164,11 @@ export async function renderHome({ req, res, state, wantsPartial }) {
         : 'Governance modules are disabled for this provider.',
     },
   );
-  const federationList = renderHomeList(
-    transactionEntries.map((entry) => formatFederationItem(entry, state, { canAdminister })),
-    { emptyMessage: 'No recent audit events recorded yet.' },
-  );
+  const federationList = showAuditPreview
+    ? renderHomeList(transactionEntries.map((entry) => formatFederationItem(entry, state)), {
+        emptyMessage: 'No recent audit events recorded yet.',
+      })
+    : '';
 
   const opsItems = buildOpsItems({
     effective,
@@ -177,15 +187,18 @@ export async function renderHome({ req, res, state, wantsPartial }) {
       person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
-      circleName: effective.circleName,
-      summaryText,
+      circleName: escapeHtml(effective.circleName),
+      workspaceCreateHref: postGate.allowed && !hiddenDiscussionSections?.includes('discussion-compose')
+        ? '/discussion?compose=post#discussion-compose'
+        : '',
+      summaryText: escapeHtml(summaryText),
       overviewPills,
-      overviewActions: buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, canAdminister }),
-      overviewNote: buildOverviewNote({ effective, actorLabels, person, postGate }),
+      overviewActions: buildOverviewActions({ person, federationEnabled, canAdminister }),
+      overviewNote: escapeHtml(buildOverviewNote({ effective, actorLabels, person, postGate, canAdminister })),
       accessList,
       homeStats,
       conversationSummary,
-      governanceSummary,
+      governanceSummary: escapeHtml(governanceSummary),
       federationSummary,
       conversationActions: buildConversationActions({ socialEnabled }),
       governanceActions: buildGovernanceActions({ petitionsEnabled, delegationEnabled, groupsEnabled }),
@@ -202,7 +215,7 @@ export async function renderHome({ req, res, state, wantsPartial }) {
   return sendHtml(res, html);
 }
 
-function buildSummaryText({ person, actorLabels, effective, postGate }) {
+function buildSummaryText({ person, actorLabels, postGate }) {
   if (!person) {
     return `Read public conversation now. Verify with wallet when you need a persistent ${actorLabels.actorLabel} handle, private alerts, proposals, or votes.`;
   }
@@ -212,15 +225,15 @@ function buildSummaryText({ person, actorLabels, effective, postGate }) {
   if (!postGate.allowed) {
     return `Signed in as ${person.handle}. Review the current Circle policy before acting: your session is present, but one or more participation gates are still blocked.`;
   }
-  return `Signed in as ${person.handle}. Work across messaging, discussion, proposals, and accountability cues without storing raw identity data on the provider.`;
+  return `Signed in as ${person.handle}.`;
 }
 
-function buildOverviewNote({ effective, actorLabels, person, postGate }) {
+function buildOverviewNote({ effective, actorLabels, person, postGate, canAdminister }) {
   const notes = [
     `Circle ${effective.id} v${effective.version} · ${effective.circleName}`,
     `Hash-only identity: raw PID is never stored; accountability follows the blinded ${actorLabels.actorLabel} hash.`,
   ];
-  if (!effective.initialized) {
+  if (!effective.initialized && canAdminister) {
     notes.push('Installation wizard is still pending in Admin.');
   }
   if (person && !postGate.allowed && postGate.message) {
@@ -229,24 +242,12 @@ function buildOverviewNote({ effective, actorLabels, person, postGate }) {
   return notes.join(' ');
 }
 
-function buildOverviewActions({ person, socialEnabled, petitionsEnabled, federationEnabled, canAdminister }) {
+function buildOverviewActions({ person, federationEnabled, canAdminister }) {
   const links = [];
   if (!person) {
-    links.push('<a class="cta" href="/auth/eudi" data-partial>Verify with wallet</a>');
-  } else if (socialEnabled) {
-    links.push('<a class="cta" href="/social/feed" data-partial>Open social feed</a>');
+    links.push('<a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>');
   } else {
-    links.push('<a class="cta" href="/discussion" data-partial>Open discussion</a>');
-  }
-  if (socialEnabled) {
-    links.push('<a class="ghost" href="/social/feed" data-partial>Social lane</a>');
-  }
-  links.push('<a class="ghost" href="/discussion" data-partial>Discussion</a>');
-  if (petitionsEnabled) {
-    links.push('<a class="ghost" href="/petitions" data-partial>Proposals</a>');
-  }
-  if (person) {
-    links.push('<a class="ghost" href="/notifications" data-partial>Alerts</a>');
+    links.push('<a class="ghost" href="/notifications" data-partial>Notifications</a>');
   }
   if (canAdminister) {
     links.push('<a class="ghost" href="/admin" data-partial>Admin</a>');
@@ -441,24 +442,22 @@ function formatGovernanceItem(entry = {}) {
   };
 }
 
-function formatFederationItem(entry = {}, state, { canAdminister = false } = {}) {
+function formatFederationItem(entry = {}, state) {
   const createdAt = formatTimestamp(entry.createdAt, 'Unknown date');
   const actorLabel = entry.actorHash ? `@${resolveHandleForHash(state, entry.actorHash)}` : '';
   return {
     title: humanizeTransactionType(entry.type),
     summary: summarizeTransaction(entry),
     meta: `${createdAt}${actorLabel ? ` · ${actorLabel}` : ''}`,
-    // /transactions serves the raw JSON log; the readable view lives in admin.
-    // Non-admins get an unlinked entry rather than a dead end.
-    href: canAdminister ? '/admin#admin-transactions' : null,
-    partial: canAdminister,
+    href: '/admin#admin-transactions',
+    partial: true,
     pills: [entry.validationStatus === 'preview' ? { label: 'Preview', tone: 'warning' } : { label: 'Validated' }],
   };
 }
 
 function buildOpsItems({ effective, federationEnabled, canAdminister, transactionEntries, policy, moduleSettings }) {
   const items = [];
-  if (!effective.initialized) {
+  if (!effective.initialized && canAdminister) {
     items.push({
       title: 'Finish installation wizard',
       summary: 'Set Circle basics, data mode, and peer alignment before inviting more participants.',
@@ -478,7 +477,7 @@ function buildOpsItems({ effective, federationEnabled, canAdminister, transactio
       pills: [{ label: 'Admin' }],
     });
   }
-  if (federationEnabled) {
+  if (federationEnabled && canAdminister) {
     items.push({
       title: 'Check gossip and peer health',
       summary: transactionEntries.length
@@ -518,7 +517,7 @@ function isDiscussionEntry(entry = {}) {
   if (entry.petitionId) return false;
   if (entry.parentId) return false;
   if (entry.stance === 'article' || entry.stance === 'comment') return false;
-  return true;
+  return matchesGroupScope(entry, null);
 }
 
 function isForumThread(entry = {}) {

@@ -30,10 +30,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         pidHashShort: existing.pidHash?.slice(0, 8) || 'verified',
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
-        person,
-        personHandle: existingHandle,
-        roleLabel: existingRole,
-        isVerified: true,
+        person: { ...existing, sessionId: existing.id, handle: existingHandle, role: existingRole },
       },
       { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
     );
@@ -123,7 +120,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   const handle = session.handle || `${handlePrefix}-${pidHash.slice(0, 8)}`;
   const banned = Boolean(session.banned);
 
-  state.sessions.set(sessionId, {
+  const verifiedSession = {
     ...session,
     status: 'verified',
     pidHash,
@@ -132,7 +129,8 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
     handle,
     role,
     banned,
-  });
+  };
+  state.sessions.set(sessionId, verifiedSession);
   invalidateSessionIndex(state);
   await persistSessions(state);
 
@@ -144,9 +142,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
       pidHashShort: pidHash.slice(0, 8),
       ledgerNote,
       actorId: actor.id,
-      personHandle: handle,
-      roleLabel: role,
-      isVerified: true,
+      person: { ...verifiedSession, sessionId },
     },
     { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
   );

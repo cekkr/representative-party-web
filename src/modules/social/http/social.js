@@ -42,7 +42,7 @@ import { renderCalloutRow } from '../../../interfaces/http/views/shared.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'social' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'social' });
   }
   const person = getPerson(req, state);
   const followTypeFilter = url.searchParams.get('type') || '';
@@ -74,6 +74,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
       person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
+      workspaceCreateHref: permission.allowed ? '/social/feed?compose=post#social-compose' : '',
       postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
       postingReasonLine,
       socialContext: renderContextPanel({

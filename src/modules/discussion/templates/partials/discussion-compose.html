@@ -1,7 +1,7 @@
-<section class="panel" id="discussion-compose" data-composer-section="discussion-compose" data-section-label="New post">
-  <p class="eyebrow">Discussion</p>
-  <h3>Share a contribution</h3>
-  <details class="form-toggle" {{composeOpen}}>
+<section class="panel" id="discussion-compose" tabindex="-1" aria-labelledby="discussion-compose-title" data-composer-section="discussion-compose" data-section-label="New post">
+  <h2 id="discussion-compose-title">Share a contribution</h2>
+  {{discussionContext}}
+  <details class="form-toggle" {{composeState}}>
     <summary>Start a discussion post</summary>
     <form class="stack" method="post" action="/discussion" data-enhance="discussion">
       <div class="form-grid">
@@ -31,11 +31,7 @@
       <p class="muted small">One URL per line.</p>
       <div class="cta-row">
         <button class="cta" type="submit">Post to discussion</button>
-        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
       </div>
     </form>
   </details>
-  <datalist id="topics-list">
-    {{topicDatalist}}
-  </datalist>
 </section>

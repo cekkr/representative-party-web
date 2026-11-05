@@ -67,8 +67,10 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Forum threads have no category field, so every article lands on `Forum / general`; give the forum compose form the same Category input and datalist the proposal form has, so long-form pieces join the party's category tree.
 - The petition comment route stores the literal `Argument note` as the title of an untitled rebuttal; the view now treats it as a placeholder (`ownArgumentTitle`). Stop writing it (store an empty title) and drop the view-side special case after a migration clears existing rows.
 - The argument-map node still carries an `Author: @handle` footer (`renderAuthorHashLine`) while every other card uses the byline head; revisit when the argument map gets a richer layout.
-- Replace the mobile side-navigation height cap with an accessible disclosure or compact horizontal section switcher, preserving keyboard search while putting page content above the fold.
-- Give partial navigation and form responses an explicit focus target in `src/public/app.js`. Replacing the shell body can discard the focused control. Focus the destination heading or anchor, then use the error summary or updated record for form responses.
+- Extend the destination-heading and anchor focus used by partial navigation to explicit error summaries and changed records on form responses.
+- Canonicalize the URL after an enhanced scoped discussion POST so a reload or bookmark opens the same group lane as the rendered response.
+- Gate the wallet success page's social-wall shortcut on the Social module and provide Discussion as the primary return path in a conversation-only deployment.
+- Replace the shared fallback heading on remaining surfaces with a route-owned heading as their layouts are converted. Coordination currently repeats its workspace title in the first panel.
 - Separate enhanced POST recovery from link fallback in `src/public/app.js`. The catch path calls `form.submit()` even after a response or rendering failure, which can repeat a committed write and omit the named submitter. Recover with a read of the affected record when the write outcome is unknown and verify both submitter intent and one-write behavior.
 - Resolve proposal links and successful POST destinations from one scope-aware canonical GET URL. Current proposal and notification links use a bare fragment on the paginated collection, and several grouped actions return to the Circle list or leave the POST endpoint in browser history. Carry the authorized group and stable item id to the focused view. Verify the same destination in full and partial responses, including after promotion.
 - Add a shared “illustrative data / template preview / persisted workflow” treatment so prototype organization layers can never be mistaken for live delivery, protected intake, financial execution, or pressure analysis.
@@ -96,6 +98,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - `/admin` renders all 20 panels on every request, including heavyweight ones (transactions, media review, topic gardener). Now that it is decomposed into partials, the lazy-render idea already listed under Performance is straightforward to implement per partial.
 
 ## Security follow-ups
+
+- Carry group lane visibility into transaction read and export policy. Home excludes scoped records and restricts audit previews to signed-in provider admins, but raw transaction endpoints can expose lane payloads. Resolve legacy records through their stored source when the audit payload has no group ID, and keep legitimate operator audit access.
 - Scope direct proposal edits, signatures, comments, stage changes, and ballots to the stored record's group lane. These handlers apply Circle action checks after locating the proposal by id and lack a stored group-lane check. Reuse the group rules for focused reads and item-id writes. Add regression coverage for members-only and disabled lanes with direct requests.
 - `POST /circle/peers` (`registerPeer`) accepts anonymous requests, so anyone reachable can add peers to the gossip set. Peers are "hints, not trust anchors" by design, but unauthenticated writes to the peer list still deserve an explicit policy decision (admin-only, or signed peer announcements).
 - `/transactions` and `/transactions/ledger` are world-readable and expose `actorHash`, digests, and payload topics. Blinded hashes are the intended pseudonym, so this is arguably the transparency goal — but it should be a documented decision with a per-provider toggle rather than an implicit default.
@@ -126,6 +130,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Pilot libp2p gossipsub channels for social-lane event replication (with bounded replay + signature checks) to reduce HTTP gossip overhead on high-churn feeds.
 
 ## Completed
+
+- Replaced the height-capped mobile navigation with a native Menu disclosure using the desktop rail's gated link model. Kept jump search and added skip-to-main and destination focus.
 
 - Shared layout declares a local SVG favicon, also served at `/favicon.ico`.
 - KV writes queue snapshots and replace the file atomically so concurrent case, discussion, and audit writes retain their separate keys.

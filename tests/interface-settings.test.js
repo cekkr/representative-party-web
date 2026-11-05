@@ -169,7 +169,7 @@ test('sanitizeSectionKey rejects unsafe values', () => {
   assert.equal(sanitizeSectionKey(42), '');
 });
 
-test('appearance defaults and hidden sections persist through the session and SSR', async () => {
+test('saved appearance and hidden sections survive the topbar verbosity toggle', async () => {
   const port = await getAvailablePort();
   const server = await startServer({ port });
   try {
@@ -182,18 +182,28 @@ test('appearance defaults and hidden sections persist through the session and SS
         uiVerbosity: '',
         uiAccent: 'teal',
         uiDensity: 'compact',
-        uiTheme: 'dark',
+        uiTheme: 'light',
         uiHiddenSections: JSON.stringify({ home: ['home-ops'] }),
       },
       { cookie, partial: true },
     );
     assert.equal(saveResponse.status, 200);
 
+    const saveVerbosity = (uiVerbosity) => postForm(
+      `${server.baseUrl}/profile`,
+      { intent: 'ui-preferences', uiVerbosity },
+      { cookie, partial: true },
+    );
+    const compact = await saveVerbosity('compact');
+    assert.equal(compact.status, 200);
+    assert.match(await compact.text(), /data-verbosity-override="compact"/);
+
     const { text: home } = await fetchText(`${server.baseUrl}/`, { headers: { Cookie: cookie } });
 
     // The saved appearance renders onto <html> so it holds without JavaScript.
     assert.match(home, /<html[^>]*data-ui-accent="teal"/);
     assert.match(home, /<html[^>]*data-ui-density="compact"/);
+    assert.match(home, /<html[^>]*data-theme="light"/);
 
     // The hidden section is stamped server-side on its opt-in panel.
     const opsTag = home.match(/<section[^>]*data-composer-section="home-ops"[^>]*>/);
@@ -204,6 +214,21 @@ test('appearance defaults and hidden sections persist through the session and SS
     const overviewTag = home.match(/<section[^>]*data-composer-section="home-overview"[^>]*>/);
     assert.ok(overviewTag);
     assert.doesNotMatch(overviewTag[0], /data-member-hidden/);
+
+    const reset = await saveVerbosity('');
+    assert.equal(reset.status, 200);
+    assert.match(await reset.text(), /data-verbosity-override=""/);
+    const { text: afterReset } = await fetchText(`${server.baseUrl}/`, { headers: { Cookie: cookie } });
+    assert.match(afterReset, /<html[^>]*data-theme="light"/);
+    assert.match(afterReset, /<section[^>]*data-composer-section="home-ops"[^>]*data-member-hidden="true"/);
+
+    const fullForm = await postForm(`${server.baseUrl}/profile`, {
+      intent: 'ui-preferences', uiVerbosity: '', uiLargeText: 'off',
+    }, { cookie, partial: true });
+    assert.equal(fullForm.status, 200);
+    const { text: afterFullForm } = await fetchText(`${server.baseUrl}/`, { headers: { Cookie: cookie } });
+    assert.match(afterFullForm, /<html[^>]*data-theme="dark"/);
+    assert.doesNotMatch(afterFullForm, /<section[^>]*data-composer-section="home-ops"[^>]*data-member-hidden/);
   } finally {
     await server.stop();
   }

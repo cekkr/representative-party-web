@@ -13,7 +13,7 @@ function adminNote(person) {
 export async function renderAdminRequired({ res, state, wantsPartial, person }) {
   const html = await renderPage(
     'admin-required',
-    { adminNote: adminNote(person) },
+    { adminNote: adminNote(person), person },
     { wantsPartial, title: 'Admin access required', state },
   );
   return sendHtml(res, html, {}, 403);

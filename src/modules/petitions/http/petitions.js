@@ -41,6 +41,7 @@ import {
   listOwnersFollowingDelegate,
 } from '../../delegation/delegatedBallots.js';
 import {
+  canPostToGroupLane,
   listPostableGroupLanes,
   listReadableGroupLanes,
   matchesGroupScope,
@@ -79,7 +80,7 @@ async function resolvePetitionTopic(state, { input, classifyText, previous } = {
 
 export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'petitions')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'petitions' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'petitions' });
   }
   const person = getPerson(req, state);
   const modules = resolveModuleSettings(state);
@@ -127,11 +128,16 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
   const stageFilterOptions = renderStageFilterOptions(stageFilter);
   const actorLabels = getActorLabels(state);
+  const composeParams = new URLSearchParams({ compose: 'proposal' });
+  if (activeGroupId) composeParams.set('group', activeGroupId);
+  if (stageFilter !== 'all') composeParams.set('stage', stageFilter);
+  const canCompose = petitionGate.allowed && canPostToGroupLane(state, person, scope.ok ? scope.group : null, 'petitions');
   const html = await renderPage(
     'petitions',
     {
       person,
       personHandle: resolvePersonHandle(person),
+      workspaceCreateHref: canCompose ? `/petitions?${composeParams}#petitions-compose` : '',
       petitionsContext: renderContextPanel({
         gates: [
           {

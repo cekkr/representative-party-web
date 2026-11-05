@@ -1,24 +1,17 @@
 :root {
-  /* Modern semantic token system, dark-first. Inspired by the ForumLab "modern"
-     and Zisco ERP references: a single indigo/violet primary hue drives the whole
-     accent system, neutral surfaces step up in lightness, and rounding/elevation
-     read as a product, not a neon dashboard. The light palette re-declares only
-     this token block under :root[data-theme="light"] — component CSS is untouched.
-
-     --primary-h is the single knob the member "Appearance" control retunes live;
-     everything accent-colored derives from it, so changing one channel re-tints the
-     entire interface. Existing hex var names are aliased at the bottom so all
-     component CSS keeps resolving with no mass rename. */
+  /* Cool canvas and stepped surfaces, with an accent derived from the member's hue.
+     Components share these semantic tokens in both themes. */
   --primary-h: 248;
   --primary-s: 84%;
   --primary-l: 66%;
   --primary: hsl(var(--primary-h) var(--primary-s) var(--primary-l));
   --primary-strong: hsl(var(--primary-h) var(--primary-s) 57%);
-  --primary-foreground: hsl(var(--primary-h) 45% 97%);
   --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.16);
-  /* Companion hue (primary shifted toward periwinkle) keeps brand gradients alive. */
-  --primary-two: hsl(calc(var(--primary-h) + 24) 85% 70%);
-  --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.55);
+  --link: hsl(var(--primary-h) var(--primary-s) 79%);
+  --ring: var(--link);
+  --action-fill: hsl(211 28% 82%);
+  --action-hover: hsl(var(--primary-h) var(--primary-s) 74%);
+  --action-ink: hsl(215 36% 12%);
   /* Ink for text sitting on an accent-tinted chip. --primary itself is tuned to be a
      fill, and at L66% on its own 14% tint it only reaches 3.5:1 — so accent-tinted
      chips get a dedicated ink whose lightness is pinned away from the tint in each
@@ -26,16 +19,16 @@
   --primary-ink: hsl(var(--primary-h) var(--primary-s) 76%);
 
   /* Neutral surfaces */
-  --background: #0b0e14;
-  --surface: #141924;
-  --surface-2: #1b2230;
-  --surface-3: #232c3d;
+  --background: hsl(215 36% 9%);
+  --surface: hsl(215 32% 14%);
+  --surface-2: hsl(215 30% 17%);
+  --surface-3: hsl(215 27% 22%);
   --card: var(--surface);
-  --foreground: #e7edf6;
-  --muted-foreground: #93a2b7;
-  --border: #232c3b;
-  --border-strong: #313d52;
-  --nav-surface: #121722;
+  --foreground: hsl(212 38% 92%);
+  --muted-foreground: hsl(214 27% 72%);
+  --border: hsl(215 24% 25%);
+  --border-strong: hsl(215 23% 44%);
+  --nav-surface: var(--surface);
 
   /* Semantic status. Stored as HSL channel triplets so a component can take the same
      colour at its own alpha (hsl(var(--warning-hsl) / 0.12)) instead of hardcoding a
@@ -68,8 +61,8 @@
 
   /* Radius scale */
   --radius-sm: 0.5rem;
-  --radius: 0.85rem;
-  --radius-lg: 1.15rem;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
   --radius-pill: 999px;
 
   /* Elevation */
@@ -86,8 +79,10 @@
 
   /* Density — retuned by :root[data-ui-density]; component paddings/gaps scale off it. */
   --density-scale: 1;
-  --pad-card: calc(1.15rem * var(--density-scale));
-  --gap-stack: calc(0.9rem * var(--density-scale));
+  --pad-card: calc(1.5rem * var(--density-scale));
+  --gap-stack: calc(1rem * var(--density-scale));
+  --work-gap: calc(1.5rem * var(--density-scale));
+  --page-gutter: clamp(1rem, 2.5vw, 1.5rem);
 
   /* Back-compat aliases: legacy component CSS resolves through these onto the
      new semantic tokens. Do not reintroduce raw hex in components. */
@@ -96,7 +91,7 @@
   --muted: var(--muted-foreground);
   --highlight: var(--primary);
   --highlight-strong: var(--primary-strong);
-  --accent: var(--primary-two);
+  --accent: var(--link);
   --accent-soft: var(--primary-soft);
 }
 
@@ -117,22 +112,24 @@
 :root[data-theme='light'] {
   --primary-l: 52%;
   --primary-strong: hsl(var(--primary-h) var(--primary-s) 44%);
-  --primary-foreground: hsl(var(--primary-h) 45% 98%);
   --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.12);
-  --primary-two: hsl(calc(var(--primary-h) + 24) 72% 52%);
-  --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.45);
-  --primary-ink: hsl(var(--primary-h) var(--primary-s) 40%);
+  --link: hsl(var(--primary-h) var(--primary-s) var(--light-link-lightness, 25%));
+  --ring: var(--link);
+  --action-fill: hsl(207 23% 23%);
+  --action-hover: var(--link);
+  --action-ink: hsl(0 0% 100%);
+  --primary-ink: var(--link);
 
-  --background: #f4f6fb;
-  --surface: #ffffff;
-  --surface-2: #f1f4fa;
-  --surface-3: #e6eaf3;
+  --background: hsl(207 65% 97%);
+  --surface: hsl(0 0% 100%);
+  --surface-2: hsl(210 50% 98%);
+  --surface-3: hsl(211 52% 94%);
   --card: var(--surface);
-  --foreground: #131824;
-  --muted-foreground: #5a6679;
-  --border: #dfe4ee;
-  --border-strong: #c3ccdc;
-  --nav-surface: #ffffff;
+  --foreground: hsl(207 23% 23%);
+  --muted-foreground: hsl(209 17% 38%);
+  --border: hsl(212 28% 91%);
+  --border-strong: hsl(211 16% 54%);
+  --nav-surface: var(--surface);
 
   --success-hsl: 167.4 78% 28.6%;
   --warning-hsl: 33.2 88% 31%;
@@ -140,9 +137,9 @@
   --info-hsl: 218.3 74% 46.9%;
 
   --hairline-hsl: 219 22% 46%;
-  --inset-hsl: 222 30% 92%;
-  --inset-2-hsl: 220 30% 96%;
-  --inset-3-hsl: 220 28% 93%;
+  --inset-hsl: 210 46% 94%;
+  --inset-2-hsl: 209 52% 97%;
+  --inset-3-hsl: 209 42% 96%;
   --inset-4-hsl: 0 0% 100%;
   --marker-hsl: 168 68% 23%;
   --on-accent: #ffffff;
@@ -160,22 +157,24 @@
   :root[data-theme='system'] {
     --primary-l: 52%;
     --primary-strong: hsl(var(--primary-h) var(--primary-s) 44%);
-    --primary-foreground: hsl(var(--primary-h) 45% 98%);
     --primary-soft: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.12);
-    --primary-two: hsl(calc(var(--primary-h) + 24) 72% 52%);
-    --ring: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.45);
-    --primary-ink: hsl(var(--primary-h) var(--primary-s) 40%);
+    --link: hsl(var(--primary-h) var(--primary-s) var(--light-link-lightness, 25%));
+    --ring: var(--link);
+    --action-fill: hsl(207 23% 23%);
+    --action-hover: var(--link);
+    --action-ink: hsl(0 0% 100%);
+    --primary-ink: var(--link);
 
-    --background: #f4f6fb;
-    --surface: #ffffff;
-    --surface-2: #f1f4fa;
-    --surface-3: #e6eaf3;
+    --background: hsl(207 65% 97%);
+    --surface: hsl(0 0% 100%);
+    --surface-2: hsl(210 50% 98%);
+    --surface-3: hsl(211 52% 94%);
     --card: var(--surface);
-    --foreground: #131824;
-    --muted-foreground: #5a6679;
-    --border: #dfe4ee;
-    --border-strong: #c3ccdc;
-    --nav-surface: #ffffff;
+    --foreground: hsl(207 23% 23%);
+    --muted-foreground: hsl(209 17% 38%);
+    --border: hsl(212 28% 91%);
+    --border-strong: hsl(211 16% 54%);
+    --nav-surface: var(--surface);
 
     --success-hsl: 167.4 78% 28.6%;
     --warning-hsl: 33.2 88% 31%;
@@ -183,9 +182,9 @@
     --info-hsl: 218.3 74% 46.9%;
 
     --hairline-hsl: 219 22% 46%;
-    --inset-hsl: 222 30% 92%;
-    --inset-2-hsl: 220 30% 96%;
-    --inset-3-hsl: 220 28% 93%;
+    --inset-hsl: 210 46% 94%;
+    --inset-2-hsl: 209 52% 97%;
+    --inset-3-hsl: 209 42% 96%;
     --inset-4-hsl: 0 0% 100%;
     --marker-hsl: 168 68% 23%;
     --on-accent: #ffffff;
@@ -229,9 +228,10 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--text);
-  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-  line-height: 1.55;
-  padding: 0 1.1rem 1.75rem;
+  font-family: system-ui, 'Segoe UI', sans-serif;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  padding: 0 var(--page-gutter) 2rem;
   max-width: 1320px;
   margin-inline: auto;
 }
@@ -261,10 +261,6 @@ body[data-ui-nav="compact"] .side-nav__children {
   display: none !important;
 }
 
-body[data-ui-nav="compact"] .side-nav__item {
-  padding: 0.2rem 0.3rem;
-}
-
 body[data-ui-nav="compact"] .side-nav__group {
   gap: 0.4rem;
 }
@@ -288,8 +284,9 @@ body[data-ui-nav="compact"] .side-nav__group {
    which is declared on :root, recomputes with the new hue. "violet" is the default and
    needs no override. */
 :root[data-ui-accent="blue"] {
-  --primary-h: 214;
-  --primary-s: 90%;
+  --primary-h: 206;
+  --primary-s: 82%;
+  --light-link-lightness: 35%;
 }
 
 :root[data-ui-accent="teal"] {
@@ -345,6 +342,12 @@ a:hover {
   text-decoration: underline;
 }
 
+.topic-body a:not(.pill, .ghost),
+.reply-card__content a {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
 /* Accessible, token-driven focus ring shared by every interactive control, tinted
    by the live accent hue. Mouse clicks stay ring-free via :focus-visible. */
 a:focus-visible,
@@ -352,39 +355,62 @@ button:focus-visible,
 input:focus-visible,
 textarea:focus-visible,
 select:focus-visible,
+summary:focus-visible,
 [tabindex]:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
 }
 
+.skip-link {
+  position: fixed;
+  inset: 0.5rem auto auto var(--page-gutter);
+  z-index: 150;
+  transform: translateY(calc(-100% - 1rem));
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus {
+  transform: none;
+}
+
 header.topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.85rem 0;
-  gap: 1rem;
+  padding-block: calc(0.75rem * var(--density-scale));
+  gap: 0.5rem 1rem;
   flex-wrap: wrap;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 1.1rem;
+  margin-bottom: var(--gap-stack);
+}
+
+.topbar__location,
+.shell-menu {
+  display: none;
 }
 
 .topbar__brand {
   display: flex;
   align-items: center;
-  gap: 0.7rem;
+  gap: 0.75rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .orb {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--highlight), var(--accent));
+  border-radius: var(--radius-sm);
+  background: var(--primary);
   flex: 0 0 auto;
 }
 
-.topbar__brand h1 {
-  font-size: 1.15rem;
+.topbar__title {
+  margin: 0;
+  font-size: 1.0625rem;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
@@ -399,8 +425,10 @@ header.topbar {
 .topbar__actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
   position: relative;
+  min-width: 0;
 }
 
 .quick-nav {
@@ -510,8 +538,8 @@ header.topbar {
   --sw-l: 66%;
 }
 .accent-swatch--blue > span {
-  --sw-h: 214;
-  --sw-s: 90%;
+  --sw-h: 206;
+  --sw-s: 82%;
   --sw-l: 62%;
 }
 .accent-swatch--teal > span {
@@ -561,12 +589,12 @@ header.topbar {
   padding: 0.3rem 0.7rem;
   font-size: 0.78rem;
   color: var(--muted);
-  transition: background 0.12s ease, color 0.12s ease;
 }
 
 .segmented__option input:checked + span {
-  background: var(--primary);
-  color: var(--primary-foreground);
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-weight: 700;
 }
 
 .segmented__option input:focus-visible + span {
@@ -619,12 +647,11 @@ header.topbar {
   border-radius: 999px;
   font-weight: 600;
   font-size: 0.9rem;
-  transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
 }
 
 .quick-link:hover {
-  border-color: var(--accent);
-  background: hsl(var(--marker-hsl) / 0.12);
+  border-color: var(--link);
+  background: var(--surface-3);
   text-decoration: none;
 }
 
@@ -642,18 +669,14 @@ header.topbar {
 
 .shell {
   display: grid;
-  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
-  gap: 1.5rem;
+  grid-template-columns: 12.5rem minmax(0, 1fr);
+  gap: var(--work-gap);
   align-items: start;
 }
 
 .shell main {
   min-width: 0;
-  /* Two-column page grids inside the shell must react to the width they actually get,
-     not the viewport's: the side-nav takes ~240px plus a 1.5rem gap, so a viewport-keyed
-     breakpoint left the main column at ~160px on a ~850px screen while the aside kept
-     its full 360px. Declaring the container here lets .page-grid collapse on its own
-     measurements. */
+  /* Let page grids respond to the available width after the work navigation. */
   container-type: inline-size;
   container-name: shell-main;
 }
@@ -665,11 +688,10 @@ header.topbar {
   background: var(--nav-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: 1rem;
-  box-shadow: var(--shadow);
+  padding: calc(0.75rem * var(--density-scale));
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--gap-stack);
   max-height: calc(100vh - 2rem);
   overflow-y: auto;
   overflow-x: hidden;
@@ -713,41 +735,71 @@ header.topbar {
   padding-right: 0.65rem;
 }
 
+.side-nav__destinations {
+  display: grid;
+  gap: var(--gap-stack);
+}
+
+[data-nav-create]:empty {
+  display: none;
+}
+
 .side-nav__group {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.125rem;
+  overflow-wrap: anywhere;
+}
+
+.side-nav__group-title {
+  margin: 0 0 0.25rem;
+  padding-inline: 0.5rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.side-nav__create {
+  justify-content: center;
+  inline-size: 100%;
 }
 
 .side-nav__item {
   display: flex;
   flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.35rem 0.4rem;
-  border-radius: 0.8rem;
-}
-
-.side-nav__item.is-active {
-  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.12);
-  border: 1px solid hsl(var(--primary-h) var(--primary-s) 50% / 0.34);
+  gap: 0.25rem;
 }
 
 .side-nav__link {
+  display: flex;
+  align-items: center;
+  min-block-size: 2rem;
+  padding: calc(0.25rem * var(--density-scale)) 0.5rem;
+  border-inline-start: 2px solid transparent;
+  border-radius: var(--radius-sm);
   font-weight: 600;
   color: var(--text);
 }
 
+.side-nav__link[aria-current="page"] {
+  border-inline-start-color: currentColor;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+
 .side-nav__child {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 0.8125rem;
 }
 
 .side-nav__children {
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
-  padding-left: 0.6rem;
-  border-left: 1px solid hsl(var(--hairline-hsl) / 0.3);
+  margin-inline-start: 0.55rem;
+  padding-inline-start: 0.55rem;
+  border-inline-start: 1px solid var(--border);
 }
 
 body[data-composer-mode="on"] [data-composer-key] {
@@ -782,13 +834,15 @@ body[data-composer-mode="on"] .is-composer-selected {
 
 h1 {
   margin: 0;
-  font-size: 2.05rem;
+  font-size: 1.75rem;
+  line-height: 1.2;
   letter-spacing: -0.02em;
 }
 
 h2 {
   margin: 0 0 0.35rem;
-  font-size: 1.55rem;
+  font-size: 1.5rem;
+  line-height: 1.25;
 }
 
 h3 {
@@ -808,7 +862,72 @@ p {
 main {
   display: flex;
   flex-direction: column;
-  gap: 0.9rem;
+  gap: var(--gap-stack);
+}
+
+.workspace-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  overflow-wrap: anywhere;
+}
+
+.workspace-heading__summary {
+  max-width: 70ch;
+  color: var(--muted);
+  margin: 0.35rem 0 0;
+}
+
+.workspace-heading__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.workspace-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.workspace-switcher a {
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.workspace-switcher a[aria-current="page"] {
+  border-color: currentColor;
+  color: var(--link);
+  font-weight: 700;
+}
+
+.page-grid--discussion .page-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+
+#discussion-filters .form-grid {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+#discussion-filters .cta-row {
+  margin: 0;
+}
+
+body:has(#discussion-compose:is([data-member-hidden="true"], [hidden])) [data-discussion-compose-link] {
+  display: none;
 }
 
 .status-strip {
@@ -839,9 +958,7 @@ main {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.75rem;
-  /* Only a positioning frame: it stays as tall as the collapsed panel, so
-     letting it take pointer events made it swallow clicks on whatever sits
-     underneath (the social composer, feed filters). Children opt back in. */
+  /* Only the visible toolbar and panel accept pointer events. */
   pointer-events: none;
 }
 
@@ -900,6 +1017,7 @@ main {
 }
 
 .composer-tool__panel {
+  display: none;
   width: min(360px, 90vw);
   max-height: 75vh;
   overflow: auto;
@@ -908,15 +1026,10 @@ main {
   border-radius: 1rem;
   padding: 1rem;
   box-shadow: var(--shadow);
-  opacity: 0;
-  transform: translateY(12px);
-  pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
 body[data-composer-mode="on"] .composer-tool__panel {
-  opacity: 1;
-  transform: translateY(0);
+  display: block;
   pointer-events: auto;
 }
 
@@ -1192,8 +1305,14 @@ body[data-composer-mode="on"] .composer-tool__panel {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--pad-card) calc(var(--pad-card) + 0.15rem);
-  box-shadow: var(--shadow-soft);
+  padding: var(--pad-card);
+  overflow-wrap: anywhere;
+}
+
+@container shell-main (max-width: 700px) {
+  .panel {
+    padding: min(var(--pad-card), 1rem);
+  }
 }
 
 .panel > details.form-toggle {
@@ -1202,8 +1321,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
 
 .page-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, var(--page-aside-width, 360px));
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, var(--page-aside-width, 288px));
+  gap: var(--work-gap);
   align-items: start;
 }
 
@@ -1212,15 +1331,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
    side-nav is already accounted for. */
 @container shell-main (max-width: 700px) {
   .page-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .page-aside {
-    order: -1;
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1238,18 +1349,13 @@ body[data-composer-mode="on"] .composer-tool__panel {
 .page-aside {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--gap-stack);
   align-self: start;
-  padding-right: 0.25rem;
+  min-width: 0;
 }
 
 .page-grid--organization {
   overflow-wrap: anywhere;
-}
-
-.page-grid--organization .page-aside {
-  min-width: 0;
-  order: 0;
 }
 
 .grid {
@@ -1325,7 +1431,12 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 .home-panel-grid {
-  align-items: stretch;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  align-items: start;
+}
+
+#home-lane-federation {
+  grid-column: 1 / -1;
 }
 
 .home-lane {
@@ -1337,6 +1448,9 @@ body[data-composer-mode="on"] .composer-tool__panel {
 .home-list {
   display: grid;
   gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 
 .home-list__item {
@@ -1377,35 +1491,34 @@ a.home-list__title:hover {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  padding: 0.6rem 1.15rem;
-  border-radius: var(--radius);
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
   font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   cursor: pointer;
-  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.2s ease,
-    border-color 0.2s ease;
 }
 
 .cta {
-  background: linear-gradient(135deg, var(--primary), var(--primary-two));
-  color: var(--primary-foreground);
-  border: 1px solid transparent;
-  box-shadow: 0 12px 26px -10px hsl(var(--primary-h) var(--primary-s) 45% / 0.6);
+  min-block-size: 2.75rem;
+  background: var(--action-fill);
+  color: var(--action-ink);
+  border-color: transparent;
 }
 
 .cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 32px -10px hsl(var(--primary-h) var(--primary-s) 45% / 0.7);
+  background: var(--action-hover);
   text-decoration: none;
 }
 
 .ghost {
-  border: 1px solid var(--border-strong);
   color: var(--text);
-  background: var(--surface-2);
+  background: var(--surface);
 }
 
 .ghost:hover {
-  border-color: var(--primary);
+  border-color: var(--link);
   background: var(--surface-3);
   text-decoration: none;
 }
@@ -1852,7 +1965,7 @@ ul.plain li:last-child {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   gap: 0.75rem;
 }
 
@@ -2383,7 +2496,7 @@ code {
 
 .context-panel__gates {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
   gap: 0.5rem;
 }
 
@@ -3844,46 +3957,105 @@ code {
   }
 }
 
-@media (max-width: 720px) {
-  header.topbar {
-    flex-direction: column;
-    align-items: flex-start;
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .side-nav--desktop {
+    display: none;
+  }
+
+  .topbar__location {
+    display: block;
+    margin: 0;
+    color: var(--muted);
+    overflow-wrap: anywhere;
+  }
+
+  .quick-nav .quick-link:not([data-nav-key="notifications"], .quick-link--context) {
+    display: none;
+  }
+
+  .topbar__actions :is(.ui-settings-toggle, .verbosity-toggle, .quick-link) {
+    min-block-size: 2.75rem;
+    padding-inline: 0.6rem;
+  }
+
+  .ui-settings-panel {
+    width: min(340px, calc(100vw - 2 * var(--page-gutter)));
+  }
+
+  .shell-menu {
+    display: block;
+    margin-inline-start: auto;
+  }
+
+  .shell-menu[open] {
+    flex-basis: 100%;
+  }
+
+  .shell-menu__toggle {
+    width: max-content;
+    min-block-size: 2.75rem;
+    padding: 0.6rem 0.8rem;
+    margin-inline-start: auto;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+    background: var(--surface);
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .side-nav--mobile {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    margin-block-start: 0.5rem;
+  }
+
+  .side-nav--mobile .side-nav__link,
+  .side-nav--mobile .side-nav__child {
+    min-block-size: 2.75rem;
+    display: flex;
+    align-items: center;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar__brand .orb {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .topbar__brand {
+    flex: 1 1 0;
   }
 
   .topbar__actions {
-    width: 100%;
-    justify-content: flex-start;
-    position: relative;
+    flex: 1 1 100%;
+  }
+
+  .ui-settings-panel {
+    left: 0;
+    right: auto;
   }
 
   .quick-nav {
     justify-content: flex-start;
   }
 
-  .ui-settings-panel {
-    left: 0;
-    right: auto;
-    width: min(360px, 96vw);
-  }
-
-  .shell {
-    grid-template-columns: 1fr;
-  }
-
   .home-overview__hero {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .home-access__row {
     flex-direction: column;
     align-items: flex-start;
   }
+}
 
-  .side-nav {
-    position: static;
-    max-height: min(18rem, 45vh);
-  }
-
+@media (max-width: 720px) {
   .sticky-composer {
     position: static;
   }
@@ -3896,15 +4068,11 @@ code {
      normally collapses the page grid, and it triggers earlier because it measures the
      content column rather than the viewport. */
   .page-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .page-aside {
-    order: -1;
-    position: static;
-    max-height: none;
-    overflow: visible;
-    padding-right: 0;
+  .panel {
+    padding: min(var(--pad-card), 1rem);
   }
 
   .composer__chip input {

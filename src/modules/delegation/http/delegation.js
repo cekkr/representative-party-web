@@ -53,7 +53,7 @@ export async function resolveConflict({ req, res, state }) {
 
 export async function renderDelegation({ req, res, state, wantsPartial }) {
   if (!isModuleEnabled(state, 'delegation')) {
-    return renderModuleDisabled({ res, state, wantsPartial, moduleKey: 'delegation' });
+    return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'delegation' });
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'delegate');

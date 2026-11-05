@@ -1,18 +1,24 @@
 import { getModuleDefinition } from '../../../modules/circle/modules.js';
+import { getPerson } from '../../../modules/identity/person.js';
+import { canAdministerProvider } from '../../../modules/identity/privileges.js';
 import { recordModuleDisabled } from '../../../modules/ops/metrics.js';
 import { sendHtml, sendJson } from '../../../shared/utils/http.js';
 import { renderPage } from './templates.js';
 
-export async function renderModuleDisabled({ res, state, wantsPartial, moduleKey }) {
+export async function renderModuleDisabled({ req, res, state, wantsPartial, moduleKey }) {
   recordModuleDisabled(state, moduleKey);
   const definition = getModuleDefinition(moduleKey);
   const moduleName = definition?.label || moduleKey;
   const moduleNote = definition?.description
     ? `${definition.description} This module is disabled in admin settings.`
     : 'This module is disabled in admin settings and cannot be accessed right now.';
+  const person = getPerson(req, state);
+  const adminLink = canAdministerProvider(person, state)
+    ? '<a class="ghost" href="/admin#modules" data-partial>Review module toggles</a>'
+    : '';
   const html = await renderPage(
     'module-disabled',
-    { moduleKey, moduleName, moduleNote },
+    { moduleKey, moduleName, moduleNote, person, adminLink },
     { wantsPartial, title: `${moduleName} disabled`, state },
   );
   return sendHtml(res, html, {}, 403);

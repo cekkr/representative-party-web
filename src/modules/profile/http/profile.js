@@ -78,7 +78,10 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       return sendJson(res, 404, { error: 'session_not_found', message: 'Session not found.' });
     }
     const normalized = normalizeVerbosityMode(body.uiVerbosity);
-    const uiSettings = normalizeInterfaceSettings(body);
+    // The topbar's verbosity toggle submits only its override. A full
+    // preferences submission still replaces the stored interface defaults.
+    const verbosityOnly = Object.hasOwn(body, 'uiVerbosity')
+      && Object.keys(body).every((key) => key === 'intent' || key === 'uiVerbosity');
     const next = { ...currentSession };
     const flashParts = [];
     if (normalized) {
@@ -88,8 +91,10 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       delete next.uiVerbosity;
       flashParts.push('UI verbosity reset to Circle default.');
     }
-    next.uiSettings = uiSettings;
-    flashParts.push('Interface defaults updated.');
+    if (!verbosityOnly) {
+      next.uiSettings = normalizeInterfaceSettings(body);
+      flashParts.push('Interface defaults updated.');
+    }
     state.sessions.set(person.sessionId, next);
     invalidateSessionIndex(state);
     await persistSessions(state);
@@ -98,7 +103,7 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
       res,
       state,
       wantsPartial,
-      person: { ...person, ...next },
+      person: { ...person, ...next, uiVerbosity: next.uiVerbosity },
       uiFlash: flashParts.join(' '),
     });
   }

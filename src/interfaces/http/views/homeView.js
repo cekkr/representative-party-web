@@ -58,9 +58,9 @@ export function renderHomeList(items = [], { emptyMessage = 'No recent activity 
     return renderEmptyState(emptyMessage, { size: 'small' });
   }
   return `
-    <div class="home-list">
+    <ul class="home-list">
       ${filtered.map((item) => renderHomeListItem(item)).join('\n')}
-    </div>
+    </ul>
   `;
 }
 
@@ -72,11 +72,11 @@ function renderHomeListItem(item = {}) {
   const meta = item.meta ? `<p class="muted tiny">${escapeHtml(String(item.meta))}</p>` : '';
   const pills = Array.isArray(item.pills) && item.pills.length ? `<div class="discussion__meta">${renderHomePills(item.pills)}</div>` : '';
   return `
-    <article class="home-list__item">
+    <li class="home-list__item">
       ${title}
       ${summary}
       ${pills}
       ${meta}
-    </article>
+    </li>
   `;
 }

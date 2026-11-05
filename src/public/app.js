@@ -251,18 +251,26 @@ function isTextInputLike(target) {
   return Boolean(target.closest('input, textarea, select, [contenteditable="true"]'));
 }
 
-function scrollToHash(url) {
+function focusPageDestination(root, url) {
   const targetUrl = new URL(url, window.location.origin);
-  const hash = targetUrl.hash;
-  const behavior = prefersReducedMotion() ? 'auto' : 'smooth';
-  if (hash) {
-    const target = document.querySelector(hash);
-    if (target) {
-      target.scrollIntoView({ behavior, block: 'start' });
-      return;
-    }
+  let anchor = null;
+  try {
+    anchor = document.getElementById(decodeURIComponent(targetUrl.hash.slice(1)));
+  } catch (_error) {
+    // A malformed fragment still resolves to the page heading.
   }
-  window.scrollTo({ top: 0, behavior });
+  const visibleAnchor = anchor && root.contains(anchor) && anchor.getClientRects().length;
+  const target = (visibleAnchor && anchor) || root.querySelector('h1') || root;
+  if (!target.matches('a[href], button, input, select, textarea, summary, [tabindex]')) {
+    target.tabIndex = -1;
+  }
+  target.focus({ preventScroll: true });
+  const behavior = prefersReducedMotion() ? 'auto' : 'smooth';
+  if (target === anchor) {
+    target.scrollIntoView({ behavior, block: 'start' });
+  } else {
+    window.scrollTo({ top: 0, behavior });
+  }
 }
 
 async function submitExtensionsForm(form, submitter) {
@@ -399,7 +407,7 @@ function hydrateComposerTargets() {
     { selector: '.topbar__actions', key: 'layout.topbarActions', role: 'container' },
     { selector: '.quick-nav', key: 'layout.quickNav', role: 'container' },
     { selector: '.shell', key: 'layout.shell', role: 'container' },
-    { selector: '.side-nav', key: 'layout.sideNav', role: 'container' },
+    { selector: '.side-nav--desktop', key: 'layout.sideNav', role: 'container' },
     { selector: 'main[data-shell]', key: 'layout.main', role: 'container' },
     { selector: '.page-main', key: 'layout.pageMain', role: 'container' },
     { selector: '.page-aside', key: 'layout.pageAside', role: 'container' },
@@ -822,6 +830,7 @@ function createComposerTool(tool) {
       setDraggableState(false);
       hideDropLine();
     } else {
+      if (tool.style.top) clampToolPosition();
       setStatus('Composer mode active.');
       hydrateComposerTargets();
       applyComposerStyleOverridesToPage(state);
@@ -1379,7 +1388,7 @@ function createComposerTool(tool) {
     noteDirty();
   };
 
-  const updateNavOrdersFromDom = () => {
+  const updateNavOrdersFromDom = (element) => {
     const quick = document.querySelector('.quick-nav');
     if (quick) {
       const quickOrder = Array.from(quick.querySelectorAll('.quick-link:not(.quick-link--context)'))
@@ -1387,13 +1396,15 @@ function createComposerTool(tool) {
         .filter(Boolean);
       state.quickActionsOrder = mergeOrders(quickOrder, state.quickActionsOrder);
     }
-    const groups = Array.from(document.querySelectorAll('.side-nav__group'));
+    const sideNav = element.closest('[data-nav-shell]') || document.querySelector('.side-nav--desktop');
+    const groups = Array.from(sideNav?.querySelectorAll('.side-nav__group') || []);
     if (groups.length) {
       const sideOrder = groups
         .flatMap((group) => Array.from(group.querySelectorAll('.side-nav__item')))
         .map((item) => item.dataset.navSection)
         .filter(Boolean);
       state.sideNavOrder = mergeOrders(sideOrder, state.sideNavOrder);
+      reorderSideNav(state.sideNavOrder);
     }
     buildHierarchyTree();
     noteDirty();
@@ -1437,7 +1448,7 @@ function createComposerTool(tool) {
     if (el.classList.contains('panel')) {
       updateLayoutFromDom();
     } else if (el.closest('.quick-nav') || el.closest('.side-nav__group')) {
-      updateNavOrdersFromDom();
+      updateNavOrdersFromDom(el);
     } else {
       updateDomOrderFromElement(el);
     }
@@ -1626,7 +1637,7 @@ function createComposerTool(tool) {
       if (type === 'panel') {
         updateLayoutFromDom();
       } else if (type === 'nav') {
-        updateNavOrdersFromDom();
+        updateNavOrdersFromDom(el);
       } else if (type === 'grid') {
         updateDomOrderFromElement(el);
       }
@@ -2026,7 +2037,7 @@ function createComposerTool(tool) {
     buildList(quickList, getNavItems('.quick-nav .quick-link:not(.quick-link--context)'));
     if (sideLists) {
       sideLists.innerHTML = '';
-      const groups = Array.from(document.querySelectorAll('.side-nav__group'));
+      const groups = Array.from(document.querySelectorAll('.side-nav--desktop .side-nav__group'));
       groups.forEach((group) => {
         const label = group.querySelector('.eyebrow')?.textContent.trim() || 'Section';
         const items = Array.from(group.querySelectorAll('.side-nav__link'))
@@ -2429,6 +2440,7 @@ function syncPageMeta() {
   if (!meta || !document.body) return;
   const body = document.body;
   if (meta.dataset.pageKey !== undefined) body.dataset.pageKey = meta.dataset.pageKey;
+  if (meta.dataset.pageTitle) document.title = meta.dataset.pageTitle;
   if (meta.dataset.verbosity !== undefined) body.dataset.verbosity = meta.dataset.verbosity;
   if (meta.dataset.verbosityDefault !== undefined) body.dataset.verbosityDefault = meta.dataset.verbosityDefault;
   if (meta.dataset.verbosityOverride !== undefined) body.dataset.verbosityOverride = meta.dataset.verbosityOverride;
@@ -2438,6 +2450,26 @@ function syncPageMeta() {
   if (meta.dataset.composerAllowed !== undefined) body.dataset.composerAllowed = meta.dataset.composerAllowed;
   if (meta.dataset.uiSettingsServer !== undefined) body.dataset.uiSettingsServer = meta.dataset.uiSettingsServer;
   meta.remove();
+}
+
+function syncPageNavigation() {
+  const payload = document.querySelector('template[data-page-navigation]');
+  if (payload) {
+    for (const selector of ['[data-nav-destinations]', '[data-nav-create]', '[data-nav-location]', '.quick-nav']) {
+      const source = payload.content.querySelector(selector);
+      if (!source) continue;
+      document.querySelectorAll(selector).forEach((destination) => {
+        destination.replaceChildren(...source.cloneNode(true).childNodes);
+      });
+    }
+    payload.remove();
+  }
+  const current = document.querySelector('.side-nav--desktop [aria-current="page"]');
+  if (current) {
+    document.body.dataset.section = current.dataset.navKey;
+  } else {
+    delete document.body.dataset.section;
+  }
 }
 
 function updateVerbosityToggleUI() {
@@ -2456,6 +2488,7 @@ function updateVerbosityToggleUI() {
 function initVerbosityToggle() {
   const button = document.querySelector('[data-verbosity-toggle]');
   if (!button || !document.body) return;
+  button.hidden = false;
   updateVerbosityToggleUI();
   if (button.dataset.verbosityBound === 'true') return;
   button.dataset.verbosityBound = 'true';
@@ -2498,6 +2531,7 @@ function initUiSettingsPanel() {
     syncBusyIndicator();
     return;
   }
+  toggle.hidden = false;
   const closeButton = panel.querySelector('[data-ui-settings-close]');
   const saveButton = panel.querySelector('[data-ui-settings-save]');
   const resetButton = panel.querySelector('[data-ui-settings-reset]');
@@ -2731,49 +2765,30 @@ function initUiSettingsPanel() {
 }
 
 function initNavFilter() {
-  if (typeof window.__navFilterCleanup === 'function') {
-    window.__navFilterCleanup();
-    window.__navFilterCleanup = null;
-  }
-  const shell = document.querySelector('[data-nav-shell]');
-  if (!shell) return;
+  window.__navFilterCleanup?.();
+  const cleanups = Array.from(document.querySelectorAll('[data-nav-shell]'), bindNavFilter);
+  window.__navFilterCleanup = () => cleanups.forEach((cleanup) => cleanup?.());
+}
+
+function bindNavFilter(shell) {
+  const disclosure = shell.closest('[data-nav-disclosure]');
   const input = shell.querySelector('[data-nav-filter-input]');
   const clearButton = shell.querySelector('[data-nav-filter-clear]');
   const emptyState = shell.querySelector('[data-nav-filter-empty]');
   const groups = Array.from(shell.querySelectorAll('.side-nav__group'));
   const items = Array.from(shell.querySelectorAll('.side-nav__item'));
   if (!input || !groups.length || !items.length) return;
-
-  const restoreChildrenState = () => {
-    shell.querySelectorAll('[data-nav-children]').forEach((childBlock) => {
-      if (childBlock.dataset.navFilterHiddenBase === undefined) return;
-      childBlock.hidden = childBlock.dataset.navFilterHiddenBase === 'true';
-      delete childBlock.dataset.navFilterHiddenBase;
-    });
-  };
+  shell.querySelector('[data-nav-filter-block]').hidden = false;
 
   const applyFilter = () => {
     const query = (input.value || '').trim().toLowerCase();
     if (clearButton) clearButton.hidden = !query;
-    if (!query) {
-      items.forEach((item) => {
-        item.hidden = false;
-      });
-      groups.forEach((group) => {
-        group.hidden = false;
-      });
-      restoreChildrenState();
-      if (emptyState) emptyState.hidden = true;
-      syncNavigationState();
-      return;
-    }
-
     let visibleCount = 0;
     items.forEach((item) => {
       const linkText = item.querySelector('.side-nav__link')?.textContent || '';
       const childText = Array.from(item.querySelectorAll('.side-nav__child'))
         .map((node) => node.textContent || '')
-        .join(' ');
+        .join(' ').toLowerCase();
       const haystack = `${linkText} ${childText}`.toLowerCase();
       const matched = haystack.includes(query);
       item.hidden = !matched;
@@ -2782,12 +2797,8 @@ function initNavFilter() {
       }
       const childBlock = item.querySelector('[data-nav-children]');
       if (!childBlock) return;
-      if (childBlock.dataset.navFilterHiddenBase === undefined) {
-        childBlock.dataset.navFilterHiddenBase = childBlock.hidden ? 'true' : 'false';
-      }
-      if (matched && childText.toLowerCase().includes(query)) {
-        childBlock.hidden = false;
-      }
+      const isCurrent = Boolean(item.querySelector('[aria-current="page"]'));
+      childBlock.hidden = query ? !matched || (!isCurrent && !childText.includes(query)) : !isCurrent;
     });
 
     groups.forEach((group) => {
@@ -2814,26 +2825,24 @@ function initNavFilter() {
   };
 
   const onDocumentKeydown = (event) => {
+    if (!(disclosure || shell).getClientRects().length) return;
     const active = document.activeElement;
     const typing = isTextInputLike(active);
     const isHotkey = (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k';
-    if (isHotkey) {
+    const isSlash = event.key === '/' && !typing && !event.altKey && !event.ctrlKey && !event.metaKey;
+    if (isHotkey || isSlash) {
       event.preventDefault();
+      if (disclosure) disclosure.open = true;
       input.focus();
-      input.select();
+      if (isHotkey) input.select();
       return;
     }
-    if (event.key === '/' && !typing && !event.altKey && !event.ctrlKey && !event.metaKey) {
-      event.preventDefault();
-      input.focus();
-      return;
-    }
-    if (event.key === 'Escape' && active === input) {
-      if (input.value) {
-        clearFilter();
-      } else {
-        input.blur();
-      }
+    if (event.key !== 'Escape') return;
+    if (active === input && input.value) {
+      clearFilter();
+    } else if (disclosure?.open && disclosure.contains(active)) {
+      disclosure.open = false;
+      disclosure.querySelector('summary')?.focus();
     }
   };
 
@@ -2844,7 +2853,7 @@ function initNavFilter() {
   document.addEventListener('keydown', onDocumentKeydown);
   applyFilter();
 
-  window.__navFilterCleanup = () => {
+  return () => {
     input.removeEventListener('input', onInput);
     if (clearButton) {
       clearButton.removeEventListener('click', onClear);
@@ -3011,58 +3020,6 @@ function initInstallWizard(root) {
   syncFromHash();
 }
 
-function syncNavigationState() {
-  const items = Array.from(document.querySelectorAll('[data-nav-section]'));
-  if (!items.length) return;
-  const path = window.location.pathname;
-  let activeKey = '';
-  let bestLength = -1;
-
-  for (const item of items) {
-    const key = item.dataset.navSection || '';
-    const exact = item.dataset.navExact === 'true';
-    const matchPath = item.dataset.navPath || '';
-    const prefix = item.dataset.navPrefix || '';
-    if (exact && matchPath && path === matchPath) {
-      activeKey = key;
-      bestLength = matchPath.length;
-      break;
-    }
-    if (!exact && prefix && path.startsWith(prefix) && prefix.length > bestLength) {
-      activeKey = key;
-      bestLength = prefix.length;
-    }
-  }
-
-  if (activeKey) {
-    document.body.dataset.section = activeKey;
-  } else {
-    delete document.body.dataset.section;
-  }
-
-  items.forEach((item) => {
-    const isActive = item.dataset.navSection === activeKey;
-    item.classList.toggle('is-active', isActive);
-    const link = item.querySelector('[data-nav-link]');
-    if (!link) return;
-    if (isActive) {
-      link.setAttribute('aria-current', 'page');
-    } else {
-      link.removeAttribute('aria-current');
-    }
-  });
-
-  const childBlocks = Array.from(document.querySelectorAll('[data-nav-children]'));
-  childBlocks.forEach((block) => {
-    block.hidden = block.dataset.navChildren !== activeKey;
-  });
-
-  const contextLinks = Array.from(document.querySelectorAll('[data-quick-section]'));
-  contextLinks.forEach((link) => {
-    link.hidden = link.dataset.quickSection !== activeKey;
-  });
-}
-
 function setComposePanelState(panel, { open, focus = false } = {}) {
   if (!panel) return;
   const toggle = panel.querySelector('[data-compose-toggle]');
@@ -3167,7 +3124,7 @@ function isHtmlResponse(response) {
   applyUiSettings(readUiSettings());
   initInstallWizard(root);
   syncPageMeta();
-  syncNavigationState();
+  syncPageNavigation();
   applyPageLayout();
   initUiSettingsPanel();
   initNavFilter();
@@ -3180,9 +3137,11 @@ function isHtmlResponse(response) {
   document.addEventListener('click', async (event) => {
     const anchor = event.target.closest('a[data-partial]');
     if (!anchor) return;
+    if (event.defaultPrevented || event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (anchor.hasAttribute('target') || anchor.hasAttribute('download')) return;
     if (!isPartialNavigationEnabled()) return;
     const url = anchor.href;
-    if (!url.startsWith(window.location.origin)) return;
+    if (anchor.origin !== window.location.origin) return;
     event.preventDefault();
     setAppBusy(true);
     try {
@@ -3197,7 +3156,7 @@ function isHtmlResponse(response) {
       applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
-      syncNavigationState();
+      syncPageNavigation();
       applyPageLayout();
       initUiSettingsPanel();
       initNavFilter();
@@ -3206,7 +3165,9 @@ function isHtmlResponse(response) {
       initStickyComposerAutoCollapse();
       initPressureWorkspace();
       syncBusyIndicator();
-      scrollToHash(url);
+      const disclosure = document.querySelector('[data-nav-disclosure]');
+      if (disclosure) disclosure.open = false;
+      focusPageDestination(root, url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
@@ -3307,7 +3268,7 @@ function isHtmlResponse(response) {
       applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
-      syncNavigationState();
+      syncPageNavigation();
       applyPageLayout();
       initUiSettingsPanel();
       initNavFilter();
@@ -3316,7 +3277,7 @@ function isHtmlResponse(response) {
       initStickyComposerAutoCollapse();
       initPressureWorkspace();
       syncBusyIndicator();
-      scrollToHash(url);
+      focusPageDestination(root, url);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
