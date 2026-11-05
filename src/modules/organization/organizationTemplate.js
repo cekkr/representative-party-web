@@ -319,7 +319,7 @@ export function renderPressureInbox(cases, selectedId) {
       return `
         <a
           class="pressure-case${active ? ' is-active' : ''}"
-          href="/organization?case=${encodeURIComponent(entry.id)}#pressure-focus"
+          href="/organization?view=preview&amp;case=${encodeURIComponent(entry.id)}#pressure-focus"
           data-partial
           ${active ? 'aria-current="true"' : ''}
         >
@@ -382,7 +382,7 @@ export function renderLayerPanels(selected, modules = {}, { canConfigure = false
             <p class="eyebrow">${escapeHtml(layer.shortLabel)} layer</p>
             <h3>${escapeHtml(layer.label)}</h3>
           </div>
-          <span class="pill ${enabled ? '' : 'ghost'}">${enabled ? 'Enabled' : 'Template preview'}</span>
+          <span class="pill ghost">Template preview</span>
         </div>
         <p class="muted small">${escapeHtml(layer.description)}</p>
         ${previewNote}

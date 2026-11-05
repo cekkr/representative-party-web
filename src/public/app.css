@@ -1243,6 +1243,15 @@ body[data-composer-mode="on"] .composer-tool__panel {
   padding-right: 0.25rem;
 }
 
+.page-grid--organization {
+  overflow-wrap: anywhere;
+}
+
+.page-grid--organization .page-aside {
+  min-width: 0;
+  order: 0;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -3808,12 +3817,12 @@ code {
     border-bottom: 1px solid var(--border);
   }
 
-  .pressure-case-list {
+  .pressure-board__inbox .pressure-case-list {
     grid-template-columns: repeat(3, minmax(220px, 1fr));
     overflow-x: auto;
   }
 
-  .pressure-case {
+  .pressure-board__inbox .pressure-case {
     border-right: 1px solid hsl(var(--hairline-hsl) / 0.14);
   }
 

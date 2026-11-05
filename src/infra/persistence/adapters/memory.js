@@ -48,6 +48,10 @@ class MemoryStateStore {
     this._data.discussions = clone(entries || []);
   }
 
+  async saveOrganizationCases(entries) {
+    this._data.organizationCases = clone(entries);
+  }
+
   async savePetitions(entries) {
     this._data.petitions = clone(entries || []);
   }

@@ -9,7 +9,7 @@ const MAX_SUMMARIES = 200;
 const MAX_ENTRY_DIGESTS = 120;
 
 export function buildTransactionsPayload(state, { limit = 100 } = {}) {
-  if (!state?.transactions || state.transactions.length === 0) return null;
+  if (!state?.transactions?.some((entry) => !entry.providerLocal)) return null;
   const envelope = exportTransactionsEnvelope(state, { limit });
   return envelope ? { envelope } : null;
 }

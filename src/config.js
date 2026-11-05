@@ -79,6 +79,7 @@ export const FILES = {
   sessions: join(PATHS.DATA_ROOT, 'sessions.json'),
   peers: join(PATHS.DATA_ROOT, 'peers.json'),
   discussions: join(PATHS.DATA_ROOT, 'discussions.json'),
+  organizationCases: join(PATHS.DATA_ROOT, 'organization-cases.json'),
   petitions: join(PATHS.DATA_ROOT, 'petitions.json'),
   signatures: join(PATHS.DATA_ROOT, 'signatures.json'),
   votes: join(PATHS.DATA_ROOT, 'votes.json'),

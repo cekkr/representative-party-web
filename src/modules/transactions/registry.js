@@ -27,16 +27,19 @@ export async function logTransaction(state, entry = {}) {
     digest,
     validationStatus: entry.validationStatus || 'validated',
     createdAt: entry.createdAt || now,
+    ...(entry.providerLocal ? { providerLocal: true } : {}),
   });
-  state.transactions = [stamped, ...(state.transactions || [])].slice(0, 500);
+  const previous = state.transactions || [];
+  const existing = entry.id && previous.find((item) => item.id === entry.id);
+  if (!existing) state.transactions = [stamped, ...previous].slice(0, 500);
   await persistTransactions(state);
-  return stamped;
+  return existing || stamped;
 }
 
-export function listTransactions(state, { type, limit = 50 } = {}) {
-  const filtered = filterVisibleEntries(state.transactions || [], state);
-  const narrowed = type ? filtered.filter((t) => t.type === type) : filtered;
-  return narrowed.slice(0, limit);
+export function listTransactions(state, { type, limit = 50, includeProviderLocal = false } = {}) {
+  return filterVisibleEntries(state.transactions, state, (entry) =>
+    (includeProviderLocal || !entry.providerLocal) && (!type || entry.type === type)
+  ).slice(0, limit);
 }
 
 export function exportTransactionsEnvelope(state, { limit = 100 } = {}) {

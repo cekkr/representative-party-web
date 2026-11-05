@@ -47,6 +47,11 @@ export async function persistDiscussions(state) {
   await state.store.saveDiscussions(state.discussions);
 }
 
+export async function persistOrganizationCases(state, cases) {
+  await state.store.saveOrganizationCases(cases);
+  state.organizationCases = cases;
+}
+
 export async function persistPetitions(state) {
   await state.store.savePetitions(state.petitions);
 }
@@ -132,6 +137,7 @@ function hydrateState(data) {
     sessions: new Map(data.sessions.map((session) => [session.id, session])),
     peers: new Set(data.peers),
     discussions: data.discussions,
+    organizationCases: data.organizationCases || [],
     petitions: data.petitions,
     signatures: data.signatures,
     votes: data.votes,

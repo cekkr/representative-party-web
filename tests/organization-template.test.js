@@ -43,12 +43,12 @@ test('organization template models protected voice and independently layered pre
   assert.match(panels, /Template preview/);
 });
 
-test('organization coordination route renders the original project reference as a live template', { timeout: 30000 }, async (t) => {
+test('organization coordination route renders the workspace preview separately from live cases', { timeout: 30000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
   t.after(async () => server.stop());
 
-  const response = await fetch(`${server.baseUrl}/organization`);
+  const response = await fetch(`${server.baseUrl}/organization?view=preview`);
   assert.equal(response.status, 200);
   const html = await response.text();
   assert.match(html, /Coordination workspace/);
@@ -59,4 +59,7 @@ test('organization coordination route renders the original project reference as 
   assert.match(html, /Organizational mirror/);
   assert.match(html, /pressure-layer-protection/);
   assert.doesNotMatch(html, /PersonalPressure\.md/);
+  const live = await fetch(`${server.baseUrl}/organization`);
+  assert.equal(live.status, 200);
+  assert.doesNotMatch(await live.text(), /Illustrative case data/);
 });

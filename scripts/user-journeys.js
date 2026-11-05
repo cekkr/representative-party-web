@@ -491,7 +491,7 @@ async function journeyOrganization(browser) {
   console.log('\n— organization: read a case and switch layers');
   const nadia = await member(browser, 'nadia');
 
-  await visit(nadia, '/organization');
+  await visit(nadia, '/organization?view=preview');
   await expectText(nadia, 'Night medication deliveries', 'the focused case opens on its source message');
   await shot(nadia, 'organization-case', 'The focused case opens on the source message, with the case lens beside it.', { focus: '.pressure-board' });
 

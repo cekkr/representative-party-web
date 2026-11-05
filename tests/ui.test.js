@@ -1516,3 +1516,46 @@ test('compose forms stay reachable at a short viewport', { timeout: 60000 }, asy
     await page.close();
   }
 });
+
+test('organization case details stay ahead of the queue and fit a phone viewport', { timeout: 30000 }, async (t) => {
+  const port = await getAvailablePort();
+  const server = await startServer({ port, dataAdapter: 'memory' });
+  t.after(async () => server.stop());
+
+  const { baseUrl } = server;
+  const member = await createVerifiedSession(baseUrl, { pidHash: 'n-calabrese' });
+  await postForm(baseUrl + '/discussion', {
+    topic: 'Emergency Department / Admissions',
+    content: 'At 03:40 we have 11 patients waiting for a bed, four for more than 24 hours.',
+    evidenceLinks: 'https://example.org/asl-val-sereno/admissions-flow-and-weekend-bed-availability',
+  }, member);
+  const discussion = await fetchText(baseUrl + '/discussion', { headers: { Cookie: member.cookie } });
+  const source = discussion.text.match(/href="\/organization\?source=([^"]+)"/);
+  assert.ok(source);
+  const opened = await postForm(baseUrl + '/organization', {
+    intent: 'promote', sourceId: source[1], voiceType: 'need',
+    summary: 'Weekend boarding in the Emergency Department',
+    consequence: 'Triage staff must reassess patients while they wait for admission.',
+  }, member);
+  assert.equal(opened.status, 200);
+
+  const browser = await puppeteer.launch({
+    headless: 'new',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  t.after(async () => browser.close());
+
+  const page = await browser.newPage();
+  await setSessionCookie(page, baseUrl, member.sessionId);
+  await page.setViewport({ width: 390, height: 844 });
+  await page.setJavaScriptEnabled(false);
+  await page.goto(opened.url, { waitUntil: 'load' });
+  const layout = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    caseTop: document.querySelector('#organization-case-work').getBoundingClientRect().top,
+    queueTop: document.querySelector('#organization-case-queue').getBoundingClientRect().top,
+  }));
+  assert.ok(layout.scrollWidth <= layout.width, 'the case and queue fit the viewport');
+  assert.ok(layout.caseTop < layout.queueTop, 'the case precedes its queue');
+});

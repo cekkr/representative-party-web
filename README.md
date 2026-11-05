@@ -4,7 +4,7 @@
 
 A **communication-first modular organization kernel** that can begin as shared messaging and grow into protected voice, responsibility, hierarchy, authority, resource, sector, pressure-learning, civic-governance, and federation workflows.
 
-This repository is a Node.js SSR application that starts as a usable email/discussion + notification workspace, then lets an organization progressively enable higher‑stakes modules without adopting one fixed operating model. The former party-centric product name is retired; **Party Circle** remains an optional civic policy bundle. Its identity layer can enforce **one natural person = one voice** **without storing raw PII** when that bundle is enabled.
+This repository is a Node.js SSR application that starts as a usable discussion, forum, and notification workspace, then lets an organization progressively enable higher‑stakes modules without adopting one fixed operating model. The former party-centric product name is retired; **Party Circle** remains an optional civic policy bundle. Its identity layer can enforce **one natural person = one voice** **without storing raw PII** when that bundle is enabled.
 
 > **Status / intent**
 > Practical scaffold for pilots, internal deployments, and research‑grade iteration. Some protocols (OIDC4VP, ActivityPub, federation hardening) are present as scaffolding and will evolve — see `ROADMAP.md`.
@@ -82,7 +82,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 ## Highlights
 
 - **Messaging‑first kernel**: discussion + forum + notifications work alone, with evidence/citation links supported on discussion notes and forum comments.
-- **Organization pressure workspace**: `/organization` demonstrates email-first intake, needs/concerns/advice, protected visibility, responsibilities, formal-vs-actual structure, explicit powers, funds, sectors, mediation, aggregate pressure dynamics, and impact learning as independent layers.
+- **Organization pressure workspace** opens a case from an attributed discussion post, records an acknowledgement and review date, and keeps the original post and evidence visible. An illustrative workspace shows the planned email, protected voice, and advanced layers.
 - **Natural‑person exclusion principle (optional)**: a Circle can require verified natural persons (no org/bot/service accounts holding handles).
 - **Blinded uniqueness ledger**: prevent duplicate participation without retaining raw PID/PII.
 - **Provider-blind option (scaffold)**: `/admin` policy fields for observe/strict, ring registry gossip, and ringSignature placeholders for votes/transactions; issuer escrow + mixnet transport planned.
@@ -126,8 +126,9 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - SSR pages + partial‑HTML navigation (fast, indexable, minimal JS)
 
 ### 2) Add organization layers when they earn their place
-- Protected voice modes for needs, constructive concerns, advice, resource consultations, and disputes
-- Responsibilities, contextual hierarchies, explicit authority, financial context, sectors, mediation, pressure dynamics, and impact review
+With Coordination enabled, signed-in users with posting access can choose **Open a case** on an attributed post in the shared discussion feed. Choose a voice type, explain the consequence, and then record an acknowledgement and review date in the case workspace. The queue is searchable and stays on the provider.
+
+Open the workspace preview to explore the planned email intake, protected voice, responsibilities, hierarchy, authority, funds, sectors, mediation, pressure analysis, and impact review.
 
 ### 3) Add civic “Circle” guarantees when ready
 - OIDC4VP verification scaffold (EUDI wallet flow)
@@ -249,7 +250,7 @@ npm run db:check
 ### Useful endpoints
 
 - `/` landing, `/health` metrics
-- `/organization` communication-first organization pressure template and organizational mirror
+- `/organization` for the case workspace and searchable queue, with POST actions to open and acknowledge cases. `/organization?view=preview` for the illustrative layer views.
 - `/auth/eudi` start verification, `/auth/callback` return
 - `/discussion`, `/forum`, `/notifications`, `/delegation`
 - `/profile` (provider‑local profile attributes editor)
@@ -281,7 +282,10 @@ npm run db:check
 Optional modules are organized in four lanes so you can deploy only the layer you need: `Organization operations`, `P2P social/community`, `Civic governance`, and `Federation/resilience`.
 
 ### Organization operations
-- **Coordination workspace**: familiar message intake, bounded replies, manual case promotion, and searchable history.
+- **Coordination workspace** opens cases from attributed shared discussion posts, records acknowledgements and review dates, and searches provider-local history.
+
+The following layers are available as previews.
+
 - **Protected voice**: permission-aware attributed, role-visible, department-visible, and protected intake modes.
 - **Responsibilities and hierarchy**: outcome owners, action commitments, contextual escalation, and formal-vs-actual working flow.
 - **Authority and funds**: explicit decision rights plus visible resource constraints, accountable decisions, execution, and reconciliation.
@@ -464,6 +468,7 @@ Provider settings are persisted in `src/data/settings.json` and can be edited vi
 - **Auth & sessions:** `/auth/eudi` issues offers; `/auth/callback` finalizes through `src/modules/identity/*` (blinded PID hash + ActivityPub actor) and `src/modules/auth/http/auth.js`. Pending sessions can be resumed with `?session={id}`.
 - **Uniqueness Ledger + circle sync:** ledger/sessions/peers persisted in `src/data/`; `/circle/gossip` ingests peer hashes + capability hints, `/circle/ledger` exports, `/circle/peers` manages hints. Signing/verification lives in `src/modules/circle/federation.js`.
 - **Policy gates:** role-aware checks (person/moderator/delegate + banned flag) in `src/modules/circle/policy.js`; surfaced in `/health` and UI. Extensions can decorate/override decisions.
+- **Coordination** uses `src/modules/organization/cases.js` for the case envelope. Cases link to their source discussion by id and retain its evidence by reference. Case actions appear in the provider admin transaction view.
 - **Discussion + forum:** `/discussion` and `/forum` controllers render SSR pages; posts/comments are persisted via `src/infra/persistence/storage.js`; topic classification hook runs per post via `src/modules/topics/classification.js`.
 - **Social feed & follows:** `/social/*` handles short posts + replies + reshares driven by typed follows (circle/interest/info/alerts), plus optional photo/video uploads. Media stays provider-local, locks by default until viewers request access (view requests notify authors), and can be blocked after mass reports or manual review. Follow edges and micro-posts persist through `src/infra/persistence/storage.js`; the feed filter surfaces per-type counts so users can see coverage at a glance, and UX keeps this lane scoped to small talk/info so petitions/votes remain distinct.
 - **Petitions + votes:** `/petitions` drafts proposals with summary + optional full text + evidence summary/links; `/petitions/update` records collaborative revisions and version history; quorum moves proposals into discussion (or straight to vote when configured), and `/petitions/status` advances them to vote/closed. Signatures at `/petitions/sign`, discussion notes at `/petitions/comment` (stance tags + fact‑check requests + evidence/citation prompts), and `/petitions/vote` records one vote per person and emits a signed vote envelope (if signing keys set) from `src/modules/votes/voteEnvelope.js`; `/votes/ledger` exports, `/votes/gossip` ingests envelopes. The proposals page includes a discussion feed and stage filter with per-proposal anchors to jump between feed items and the list.
@@ -497,6 +502,7 @@ Defaults live under `src/data/`:
 
 - `ledger.json`, `sessions.json`, `peers.json`
 - `discussions.json`, `petitions.json`, `signatures.json`, `votes.json`, `delegations.json`, `notifications.json`
+- `organization-cases.json` after the first case is opened
 - `topics.json`, `groups.json`, `group-policies.json`, `group-elections.json`
 - `actors.json`
 - `social-follows.json`, `social-posts.json`, `social-media.json`

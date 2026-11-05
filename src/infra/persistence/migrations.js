@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 25;
+export const LATEST_SCHEMA_VERSION = 26;
 
 const MIGRATIONS = [
   {
@@ -663,6 +663,16 @@ const MIGRATIONS = [
         groupPolicies,
         discussions: (data.discussions || []).map(withRequests),
         petitions: (data.petitions || []).map(withRequests),
+      };
+    },
+  },
+  {
+    version: 26,
+    description: 'Initialize provider-local coordination cases without promoting existing messages.',
+    up(data) {
+      return {
+        ...data,
+        organizationCases: Array.isArray(data.organizationCases) ? data.organizationCases : [],
       };
     },
   },

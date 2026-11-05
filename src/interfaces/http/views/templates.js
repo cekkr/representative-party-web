@@ -43,6 +43,7 @@ const TEMPLATE_MODULES = {
   social: 'social',
   admin: 'admin',
   coordination: 'organization',
+  'organization-cases': 'organization',
 };
 
 export async function renderPage(templateName, data = {}, { wantsPartial = false, title = DEFAULT_PAGE_TITLE, state } = {}) {

@@ -27,6 +27,7 @@ export function renderDiscussionList(entries, state, options = {}) {
       const promotionNote = describePromotionTrail(entry);
       const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
       const promote = renderPromoteControl(entry, options);
+      const caseAction = options.caseAction?.(entry);
       const promotionRequests = renderPromotionRequestControls(entry, options, {
         action: '/discussion',
         idField: 'discussionId',
@@ -53,6 +54,7 @@ export function renderDiscussionList(entries, state, options = {}) {
           <div class="topic-body">
             <p>${escapeHtml(entry.content)}</p>
             ${evidenceBlock}
+            ${caseAction ? `<a class="pill ghost" href="${escapeHtml(caseAction.href)}" data-partial>${escapeHtml(caseAction.label)}</a>` : ''}
             ${promote}
             ${promotionRequests}
           </div>

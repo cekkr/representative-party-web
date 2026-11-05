@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, rename, rm } from 'node:fs/promises';
 import { dirname } from 'node:path';
 
 import { PATHS } from '../../../config.js';
@@ -8,6 +8,7 @@ const KEYS = [
   'sessions',
   'peers',
   'discussions',
+  'organizationCases',
   'petitions',
   'signatures',
   'votes',
@@ -40,6 +41,7 @@ class KeyValueStateStore {
     this.adapterId = 'kv';
     this.filename = filename;
     this.cache = null;
+    this.pendingWrite = Promise.resolve();
   }
 
   async prepare() {
@@ -62,13 +64,12 @@ class KeyValueStateStore {
   }
 
   async saveData(data) {
-    const store = this.cache || (await this.readStore());
-    const next = { ...store };
+    const entries = {};
     for (const key of KEYS) {
-      next[key] = data[key] ?? defaultForKey(key);
+      if (key === 'organizationCases' && !data.organizationCases?.length) continue;
+      entries[key] = data[key] ?? defaultForKey(key);
     }
-    this.cache = next;
-    await this.writeStore(next);
+    await this.saveEntries(entries);
   }
 
   async saveMeta(meta) {
@@ -89,6 +90,10 @@ class KeyValueStateStore {
 
   async saveDiscussions(entries) {
     await this.saveKey('discussions', entries);
+  }
+
+  async saveOrganizationCases(entries) {
+    await this.saveKey('organizationCases', entries);
   }
 
   async savePetitions(entries) {
@@ -168,10 +173,18 @@ class KeyValueStateStore {
   }
 
   async saveKey(key, value) {
-    const store = this.cache || (await this.readStore());
-    const next = { ...store, [key]: value };
-    this.cache = next;
-    await this.writeStore(next);
+    await this.saveEntries({ [key]: value });
+  }
+
+  saveEntries(entries) {
+    const write = this.pendingWrite.then(async () => {
+      const store = this.cache || (await this.readStore());
+      const next = { ...store, ...entries };
+      await this.writeStore(next);
+      this.cache = next;
+    });
+    this.pendingWrite = write.catch(() => {});
+    return write;
   }
 
   async readStore() {
@@ -187,7 +200,13 @@ class KeyValueStateStore {
   }
 
   async writeStore(store) {
-    await writeFile(this.filename, JSON.stringify(store, null, 2));
+    const pendingFile = this.filename + '.tmp';
+    try {
+      await writeFile(pendingFile, JSON.stringify(store, null, 2));
+      await rename(pendingFile, this.filename);
+    } finally {
+      await rm(pendingFile, { force: true });
+    }
   }
 }
 

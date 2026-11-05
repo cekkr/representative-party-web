@@ -3,6 +3,7 @@ const KEYS = [
   'sessions',
   'peers',
   'discussions',
+  'organizationCases',
   'petitions',
   'signatures',
   'votes',
@@ -67,7 +68,9 @@ class MysqlStateStore {
   }
 
   async saveData(data) {
-    const entries = KEYS.map((key) => [key, data[key] ?? defaultForKey(key)]);
+    const entries = KEYS
+      .filter((key) => key !== 'organizationCases' || data.organizationCases?.length)
+      .map((key) => [key, data[key] ?? defaultForKey(key)]);
     await this.writeManyJson(entries);
   }
 
@@ -89,6 +92,10 @@ class MysqlStateStore {
 
   async saveDiscussions(entries) {
     await this.writeJson('discussions', entries);
+  }
+
+  async saveOrganizationCases(entries) {
+    await this.writeJson('organizationCases', entries);
   }
 
   async savePetitions(entries) {

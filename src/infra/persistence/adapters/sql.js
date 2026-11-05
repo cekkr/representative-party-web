@@ -8,6 +8,7 @@ const KEYS = [
   'sessions',
   'peers',
   'discussions',
+  'organizationCases',
   'petitions',
   'signatures',
   'votes',
@@ -63,6 +64,7 @@ class SqlStateStore {
 
   async saveData(data) {
     for (const key of KEYS) {
+      if (key === 'organizationCases' && !data.organizationCases?.length) continue;
       await this.writeJson(key, data[key] || defaultForKey(key));
     }
   }
@@ -85,6 +87,10 @@ class SqlStateStore {
 
   async saveDiscussions(entries) {
     await this.writeJson('discussions', entries);
+  }
+
+  async saveOrganizationCases(entries) {
+    await this.writeJson('organizationCases', entries);
   }
 
   async savePetitions(entries) {

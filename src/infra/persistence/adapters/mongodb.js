@@ -3,6 +3,7 @@ const KEYS = [
   'sessions',
   'peers',
   'discussions',
+  'organizationCases',
   'petitions',
   'signatures',
   'votes',
@@ -78,6 +79,7 @@ class MongoStateStore {
   async saveData(data) {
     const ops = [];
     for (const key of KEYS) {
+      if (key === 'organizationCases' && !data.organizationCases?.length) continue;
       ops.push({
         updateOne: {
           filter: { _id: key },
@@ -108,6 +110,10 @@ class MongoStateStore {
 
   async saveDiscussions(entries) {
     await this.writeDoc('discussions', entries);
+  }
+
+  async saveOrganizationCases(entries) {
+    await this.writeDoc('organizationCases', entries);
   }
 
   async savePetitions(entries) {

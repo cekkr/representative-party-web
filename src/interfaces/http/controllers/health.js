@@ -23,6 +23,7 @@ export function renderHealth({ res, state }) {
   const uploadsCleanupEnabled = Number.isFinite(retentionHours) && retentionHours > 0;
   const uploadsCleanupScheduled =
     uploadsCleanupEnabled && Number.isFinite(intervalMinutes) && intervalMinutes > 0;
+  const publicTransactions = (state.transactions || []).filter((entry) => !entry.providerLocal);
   return sendJson(res, 200, {
     status: 'ok',
     ledger: state.uniquenessLedger.size,
@@ -74,9 +75,9 @@ export function renderHealth({ res, state }) {
     now: new Date().toISOString(),
     auditLog: (state.settings?.auditLog || []).slice(-10),
     transactions: {
-      count: state.transactions?.length || 0,
+      count: publicTransactions.length,
       summaries: filterVisibleEntries(state.transactionSummaries || [], state).length,
-      recent: (state.transactions || []).slice(0, 5).map((t) => ({ id: t.id, type: t.type, digest: t.digest, at: t.createdAt })),
+      recent: publicTransactions.slice(0, 5).map((t) => ({ id: t.id, type: t.type, digest: t.digest, at: t.createdAt })),
     },
     outbound: {
       deliveries: summarizeOutboundDeliveries(state),

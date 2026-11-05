@@ -1112,8 +1112,7 @@ leave 42 residents with one OSS. **B4.4** tests exactly that.
 The ASL could stop here and have gained something.
 
 **B1.3** the corroborating signals — `POST /discussion`, topic `pronto-soccorso` — **[drive]**
-→ the messaging kernel is live today even though the case workspace is a
-template, so the four weekends **exist as four real messages** from three
+→ the messaging kernel records four real messages from three
 different shifts:
 - `@n.calabrese` (Sat 21/02, `stance=concern`): the 03:40 email above, posted;
 - `@r.ferrara` (Sat 28/02): `Confirmed from Saturday's shift: 9 waiting at 02:00, median 17 hours. I had to move a trolley into the examination corridor.`
@@ -1140,6 +1139,19 @@ makes that gap visible (logged in `OPTIMIZATIONS.md`).
 **B2.2** the original email stays visible — **[fixture]**
 → Invariant 3: *the source is never rewritten.* Assert the `emailBody` still
 renders verbatim beside every added layer.
+
+**B2.3** `@r.ferrara` opens a Fundamental need case from the attributed
+`@n.calabrese` discussion post in **B1.3** — **[drive]**
+→ `POST /organization`, `intent=promote`. The first boarding post stays in
+the shared feed. The case renders the same author, text, and evidence from the
+source id. A repeated promotion opens the existing case.
+
+**B2.4** `@r.ferrara` records an acknowledgement and a review date —
+**[drive]**
+→ `POST /organization`, `intent=acknowledge`. The case records who acknowledged
+it and when to revisit it. The acknowledgement and source survive a restart.
+The end-to-end assertions live in `tests/organization-cases.test.js` and use a
+separate provider store.
 
 ### B3 — Safe voice
 
@@ -1303,16 +1315,14 @@ be written:
   layers, and the messaging kernel (`/discussion`, `/forum`, `/notifications`,
   `/profile`) — which is where **B1.3**, **B1.4**, and **B5.3** live as real,
   replayable content today. Each toggle and message is a separate trace event.
-- **[fixture]** — everything on `/organization`. It renders from the hardcoded
-  `ORGANIZATION_TEMPLATE_CASES` constant. There is **no persistence and no
-  write path**: the only interactions are `?case=<id>` and layer tab switching.
-  Replacing those four cases with **B-1…B-4** is the single highest-value change
-  this document enables — the workspace would then show a recognisable ASL
-  instead of a generic care cooperative. Preloading those cases and checking
-  the final page is a render test, not a replay of **B1–B6**.
-- **[design]** — case promotion, protected relay, commitments, authority grants,
-  funds records, mediation, impact reviews. Module-owned records, created lazily
-  when a layer is enabled, per the canonical case contract. Not built.
+- **[drive]** — the attributed discussion case path at `/organization`
+  (**B2.3**, **B2.4**) with case search and durable review dates.
+- **[fixture]** — `/organization?view=preview` renders the illustrative inbox
+  and layers from `ORGANIZATION_TEMPLATE_CASES`. Replacing the older examples
+  with **B-1…B-4** remains on the preview backlog.
+- **[design]** — inbound email promotion, timed outbound response boundaries,
+  protected relay, commitments, authority grants, funds records, mediation,
+  and impact reviews.
 
 ### A vocabulary drift (physics metaphor retired)
 
@@ -1386,6 +1396,7 @@ the doc keeps those as case descriptors.
 | Module toggles / adoption staircase | A.0 | B3.4, B4.7, B4.1–B4.6, B6.2–B6.1 |
 | Corroborating signals behind volume | — | B1.3 |
 | Acknowledgement with stated boundary | — | B1.4 |
+| Discussion case promotion and recorded review date | — | B2.3–B2.4 |
 | Protected voice + reveal policy | — | B3.4, B3.1–B3.2 |
 | Whistleblowing boundary (D.lgs. 24/2023) | — | B3.3 |
 | Responsibilities vs authority | — | B4.1, B4.3 |

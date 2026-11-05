@@ -118,11 +118,9 @@ const CHILD_SECTIONS = {
     { label: 'Operations', href: '/#home-ops', partial: true },
   ],
   coordination: [
-    { label: 'Pressure inbox', href: '/organization#pressure-inbox', partial: true },
-    { label: 'Focused case', href: '/organization#pressure-focus', partial: true },
-    { label: 'Module layers', href: '/organization#pressure-layers', partial: true },
-    { label: 'Pressure map', href: '/organization#pressure-map', partial: true },
-    { label: 'Operating map', href: '/organization#operating-map', partial: true },
+    { label: 'Case workspace', href: '/organization#organization-case-work', partial: true },
+    { label: 'Case queue', href: '/organization#organization-case-queue', partial: true },
+    { label: 'Workspace preview', href: '/organization?view=preview#pressure-inbox', partial: true },
   ],
   social: [
     { label: 'New post', href: '/social/feed?compose=post#social-compose', partial: true },

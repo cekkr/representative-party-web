@@ -176,7 +176,7 @@ than a control — that is what the label pass removed.
 | forum | `forum-threads`, `forum-compose` | **[done]** both |
 | discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics` | **[done]** all 4 |
 | petitions | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` | **[done]** all 5 |
-| organization | `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[done]** all 4 |
+| organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `operating-map`, `pressure-map`, `pressure-inbox` | **[done]** all 6 |
 | delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-recommendations`, `delegation-effective`, `delegation-set`, `delegation-current` | **[done]** all 7 |
 | delegates | `delegate-directory`, `delegate-directory-list`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` | **[done]** all 7 |
 | governance | `governance-overview`, `governance-proposals` | **[done]** both |
@@ -221,7 +221,8 @@ rail. Content leads — a compose form never sits above the feed it contributes 
 | `/forum` | [forum.html](src/modules/forum/templates/forum.html) | main: threads · aside: compose | thread list rows + right compose rail | **[done]** exemplar |
 | `/discussion` | [discussion.html](src/modules/discussion/templates/discussion.html) + partials | main: feed · aside: compose/filters/topics | modern list rows + right rail | **[done]** |
 | `/petitions` | [petitions.html](src/modules/petitions/templates/petitions.html) + partials | main: active proposals/deliberations · aside: compose/stage filter/delegates | proposal cards, stage chips, argument map | **[done]** structure; argument-map polish outstanding |
-| `/organization` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → pressure inbox → organizational mirror → operating map | inbox-first: source message, layer tabs, operating map, pressure views | **[done]** hero demoted to a strip; inbox above the fold |
+| `/organization` | [organization-cases.html](src/modules/organization/templates/organization-cases.html) | main: case details, source post, acknowledgement or promotion form · aside: searchable queue and preview link | attributed source card with evidence, voice type and review date | **[done]** live case workflow |
+| `/organization?view=preview` | [coordination.html](src/modules/organization/templates/coordination.html) + partials | workspace strip → illustrative pressure inbox → organizational mirror → operating map | source email fixture, layer tabs, operating map, pressure views | **[done]** labelled preview |
 | `/governance` | [governance.html](src/modules/governance/templates/governance.html) | main: constitution → change proposals · aside: propose a change | settings cards + change-proposal list | **[done]** |
 | `/delegation` | [delegation.html](src/modules/delegation/templates/delegation.html) | main: overview → delegated-ballot inbox → your delegated ballots → current → effective chains · aside: set a delegate/recommendations | delegate cards + chain view + ballot inbox | **[done]** |
 | `/delegates` | [delegate-directory.html](src/modules/delegates/templates/delegate-directory.html) / [profile](src/modules/delegates/templates/delegate-profile.html) | directory — main: people list · aside: search. profile — main: summary/coverage/votes/activity · aside: endorsements | searchable people grid + profile dashboard | **[done]** |
@@ -255,6 +256,8 @@ template-hygiene item.
   `@container shell-main (max-width: 700px)`. A viewport-keyed breakpoint ignored the
   ~240px side-nav and left the main column at ~160px on a ~850px screen while the aside
   kept its full 360px. The old `@media (max-width: 720px)` rule stays as a fallback.
+- On the live case workspace, the source and case details precede the queue when
+  the grid collapses. `tests/ui.test.js` checks the order and width at 390px.
 
 ---
 
@@ -287,7 +290,8 @@ template-hygiene item.
 | Governance history reads as decisions ("Approved — …", proposer vs decider) instead of event types | **[done]** |
 | Cachet / delegation-topic labels in the member's casing (`Healthcare / Waiting lists`, not the normalised key) | **[todo]** (see OPTIMIZATIONS) |
 | Proposal Category field (compose + draft edit) with topic datalist | **[done]** |
-| Favicon (kills `/favicon.ico` 404) | **[todo]** (see OPTIMIZATIONS) |
+| Shared self-hosted favicon with a `/favicon.ico` fallback | **[done]** |
+| Open an attributed case from Discussion, acknowledge with a review date, and search the case queue | **[done]** |
 | Mobile nav: accessible disclosure instead of height cap | **[todo]** (see OPTIMIZATIONS) |
 
 ---
@@ -309,8 +313,7 @@ template-hygiene item.
    typography.
 6. **Composer palette** — component insert/delete/wrap + richer property groups (already a
    ROADMAP Phase-2 item).
-7. **Chrome fixes** — favicon; admin composer-bar/status-strip overlap on narrow widths;
-   mobile side-nav disclosure.
+7. **Chrome fixes** — admin composer-bar/status-strip overlap on narrow widths and mobile side-nav disclosure. The favicon is shipped.
 8. **Rename the rotated section keys** in `profile.html` / `delegate-profile.html` behind a
    migration for stored `hiddenSections` and Composer layouts (§5).
 

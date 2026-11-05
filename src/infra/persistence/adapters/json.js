@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 
 import { FILES, PATHS } from '../../../config.js';
 
@@ -21,6 +21,7 @@ class JsonStateStore {
       sessions: await this.readJson(FILES.sessions, []),
       peers: await this.readJson(FILES.peers, []),
       discussions: await this.readJson(FILES.discussions, []),
+      organizationCases: await this.readJson(FILES.organizationCases, []),
       petitions: await this.readJson(FILES.petitions, []),
       signatures: await this.readJson(FILES.signatures, []),
       votes: await this.readJson(FILES.votes, []),
@@ -52,6 +53,7 @@ class JsonStateStore {
     await this.writeJson(FILES.sessions, data.sessions || []);
     await this.writeJson(FILES.peers, data.peers || []);
     await this.writeJson(FILES.discussions, data.discussions || []);
+    if (data.organizationCases?.length) await this.saveOrganizationCases(data.organizationCases);
     await this.writeJson(FILES.petitions, data.petitions || []);
     await this.writeJson(FILES.signatures, data.signatures || []);
     await this.writeJson(FILES.votes, data.votes || []);
@@ -91,6 +93,16 @@ class JsonStateStore {
 
   async saveDiscussions(entries) {
     await this.writeJson(FILES.discussions, entries);
+  }
+
+  async saveOrganizationCases(entries) {
+    const pendingFile = FILES.organizationCases + '.tmp';
+    try {
+      await this.writeJson(pendingFile, entries);
+      await rename(pendingFile, FILES.organizationCases);
+    } finally {
+      await rm(pendingFile, { force: true });
+    }
   }
 
   async savePetitions(entries) {

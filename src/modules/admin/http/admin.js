@@ -1690,7 +1690,7 @@ function buildAdminViewModel(
   const ledgerHash = computeLedgerHash([...state.uniquenessLedger]);
   const gossipIngest = isGossipEnabled(replicationProfile) ? 'on' : 'off';
   const circleKeyCallout = buildCircleKeyCallout(state);
-  const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8 }));
+  const transactionsList = renderTransactionsList(listTransactions(state, { limit: 8, includeProviderLocal: true }));
   const transactionSummariesList = renderTransactionSummariesList(
     filterVisibleEntries(state.transactionSummaries || [], state).slice(0, 8),
   );

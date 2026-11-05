@@ -21,6 +21,8 @@ import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../../../interfaces/http/views/topicHelpers.js';
 import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
+import { isModuleEnabled } from '../../circle/modules.js';
+import { isCaseSource } from '../../organization/cases.js';
 import {
   listPostableGroupLanes,
   listReadableGroupLanes,
@@ -293,6 +295,17 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
       : baseEntries.filter((entry) => normalizeTopicKey(entry.topic) === topicFilterKey);
 
   const pageInfo = paginate(discussionEntries, { page: parsePage(url?.searchParams?.get('page')) });
+  let caseAction;
+  if (!activeGroupId && person?.pidHash && permission.allowed && isModuleEnabled(state, 'coordination')) {
+    const caseIds = new Map(state.organizationCases.map((entry) => [entry.sourceMessageId, entry.caseId]));
+    caseAction = (entry) => {
+      if (!isCaseSource(entry)) return null;
+      const caseId = caseIds.get(entry.id);
+      return caseId
+        ? { href: `/organization?case=${encodeURIComponent(caseId)}`, label: 'View case' }
+        : { href: `/organization?source=${encodeURIComponent(entry.id)}`, label: 'Open a case' };
+    };
+  }
   const discussionPager = renderPager(pageInfo, {
     baseHref: '/discussion',
     query: { topic: topicFilterKey === 'all' ? '' : topicFilterKey, group: activeGroupId || '' },
@@ -334,6 +347,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
       }),
       discussionList: renderDiscussionList(pageInfo.items, state, {
         groupId: activeGroupId,
+        caseAction,
         promotable: (entry) => evaluatePromotion(state, person, { kind: 'discussion', entry }),
         requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'discussion', entry }),
         decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'discussion', entry }),
