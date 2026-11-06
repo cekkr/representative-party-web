@@ -365,7 +365,7 @@ async function journeyProposalToVote(browser) {
   await typeInto(nadia, '#petitions-compose textarea[name="impact"]', 'Night ward staff regain the full check window; pharmacy keeps its release batching.');
   await typeInto(nadia, '#petitions-compose input[name="quorum"]', '3');
   await submitNear(nadia, '#petitions-compose input[name="title"]');
-  const drafted = await expectText(nadia, 'night medication delivery sequence', 'proposal appears in the list after drafting');
+  const drafted = await expectText(nadia, 'night medication delivery sequence', 'drafting opens the proposal workspace');
   await shot(nadia, 'proposal-drafted', 'A member drafts a proposal with a structured outline (problem, action, impact).');
   if (!drafted) return null;
 
@@ -382,14 +382,15 @@ async function journeyProposalToVote(browser) {
   await clickText(nadia, 'button', 'Sign', { optional: true });
   for (const handle of ['tomas', 'ines', 'koen']) {
     const page = await member(browser, handle);
-    await visit(page, '/petitions');
+    await visit(page, `/petitions?proposal=${petitionId}`);
     await clickText(page, 'button', 'Sign', { optional: true });
   }
 
-  await visit(nadia, '/petitions');
+  await visit(nadia, `/petitions?proposal=${petitionId}`);
   await shot(nadia, 'proposal-signatures', 'Signatures accumulate toward quorum, which moves the proposal into discussion.', { focus: '[id^="petition-"]' });
 
   // Deliberate with a stance tag.
+  await visit(nadia, `/petitions?proposal=${petitionId}&view=discussion`);
   await selectOption(nadia, `select[name="stance"]`, 'support');
   await typeInto(nadia, `textarea[name="content"]`, 'Three shifts is enough to see the pattern without disrupting the rota.');
   await submitNear(nadia, `textarea[name="content"]`);
@@ -412,7 +413,7 @@ async function journeyVote(browser, petitionId) {
 
   // A plain member must not be able to open a vote on their own proposal.
   const nadia = await member(browser, 'nadia');
-  await visit(nadia, '/petitions');
+  await visit(nadia, `/petitions?proposal=${petitionId}`);
   const authorSeesModeration = await nadia.$('form[action="/petitions/status"]');
   if (authorSeesModeration) {
     record('a non-moderator author is offered the status/freeze control');
@@ -421,7 +422,7 @@ async function journeyVote(browser, petitionId) {
   }
 
   const mod = await moderator(browser);
-  await visit(mod, '/petitions');
+  await visit(mod, `/petitions?proposal=${petitionId}`);
   if (!(await selectOption(mod, 'form[action="/petitions/status"] select[name="status"]', 'vote'))) return;
   await clickText(mod, 'span', 'Confirm freeze', { optional: true });
   await shot(mod, 'proposal-freeze', 'A moderator must confirm the pre-vote draft freeze before the ballot opens.');
@@ -432,13 +433,13 @@ async function journeyVote(browser, petitionId) {
   // Members cast their ballots.
   for (const handle of ['nadia', 'tomas', 'ines']) {
     const page = await member(browser, handle);
-    await visit(page, '/petitions');
+    await visit(page, `/petitions?proposal=${petitionId}&view=ballot`);
     await selectOption(page, 'form[action="/petitions/vote"] select[name="choice"]', 'yes');
     await clickText(page, 'button', 'Vote', { optional: true });
   }
 
   const nadia2 = await member(browser, 'nadia');
-  await visit(nadia2, '/petitions');
+  await visit(nadia2, `/petitions?proposal=${petitionId}&view=ballot`);
   await expectText(nadia2, 'yes', 'the tally shows the recorded votes');
   await shot(nadia2, 'vote-cast', 'Members cast topic-scoped votes; the tally updates and each vote is a signed envelope.', { focus: '[id^="petition-"]' });
 }

@@ -9,7 +9,7 @@ import { getAvailablePort, startServer } from './helpers/server.js';
 
 async function extractFirstPetitionId(baseUrl) {
   const { text } = await fetchText(`${baseUrl}/petitions`);
-  const match = text.match(/name="petitionId" value="([^"]+)"/);
+  const match = text.match(/id="petition-([^"]+)"/);
   if (!match) {
     throw new Error('Failed to parse petitionId from petitions page');
   }

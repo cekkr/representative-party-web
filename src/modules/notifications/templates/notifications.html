@@ -1,18 +1,22 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Notifications</h1>
+    <p>{{unreadLabel}}</p>
+  </div>
+  <form class="cta-row" method="post" action="/notifications/read" data-enhance="notifications" {{markReadHidden}}>
+    <input type="hidden" name="page" value="{{pageNumber}}" />
+    <button class="ghost" type="submit">Mark all read</button>
+  </form>
+</header>
 <div class="page-grid page-grid--notifications">
   <div class="page-main">
     <section class="panel" data-composer-section="notifications-inbox" data-section-label="Alerts inbox">
-      <p class="eyebrow">Notifications</p>
-      <h2>Internal alerts</h2>
-      <p class="muted small is-verbose">Handle: {{personHandle}}</p>
-      <form class="cta-row" method="post" action="/notifications/read" data-enhance="notifications">
-        <button class="ghost" type="submit">Mark all read</button>
-      </form>
-      <div class="discussion-list">
-        {{notifications}}
-      </div>
+      <h2>Inbox</h2>
+      {{notifications}}
+      {{notificationsPager}}
     </section>
   </div>
-  <aside class="page-aside">
+  <aside class="page-aside" aria-label="Alert settings">
     {{preferencesPanel}}
   </aside>
 </div>

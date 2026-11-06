@@ -299,7 +299,7 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   await personPage.goto(`${server.baseUrl}/petitions?compose=proposal`, { waitUntil: 'networkidle0' });
   await personPage.type('input[name="title"]', 'UI Petition');
   await personPage.type('textarea[name="summary"]', 'Testing petition flow');
-  await personPage.click('form[action="/petitions"] button[type="submit"]');
+  await personPage.click('#petitions-compose form button[type="submit"]');
   await personPage.waitForFunction(() => document.body.textContent.includes('UI Petition'));
   const moderationForm = await personPage.$('form[action="/petitions/status"]');
   assert.equal(moderationForm, null);
@@ -307,7 +307,7 @@ test('UI respects roles, privileges, module toggles, and background styling', { 
   const moderatorPage = await moderatorContext.newPage();
   await configurePage(moderatorPage, server.baseUrl);
   await setSessionCookie(moderatorPage, server.baseUrl, moderatorSession.sessionId);
-  await moderatorPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await moderatorPage.goto(personPage.url(), { waitUntil: 'networkidle0' });
   await moderatorPage.waitForFunction(() => document.body.textContent.includes('UI Petition'));
   const moderatorForm = await moderatorPage.$('form[action="/petitions/status"]');
   assert.ok(moderatorForm);
@@ -1155,7 +1155,7 @@ test('UI notifications surface mentions and persist preferences', { timeout: 600
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
   await page.goto(`${server.baseUrl}/notifications`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => document.body.textContent.includes('Mention in proposal'));
+  await page.waitForFunction(() => document.body.textContent.includes('Mention in a proposal'));
 
   const initiallyChecked = await page.$eval('input[name="notifyProposalComments"]', (el) => el.checked);
   assert.equal(initiallyChecked, true);
@@ -1172,9 +1172,8 @@ test('UI notifications surface mentions and persist preferences', { timeout: 600
   const readResponse = page.waitForResponse((response) => response.url().endsWith('/notifications/read'));
   await page.click('form[action="/notifications/read"] button[type="submit"]');
   await readResponse;
-  await page.waitForFunction(() =>
-    Array.from(document.querySelectorAll('span.pill.ghost')).some((el) => el.textContent.trim() === 'read'),
-  );
+  await page.waitForFunction(() => document.querySelector('main h1 + p')?.textContent === '0 unread');
+  assert.equal(new URL(page.url()).pathname, '/notifications');
 });
 
 test('UI petition revisions and freeze state update', { timeout: 60000 }, async (t) => {
@@ -1191,7 +1190,7 @@ test('UI petition revisions and freeze state update', { timeout: 60000 }, async 
     { partial: true },
   );
 
-  await postForm(
+  const draft = await postForm(
     `${server.baseUrl}/petitions`,
     { title: 'Revision Petition', summary: 'Initial summary', body: 'Initial body' },
     { cookie: authorSession.cookie },
@@ -1206,7 +1205,7 @@ test('UI petition revisions and freeze state update', { timeout: 60000 }, async 
   const authorPage = await browser.newPage();
   await configurePage(authorPage, server.baseUrl);
   await setSessionCookie(authorPage, server.baseUrl, authorSession.sessionId);
-  await authorPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await authorPage.goto(draft.url, { waitUntil: 'networkidle0' });
 
   await authorPage.evaluate(() => {
     const details = Array.from(document.querySelectorAll('details.note')).find((node) =>
@@ -1232,7 +1231,7 @@ test('UI petition revisions and freeze state update', { timeout: 60000 }, async 
   const moderatorPage = await browser.newPage();
   await configurePage(moderatorPage, server.baseUrl);
   await setSessionCookie(moderatorPage, server.baseUrl, moderatorSession.sessionId);
-  await moderatorPage.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await moderatorPage.goto(draft.url, { waitUntil: 'networkidle0' });
 
   const statusForm = await moderatorPage.$('form[action="/petitions/status"]');
   assert.ok(statusForm);
@@ -1243,9 +1242,12 @@ test('UI petition revisions and freeze state update', { timeout: 60000 }, async 
   const applyButton = await statusForm.$('button[type="submit"]');
   await applyButton.click();
   await moderatorPage.waitForFunction(() => document.body.textContent.includes('Frozen proposal text'));
-  await moderatorPage.waitForFunction(() =>
-    document.body.textContent.includes('Draft editing closes once the vote stage opens'),
-  );
+  await moderatorPage.waitForSelector('nav[aria-label="Proposal sections"] [aria-current="page"][href*="view=ballot"]');
+  assert.equal(await moderatorPage.$('form[action="/petitions/update"]'), null);
+  await moderatorPage.click('a[href*="view=history#revision-"]');
+  await moderatorPage.waitForSelector('nav[aria-label="Proposal sections"] [aria-current="page"][href*="view=history"]');
+  const focused = await moderatorPage.evaluate(() => document.activeElement?.textContent);
+  assert.match(focused, /Revision used for the ballot/);
 });
 
 test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async (t) => {
@@ -1524,7 +1526,7 @@ test('UI petition discussion exposes evidence prompt (agent viewport)', { timeou
   t.after(async () => server.stop());
 
   const session = await createVerifiedSession(server.baseUrl, { pidHash: 'evidence-ui' });
-  await postForm(
+  const draft = await postForm(
     `${server.baseUrl}/petitions`,
     { title: 'Evidence UI', summary: 'Testing evidence prompt', body: '' },
     { cookie: session.cookie },
@@ -1539,21 +1541,21 @@ test('UI petition discussion exposes evidence prompt (agent viewport)', { timeou
   const page = await browser.newPage();
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, session.sessionId);
-  await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
-
-  await page.evaluate(() => {
-    const discussion = Array.from(document.querySelectorAll('details.note')).find((node) =>
-      node.querySelector('summary')?.textContent?.includes('Discussion'),
-    );
-    if (discussion) {
-      discussion.open = true;
-      discussion.scrollIntoView({ block: 'center' });
-    }
-  });
-  await new Promise((resolve) => setTimeout(resolve, 200));
+  await page.setJavaScriptEnabled(false);
+  await page.goto(draft.url, { waitUntil: 'networkidle0' });
+  const discussion = await page.$('nav[aria-label="Proposal sections"] a[href*="view=discussion"]');
+  await Promise.all([page.waitForNavigation(), discussion.click()]);
+  await page.$eval('#proposal-comment', (form) => form.scrollIntoView({ block: 'center' }));
 
   const snapshot = await captureViewport(page);
   assertSnapshot(snapshot, { target: { text: 'Evidence / citations' }, min: 1 });
+  await page.type('#proposal-comment textarea[name="content"]', 'Attach the published waiting-list report.');
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('#proposal-comment button[type="submit"]'),
+  ]);
+  assert.equal(new URL(page.url()).searchParams.get('view'), 'discussion');
+  assert.match(await page.$eval('#petitions-discussion', (panel) => panel.innerText), /Attach the published waiting-list report/);
 });
 
 // An expanded compose form is taller than a short viewport. Two layout choices break
@@ -1576,7 +1578,7 @@ test('compose forms stay reachable at a short viewport', { timeout: 60000 }, asy
   const surfaces = [
     { url: '/discussion?compose=post', form: '#discussion-compose form' },
     { url: '/forum?compose=thread', form: 'form[action="/forum"]' },
-    { url: '/petitions?compose=proposal', form: 'form[action="/petitions"]' },
+    { url: '/petitions?compose=proposal', form: '#petitions-compose form' },
   ];
 
   for (const { url, form } of surfaces) {

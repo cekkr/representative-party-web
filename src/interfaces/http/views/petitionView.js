@@ -20,167 +20,193 @@ import {
   resolveVoteChoice,
   tallyVotes,
 } from '../../../modules/delegation/delegatedBallots.js';
+import { proposalBrowseHref, proposalHref } from '../../../modules/petitions/proposalLinks.js';
 import { describePromotionTrail } from '../../../modules/groups/promotion.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
 
-export function renderPetitionList(
-  petitions,
-  votes,
-  signatures,
-  person,
-  canModerate,
-  commentsByPetition = new Map(),
-  options = {},
-) {
-  const allowDelegation = options.allowDelegation !== false;
-  const allowVoting = options.allowVoting !== false;
-  const allowLaneParticipation = options.allowLaneParticipation !== false;
-  const allowEditing = options.allowEditing === true;
-  const editGate = options.editGate || {};
-  const actorLabels = options.actorLabels || {};
-  const actorLabelPlural = actorLabels.actorLabelPlural || 'users';
-  const state = options.state;
-  if (!petitions.length) {
-    return renderPetitionOnboarding(options);
+export function renderProposalCollection(proposals, { state, signatures, commentsByPetition, browse, activeGroupId, filteredEmpty, createHref }) {
+  if (!proposals.length) {
+    if (filteredEmpty) {
+      return `<p>No proposals match this stage. <a href="${escapeHtml(proposalBrowseHref(activeGroupId))}" data-partial>Clear stage filter</a>.</p>`;
+    }
+    return `<div class="onboarding-card">
+      <h3>No proposals yet</h3>
+      <p>Draft a proposal when a discussion needs a formal decision.</p>
+      ${createHref ? `<a class="cta" href="${escapeHtml(createHref)}" data-partial>Draft a proposal</a>` : ''}
+    </div>`;
+  }
+  const signatureCounts = buildSignatureBuckets(signatures);
+  const topicCache = new Map();
+  const cards = proposals.map((proposal) => {
+    const comments = commentsByPetition.get(proposal.id) || [];
+    const signatureCount = signatureCounts.get(proposal.id)?.count || 0;
+    return `
+      <li>
+        <article class="discussion record-card" id="petition-${escapeHtml(proposal.id)}">
+          <header>
+            <div class="topic-meta">${renderProposalStage(proposal)}${renderPreviewPill(proposal)}${renderIssuerPill(proposal)}</div>
+            <h3><a href="${escapeHtml(proposalHref(proposal, browse))}" data-partial>${escapeHtml(proposal.title)}</a></h3>
+            <p class="topic-breadcrumbs">${escapeHtml(resolveTopicBreadcrumb(proposal, state, topicCache))}</p>
+          </header>
+          <p>${escapeHtml(truncateText(proposal.summary, 240))}</p>
+          <footer class="stack">
+            ${renderProposalByline(proposal, state)}
+            <p class="muted small">Signatures: ${signatureCount}${proposal.quorum ? ` / ${proposal.quorum}` : ''} · Discussion: ${comments.length}</p>
+          </footer>
+        </article>
+      </li>
+    `;
+  });
+  return `<ul class="collection-grid">${cards.join('')}</ul>`;
+}
+
+export function renderProposalWorkspace(proposal, options) {
+  const {
+    state, person, scope, browse, view, signatures, comments, votes,
+    allowEditing, allowSigning, allowCommenting, allowVoting, canVote, canModerate,
+  } = options;
+  const revisions = Array.isArray(proposal.versions) ? proposal.versions : [];
+  const stage = normalizeStage(proposal.status);
+  const signature = buildSignatureBuckets(signatures, person).get(proposal.id) || { count: 0, signed: false };
+  const href = (target) => escapeHtml(proposalHref(proposal, { ...browse, view: target }));
+  const returnFields = `
+    ${browse.stage ? `<input type="hidden" name="browseStage" value="${escapeHtml(browse.stage)}" />` : ''}
+    ${browse.page > 1 ? `<input type="hidden" name="browsePage" value="${browse.page}" />` : ''}
+  `;
+  const formFields = `<input type="hidden" name="petitionId" value="${escapeHtml(proposal.id)}" />${returnFields}`;
+  const sections = [
+    ['overview', 'Overview'],
+    ['discussion', 'Discussion'],
+    ['history', 'History'],
+  ];
+  const ballotAvailable = allowVoting && (stage === 'vote' || stage === 'closed' || Boolean(proposal.freeze));
+  if (ballotAvailable || view === 'ballot') sections.push(['ballot', 'Ballot']);
+  const scopeLabel = scope.group
+    ? `${scope.group.name || 'Group'} · ${scope.policy.lanesVisibility === 'public' ? 'Public lane' : 'Members-only lane'}`
+    : 'Whole Circle';
+  const promotionNote = describePromotionTrail(proposal);
+  const detail = `
+    <section class="panel stack" data-composer-section="petition-details" data-section-label="Proposal details">
+      <h2>Proposal details</h2>
+      ${renderProposalByline(proposal, state)}
+      ${renderUpdatedMeta(proposal, state)}
+      ${renderPreviewPill(proposal)}${renderIssuerPill(proposal)}
+      ${promotionNote ? `<p class="muted small">${escapeHtml(promotionNote)}</p>` : ''}
+    </section>
+  `;
+
+  let content;
+  let action = '';
+  if (view === 'discussion') {
+    content = renderDiscussionBlock(proposal, comments, state, { allowCommenting, formFields });
+    if (allowCommenting && stage !== 'closed') {
+      action = '<a class="cta" href="#proposal-comment">Add a contribution</a>';
+    }
+  } else if (view === 'history') {
+    content = renderRevisionHistory(proposal, state, href);
+    if (ballotAvailable) action = `<a class="ghost" href="${href('ballot')}" data-partial>Open ballot</a>`;
+  } else if (view === 'ballot') {
+    const votingOpen = stage === 'vote' && allowVoting;
+    const now = Date.now();
+    const resolution = resolveMyBallot(state, proposal, buildPetitionVoteIndex(votes), person, now);
+    const tally = tallyVotes(state, votes, { now }).get(proposal.id) ||
+      { yes: 0, no: 0, abstain: 0, pending: 0, lapsed: 0, delegated: 0, unresolved: 0 };
+    const eligible = votingOpen && canVote;
+    if (eligible) action = '<a class="cta" href="#proposal-vote">Go to your ballot</a>';
+    content = `
+      <section class="panel stack" id="proposal-ballot" data-composer-section="petition-ballot" data-section-label="Proposal ballot">
+        <h2>Ballot</h2>
+        ${proposal.freeze
+          ? `<h3>Frozen proposal text</h3>
+             ${renderFreezeNotice(proposal, state, href('history'), revisions)}
+             ${renderProposalContent(proposal.freeze)}`
+          : `<p class="muted small">${stage === 'vote' || stage === 'closed'
+            ? 'No frozen revision was recorded for this proposal.'
+            : 'The proposal has yet to reach voting.'}</p>`}
+        ${allowVoting ? renderMyBallot(state, resolution, eligible) : ''}
+        ${eligible ? `
+          <form class="form-inline" id="proposal-vote" method="post" action="/petitions/vote" data-enhance="petitions">
+            ${formFields}
+            <label class="field"><span>Your choice</span>${renderBallotSelect(resolution, options.allowDelegation)}</label>
+            <button type="submit" class="cta">${!resolution ? 'Vote' : resolution.status === 'direct' ? 'Change vote' : 'Override'}</button>
+          </form>
+        ` : `<p class="muted small">${escapeHtml(!allowVoting ? 'Voting module disabled.' : !votingOpen
+          ? stage === 'closed' ? 'Voting is closed.' : 'Voting opens after the proposal advances.'
+          : options.voteNotice || 'Voting is unavailable for this session.')}</p>`}
+        ${ballotAvailable ? `<section class="stack" aria-label="Voting outcome">
+          <h3>Voting outcome</h3>
+          ${renderVoteTally(tally)}
+        </section>` : ''}
+      </section>
+    `;
+  } else {
+    const signingOpen = stage === 'draft' || stage === 'discussion';
+    const canSign = signingOpen && allowSigning && !signature.signed;
+    if (ballotAvailable) action = `<a class="cta" href="${href('ballot')}" data-partial>Open ballot</a>`;
+    else if (canSign && stage === 'draft') action = '<a class="cta" href="#proposal-sign">Support this proposal</a>';
+    else action = `<a class="ghost" href="${href('discussion')}" data-partial>Read discussion</a>`;
+    const promoteControl = renderPromoteControl(proposal, options) + renderPromotionRequestControls(proposal, options, {
+      action: '/petitions/promote',
+      idField: 'petitionId',
+    });
+    content = `
+      <section class="panel stack" id="proposal-overview" data-composer-section="petition-overview" data-section-label="Proposal overview">
+        <h2>Overview</h2>
+        ${renderProposalContent(proposal.freeze || proposal)}
+        <p class="muted small">Signatures: ${signature.count}${proposal.quorum ? ` / ${proposal.quorum} required for quorum` : ''}</p>
+        ${signature.signed ? '<p class="muted small">You already signed.</p>' : ''}
+        ${canSign ? `<form class="form-inline" id="proposal-sign" method="post" action="/petitions/sign" data-enhance="petitions">
+          ${formFields}<button type="submit" class="ghost">Sign proposal</button>
+        </form>` : ''}
+        <p><a href="${href('history')}" data-partial>Version history</a> <span class="muted small">· Revisions: ${revisions.length}</span></p>
+        ${renderDraftUpdateForm(proposal, { allowEditing, canEdit: allowEditing && isEditableStage(proposal.status), actorLabelPlural: options.actorLabelPlural, formFields })}
+        ${renderReviewPrompt(proposal, revisions)}
+        ${canModerate ? renderModerationForm(proposal, state, formFields) : ''}
+        ${promoteControl}
+      </section>
+    `;
   }
 
-  const now = Date.now();
-  const voteBuckets = tallyVotes(state, votes, { now });
-  const voteIndex = buildPetitionVoteIndex(votes);
-  const signatureBuckets = buildSignatureBuckets(signatures || [], person);
+  return {
+    proposalAnchor: `petition-${escapeHtml(proposal.id)}`,
+    proposalTitle: escapeHtml(proposal.title),
+    proposalTopic: escapeHtml(resolveTopicBreadcrumb(proposal, state)),
+    proposalScope: `<span class="pill ghost">${escapeHtml(scopeLabel)}</span>`,
+    proposalStage: renderProposalStage(proposal),
+    proposalReturnHref: escapeHtml(proposalBrowseHref(proposal.groupId, browse)),
+    proposalAction: action,
+    proposalSections: sections.map(([key, label]) =>
+      `<a href="${href(key)}"${key === view ? ' aria-current="page"' : ''} data-partial>${label}</a>`,
+    ).join(''),
+    proposalContent: content,
+    proposalDetails: detail,
+  };
+}
 
-  const topicCache = new Map();
-  return petitions
-    .map((petition) => {
-      const topicLabel = resolveTopicBreadcrumb(petition, state, topicCache);
-      const statusLabel = displayStatus(petition.status);
-      const tally = voteBuckets.get(petition.id) || {
-        yes: 0,
-        no: 0,
-        abstain: 0,
-        pending: 0,
-        lapsed: 0,
-        delegated: 0,
-        unresolved: 0,
-      };
-      const stageAllowsVoting = isVotingStage(petition.status);
-      const stageAllowsEditing = isEditableStage(petition.status);
-      const canEdit = allowEditing && stageAllowsEditing;
-      const voteDisabled = !stageAllowsVoting || !allowVoting;
-      const voteDisabledLabel = allowVoting
-        ? 'Voting disabled while proposal is not in the vote stage.'
-        : 'Voting module disabled.';
-      const signatureSummary = signatureBuckets.get(petition.id) || { count: 0, signed: false };
-      const signatureCount = signatureSummary.count;
-      const hasSigned = signatureSummary.signed;
-      const myResolution = resolveMyBallot(state, petition, voteIndex, person, now);
-      const hasDelegatedBallot = Boolean(myResolution) && myResolution.status !== 'direct';
-      const comments = commentsByPetition.get(petition.id) || [];
-      const { argumentCount, lastCommentAt } = summarizeComments(comments);
-      const revisions = Array.isArray(petition.versions) ? petition.versions : [];
-      const anchorId = `petition-${petition.id}`;
-      const proposalText = petition.freeze?.body ?? petition.body;
-      const structuredFields = resolveStructuredFields(petition);
-      const structuredOutline = renderStructuredOutline(structuredFields);
-      const evidenceSummary = petition.freeze?.evidenceSummary ?? petition.evidenceSummary;
-      const evidenceLinks = Array.isArray(petition.freeze?.evidenceLinks)
-        ? petition.freeze.evidenceLinks
-        : Array.isArray(petition.evidenceLinks)
-          ? petition.evidenceLinks
-          : [];
-      const promotionNote = describePromotionTrail(petition);
-      const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
-      const promoteControl = `${renderPromoteControl(petition, options)}${renderPromotionRequestControls(petition, options, {
-        action: '/petitions/promote',
-        idField: 'petitionId',
-      })}`;
-      const freezeNotice = renderFreezeNotice(petition, state);
-      const reviewPrompt = renderReviewPrompt(petition, revisions);
-      const evidenceBlock = renderEvidenceBlock(evidenceSummary, evidenceLinks);
-      const createdAt = formatTimestamp(petition.createdAt);
-      const stageKey = normalizeStage(petition.status);
-      // Secondary counts live in one quiet sub-line instead of a wall of pills; the
-      // detail disclosures below already carry Discussion/Version-history/Evidence, so
-      // the head only keeps the state a reader acts on (stage, quorum, signatures).
-      const subMeta = [
-        renderUpdatedMeta(petition, state),
-        `<span>Revisions: ${revisions.length}</span>`,
-        `<span>Discussion: ${comments.length}</span>`,
-        argumentCount ? `<span>Arguments: ${argumentCount}</span>` : '',
-        lastCommentAt ? `<span>Last comment ${escapeHtml(lastCommentAt)}</span>` : '',
-        `<a href="/petitions#${escapeHtml(anchorId)}">Permalink</a>`,
-      ]
-        .filter(Boolean)
-        .join('');
-      return `
-        <article class="discussion proposal-card" id="${escapeHtml(anchorId)}">
-          <div class="topic-head">
-            ${renderActorAvatar(state, petition.authorHash || 'anonymous')}
-            <div class="topic-info">
-              <div class="topic-byline">
-                <span class="topic-author">${renderActorLabel(state, petition.authorHash || 'anonymous')}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
-              </div>
-              <h3 class="topic-title">${escapeHtml(petition.title)}</h3>
-              <div class="topic-meta">
-                <span class="pill stage stage--${escapeHtml(stageKey)}">${escapeHtml(statusLabel)}</span>
-                <span class="pill">Quorum: ${petition.quorum || 0}</span>
-                <span class="pill ghost">Signatures: ${signatureCount}</span>
-                ${petition.freeze ? '<span class="pill">Frozen</span>' : ''}
-                <span class="pill ghost">Topic: ${escapeHtml(topicLabel)}</span>
-                ${promotionPill}
-                ${renderPreviewPill(petition)}
-                ${renderIssuerPill(petition)}
-              </div>
-              <div class="proposal-submeta muted tiny">${subMeta}</div>
-            </div>
-          </div>
-          ${renderStageTimeline(petition)}
-          ${reviewPrompt}
-          ${freezeNotice}
-          <p>${escapeHtml(petition.summary)}</p>
-          ${structuredOutline}
-          ${evidenceBlock}
-          ${renderProposalText(proposalText, petition.freeze ? 'Frozen proposal text' : 'Proposal text')}
-          ${renderVoteTally(tally)}
-          ${renderMyBallot(state, myResolution)}
-          ${
-            hasSigned
-              ? '<p class="muted small">You already signed.</p>'
-              : allowLaneParticipation ? `
-          <form class="form-inline" method="post" action="/petitions/sign" data-enhance="petitions">
-            <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
-            <button type="submit" class="ghost">Sign proposal</button>
-          </form>
-          ` : ''
-          }
-          ${
-            voteDisabled
-              ? `<p class="muted small">${voteDisabledLabel}</p>`
-              : allowLaneParticipation ? `
-          <form class="form-inline" method="post" action="/petitions/vote" data-enhance="petitions">
-            <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
-            ${renderBallotSelect(myResolution, allowDelegation)}
-            <button type="submit" class="ghost">${hasDelegatedBallot ? 'Override' : myResolution ? 'Change vote' : 'Vote'}</button>
-          </form>
-          ` : ''
-          }
-          ${promoteControl}
-          ${renderDiscussionBlock(petition, comments, state, { allowCommenting: allowLaneParticipation })}
-          ${renderDraftUpdateForm(petition, {
-            canEdit,
-            allowEditing,
-            editGate,
-            actorLabelPlural,
-          })}
-          ${renderRevisionHistory(petition, state)}
-          ${canModerate ? renderModerationForm(petition, state) : ''}
-        </article>
-      `;
-    })
-    .join('\n');
+function renderProposalStage(proposal) {
+  const stage = normalizeStage(proposal.status);
+  return `<span class="pill stage stage--${stage}">${formatStageLabel(stage)}</span>`;
+}
+
+function renderProposalByline(proposal, state) {
+  const actor = proposal.authorHash || 'anonymous';
+  const date = formatTimestamp(proposal.createdAt);
+  return `<div class="topic-byline">
+    ${renderActorAvatar(state, actor, { size: 'sm' })}
+    <span class="topic-author">${renderActorLabel(state, actor)}</span>
+    ${date ? `<time class="topic-time muted small" datetime="${escapeHtml(proposal.createdAt)}">${escapeHtml(date)}</time>` : ''}
+  </div>`;
+}
+
+function renderProposalContent(proposal) {
+  return `
+    <p>${escapeHtml(proposal.summary || '')}</p>
+    ${renderStructuredOutline(resolveStructuredFields(proposal))}
+    ${renderEvidenceBlock(proposal.evidenceSummary, proposal.evidenceLinks)}
+    ${renderProposalText(proposal.body)}
+  `;
 }
 
 // Offered only when the promotion would actually succeed: the caller passes a predicate
@@ -196,37 +222,6 @@ function renderPromoteControl(petition, options = {}) {
     </form>
   `;
 }
-
-function renderPetitionOnboarding(options = {}) {
-  if (options.groupId) {
-    return `
-      <div class="onboarding-card">
-        <p class="eyebrow">Group proposals</p>
-        <h3>No proposals in this group's lane yet</h3>
-        <p class="muted small">Proposals filed here stay internal to the group until they are moved up a level.</p>
-        <div class="onboarding-actions">
-          <a class="cta" href="#petitions-compose">Draft proposal</a>
-        </div>
-      </div>
-    `;
-  }
-  return `
-    <div class="onboarding-card">
-      <p class="eyebrow">Proposals</p>
-      <h3>No proposals yet</h3>
-      <ul class="plain small">
-        <li>Summarize the decision you need.</li>
-        <li>Add structured outline details if helpful.</li>
-        <li>Attach evidence links to support review.</li>
-      </ul>
-      <div class="onboarding-actions">
-        <a class="cta" href="#petitions-compose">Draft proposal</a>
-        <a class="ghost" href="#petitions-discussion">Review deliberations</a>
-      </div>
-    </div>
-  `;
-}
-
 
 // A delegated ballot is resolved through the delegate's own vote before it is counted, and
 // one still inside its window is reported apart from the abstentions rather than folded into
@@ -277,8 +272,9 @@ function renderBallotSelect(resolution, allowDelegation) {
             </select>`;
 }
 
-function renderMyBallot(state, resolution) {
+function renderMyBallot(state, resolution, eligible) {
   if (!resolution) return '';
+  const override = eligible ? ' Cast your own vote to override.' : '';
   if (resolution.status === 'direct') {
     return `<p class="muted small">You voted <strong>${escapeHtml(resolution.choice)}</strong>.</p>`;
   }
@@ -297,7 +293,7 @@ function renderMyBallot(state, resolution) {
       <div class="callout">
         <p class="small">Your ballot is delegated to ${delegateLabel}${through} and counted as
           <strong>${escapeHtml(resolution.choice)}</strong>.</p>
-        <p class="muted tiny">Vote below to override it while the proposal is open.</p>
+        <p class="muted tiny">${override}</p>
       </div>
     `;
   }
@@ -310,7 +306,7 @@ function renderMyBallot(state, resolution) {
       <div class="callout">
         <p class="small">Your ballot is delegated to ${delegateLabel} — awaiting their vote
           (<strong>${escapeHtml(left)}</strong>).</p>
-        <p class="muted tiny">It is not counted yet.${deadlineNote} Vote below to override.</p>
+        <p class="muted tiny">It is awaiting resolution.${deadlineNote}${override}</p>
       </div>
     `;
   }
@@ -319,7 +315,7 @@ function renderMyBallot(state, resolution) {
       <div class="callout">
         <p class="small">Your delegate ${delegateLabel} did not vote in time — your ballot lapsed to
           <strong>abstain</strong>.</p>
-        <p class="muted tiny">Vote below to record your own choice while the proposal is open.</p>
+        <p class="muted tiny">${override}</p>
       </div>
     `;
   }
@@ -328,7 +324,7 @@ function renderMyBallot(state, resolution) {
     <div class="callout">
       <p class="small">Your delegated ballot could not resolve — ${escapeHtml(reason)}. It counts as
         <strong>abstain</strong>.</p>
-      <p class="muted tiny">Vote below, or fix the delegation chain on the Delegation page.</p>
+      <p class="muted tiny">${override}</p>
     </div>
   `;
 }
@@ -351,14 +347,14 @@ function buildSignatureBuckets(signatures = [], person) {
   return buckets;
 }
 
-function renderModerationForm(petition, state) {
+function renderModerationForm(petition, state, formFields) {
   const status = petition.status === 'open' ? 'vote' : petition.status;
   const frozenAt = formatTimestamp(petition.freeze?.frozenAt);
   const frozenBy = petition.freeze?.frozenBy ? `@${resolveHandleForHash(state, petition.freeze.frozenBy)}` : '';
   const freezeNote = frozenAt ? `<p class="muted small">Frozen at ${escapeHtml(frozenAt)} ${frozenBy ? `by ${escapeHtml(frozenBy)}` : ''}.</p>` : '';
   return `
     <form class="form-inline" method="post" action="/petitions/status" data-enhance="petitions">
-      <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+        ${formFields}
       <label>Status
         <select name="status">
           <option value="draft" ${status === 'draft' ? 'selected' : ''}>draft</option>
@@ -388,40 +384,19 @@ function renderProposalText(text, label = 'Proposal text') {
   `;
 }
 
-function renderStageTimeline(petition) {
-  const stage = normalizeStage(petition.status);
-  const stages = ['draft', 'discussion', 'vote', 'closed'];
-  const pills = stages
-    .map((entry) => {
-      const label = formatStageLabel(entry);
-      const klass = stage === entry ? 'pill' : 'pill ghost';
-      return `<span class="${klass}">${escapeHtml(label)}</span>`;
-    })
-    .join('');
-  return `
-    <div class="discussion__meta">
-      <span class="pill ghost">Stage</span>
-      ${pills}
-    </div>
-  `;
-}
-
-function renderDraftUpdateForm(petition, { canEdit, allowEditing, editGate, actorLabelPlural } = {}) {
+function renderDraftUpdateForm(petition, { canEdit, allowEditing, actorLabelPlural, formFields }) {
   if (!allowEditing) {
     return '';
   }
   if (!canEdit) {
     return '<p class="muted small">Draft editing closes once the vote stage opens. Review the frozen text before voting.</p>';
   }
-  const gateMessage = editGate?.allowed ? '' : editGate?.message || editGate?.reason || '';
-  const gateNotice = gateMessage ? `<p class="muted small">${escapeHtml(gateMessage)}</p>` : '';
   return `
     <details class="note">
       <summary>Update draft (collaborative)</summary>
       <p class="muted small">Verified ${escapeHtml(actorLabelPlural)} can refine this proposal while it is in draft or discussion.</p>
-      ${gateNotice}
       <form class="stack" method="post" action="/petitions/update" data-enhance="petitions">
-        <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+        ${formFields}
         <label class="field">
           <span>Title</span>
           <input name="title" value="${escapeHtml(petition.title || '')}" required />
@@ -485,9 +460,8 @@ function formatTopicInput(petition) {
   return petition?.topic || '';
 }
 
-function renderRevisionHistory(petition, state) {
+function renderRevisionHistory(petition, state, href) {
   const versions = Array.isArray(petition.versions) ? petition.versions : [];
-  if (!versions.length) return '';
   const items = versions
     .map((revision, index) => {
       const previous = versions[index + 1];
@@ -502,8 +476,10 @@ function renderRevisionHistory(petition, state) {
       // The first revision's note already says it is the initial draft; do not repeat it.
       const diffBlock = !previous && revision.note ? '' : renderRevisionDiff(revision, previous, state);
       return `
-        <li>
+        <li${revision.id ? ` id="revision-${escapeHtml(revision.id)}"` : ''}>
           <div class="muted small">${escapeHtml(when)} · ${author} · Topic: ${escapeHtml(topicLabel)}</div>
+          ${revision.id && petition.freeze?.revisionId === revision.id
+            ? `<p><a href="${href('ballot')}" data-partial>Revision used for the ballot</a></p>` : ''}
           <div>${escapeHtml(revision.title || petition.title || 'Untitled')}</div>
           ${note}
           ${diffBlock}
@@ -512,16 +488,14 @@ function renderRevisionHistory(petition, state) {
     })
     .join('');
   return `
-    <details class="note">
-      <summary>Version history (${versions.length})</summary>
-      <ul class="plain">
-        ${items}
-      </ul>
-    </details>
+    <section class="panel stack" id="proposal-history" data-composer-section="petition-history" data-section-label="Proposal history">
+      <h2>Version history <span class="muted small">(${versions.length})</span></h2>
+      ${items ? `<ol class="plain stack">${items}</ol>` : '<p class="muted">No revisions recorded.</p>'}
+    </section>
   `;
 }
 
-function renderDiscussionBlock(petition, comments, state, { allowCommenting }) {
+function renderDiscussionBlock(petition, comments, state, { allowCommenting, formFields }) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
   // Stored newest-first; a deliberation reads oldest-first so a rebuttal follows the
@@ -534,19 +508,19 @@ function renderDiscussionBlock(petition, comments, state, { allowCommenting }) {
   const argumentDatalistId = `argument-map-${petition.id}`;
   const argumentDatalist = renderArgumentDatalist(argumentData.nodes, argumentDatalistId);
   return `
-    <details class="note">
-      <summary>Discussion (${count})</summary>
+    <section class="panel stack" id="petitions-discussion" data-composer-section="petitions-discussion" data-section-label="Proposal discussion">
+      <h2>Discussion <span class="muted small">(${count})</span></h2>
       ${stanceSummary ? `<p class="muted small">${escapeHtml(stanceSummary)}</p>` : ''}
-      ${argumentMap}
       <div class="discussion-list">
         ${discussionList}
       </div>
+      ${argumentMap}
       ${
         disabled
           ? '<p class="muted small">Discussion closed.</p>'
           : allowCommenting ? `
-      <form class="stack" method="post" action="/petitions/comment" data-enhance="petitions">
-        <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
+      <form class="stack" id="proposal-comment" method="post" action="/petitions/comment" data-enhance="petitions">
+        ${formFields}
         <label class="field">
           <span>Comment type</span>
           <select name="stance">
@@ -579,11 +553,12 @@ function renderDiscussionBlock(petition, comments, state, { allowCommenting }) {
           <input type="checkbox" name="factCheck" value="yes" />
           <span>Request fact check for this comment</span>
         </label>
-        <button class="ghost" type="submit">Post comment</button>
+        <p class="muted small">Replying to ${escapeHtml(petition.title)}.</p>
+        <button class="cta" type="submit">Post comment</button>
       </form>
-      ` : ''
+      ` : '<p class="muted small">Posting requires access to this proposal’s discussion.</p>'
       }
-    </details>
+    </section>
   `;
 }
 
@@ -598,8 +573,7 @@ function indexArgumentTitles(comments = []) {
   return titles;
 }
 
-// The comment route stores "Argument note" as the title of an untitled reply. That is a
-// placeholder, not something the member wrote, so it must not read as the claim's name.
+// Older comments may have an autogenerated title on an untitled reply.
 function ownArgumentTitle(node) {
   const title = node?.argumentTitle || '';
   return node?.argumentParentId && title === 'Argument note' ? '' : title;
@@ -607,7 +581,9 @@ function ownArgumentTitle(node) {
 
 function describeArgumentParent(parentId, titles) {
   const title = titles?.get(parentId);
-  return title ? `Builds on “${escapeHtml(title)}”` : `Builds on ${escapeHtml(String(parentId).slice(0, 8))}`;
+  return title
+    ? `<a href="#proposal-note-${escapeHtml(parentId)}">Builds on “${escapeHtml(title)}”</a>`
+    : 'The original claim is unavailable.';
 }
 
 function renderPetitionComments(comments, state, { argumentTitles } = {}) {
@@ -629,20 +605,16 @@ function renderPetitionComments(comments, state, { argumentTitles } = {}) {
       const argumentParent = comment.argumentParentId
         ? `<p class="muted small">${describeArgumentParent(comment.argumentParentId, argumentTitles)}</p>`
         : '';
-      const argumentId =
-        comment.argumentTitle || comment.argumentParentId
-          ? `<p class="muted tiny">Argument node <span class="mono" title="${escapeHtml(String(comment.id))}">${escapeHtml(String(comment.id).slice(0, 8))}…</span></p>`
-          : '';
       const stanceKey = normalizeCommentStance(comment.stance);
       const coloredStance = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;
       return `
-        <article class="discussion comment-card">
+        <article class="discussion comment-card" id="proposal-note-${escapeHtml(comment.id)}">
           <div class="topic-head">
             ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
             <div class="topic-info">
               <div class="topic-byline">
                 <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+                ${createdAt ? `<time class="topic-time muted small" datetime="${escapeHtml(comment.createdAt)}">${escapeHtml(createdAt)}</time>` : ''}
               </div>
               <div class="topic-meta">
                 ${coloredStance}
@@ -658,14 +630,14 @@ function renderPetitionComments(comments, state, { argumentTitles } = {}) {
           ${argumentParent}
           <p>${escapeHtml(comment.content)}</p>
           ${renderEvidenceLinks(evidenceLinks)}
-          ${argumentId}
+          <a class="small" href="#proposal-note-${escapeHtml(comment.id)}">Permalink</a>
         </article>
       `;
     })
     .join('\n');
 }
 
-export function renderProposalDiscussionFeed(items, state) {
+export function renderProposalDiscussionFeed(items, state, browse) {
   if (!items.length) {
     return renderEmptyState('No proposal discussions yet. Join a discussion to surface activity.');
   }
@@ -673,8 +645,8 @@ export function renderProposalDiscussionFeed(items, state) {
     .map(({ comment, petition }) => {
       const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
       const snippet = (comment.content || '').slice(0, 180);
-      const anchorId = petition?.id ? `petition-${petition.id}` : null;
-      const permalink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
+      const href = proposalHref(petition, { ...browse, view: 'discussion' });
+      const permalink = `<a class="pill ghost" href="${escapeHtml(href)}#proposal-note-${escapeHtml(comment.id)}" data-partial>Open discussion</a>`;
       const stanceLabel = getCommentStanceLabel(comment.stance);
       const stanceKey = normalizeCommentStance(comment.stance);
       const stancePill = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;
@@ -693,7 +665,7 @@ export function renderProposalDiscussionFeed(items, state) {
             <div class="topic-info">
               <div class="topic-byline">
                 <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+                ${createdAt ? `<time class="topic-time muted small" datetime="${escapeHtml(comment.createdAt)}">${escapeHtml(createdAt)}</time>` : ''}
               </div>
               <div class="topic-breadcrumbs">On proposal · ${escapeHtml(displayStatus(petition?.status || 'draft'))}</div>
               <div class="topic-meta">
@@ -722,11 +694,6 @@ function displayStatus(status = '') {
   return normalized || 'draft';
 }
 
-function isVotingStage(status = '') {
-  const normalized = String(status || '').toLowerCase();
-  return normalized === 'open' || normalized === 'vote';
-}
-
 function isEditableStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'draft' || normalized === 'discussion';
@@ -744,22 +711,6 @@ function normalizeStage(status = '') {
 function formatStageLabel(stage) {
   if (!stage) return '';
   return stage.charAt(0).toUpperCase() + stage.slice(1);
-}
-
-function summarizeComments(comments = []) {
-  if (!comments.length) return { argumentCount: 0, lastCommentAt: '' };
-  let latest = 0;
-  let argumentCount = 0;
-  for (const comment of comments) {
-    if (comment?.argumentTitle || comment?.argumentParentId) {
-      argumentCount += 1;
-    }
-    const time = Date.parse(comment?.createdAt || '');
-    if (!Number.isNaN(time) && time > latest) {
-      latest = time;
-    }
-  }
-  return { argumentCount, lastCommentAt: latest ? formatTimestamp(latest) : '' };
 }
 
 function renderCommentStanceOptions(selected = 'comment') {
@@ -917,7 +868,7 @@ function renderStructuredOutline(fields = {}) {
     })
     .join('');
   return `
-    <details class="note structured-outline">
+    <details class="note structured-outline" open>
       <summary>Structured outline</summary>
       <ul class="plain structured-outline__list">
         ${items}
@@ -947,15 +898,20 @@ function renderUpdatedMeta(petition, state) {
 }
 
 
-function renderFreezeNotice(petition, state) {
+function renderFreezeNotice(petition, state, historyHref, revisions) {
   if (!petition?.freeze) return '';
   const frozenAt = formatTimestamp(petition.freeze.frozenAt);
   const frozenBy = petition.freeze.frozenBy ? `by @${resolveHandleForHash(state, petition.freeze.frozenBy)}` : '';
   const revisionId = petition.freeze.revisionId ? petition.freeze.revisionId.slice(0, 8) : '';
-  const revisionLine = revisionId ? `<p class="muted small">Revision: ${escapeHtml(revisionId)}</p>` : '';
+  const revisionLink = revisions.some((revision) => revision.id === petition.freeze.revisionId);
+  const revisionLine = revisionId
+    ? `<p class="muted small">${revisionLink
+      ? `<a href="${historyHref}#revision-${escapeHtml(petition.freeze.revisionId)}" data-partial>Frozen revision ${escapeHtml(revisionId)}</a>`
+      : `Frozen revision ${escapeHtml(revisionId)}`}</p>`
+    : '';
   return `
     <div class="callout">
-      <p class="muted small">Draft frozen for voting ${frozenAt ? `at ${escapeHtml(frozenAt)}` : ''} ${escapeHtml(frozenBy)}.</p>
+      <p class="muted small">Frozen ${frozenAt ? `at ${escapeHtml(frozenAt)}` : 'for voting'} ${escapeHtml(frozenBy)}.</p>
       ${revisionLine}
       <p class="muted small">Votes are recorded against the frozen text.</p>
     </div>

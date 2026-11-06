@@ -1,0 +1,22 @@
+<div class="proposal-workspace" id="{{proposalAnchor}}">
+  <a href="{{proposalReturnHref}}" data-partial>Back to proposals</a>
+  <header class="workspace-heading">
+    <div>
+      <p class="topic-breadcrumbs">{{proposalTopic}}</p>
+      <h1 tabindex="-1">{{proposalTitle}}</h1>
+      <div class="topic-meta">{{proposalScope}} {{proposalStage}}</div>
+    </div>
+    {{proposalAction}}
+  </header>
+  <nav class="workspace-sections" aria-label="Proposal sections">
+    {{proposalSections}}
+  </nav>
+  <div class="page-grid page-grid--petitions">
+    <div class="page-main">
+      {{proposalContent}}
+    </div>
+    <aside class="page-aside" aria-label="Proposal details">
+      {{proposalDetails}}
+    </aside>
+  </div>
+</div>

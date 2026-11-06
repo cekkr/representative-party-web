@@ -72,13 +72,14 @@ test('form controls inherit the app theme on every lane', { timeout: 90000 }, as
     sameSite: 'Lax',
   });
 
-  for (const route of ['/petitions', '/groups', '/delegation', '/discussion', '/profile', '/admin']) {
+  const ballotRoute = `/petitions?proposal=${petitionId}&view=ballot`;
+  for (const route of ['/petitions', ballotRoute, '/groups', '/delegation', '/discussion', '/profile', '/admin']) {
     await page.goto(`${server.baseUrl}${route}`, { waitUntil: 'networkidle0' });
     assert.deepEqual(await lightControls(page), [], `unthemed controls on ${route}`);
   }
 
   // The vote control specifically: it is the one a member uses to decide.
-  await page.goto(`${server.baseUrl}/petitions`, { waitUntil: 'networkidle0' });
+  await page.goto(`${server.baseUrl}${ballotRoute}`, { waitUntil: 'networkidle0' });
   const voteSelect = await page.$('form[action="/petitions/vote"] select[name="choice"]');
   assert.ok(voteSelect, 'expected a vote choice control on a proposal in the vote stage');
 });

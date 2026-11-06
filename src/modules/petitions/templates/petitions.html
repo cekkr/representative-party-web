@@ -1,11 +1,20 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Proposals &amp; Votes</h1>
+    <p>{{petitionsScopeLabel}}</p>
+  </div>
+  {{petitionsCreateAction}}
+</header>
+{{petitionsScopeTabs}}
+{{petitionsScopeNotice}}
 <div class="page-grid page-grid--petitions">
   <div class="page-main">
+    {{> petitions-filters}}
     {{> petitions-active}}
     {{> petitions-discussion}}
   </div>
-  <aside class="page-aside">
+  <aside class="page-aside" aria-label="Proposal tools">
     {{> petitions-compose}}
-    {{> petitions-filters}}
     {{> petitions-delegates}}
   </aside>
 </div>

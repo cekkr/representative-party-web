@@ -36,6 +36,8 @@ const TEMPLATE_MODULES = {
   'forum-thread': 'forum',
   governance: 'governance',
   petitions: 'petitions',
+  'petition-workspace': 'petitions',
+  'petition-unavailable': 'petitions',
   groups: 'groups',
   delegation: 'delegation',
   'delegate-profile': 'delegates',

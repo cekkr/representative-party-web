@@ -37,7 +37,7 @@ test('petition comments render evidence links', { timeout: 60000 }, async (t) =>
     { cookie: session.cookie },
   );
 
-  const { text } = await fetchText(`${server.baseUrl}/petitions`, {
+  const { text } = await fetchText(`${server.baseUrl}/petitions?proposal=${petitionId}&view=discussion`, {
     headers: { Cookie: session.cookie },
   });
 

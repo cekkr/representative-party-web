@@ -375,20 +375,21 @@ async function findPetitionId(page, titleFragment) {
   }, titleFragment);
 }
 
-/** Signs the proposal card matching `titleFragment` (its Sign button). */
+function openProposal(page, id, view = 'overview') {
+  const query = new URLSearchParams({ proposal: id, view });
+  return visit(page, `/petitions?${query}`);
+}
+
+/** Finds a proposal from the collection and signs it in its workspace. */
 async function signPetition(page, titleFragment) {
   await visit(page, '/petitions');
-  const clicked = await page.evaluate((frag) => {
-    const cards = [...document.querySelectorAll('[id^="petition-"]')];
-    const card = cards.find((c) => (c.textContent || '').toLowerCase().includes(frag.toLowerCase()));
-    if (!card) return false;
-    const btn = [...card.querySelectorAll('button')].find((b) => (b.textContent || '').trim().toLowerCase().startsWith('sign'));
-    if (!btn) return false;
-    btn.click();
-    return true;
-  }, titleFragment);
-  await settle(page);
-  return clicked;
+  const id = await findPetitionId(page, titleFragment);
+  if (!id) {
+    record(`Could not find the proposal containing "${titleFragment}".`);
+    return false;
+  }
+  await openProposal(page, id);
+  return submitNear(page, '#proposal-sign input[name="petitionId"]');
 }
 
 /** Opens the <details> whose summary text matches, so a collapsed card section is visible in a shot. */
@@ -755,7 +756,7 @@ async function journeyProposal(browser) {
   );
   await typeInto(giulia, '#petitions-compose textarea[name="evidenceLinks"]', EVIDENCE.survey);
   await submitNear(giulia, '#petitions-compose input[name="title"]');
-  const drafted = await expectText(giulia, 'Conditional intramoenia', 'the structured proposal appears in the list');
+  const drafted = await expectText(giulia, 'Conditional intramoenia', 'drafting opens the proposal workspace');
   if (!drafted) return null;
 
   const petitionId = await findPetitionId(giulia, 'Conditional intramoenia');
@@ -770,9 +771,11 @@ async function journeyProposal(browser) {
 
   // A3.2 — the economist revises the cap; the change and its author go on the record.
   const marco = await member(browser, 'marco.deluca');
-  await visit(marco, '/petitions');
+  await openProposal(marco, petitionId);
   await typeInto(marco, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="summary"]`,
     'In specialties where public-service waiting times exceed PNGLA priority classes, intramoenia activity in the same specialty falls to 20% of public-service volumes until those times return to compliance.');
+  await typeInto(marco, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="proposedAction"]`,
+    "A 20% cap per specialty, tied to the national platform's monitoring (Law 107/2024), with automatic suspension once waiting times return to the U/B/D/P priority classes.");
   await typeInto(marco, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`,
     'Cap raised from 15% to 20% after modelling specialist retention.');
   await submitNear(marco, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`);
@@ -790,9 +793,18 @@ async function journeyProposal(browser) {
     focus: '#petitions-active',
   });
 
+  // A3.10 — establish the recipient's preference before another actor comments.
+  await visit(giulia, '/notifications');
+  await page_check(giulia, 'input[name="notifyProposalComments"]');
+  await submitNear(giulia, 'input[name="notifyProposalComments"]');
+  await visit(giulia, '/notifications');
+  if (!(await giulia.$eval('input[name="notifyProposalComments"]', (input) => input.checked))) {
+    record('Giulia’s proposal comment preference did not persist');
+  }
+
   // A3.4 — the reasonable dissent lands on the text itself.
   const luca = await member(browser, 'luca.esposito');
-  await visit(luca, '/petitions');
+  await openProposal(luca, petitionId, 'discussion');
   await selectOption(luca, `#petition-${petitionId} select[name="stance"]`, 'concern');
   await typeInto(
     luca,
@@ -801,9 +813,22 @@ async function journeyProposal(browser) {
   );
   await submitNear(luca, `#petition-${petitionId} textarea[name="content"]`);
 
+  // Observe delivery and mark the alert read in the author's own session.
+  await visit(giulia, '/notifications');
+  const commentAlert = `li:has(a[href*="proposal=${petitionId}"][href*="view=discussion"])`;
+  const unreadAlert = await giulia.$(commentAlert);
+  if (!unreadAlert || !(await unreadAlert.evaluate((row) => row.innerText.includes('Unread')))) {
+    record('Giulia did not receive an unread alert linking to the proposal discussion');
+  } else {
+    ok('Giulia receives a scoped link to Luca’s contribution');
+    await submitNear(giulia, 'form[action="/notifications/read"] input[name="page"]');
+    await expectText(giulia, '0 unread', 'mark all read clears the unread state');
+    if (!(await giulia.$(commentAlert))) record('marking an alert read removed its discussion link');
+  }
+
   // A3.6 — the constitutional lawyer's argument-map node.
   const sofia = await member(browser, 'sofia.bianchi');
-  await visit(sofia, '/petitions');
+  await openProposal(sofia, petitionId, 'discussion');
   await selectOption(sofia, `#petition-${petitionId} select[name="stance"]`, 'concern');
   await typeInto(sofia, `#petition-${petitionId} input[name="argumentTitle"]`, 'Regional competence');
   await typeInto(
@@ -815,7 +840,7 @@ async function journeyProposal(browser) {
   await expectText(sofia, 'Regional competence', "the constitutional lawyer's argument-map node is recorded");
 
   // A3.9 — a rebuttal in the tree, not a new thread: Marco picks her node from the map.
-  await visit(marco, '/petitions');
+  await openProposal(marco, petitionId, 'discussion');
   const parentNode = await marco.evaluate((id) => {
     const options = [...document.querySelectorAll(`#argument-map-${id} option`)];
     return options.find((o) => (o.textContent || '').includes('Regional competence'))?.value || null;
@@ -835,7 +860,7 @@ async function journeyProposal(browser) {
 
   // A3.5 — a fact-check request against a specific claim.
   const valentina = await member(browser, 'valentina.sanna');
-  await visit(valentina, '/petitions');
+  await openProposal(valentina, petitionId, 'discussion');
   await selectOption(valentina, `#petition-${petitionId} select[name="stance"]`, 'question');
   await typeInto(
     valentina,
@@ -845,15 +870,14 @@ async function journeyProposal(browser) {
   await page_check(valentina, `#petition-${petitionId} input[name="factCheck"]`);
   await submitNear(valentina, `#petition-${petitionId} textarea[name="content"]`);
 
-  await visit(giulia, '/petitions');
-  await openDetails(giulia, 'Discussion', { scope: `#petition-${petitionId}` });
+  await openProposal(giulia, petitionId, 'discussion');
   await openDetails(giulia, 'Argument map (', { scope: `#petition-${petitionId}` });
   await shot(giulia, 'party-deliberation', 'Deliberation is stance-tagged and mapped: a constitutional-law objection as an argument node with the economist’s rebuttal under it, the restaurateur’s concern, and a fact-check request on a specific claim — the shape of the disagreement, not a flat thread.', {
     focus: `#petition-${petitionId}`,
   });
 
   // A3.11 — the author answers the concerns in the text itself.
-  await visit(giulia, '/petitions');
+  await openProposal(giulia, petitionId);
   await typeInto(giulia, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="risks"]`,
     'Specialists may leave for accredited private providers (raised by @luca.esposito). The cap only bites after incentives for public-service activity are funded, so capacity is added before it is constrained.');
   await typeInto(giulia, `#petition-${petitionId} form[action="/petitions/update"] textarea[name="implementationPlan"]`,
@@ -862,8 +886,7 @@ async function journeyProposal(browser) {
     'Answers the retention concern and the sampling fact-check: incentives funded before the cap bites; method annexed.');
   await submitNear(giulia, `#petition-${petitionId} form[action="/petitions/update"] input[name="note"]`);
 
-  await visit(giulia, '/petitions');
-  await openDetails(giulia, 'Version history', { scope: `#petition-${petitionId}` });
+  await openProposal(giulia, petitionId, 'history');
   await expectText(giulia, 'incentives funded before the cap bites', 'the revision note records why the text changed');
   await shot(giulia, 'party-revisions', 'Deliberation visibly changed the text: the version history runs draft → the economist’s cap revision → the author’s answer to the concerns, each revision attributed and diffable.', {
     focus: `#petition-${petitionId}`,
@@ -919,7 +942,7 @@ async function journeyVote(browser, petitionId) {
 
   // The author cannot open a vote on their own proposal.
   const giulia = await member(browser, 'giulia.ferrero');
-  await visit(giulia, '/petitions');
+  await openProposal(giulia, petitionId);
   const authorSeesFreeze = await giulia.$(`#petition-${petitionId} form[action="/petitions/status"]`);
   if (authorSeesFreeze) record('the author is offered the freeze/status control on her own proposal');
   else ok('opening a vote is not offered to the author');
@@ -928,7 +951,7 @@ async function journeyVote(browser, petitionId) {
   // Set status, tick the freeze confirmation, and submit the form in one step so the
   // confirmFreeze value is serialized with the enhanced POST.
   const elena = await member(browser, 'elena.rossi');
-  await visit(elena, '/petitions');
+  await openProposal(elena, petitionId);
   const froze = await elena.evaluate((id) => {
     const card = document.getElementById(`petition-${id}`);
     const form = card?.querySelector('form[action="/petitions/status"]');
@@ -944,8 +967,13 @@ async function journeyVote(browser, petitionId) {
     return;
   }
   await settle(elena);
-  await visit(elena, '/petitions');
+  await openProposal(elena, petitionId, 'ballot');
+  const revisionHref = await elena.$eval('a[href*="#revision-"]', (link) => link.getAttribute('href'));
+  await visit(elena, revisionHref);
+  await expectText(elena, 'Revision used for the ballot', 'the frozen ballot links to its exact attributed revision');
+  await openProposal(elena, petitionId, 'ballot');
   await expectText(elena, 'Frozen at', 'the draft is frozen and the freeze is attributed to the moderator');
+  await expectText(elena, 'A 20% cap per specialty', 'the frozen action reflects the economist’s revision');
 
   // Members vote — and Luca votes no, so the tally is not a rubber stamp.
   const ballots = [
@@ -958,7 +986,7 @@ async function journeyVote(browser, petitionId) {
   ];
   for (const [handle, choice] of ballots) {
     const page = await member(browser, handle);
-    await visit(page, '/petitions');
+    await openProposal(page, petitionId, 'ballot');
     await selectOption(page, `#petition-${petitionId} form[action="/petitions/vote"] select[name="choice"]`, choice);
     await page.evaluate((id) => {
       const form = document.querySelector(`#petition-${id} form[action="/petitions/vote"]`);
@@ -967,7 +995,7 @@ async function journeyVote(browser, petitionId) {
     await settle(page);
   }
 
-  await visit(giulia, '/petitions');
+  await openProposal(giulia, petitionId, 'ballot');
   await expectText(giulia, 'no: 1', 'the tally records the dissenting vote, not only the yeses');
   await shot(giulia, 'party-vote', 'Opening a vote is deliberate and attributed: the text is frozen by the party secretary, and the tally shows the dissent (Luca’s no) instead of a unanimous rubber stamp.', {
     focus: `#petition-${petitionId}`,
@@ -1396,7 +1424,7 @@ async function journeyDelegatedBallot(browser) {
 
   // The party secretary freezes and opens it.
   const elena = await member(browser, 'elena.rossi');
-  await visit(elena, '/petitions');
+  await openProposal(elena, petitionId);
   await elena.evaluate((id) => {
     const form = document.getElementById(`petition-${id}`)?.querySelector('form[action="/petitions/status"]');
     if (!form) return;
@@ -1408,7 +1436,7 @@ async function journeyDelegatedBallot(browser) {
   await settle(elena);
 
   // davide hands the ballot to whoever his category delegation resolves to.
-  await visit(davide, '/petitions');
+  await openProposal(davide, petitionId, 'ballot');
   await selectOption(davide, `#petition-${petitionId} form[action="/petitions/vote"] select[name="choice"]`, 'auto');
   await davide.evaluate((id) => {
     const form = document.querySelector(`#petition-${id} form[action="/petitions/vote"]`);
@@ -1416,7 +1444,7 @@ async function journeyDelegatedBallot(browser) {
   }, petitionId);
   await settle(davide);
 
-  await visit(davide, '/petitions');
+  await openProposal(davide, petitionId, 'ballot');
   await expectText(davide, 'giulia.ferrero', 'the delegation on the parent category reaches the subcategory proposal');
   await expectText(davide, 'awaiting delegates', 'an open delegated ballot is reported apart from the abstentions');
   await shot(

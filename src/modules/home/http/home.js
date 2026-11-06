@@ -1,3 +1,4 @@
+import { proposalHref } from '../../petitions/proposalLinks.js';
 import { getPerson } from '../../identity/person.js';
 import { canAdministerProvider } from '../../identity/privileges.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../circle/policy.js';
@@ -437,7 +438,7 @@ function formatGovernanceItem(entry = {}) {
     title: entry.title || 'Proposal',
     summary: buildSnippet(entry.summary || entry.body || '', 120),
     meta: `${resolveTopic(entry)} · Updated ${updatedAt}`,
-    href: `/petitions#petition-${entry.id}`,
+    href: proposalHref(entry),
     partial: true,
     pills: [{ label: displayPetitionStage(stage) }, entry.freeze ? { label: 'Frozen' } : null].filter(Boolean),
   };

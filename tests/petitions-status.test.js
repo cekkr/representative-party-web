@@ -7,7 +7,7 @@ import { getAvailablePort, startServer } from './helpers/server.js';
 
 async function extractFirstPetitionId(baseUrl) {
   const { text } = await fetchText(`${baseUrl}/petitions`);
-  const match = text.match(/name="petitionId" value="([^"]+)"/);
+  const match = text.match(/id="petition-([^"]+)"/);
   if (!match) {
     throw new Error('Failed to parse petitionId from petitions page');
   }
@@ -52,6 +52,8 @@ test('petition status update requires freeze confirmation before voting', async 
   );
   assert.equal(allowed.ok, true);
 
-  const { text } = await fetchText(`${server.baseUrl}/petitions`);
-  assert.ok(text.includes('Frozen proposal text'));
+  assert.equal(new URL(allowed.url).searchParams.get('view'), 'ballot');
+  const text = await allowed.text();
+  assert.match(text, /Frozen proposal text/);
+  assert.match(text, /view=history#revision-/);
 });

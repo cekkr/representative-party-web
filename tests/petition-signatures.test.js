@@ -43,11 +43,16 @@ test('signPetition records signatures and advances to discussion when quorum met
 
 test('signPetition advances directly to vote when petitionQuorumAdvance is vote', async () => {
   const state = buildState({ settings: { petitionQuorumAdvance: 'vote' } });
-  const petition = { id: 'petition-2', title: 'Fast Track', status: 'draft', quorum: 1 };
+  const petition = {
+    id: 'petition-2', title: 'Fast Track', status: 'draft', quorum: 1,
+    versions: [{ id: 'revision-1', summary: 'Text agreed at quorum.' }],
+  };
   state.petitions.push(petition);
   const person = { pidHash: 'person-2', sessionId: 'sess-2', handle: 'person-2' };
 
   await signPetition({ petition, person, state });
 
   assert.equal(petition.status, 'open');
+  assert.equal(petition.freeze.revisionId, 'revision-1');
+  assert.equal(petition.freeze.summary, 'Text agreed at quorum.');
 });

@@ -1,3 +1,6 @@
+import { canReadProposal, proposalHref } from '../../petitions/proposalLinks.js';
+import { canPostToGroupLane, resolveGroupScope } from '../../groups/groupScope.js';
+import { filterVisibleEntries } from '../../federation/replication.js';
 import { getPerson } from '../../identity/person.js';
 import { evaluateAction } from '../../circle/policy.js';
 import {
@@ -74,6 +77,8 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
     delegations,
   });
 
+  const votingEnabled = isModuleEnabled(state, 'votes');
+  const ballotState = { ...state, votes: filterVisibleEntries(state.votes, state) };
   const html = await renderPage(
     'delegation',
     {
@@ -87,8 +92,8 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state), state }),
       delegationDecayNote: renderDecayNote(getDelegationDecayDays(state)),
       delegateWindowNote: renderDelegateWindowNote(getDelegateVoteWindowDays(state)),
-      delegateBallotInbox: renderDelegateBallotInbox({ person, state }),
-      myDelegatedBallots: renderMyDelegatedBallots({ person, state }),
+      delegateBallotInbox: renderDelegateBallotInbox({ person, state: ballotState, votingEnabled }),
+      myDelegatedBallots: renderMyDelegatedBallots({ person, state: ballotState, votingEnabled }),
       peopleDatalist: renderPeopleDatalist(state, person),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
@@ -154,11 +159,13 @@ function renderDelegateWindowNote(windowDays = 0) {
 
 // The delegate's side of the contract: which ballots are riding on them, on what, and how
 // long they have. Without this a delegate has no way to discover a ballot they were handed.
-function renderDelegateBallotInbox({ person, state } = {}) {
+function renderDelegateBallotInbox({ person, state, votingEnabled }) {
+  if (!votingEnabled) return '<p class="muted">Voting is disabled.</p>';
   if (!person?.pidHash) {
     return '<p class="muted">Login to see ballots delegated to you.</p>';
   }
-  const rows = listBallotsAwaitingDelegate(state, person.pidHash, { includeLapsed: true });
+  const rows = listBallotsAwaitingDelegate(state, person.pidHash, { includeLapsed: true })
+    .filter(({ petition }) => canReadProposal(state, person, petition));
   if (!rows.length) {
     return '<p class="muted">No ballots are waiting on your vote.</p>';
   }
@@ -173,13 +180,15 @@ function renderDelegateBallotInbox({ person, state } = {}) {
       return `
         <div class="list-row">
           <div>
-            <p class="small"><a href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
+            <p class="small"><a href="${escapeHtml(proposalHref(petition, { view: 'ballot' }))}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
             <p class="muted tiny">Delegated by ${ownerLabel} · Topic ${escapeHtml(resolution.topic || petition.topic || 'general')}</p>
             ${forwarded}
           </div>
           <div>
             ${urgency}
-            <a class="ghost" href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>Vote</a>
+            ${canActOnBallot(state, person, petition)
+              ? `<a class="ghost" href="${escapeHtml(proposalHref(petition, { view: 'ballot' }))}" data-partial>Vote</a>`
+              : ''}
           </div>
         </div>
       `;
@@ -190,11 +199,13 @@ function renderDelegateBallotInbox({ person, state } = {}) {
 
 // The member's side: what a delegate is currently holding for them, and whether it still has
 // time to land. Overriding is a link to the proposal, where the vote form already lives.
-function renderMyDelegatedBallots({ person, state } = {}) {
+function renderMyDelegatedBallots({ person, state, votingEnabled }) {
+  if (!votingEnabled) return '<p class="muted">Voting is disabled.</p>';
   if (!person?.pidHash) {
     return '<p class="muted">Login to see ballots you delegated.</p>';
   }
-  const rows = listDelegatedBallotsForOwner(state, person.pidHash);
+  const rows = listDelegatedBallotsForOwner(state, person.pidHash)
+    .filter(({ petition }) => canReadProposal(state, person, petition));
   if (!rows.length) {
     return '<p class="muted">You have no delegated ballots. Choose "hand to my delegate" when voting on a proposal.</p>';
   }
@@ -206,13 +217,13 @@ function renderMyDelegatedBallots({ person, state } = {}) {
         resolution.status === 'resolved'
           ? `<p class="muted tiny">Counted as <strong>${escapeHtml(resolution.choice)}</strong>.</p>`
           : '';
-      const override = open
-        ? `<a class="ghost" href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>Override</a>`
-        : '<span class="muted tiny">Closed</span>';
+      const override = open && canActOnBallot(state, person, petition)
+        ? `<a class="ghost" href="${escapeHtml(proposalHref(petition, { view: 'ballot' }))}" data-partial>Override</a>`
+        : open ? '' : '<span class="muted tiny">Closed</span>';
       return `
         <div class="list-row">
           <div>
-            <p class="small"><a href="/petitions#petition-${escapeHtml(petition.id)}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
+            <p class="small"><a href="${escapeHtml(proposalHref(petition, { view: 'ballot' }))}" data-partial>${escapeHtml(petition.title || 'Proposal')}</a></p>
             <p class="muted tiny">Held by ${delegateLabel} · Topic ${escapeHtml(resolution.topic || petition.topic || 'general')}</p>
             ${outcome}
           </div>
@@ -225,6 +236,12 @@ function renderMyDelegatedBallots({ person, state } = {}) {
     })
     .join('\n');
   return `<div class="list-stack">${items}</div>`;
+}
+
+function canActOnBallot(state, person, petition) {
+  const scope = resolveGroupScope(state, person, petition.groupId, { lane: 'petitions' });
+  return scope.ok && canPostToGroupLane(state, person, scope.group, 'petitions') &&
+    evaluateAction(state, person, 'vote').allowed;
 }
 
 function describeBallotUrgency(resolution) {

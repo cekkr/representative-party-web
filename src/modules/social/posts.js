@@ -164,7 +164,8 @@ export function extractMentions(content = '') {
   MENTION_REGEX.lastIndex = 0;
   let match;
   while ((match = MENTION_REGEX.exec(content))) {
-    handles.add(match[1].toLowerCase());
+    const handle = match[1].replace(/\.+$/, '').toLowerCase();
+    if (handle.length >= 2) handles.add(handle);
   }
   return [...handles];
 }

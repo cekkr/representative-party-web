@@ -2330,25 +2330,8 @@ details.note pre {
   color: var(--primary-ink);
 }
 
-/* Proposal cards reuse the feed head; the body flows full-width under it (a proposal
-   is a document, not a one-line post), and secondary counts collapse to a quiet row. */
-.proposal-card .topic-head,
 .comment-card .topic-head {
   padding: 0 0 0.35rem;
-}
-
-.proposal-submeta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.15rem 0.55rem;
-  margin-top: 0.4rem;
-}
-
-.proposal-submeta > * + *::before {
-  content: "·";
-  margin-right: 0.55rem;
-  color: var(--border-strong);
 }
 
 .pill.stage {
@@ -4227,4 +4210,63 @@ code {
 }
 .pager > span {
   text-align: center;
+}
+
+/* Proposal browse and record views */
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record-card {
+  height: 100%;
+  overflow-wrap: anywhere;
+}
+
+.record-card h3 {
+  margin: 0.5rem 0 0.25rem;
+}
+
+.record-card footer {
+  margin-top: 0.75rem;
+}
+
+.proposal-workspace {
+  overflow-wrap: anywhere;
+}
+
+.workspace-sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 1rem;
+  margin-bottom: 1.25rem;
+  border-bottom: 1px solid hsl(var(--hairline-hsl) / 0.3);
+}
+
+.workspace-sections a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding-inline: 0.25rem;
+  border-bottom: 2px solid transparent;
+}
+
+.workspace-sections a[aria-current="page"] {
+  color: var(--primary-ink);
+  border-bottom-color: var(--primary);
+  font-weight: 700;
+}
+
+.notification-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.notification-row {
+  gap: 0.5rem;
 }

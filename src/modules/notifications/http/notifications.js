@@ -1,3 +1,6 @@
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { canReadProposal, proposalHref } from '../../petitions/proposalLinks.js';
 import { getPerson } from '../../identity/person.js';
 import { listNotificationsForPerson, markAllRead } from '../../messaging/notifications.js';
 import { resolveNotificationPreferences } from '../../messaging/outbound.js';
@@ -5,23 +8,28 @@ import { persistProfileAttributes } from '../../../infra/persistence/storage.js'
 import { upsertProviderAttributes } from '../../structure/structureManager.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { sendHtml, sendJson } from '../../../shared/utils/http.js';
+import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 
-export async function renderNotifications({ req, res, state, wantsPartial }) {
+export async function renderNotifications({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
   const notifications = listNotificationsForPerson(state, person);
+  const page = paginate(notifications, { page: parsePage(url?.searchParams.get('page')) });
+  const unread = notifications.filter((notification) => !notification.read).length;
   const preferencePanel = renderPreferencesPanel(state, person);
   const html = await renderPage(
     'notifications',
     {
-      notifications: renderNotificationList(notifications),
+      notifications: renderNotificationList(page.items, state, person),
+      notificationsPager: renderPager(page, { baseHref: '/notifications', label: 'alerts' }),
+      unreadLabel: `${unread} unread`,
+      pageNumber: page.page,
+      markReadHidden: unread ? '' : 'hidden',
       person,
       personHandle: resolvePersonHandle(person),
-      roleLabel: person?.role || 'guest',
       preferencesPanel: preferencePanel,
     },
     { wantsPartial, title: 'Notifications', state },
@@ -29,13 +37,15 @@ export async function renderNotifications({ req, res, state, wantsPartial }) {
   return sendHtml(res, html);
 }
 
-export async function markNotificationsRead({ req, res, state, wantsPartial }) {
+export async function markNotificationsRead({ req, res, state }) {
   const person = getPerson(req, state);
+  const body = await readRequestBody(req);
+  const page = parsePage(body.page);
   await markAllRead(state, person);
-  return renderNotifications({ req, res, state, wantsPartial });
+  return sendRedirect(res, page > 1 ? `/notifications?page=${page}` : '/notifications');
 }
 
-export async function updateNotificationPreferences({ req, res, state, wantsPartial }) {
+export async function updateNotificationPreferences({ req, res, state }) {
   const person = getPerson(req, state);
   if (!person?.sessionId) {
     return sendJson(res, 401, { error: 'verification_required', message: 'Login required to update preferences.' });
@@ -48,7 +58,7 @@ export async function updateNotificationPreferences({ req, res, state, wantsPart
     attributes: { notifyProposalComments },
   });
   await persistProfileAttributes(state);
-  return renderNotifications({ req, res, state, wantsPartial });
+  return sendRedirect(res, '/notifications');
 }
 
 const NOTIFICATION_TYPE_LABELS = {
@@ -99,30 +109,38 @@ export function humanizeNotificationType(type = '') {
     .join(' ');
 }
 
-function renderNotificationList(list) {
-  if (!list.length) {
-    return '<p class="muted">No notifications.</p>';
+function renderNotificationList(list, state, person) {
+  if (!list.length) return '<p class="muted">No notifications yet.</p>';
+  const proposalIds = new Set(list.map((event) => event.petitionId).filter(Boolean));
+  const proposals = new Map();
+  if (proposalIds.size) {
+    for (const proposal of state.petitions || []) {
+      if (proposalIds.has(proposal.id) && canReadProposal(state, person, proposal)) {
+        proposals.set(proposal.id, proposal);
+      }
+    }
   }
-  return list
-    .map((n) => {
-      const anchorId = n.petitionId ? `petition-${n.petitionId}` : '';
-      const proposalLink = anchorId ? `<a class="pill ghost" href="/petitions#${escapeHtml(anchorId)}">Open proposal</a>` : '';
-      const createdAt = formatTimestamp(n.createdAt);
-      const expiresAt = formatTimestamp(n.expiresAt);
-      return `
-        <article class="discussion">
-          <div class="discussion__meta">
-            <span class="pill" title="${escapeHtml(String(n.type || ''))}">${escapeHtml(humanizeNotificationType(n.type))}</span>
-            ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-            ${n.read ? '<span class="pill ghost">read</span>' : ''}
-            ${proposalLink}
-          </div>
-          <p>${escapeHtml(n.message)}</p>
-          ${expiresAt ? `<p class="muted small">Expires: ${expiresAt}</p>` : ''}
-        </article>
-      `;
-    })
-    .join('\n');
+  const rows = list.map((event) => {
+    const proposal = proposals.get(event.petitionId);
+    const hidden = event.petitionId && !proposal;
+    const message = hidden ? 'The proposal is unavailable from this inbox.' : event.message;
+    const view = /comment|mention/.test(event.type) ? 'discussion' : /ballot|^vote/.test(event.type) ? 'ballot' : 'overview';
+    const createdAt = formatTimestamp(event.createdAt);
+    const expiresAt = formatTimestamp(event.expiresAt);
+    return `
+      <li class="discussion stack notification-row">
+        <div class="discussion__meta">
+          <strong>${escapeHtml(humanizeNotificationType(event.type))}</strong>
+          ${event.read ? '' : '<span class="pill">Unread</span>'}
+          ${createdAt ? `<time class="muted small" datetime="${escapeHtml(event.createdAt)}">${escapeHtml(createdAt)}</time>` : ''}
+        </div>
+        <p>${escapeHtml(message || '')}</p>
+        ${proposal ? `<a href="${escapeHtml(proposalHref(proposal, { view }))}" data-partial>Open proposal</a>` : ''}
+        ${expiresAt ? `<p class="muted small">Expires ${escapeHtml(expiresAt)}</p>` : ''}
+      </li>
+    `;
+  }).join('');
+  return `<ul class="discussion-list notification-list">${rows}</ul>`;
 }
 
 function renderPreferencesPanel(state, person) {

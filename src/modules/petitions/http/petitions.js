@@ -9,7 +9,9 @@ import { evaluateAction, getEffectivePolicy } from '../../circle/policy.js';
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
 import { createNotification, createNotificationWithOutbound } from '../../messaging/notifications.js';
 import { persistDiscussions, persistPetitions, persistVotes } from '../../../infra/persistence/storage.js';
-import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../../petitions/signatures.js';
+import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../signatures.js';
+import { buildFreezeSnapshot } from '../lifecycle.js';
+import { canReadProposal, proposalBrowseHref, proposalHref, readProposalBrowse, resolveProposalScope } from '../proposalLinks.js';
 import { resolveNotificationPreferences } from '../../messaging/outbound.js';
 import { extractMentions } from '../../social/posts.js';
 import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
@@ -20,12 +22,11 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
-import { renderPetitionList, renderProposalDiscussionFeed } from '../../../interfaces/http/views/petitionView.js';
+import { renderProposalCollection, renderProposalDiscussionFeed, renderProposalWorkspace } from '../../../interfaces/http/views/petitionView.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
-import { paginate, parsePage } from '../../../shared/utils/pagination.js';
+import { paginate } from '../../../shared/utils/pagination.js';
 import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { recordRateLimit } from '../../ops/metrics.js';
@@ -83,129 +84,125 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
     return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'petitions' });
   }
   const person = getPerson(req, state);
-  const modules = resolveModuleSettings(state);
-  const petitionGate = evaluateAction(state, person, 'petition');
-  const voteGate = modules.votes
-    ? evaluateAction(state, person, 'vote')
-    : { allowed: false, reason: 'module_disabled', message: 'Voting module disabled.' };
-  const moderateGate = evaluateAction(state, person, 'moderate');
-  const delegationEnabled = modules.delegation;
-  const groupsEnabled = modules.groups;
-  const showDelegation = delegationEnabled && groupsEnabled;
-  const signatures = filterVisibleEntries(state.signatures, state);
-  const delegations = filterVisibleEntries(state.delegations, state);
-  const petitionComments = filterVisibleEntries(state.discussions, state, (entry) => Boolean(entry.petitionId));
-  const commentsByPetition = groupCommentsByPetition(petitionComments);
-  const conflicts = delegationEnabled ? delegations?.filter((d) => d.conflict) || [] : [];
-  let suggestions = 'Delegation module disabled.';
-  if (delegationEnabled && !groupsEnabled) {
-    suggestions = 'Group suggestions unavailable (groups disabled).';
-  } else if (showDelegation) {
-    suggestions = renderSuggestions(person, state);
-  }
   const query = url || new URL(req.url, `http://${req.headers.host}`);
+  const browse = readProposalBrowse(query.searchParams);
+  if (query.searchParams.has('proposal')) {
+    return renderFocusedProposal({ res, state, wantsPartial, person, query, browse });
+  }
+
   const scope = resolveGroupScope(state, person, readGroupScope(query.searchParams), { lane: 'petitions' });
-  // A refused scope falls back to Circle level with the reason shown, rather than an empty
-  // list that reads as "this group has no proposals".
   const activeGroupId = scope.ok ? scope.groupId : null;
-  const scopeNotice = scope.ok ? '' : scope.message;
-  const petitions = filterVisibleEntries(state.petitions, state, (entry) =>
-    matchesGroupScope(entry, activeGroupId),
-  );
-  const votes = filterVisibleEntries(state.votes, state);
-  const quorumAdvanceLabel = getQuorumAdvanceLabel(state);
-  const governance = getGovernanceSettings(state);
-  const stageFilter = normalizeStageFilter(query.searchParams.get('stage') || 'all');
-  const composeOpen = query.searchParams.get('compose') ? 'open' : '';
-  const filteredPetitions = filterPetitionsByStage(petitions, stageFilter);
-  const petitionsPageInfo = paginate(filteredPetitions, { page: parsePage(query.searchParams.get('page')) });
-  const petitionsPager = renderPager(petitionsPageInfo, {
-    baseHref: '/petitions',
-    query: { stage: stageFilter === 'all' ? '' : stageFilter, group: activeGroupId || '' },
-    label: 'proposals',
-  });
-  const petitionLookup = buildPetitionLookup(petitions);
-  const discussionFeedItems = buildDiscussionFeedItems(petitionComments, petitionLookup, stageFilter);
-  const stageFilterOptions = renderStageFilterOptions(stageFilter);
-  const actorLabels = getActorLabels(state);
-  const composeParams = new URLSearchParams({ compose: 'proposal' });
-  if (activeGroupId) composeParams.set('group', activeGroupId);
-  if (stageFilter !== 'all') composeParams.set('stage', stageFilter);
+  const petitions = filterVisibleEntries(state.petitions, state, (entry) => matchesGroupScope(entry, activeGroupId));
+  const stageFilter = browse.stage || 'all';
+  const filtered = filterPetitionsByStage(petitions, stageFilter);
+  const pageInfo = paginate(filtered, { page: browse.page });
+  const pageBrowse = { ...browse, page: pageInfo.page };
+  const petitionLookup = buildPetitionLookup(filtered);
+  const comments = filterVisibleEntries(state.discussions, state, (entry) => petitionLookup.has(entry.petitionId));
+  const commentsByPetition = groupCommentsByPetition(comments);
+  const signatures = filterVisibleEntries(state.signatures, state, (entry) => petitionLookup.has(entry.petitionId));
+  const petitionGate = evaluateAction(state, person, 'petition');
   const canParticipate = canPostToGroupLane(state, person, scope.ok ? scope.group : null, 'petitions');
   const canCompose = petitionGate.allowed && canParticipate;
-  const canVote = voteGate.allowed && canParticipate;
-  const membershipNotice = canParticipate ? '' : 'Join the group to participate in its proposal lane.';
+  const composeUrl = new URL(proposalBrowseHref(activeGroupId, pageBrowse), 'http://local');
+  composeUrl.searchParams.set('compose', 'proposal');
+  const createHref = composeUrl.pathname + composeUrl.search + '#petitions-compose';
+  const modules = resolveModuleSettings(state);
+  const topicConfig = getTopicConfig(state);
   const html = await renderPage(
     'petitions',
     {
       person,
       personHandle: resolvePersonHandle(person),
-      workspaceCreateHref: canCompose ? `/petitions?${composeParams}#petitions-compose` : '',
-      petitionsContext: renderContextPanel({
-        gates: [
-          {
-            label: 'Draft proposals',
-            status: canCompose ? 'Allowed' : 'Blocked',
-            allowed: canCompose,
-            reason: petitionGate.allowed ? membershipNotice : petitionGate.message || petitionGate.reason,
-          },
-          {
-            label: 'Vote on proposals',
-            status: canVote ? 'Allowed' : 'Blocked',
-            allowed: canVote,
-            reason: voteGate.allowed ? membershipNotice : voteGate.message || voteGate.reason,
-          },
-        ],
-        facts: [
-          { term: 'Role', value: person?.role || 'guest' },
-          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
-          { term: 'Quorum advances to', value: quorumAdvanceLabel },
-          {
-            term: 'Delegation conflicts',
-            value: delegationEnabled
-              ? conflicts.map((c) => c.topic).join(', ') || 'None detected'
-              : 'Delegation disabled',
-          },
-        ],
-        guidance: [
-          'Use proposals when you need a decision; discussion and social lanes stay exploratory.',
-          'Circle policy governs quorum and votes; group cachets inform delegation only.',
-        ],
-      }),
-      petitionsList: renderPetitionList(petitionsPageInfo.items, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
-        allowDelegation: delegationEnabled,
-        allowVoting: modules.votes,
-        allowLaneParticipation: canParticipate,
-        allowEditing: canCompose,
-        editGate: petitionGate,
-        actorLabels,
-        state,
-        groupId: activeGroupId,
-        promotable: (entry) => evaluatePromotion(state, person, { kind: 'petition', entry }),
-        requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'petition', entry }),
-        decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'petition', entry }),
-      }),
-      petitionsPager,
+      workspaceCreateHref: canCompose ? createHref : '',
+      petitionsCreateAction: canCompose ? `<a class="cta" href="${escapeHtml(createHref)}" data-partial>Draft proposal</a>` : '',
+      petitionsScopeLabel: escapeHtml(scope.ok && scope.group ? scope.group.name || 'Group' : 'Whole Circle'),
       petitionsScopeTabs: renderPetitionScopeTabs({ state, person, activeGroupId }),
-      petitionsScopeNotice: scopeNotice ? `<p class="muted small">${escapeHtml(scopeNotice)}</p>` : '',
+      petitionsScopeNotice: scope.ok ? '' : `<p class="muted small">${escapeHtml(scope.message)}</p>`,
+      petitionsFilterScope: activeGroupId ? `<input type="hidden" name="group" value="${escapeHtml(activeGroupId)}" />` : '',
+      petitionsList: renderProposalCollection(pageInfo.items, {
+        state, signatures, commentsByPetition, browse: pageBrowse, activeGroupId,
+        filteredEmpty: Boolean(browse.stage && petitions.length),
+        createHref: canCompose ? createHref : '',
+      }),
+      petitionsPager: renderPager(pageInfo, {
+        baseHref: '/petitions',
+        query: { stage: browse.stage, group: activeGroupId || '' },
+        label: 'proposals',
+      }),
       petitionsGroupPicker: renderPetitionGroupPicker(state, person, activeGroupId),
-      topicDatalist: renderTopicDatalist(
-        buildTopicOptions({
-          anchors: getTopicConfig(state).anchors,
-          pinned: getTopicConfig(state).pinned,
-          preferences: getTopicPreferences(state, person),
-          entries: petitions,
-        }),
-      ),
-      delegationSuggestions: suggestions,
-      quorumAdvanceLabel,
-      quorumDefault: governance.quorumDefault,
-      discussionFeed: renderProposalDiscussionFeed(discussionFeedItems, state),
-      stageFilterOptions,
-      composeOpen,
+      proposalComposeFormHidden: canCompose ? '' : 'hidden',
+      proposalComposeNotice: canCompose ? '' : escapeHtml(canParticipate
+        ? petitionGate.message || 'Drafting is unavailable for this session.'
+        : 'Join the group to draft a proposal here.'),
+      topicDatalist: renderTopicDatalist(buildTopicOptions({
+        anchors: topicConfig.anchors,
+        pinned: topicConfig.pinned,
+        preferences: getTopicPreferences(state, person),
+        entries: petitions,
+      })),
+      delegationSuggestions: modules.delegation && modules.groups
+        ? renderSuggestions(person, state)
+        : modules.delegation ? 'Group suggestions unavailable (groups disabled).' : 'Delegation module disabled.',
+      quorumAdvanceLabel: getQuorumAdvanceLabel(state),
+      quorumDefault: getGovernanceSettings(state).quorumDefault,
+      discussionFeed: renderProposalDiscussionFeed(buildDiscussionFeedItems(comments, petitionLookup), state, pageBrowse),
+      stageFilterOptions: renderStageFilterOptions(stageFilter),
+      composeOpen: query.searchParams.has('compose') && canCompose ? 'open' : '',
     },
     { wantsPartial, title: 'Proposals & Votes', state },
   );
+  return sendHtml(res, html);
+}
+
+async function renderFocusedProposal({ res, state, wantsPartial, person, query, browse }) {
+  const id = sanitizeText(query.searchParams.get('proposal'), 120);
+  const proposal = findVisibleEntry(state.petitions, state, (entry) => entry.id === id);
+  if (!canReadProposal(state, person, proposal)) {
+    const html = await renderPage('petition-unavailable', { person, pageKey: 'petitions' }, {
+      state, wantsPartial, title: 'Proposal unavailable',
+    });
+    return sendHtml(res, html, {}, 404);
+  }
+
+  const scope = resolveProposalScope(state, person, proposal);
+  const requestedView = query.searchParams.get('view');
+  const view = ['discussion', 'history', 'ballot'].includes(requestedView) ? requestedView : 'overview';
+  if (!matchesGroupScope(proposal, readGroupScope(query.searchParams))) {
+    return sendRedirect(res, proposalHref(proposal, { ...browse, view }));
+  }
+
+  const canParticipate = canPostToGroupLane(state, person, scope.group, 'petitions');
+  const petitionGate = evaluateAction(state, person, 'petition');
+  const voteGate = evaluateAction(state, person, 'vote');
+  const postGate = evaluateAction(state, person, 'post');
+  const modules = resolveModuleSettings(state);
+  const html = await renderPage('petition-workspace', {
+    person,
+    pageKey: 'petitions',
+    ...renderProposalWorkspace(proposal, {
+      state, person, scope, browse, view,
+      signatures: filterVisibleEntries(state.signatures, state, (entry) => entry.petitionId === id),
+      comments: view === 'discussion'
+        ? filterVisibleEntries(state.discussions, state, (entry) => entry.petitionId === id)
+        : [],
+      votes: view === 'ballot' && modules.votes
+        ? filterVisibleEntries(state.votes, state, (entry) => entry.petitionId === id)
+        : [],
+      allowEditing: canParticipate && petitionGate.allowed,
+      allowSigning: canParticipate && voteGate.allowed,
+      allowCommenting: canParticipate && postGate.allowed,
+      allowVoting: modules.votes,
+      canVote: canParticipate && voteGate.allowed,
+      voteNotice: canParticipate ? voteGate.message : 'Join the group to vote on this proposal.',
+      allowDelegation: modules.delegation,
+      canModerate: evaluateAction(state, person, 'moderate').allowed,
+      actorLabelPlural: getActorLabels(state).actorLabelPlural,
+      promotable: (entry) => evaluatePromotion(state, person, { kind: 'petition', entry }),
+      requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'petition', entry }),
+      decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'petition', entry }),
+    }),
+  }, { state, wantsPartial, title: proposal.title });
   return sendHtml(res, html);
 }
 
@@ -216,7 +213,7 @@ function requirePetitionAction(res, state, person, petitionId, { requireMembersh
     return null;
   }
   // A submitted group cannot authorize an action. Always check the record's current lane.
-  const scope = resolveGroupScope(state, person, petition.groupId, { lane: 'petitions' });
+  const scope = resolveProposalScope(state, person, petition);
   if (!scope.ok) {
     sendJson(res, scope.error === 'group_not_found' ? 404 : 403, { error: scope.error, message: scope.message });
     return null;
@@ -228,22 +225,23 @@ function requirePetitionAction(res, state, person, petitionId, { requireMembersh
   return petition;
 }
 
-function redirectToPetitionLane(res, groupId) {
-  return sendRedirect(res, groupId ? `/petitions?group=${encodeURIComponent(groupId)}` : '/petitions');
+function redirectToProposal(res, proposal, view, body = {}) {
+  const browse = readProposalBrowse(new URLSearchParams({ stage: body.browseStage || '', page: body.browsePage || '' }));
+  return sendRedirect(res, proposalHref(proposal, { ...browse, view }));
 }
 
 function renderPetitionScopeTabs({ state, person, activeGroupId }) {
   const groups = listReadableGroupLanes(state, person, 'petitions');
   if (!groups.length) return '';
   const tab = (href, label, active) =>
-    `<a class="pill ${active ? '' : 'ghost'}" href="${escapeHtml(href)}" data-partial>${escapeHtml(label)}</a>`;
+    `<a class="pill ${active ? '' : 'ghost'}" href="${escapeHtml(href)}" ${active ? 'aria-current="page"' : ''} data-partial>${escapeHtml(label)}</a>`;
   const tabs = [tab('/petitions', 'Whole Circle', !activeGroupId)];
   for (const group of groups) {
     tabs.push(
       tab(`/petitions?group=${encodeURIComponent(group.id)}`, group.name || 'Group', activeGroupId === group.id),
     );
   }
-  return `<div class="discussion__meta">${tabs.join('')}</div>`;
+  return `<nav class="discussion__meta" aria-label="Proposal lanes">${tabs.join('')}</nav>`;
 }
 
 // Only shown when the member belongs to a group with an open proposals lane.
@@ -324,7 +322,7 @@ function formatSuggestionMeta(suggestion = {}) {
   return parts.join(' | ');
 }
 
-export async function submitPetition({ req, res, state, wantsPartial }) {
+export async function submitPetition({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -453,15 +451,10 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     });
   }
 
-  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, petition, 'overview', body);
 }
 
-export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
+export async function updatePetitionDraft({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -560,15 +553,10 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     payload: { revisionId: revision.id, note: revision.note || null, topic },
   });
 
-  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, petition, 'overview', body);
 }
 
-export async function castVote({ req, res, state, wantsPartial }) {
+export async function castVote({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -694,7 +682,8 @@ export async function castVote({ req, res, state, wantsPartial }) {
 
   // Tell everyone whose ballot flows through this voter, so overriding stays their call.
   for (const follower of followers) {
-    if (!follower.ownerHash || follower.ownerHash === authorHash) continue;
+    if (!follower.ownerHash || follower.ownerHash === authorHash ||
+        !canReadProposal(state, findSessionByHash(state, follower.ownerHash), exists)) continue;
     await createNotification(state, {
       type: 'delegated_ballot_resolved',
       recipientHash: follower.ownerHash,
@@ -704,12 +693,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
     });
   }
 
-  if (exists.groupId) return redirectToPetitionLane(res, exists.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, exists, 'ballot', body);
 }
 
 // " — 5 days to vote" / "" when the deployment runs without a delegate window.
@@ -762,7 +746,7 @@ export async function promotePetition({ req, res, state }) {
         message: `A member asked to move proposal "${entry.title}" up to ${request.targetLabel}.`,
       });
     }
-    return redirectToPetitionLane(res, entry.groupId);
+    return redirectToProposal(res, entry, 'overview');
   }
 
   if (intent === 'promote-decide') {
@@ -800,7 +784,7 @@ export async function promotePetition({ req, res, state }) {
           : `Your request to move "${entry.title}" up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
       });
     }
-    return redirectToPetitionLane(res, result.approved ? result.toGroupId : entry.groupId);
+    return redirectToProposal(res, entry, 'overview');
   }
 
   const decision = applyPromotion(state, person, { kind: 'petition', entry });
@@ -823,7 +807,7 @@ export async function promotePetition({ req, res, state }) {
     petitionId,
     message: `Proposal "${entry.title}" was moved up to ${decision.targetLabel}.`,
   });
-  return redirectToPetitionLane(res, decision.toGroupId);
+  return redirectToProposal(res, entry, 'overview');
 }
 
 // Group admins and lane moderators — the people who may decide a request.
@@ -834,7 +818,7 @@ function listGroupDeciders(group) {
     .filter(Boolean);
 }
 
-export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
+export async function updatePetitionStatus({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -886,14 +870,10 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
     },
   });
 
-  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, petition, willVote || willClose ? 'ballot' : 'overview', body);
 }
 
-export async function signPetitionRoute({ req, res, state, wantsPartial }) {
+export async function signPetitionRoute({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -910,14 +890,10 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'already_signed' });
   }
   await signPetition({ petition, person, state });
-  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, petition, 'overview', body);
 }
 
-export async function postPetitionComment({ req, res, state, wantsPartial, url }) {
+export async function postPetitionComment({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -956,9 +932,8 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     return sendJson(res, 400, { error: 'petition_closed', message: 'Discussion closed for this proposal.' });
   }
   const resolvedArgumentParent = argumentParentId
-    ? state.discussions.find((entry) => entry.id === argumentParentId && entry.petitionId === petitionId)
+    ? findVisibleEntry(state.discussions, state, (entry) => entry.id === argumentParentId && entry.petitionId === petitionId)
     : null;
-  const argumentTitleFinal = argumentTitle || (resolvedArgumentParent ? 'Argument note' : '');
   let topicId = petition.topicId || null;
   let topicPath = Array.isArray(petition.topicPath) ? petition.topicPath : [];
   if (!topicId) {
@@ -975,7 +950,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
     stance,
     content,
     factCheck: Boolean(factCheck),
-    argumentTitle: argumentTitleFinal,
+    argumentTitle,
     argumentParentId: resolvedArgumentParent ? argumentParentId : '',
     evidenceLinks,
     authorHash: person?.pidHash || 'anonymous',
@@ -992,18 +967,14 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
       petitionId,
       stance,
       factCheck: Boolean(factCheck),
-      argumentTitle: argumentTitleFinal || null,
+      argumentTitle: argumentTitle || null,
       argumentParentId: resolvedArgumentParent ? argumentParentId : null,
       evidenceLinks,
     },
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
-  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true, url });
-  }
-  return sendRedirect(res, '/petitions');
+  return redirectToProposal(res, petition, 'discussion', body);
 }
 
 function groupCommentsByPetition(comments = []) {
@@ -1042,7 +1013,7 @@ async function notifyPetitionAuthor(state, { petition, commenter, petitionId, co
   const authorSession = findSessionByHash(state, petition.authorHash);
   const commenterLabel = commenter?.handle || 'someone';
   const prefs = resolveNotificationPreferences(state, { sessionId: authorSession?.id, handle: authorSession?.handle });
-  if (!prefs.proposalComments) return;
+  if (!prefs.proposalComments || !authorSession || !canReadProposal(state, authorSession, petition)) return;
   await createNotificationWithOutbound(
     state,
     {
@@ -1061,7 +1032,7 @@ async function notifyPetitionMentions(state, { petition, commenter, petitionId, 
   const recipients = new Map();
   for (const handle of mentions) {
     const session = findSessionByHandle(state, handle);
-    if (!session) continue;
+    if (!session || !canReadProposal(state, session, petition)) continue;
     if (commenter?.pidHash && session.pidHash === commenter.pidHash) continue;
     if (recipients.has(session.pidHash)) continue;
     const prefs = resolveNotificationPreferences(state, { sessionId: session.id, handle: session.handle });
@@ -1110,13 +1081,11 @@ function renderStageFilterOptions(selected = 'all') {
     .join('\n');
 }
 
-function buildDiscussionFeedItems(comments = [], petitionLookup, stageFilter) {
+function buildDiscussionFeedItems(comments = [], petitionLookup) {
   const items = [];
   for (const comment of comments) {
     const petition = petitionLookup.get(comment.petitionId);
     if (!petition) continue;
-    const petitionStage = normalizeStageFilter(petition.status);
-    if (stageFilter !== 'all' && petitionStage !== stageFilter) continue;
     items.push({ comment, petition });
   }
   return items.sort((a, b) => Date.parse(b.comment.createdAt) - Date.parse(a.comment.createdAt)).slice(0, 30);
@@ -1167,33 +1136,6 @@ function buildPetitionRevision({
 function isEditableStage(status = '') {
   const normalized = String(status || '').toLowerCase();
   return normalized === 'draft' || normalized === 'discussion';
-}
-
-function buildFreezeSnapshot(petition, person) {
-  const latest = Array.isArray(petition?.versions) ? petition.versions[0] : null;
-  const source = latest || petition || {};
-  return {
-    revisionId: latest?.id || null,
-    frozenAt: new Date().toISOString(),
-    frozenBy: person?.pidHash || 'anonymous',
-    title: source.title || petition.title || '',
-    summary: source.summary || petition.summary || '',
-    body: source.body || petition.body || '',
-    evidenceSummary: source.evidenceSummary || petition.evidenceSummary || '',
-    evidenceLinks: Array.isArray(source.evidenceLinks) ? source.evidenceLinks : petition.evidenceLinks || [],
-    problem: source.problem || petition.problem || '',
-    proposedAction: source.proposedAction || petition.proposedAction || '',
-    impact: source.impact || petition.impact || '',
-    risks: source.risks || petition.risks || '',
-    implementationPlan: source.implementationPlan || petition.implementationPlan || '',
-    topic: source.topic || petition.topic || 'general',
-    topicId: source.topicId || petition.topicId || null,
-    topicPath: Array.isArray(source.topicPath)
-      ? source.topicPath
-      : Array.isArray(petition.topicPath)
-        ? petition.topicPath
-        : [],
-  };
 }
 
 function parseStructuredFields(body = {}, fallback = {}) {

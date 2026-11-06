@@ -3152,7 +3152,9 @@ function isHtmlResponse(response) {
       if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
-      window.history.pushState({}, '', url);
+      const destination = new URL(response.redirected ? response.url : url);
+      if (!destination.hash) destination.hash = anchor.hash;
+      window.history.pushState({}, '', destination.href);
       applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
@@ -3167,7 +3169,7 @@ function isHtmlResponse(response) {
       syncBusyIndicator();
       const disclosure = document.querySelector('[data-nav-disclosure]');
       if (disclosure) disclosure.open = false;
-      focusPageDestination(root, url);
+      focusPageDestination(root, destination.href);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
@@ -3221,6 +3223,8 @@ function isHtmlResponse(response) {
       await submitDelegationChoice(form);
       return;
     }
+    const action = new URL(form.getAttribute('action') || window.location.href, document.baseURI);
+    const recordForm = mode === 'forum' || mode === 'petitions' || action.pathname === '/petitions/promote';
     let redirectedTo;
     try {
       setAppBusy(true);
@@ -3239,13 +3243,12 @@ function isHtmlResponse(response) {
       const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
       const method = (form.method || 'POST').toUpperCase();
       const headers = { 'X-Requested-With': 'partial' };
-      let url = form.action;
+      let url = action.href;
       const options = { method, headers };
       if (method === 'GET') {
         const params = new URLSearchParams(formData);
-        const target = new URL(form.action, window.location.origin);
-        target.search = params.toString();
-        url = target.toString();
+        action.search = params.toString();
+        url = action.href;
       } else {
         options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
       }
@@ -3253,7 +3256,7 @@ function isHtmlResponse(response) {
       redirectedTo = response.redirected ? response.url : '';
       if (!response.ok) {
         if (response.status === 401 || response.status === 403 || response.status === 429 ||
-            (mode === 'forum' && response.status >= 400 && response.status < 500)) {
+            (recordForm && response.status >= 400 && response.status < 500)) {
           try {
             const payload = await response.json();
             alert(payload.message || payload.error || 'Not allowed for this role.');
@@ -3287,8 +3290,8 @@ function isHtmlResponse(response) {
       console.error(error);
       if (redirectedTo) {
         window.location.href = redirectedTo;
-      } else if (mode === 'forum') {
-        alert('The submission could not be confirmed. Check the forum before trying again.');
+      } else if (recordForm) {
+        alert('The submission could not be confirmed. Check the record before trying again.');
       } else {
         form.submit();
       }

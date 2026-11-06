@@ -1,16 +1,12 @@
 <section class="panel" id="petitions-filters" data-composer-section="petitions-filters" data-section-label="Stage filter">
-  <p class="eyebrow">Feed controls</p>
-  <h3>Filter the proposals</h3>
-  <form class="form-grid" method="get" action="/petitions" data-enhance="petitions-filter">
+  <form class="form-inline" method="get" action="/petitions" data-enhance="petitions-filter">
+    {{petitionsFilterScope}}
     <label class="field">
       <span>Filter by stage</span>
       <select name="stage">
         {{stageFilterOptions}}
       </select>
     </label>
-    <div class="cta-row">
-      <button class="ghost" type="submit">Apply filter</button>
-    </div>
+    <button class="ghost" type="submit">Apply filter</button>
   </form>
-  <p class="muted small">Stages run draft &rarr; discussion &rarr; vote &rarr; closed.</p>
 </section>

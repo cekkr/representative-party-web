@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { persistSignatures, persistPetitions } from '../../infra/persistence/storage.js';
 import { createNotificationWithOutbound } from '../messaging/notifications.js';
 import { countVisibleEntries, someVisibleEntries, stampLocalEntry } from '../federation/replication.js';
+import { buildFreezeSnapshot } from './lifecycle.js';
 import { logTransaction } from '../transactions/registry.js';
 
 export function countSignatures(petitionId, state) {
@@ -38,6 +39,7 @@ export async function signPetition({ petition, person, state }) {
   const count = countSignatures(petition.id, state);
   if (petition.quorum && count >= petition.quorum && petition.status === 'draft') {
     const advanceStage = getQuorumAdvanceStage(state);
+    if (advanceStage === 'vote') petition.freeze = buildFreezeSnapshot(petition, person);
     petition.status = advanceStage === 'vote' ? 'open' : 'discussion';
     await persistPetitions(state);
     const nextLabel = advanceStage === 'vote' ? 'vote' : 'discussion';
@@ -45,7 +47,13 @@ export async function signPetition({ petition, person, state }) {
       type: 'petition_quorum',
       actorHash: person.pidHash,
       petitionId: petition.id,
-      payload: { petitionId: petition.id, status: petition.status, signatures: count },
+      payload: {
+        petitionId: petition.id,
+        status: petition.status,
+        signatures: count,
+        freezeRevisionId: petition.freeze?.revisionId || null,
+        frozenAt: petition.freeze?.frozenAt || null,
+      },
     });
     await createNotificationWithOutbound(
       state,
