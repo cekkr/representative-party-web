@@ -121,7 +121,9 @@ test('verified users can propose governance changes and admin approval updates t
   assert.match(approveHtml, /Governance proposal approved and defaults updated/);
 
   const { text: governanceText } = await fetchText(`${server.baseUrl}/governance`);
-  assert.match(governanceText, /Default quorum: 9/);
+  // The current rules read as term/value pairs, and an approved change shows its effect.
+  assert.match(governanceText, /<dt>Default quorum<\/dt>\s*<dd>9 signatures<\/dd>/);
+  assert.match(governanceText, /<th scope="col">Before<\/th><th scope="col">After<\/th>/);
   // The public history reads as a decision, keeps who proposed it apart from who decided,
   // and never leaks the internal event type.
   assert.match(governanceText, /Approved — Pilot quorum update/);

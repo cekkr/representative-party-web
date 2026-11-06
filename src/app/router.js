@@ -106,8 +106,8 @@ const routes = [
       const segments = pathname.split('/').filter(Boolean);
       return { hash: segments[segments.length - 1] || '' };
     },
-    action: ({ req, res, state, wantsPartial, params }) =>
-      renderDelegateProfile({ req, res, state, wantsPartial, params }),
+    action: ({ req, res, state, wantsPartial, params, url }) =>
+      renderDelegateProfile({ req, res, state, wantsPartial, params, url }),
   },
   { method: 'GET', path: '/votes/ledger', action: exportVotes },
   { method: 'POST', path: '/votes/gossip', action: gossipVotes },

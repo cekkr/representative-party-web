@@ -1,42 +1,38 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Governance</h1>
+    <p class="workspace-heading__summary">The digital constitution sets how proposals move through discussion and voting. Members propose changes; each decision is recorded with who asked and who decided.</p>
+  </div>
+  {{proposeAction}}
+</header>
+<nav class="workspace-sections" aria-label="Governance sections">
+  <a href="#governance-overview">Current rules</a>
+  <a href="#governance-proposals">Change proposals&nbsp;<span class="muted small">({{governanceOpenCount}})</span></a>
+  <a href="#governance-decisions">Decisions</a>
+</nav>
 <div class="page-grid page-grid--governance">
-  <div class="page-main">
-    <section class="panel" data-composer-section="governance-overview" data-section-label="Digital constitution">
-      <p class="eyebrow">Governance</p>
-      <h2>Digital constitution</h2>
-      <p>These defaults describe how proposals move through discussion and voting. Providers can adjust them via admin settings.</p>
-      <div class="callout">
-        <p class="muted small">Default quorum: {{quorumDefault}}</p>
-        <p class="muted small">Discussion window: {{discussionWindowDays}} days</p>
-        <p class="muted small">Vote window: {{voteWindowDays}} days</p>
-        <p class="muted small">Review window: {{reviewWindowHours}} hours</p>
-        <p class="muted small">Default vote method: {{defaultVoteMethod}}</p>
-        <p class="muted small">Delegation decay: {{delegationDecayDays}}</p>
-        <p class="muted small">Delegate vote window: {{delegateVoteWindowDays}}</p>
-        <p class="muted small">Last updated: {{governanceUpdatedAt}} - {{governanceUpdatedBy}}</p>
-      </div>
+  <div class="page-main stack">
+    <section class="panel stack" id="governance-overview" data-composer-section="governance-overview" data-section-label="Digital constitution" aria-labelledby="governance-rules-title">
+      <h2 id="governance-rules-title">Current rules</h2>
+      {{governanceRules}}
+      <p class="muted small">Last updated {{governanceUpdatedAt}} by {{governanceUpdatedBy}}.</p>
       <details class="note">
         <summary>Governance notes</summary>
         <p class="muted small">{{governanceNotes}}</p>
       </details>
     </section>
 
-    <section class="panel" data-composer-section="governance-proposals" data-section-label="Change proposals">
-      <p class="eyebrow">Governance</p>
-      <h2>Change proposals</h2>
-      <div class="stack">
-        <p class="muted small">Open proposals</p>
-        {{governanceProposalList}}
-      </div>
-      <div class="stack">
-        <p class="muted small">Decision history</p>
-        {{governanceHistoryList}}
-      </div>
+    <section class="panel stack" id="governance-proposals" data-composer-section="governance-proposals" data-section-label="Change proposals" aria-labelledby="governance-proposals-title">
+      <h2 id="governance-proposals-title">Change proposals</h2>
+      <p class="muted small">Each proposal shows the rule as it stands today next to the change. Proposals stay advisory until the provider decides them.</p>
+      {{governanceProposalList}}
+      <h2 class="h3" id="governance-decisions" tabindex="-1">Decisions</h2>
+      {{governanceHistoryList}}
     </section>
   </div>
   <aside class="page-aside">
-    <section class="panel" data-composer-section="governance-propose" data-section-label="Propose a change">
-      <p class="eyebrow">Governance</p>
-      <h3>Propose a change</h3>
+    <section class="panel" id="governance-propose" data-composer-section="governance-propose" data-section-label="Propose a change">
+      <h2 class="h3">Propose a change</h2>
       <p class="muted small">{{proposalHelp}}</p>
       <p class="muted small">{{proposalFlash}}</p>
       {{proposalErrors}}
@@ -99,7 +95,7 @@
           <textarea name="governanceProposalNotes" rows="3" {{proposalDisabled}}>{{proposalNotes}}</textarea>
         </label>
         <div class="cta-row">
-          <button class="ghost" type="submit" {{proposalDisabled}}>Submit change proposal</button>
+          <button class="cta" type="submit" {{proposalDisabled}}>Submit change proposal</button>
         </div>
       </form>
     </section>

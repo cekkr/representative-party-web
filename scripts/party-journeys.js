@@ -529,7 +529,7 @@ async function journeyArrive(browser) {
   }
   await settle(admin);
   await visit(admin, '/governance');
-  await expectText(admin, 'Default quorum: 250', 'the party constitution publishes its Scenario A defaults');
+  await expectText(admin, '250 signatures', 'the party constitution publishes its Scenario A defaults');
 }
 
 /** A2 — Conversation before any vote: live threads, a fact-check loop, a public concession. */
@@ -1481,7 +1481,7 @@ async function journeyAccountability(browser) {
   // Open Marco's accountability dashboard: delegations received/set, vote history, and
   // (after A5) a lost election on the record next to the accumulated delegations.
   const href = await marco.evaluate(() => {
-    const rows = [...document.querySelectorAll('.list-row')];
+    const rows = [...document.querySelectorAll('.person-card')];
     const row = rows.find((r) => (r.textContent || '').toLowerCase().includes('marco.deluca'));
     return row?.querySelector('a[href^="/delegates/"]')?.getAttribute('href') || null;
   });
@@ -1539,7 +1539,7 @@ async function journeyGovernance(browser) {
   await settle(admin);
 
   await visit(tommaso, '/governance');
-  await expectText(tommaso, 'Default quorum: 120', 'the accepted proposal updates the constitution defaults');
+  await expectText(tommaso, '120 signatures', 'the accepted proposal updates the constitution defaults');
   await shot(tommaso, 'party-governance', 'Governance changes itself: a member proposes lowering the default quorum because the uniform one starves the long tail; the decision and its reason enter public history. The tension stays visible — today the provider decides, and whether that should become a member vote is an open design question.', {
     focus: 'main',
   });

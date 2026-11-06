@@ -1,21 +1,20 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Cases</h1>
+    <p class="workspace-heading__summary">Record a consequence from a discussion post, acknowledge it, and agree when to review it. The original message stays the source. Cases stay on this provider.</p>
+  </div>
+  <p class="workspace-heading__actions"><a class="ghost" href="/organization?view=preview" data-partial>Explore the workspace preview</a></p>
+</header>
 <div class="page-grid page-grid--organization">
   <div class="page-main stack">
     <section class="panel stack" id="organization-case-work" data-composer-section="organization-case-work" data-section-label="Case workspace">
-      <header>
-        <p class="eyebrow">Organization operations</p>
-        <h2>Coordination workspace</h2>
-        <p class="muted small">Use cases to record a consequence and agree when to review it.</p>
-      </header>
       {{caseDetail}}
     </section>
   </div>
-  <aside class="page-aside stack">
+  <aside class="page-aside stack" aria-label="Case queue">
     <section class="panel stack" id="organization-case-queue" data-composer-section="organization-case-queue" data-section-label="Case queue">
-      <h3>Case queue</h3>
+      <h2 class="h3">Case queue</h2>
       {{caseQueue}}
-      <div class="cta-row">
-        <a class="ghost tiny" href="/organization?view=preview" data-partial>Explore the workspace preview</a>
-      </div>
     </section>
   </aside>
 </div>

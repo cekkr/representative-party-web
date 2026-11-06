@@ -54,7 +54,7 @@ export async function resolveConflict({ req, res, state }) {
   return sendJson(res, 200, { status: 'ok', topic, delegateHash });
 }
 
-export async function renderDelegation({ req, res, state, wantsPartial }) {
+export async function renderDelegation({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'delegation')) {
     return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'delegation' });
   }
@@ -95,6 +95,9 @@ export async function renderDelegation({ req, res, state, wantsPartial }) {
       delegateBallotInbox: renderDelegateBallotInbox({ person, state: ballotState, votingEnabled }),
       myDelegatedBallots: renderMyDelegatedBallots({ person, state: ballotState, votingEnabled }),
       peopleDatalist: renderPeopleDatalist(state, person),
+      // A People profile links here with ?delegate=<handle>; it only pre-fills the
+      // form, and the POST resolves and gates the target as usual.
+      delegatePrefill: escapeHtml(sanitizeText(url?.searchParams?.get('delegate') || '', 80).replace(/^@+/, '')),
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences) || 'none',
       topicAnchors: formatTopicList(topicConfig.anchors || []),

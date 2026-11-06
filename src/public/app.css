@@ -4105,6 +4105,152 @@ code {
   margin-top: 0.75rem;
 }
 
+/* Record headers, stat grids, and collection search shared by People,
+   Governance, and organization cases. */
+.collection-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.collection-search .field {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+.person-card .person-row__id {
+  align-items: flex-start;
+}
+
+.person-card h3 {
+  margin: 0 0 0.35rem;
+}
+
+.avatar--lg {
+  width: 64px;
+  height: 64px;
+  font-size: 1.6rem;
+}
+
+.profile-heading .person-row__id {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.profile-heading__name {
+  margin: 0 0 0.35rem;
+}
+
+.profile-heading__name .actor {
+  font-size: inherit;
+}
+
+.record-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.record-stats__item {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.record-stats__item dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.record-stats__item dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.record-stats__item dd.tiny {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.topic-count-list .list-row,
+.plain > .list-row {
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+h2.h3 {
+  font-size: 1.15rem;
+}
+
+/* Governance: the current rule next to the proposed one. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.record-stats--rules .record-stats__item dd {
+  font-size: 1.125rem;
+}
+
+.rule-change {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.rule-change th,
+.rule-change td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.rule-change thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.rule-change td:last-child {
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+
+.case-history {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  border-inline-start: 2px solid var(--border);
+  list-style: none;
+}
+
+.case-history > li + li {
+  margin-top: 0.75rem;
+}
+
+.case-heading h2 {
+  margin: 0;
+}
+
+.decision-entry {
+  border-inline-start: 3px solid var(--border-strong);
+}
+
+.decision-entry.is-approved {
+  border-inline-start-color: var(--success);
+}
+
+.decision-entry.is-rejected {
+  border-inline-start-color: var(--danger);
+}
+
 .group-tree,
 .group-member-list {
   padding: 0;

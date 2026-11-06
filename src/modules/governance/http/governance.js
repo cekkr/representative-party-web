@@ -117,6 +117,11 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
       proposalDelegationDecayDays: escapeHtml(String(governance.delegationDecayDays)),
       proposalDelegateVoteWindowDays: escapeHtml(String(governance.delegateVoteWindowDays)),
       proposalNotes: escapeHtml(governance.notes || ''),
+      governanceRules: renderCurrentRules(governance),
+      governanceOpenCount: escapeHtml(`${openProposals.length} open`),
+      proposeAction: person
+        ? '<p class="workspace-heading__actions"><a class="cta" href="#governance-propose">Propose a change</a></p>'
+        : '<p class="workspace-heading__actions"><a class="ghost" href="/auth/eudi" data-partial>Verify to propose a change</a></p>',
       governanceProposalList: renderGovernanceProposalList(openProposals, state),
       governanceHistoryList: renderGovernanceHistoryList(history, state),
     },
@@ -124,6 +129,35 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
   );
 
   return sendHtml(res, html);
+}
+
+const RULE_FIELDS = [
+  'quorumDefault',
+  'discussionWindowDays',
+  'voteWindowDays',
+  'reviewWindowHours',
+  'defaultVoteMethod',
+  'delegationDecayDays',
+  'delegateVoteWindowDays',
+];
+
+const RULE_LABELS = {
+  quorumDefault: 'Default quorum',
+  discussionWindowDays: 'Discussion window',
+  voteWindowDays: 'Vote window',
+  reviewWindowHours: 'Review window',
+  defaultVoteMethod: 'Default vote method',
+  delegationDecayDays: 'Delegation decay',
+  delegateVoteWindowDays: 'Delegate vote window',
+};
+
+function renderCurrentRules(governance) {
+  const items = RULE_FIELDS.map((field) => `
+    <div class="record-stats__item">
+      <dt>${escapeHtml(RULE_LABELS[field])}</dt>
+      <dd>${escapeHtml(formatRuleValue(field, governance[field]))}</dd>
+    </div>`).join('');
+  return `<dl class="record-stats record-stats--rules">${items}</dl>`;
 }
 
 function renderProposalErrors(errors = []) {
@@ -135,24 +169,72 @@ function renderProposalErrors(errors = []) {
   `;
 }
 
+// Values are stored raw (`0`, `majority`); members read rules.
+const RULE_FORMATS = {
+  quorumDefault: (value) => `${value} signatures`,
+  discussionWindowDays: (value) => `${value} days`,
+  voteWindowDays: (value) => `${value} days`,
+  reviewWindowHours: (value) => `${value} hours`,
+  delegationDecayDays: (value) => (Number(value) ? `${value} days without renewal` : 'Off'),
+  delegateVoteWindowDays: (value) => (Number(value) ? `${value} days` : 'No deadline'),
+};
+
+function formatRuleValue(field, value) {
+  if (value === undefined || value === null || value === '') return 'Not set';
+  const format = RULE_FORMATS[field];
+  return format ? format(value) : String(value);
+}
+
+// The current rule sits beside the proposed one, so a reader never has to
+// remember the constitution to understand what a change does.
+function renderRuleChange(changes = [], { current = null, decided = false } = {}) {
+  if (!changes.length) return '';
+  const firstHeading = decided ? 'Before' : 'Current rule';
+  const secondHeading = decided ? 'After' : 'Proposed';
+  const rows = changes
+    .map((change) => {
+      const before = current && !decided ? current[change.field] : change.from;
+      return `<tr>
+        <th scope="row">${escapeHtml(change.label || change.field)}</th>
+        <td>${escapeHtml(formatRuleValue(change.field, before))}</td>
+        <td>${escapeHtml(formatRuleValue(change.field, change.to))}</td>
+      </tr>`;
+    })
+    .join('');
+  return `
+    <div class="table-scroll">
+      <table class="rule-change">
+        <thead><tr><th scope="col">Rule</th><th scope="col">${firstHeading}</th><th scope="col">${secondHeading}</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderByline(state, hash, handle, fallback, at, prefix) {
+  const date = formatTimestamp(at);
+  return `<p class="muted small">${prefix} ${renderGovernanceActor(state, hash, handle, fallback)}${date ? ` · <time datetime="${escapeHtml(at)}">${escapeHtml(date)}</time>` : ''}</p>`;
+}
+
 function renderGovernanceProposalList(proposals = [], state) {
   if (!proposals.length) {
-    return '<p class="muted small">No open governance proposals.</p>';
+    return '<p class="muted">No change proposals are open. Any verified member can propose one.</p>';
   }
+  const current = getGovernanceSettings(state);
   return `
-    <ul class="callout-list">
+    <ul class="discussion-list">
       ${proposals
-        .map((proposal) => {
-          const changes = renderChangeList(proposal.changes || []);
-          return `
-            <li class="callout">
-              <strong>${escapeHtml(proposal.title)}</strong>
-              <p class="muted small">${escapeHtml(proposal.reason)}</p>
-              <p class="muted small">Proposed by ${renderGovernanceActor(state, proposal.authorHash, proposal.authorHandle, 'a verified member')} · ${escapeHtml(formatTimestamp(proposal.createdAt))}</p>
-              ${changes}
-            </li>
-          `;
-        })
+        .map((proposal) => `
+            <li>
+              <article class="discussion stack" id="governance-proposal-${escapeHtml(proposal.id)}">
+                <header>
+                  <div class="topic-meta"><span class="pill stage--discussion">Open for decision</span></div>
+                  <h3>${escapeHtml(proposal.title)}</h3>
+                  ${renderByline(state, proposal.authorHash, proposal.authorHandle, 'a verified member', proposal.createdAt, 'Proposed by')}
+                </header>
+                ${proposal.reason ? `<p>${escapeHtml(proposal.reason)}</p>` : ''}
+                ${renderRuleChange(proposal.changes || [], { current })}
+              </article>
+            </li>`)
         .join('')}
     </ul>
   `;
@@ -166,6 +248,11 @@ const HISTORY_LABELS = {
   admin_update: 'Set by the provider',
 };
 
+const HISTORY_TONES = {
+  proposal_approved: 'is-approved',
+  proposal_rejected: 'is-rejected',
+};
+
 function renderGovernanceActor(state, hash, handle, fallback) {
   if (hash) return renderActorLabel(state, hash, { showHash: false });
   return escapeHtml(handle ? `@${handle}` : fallback);
@@ -173,12 +260,12 @@ function renderGovernanceActor(state, hash, handle, fallback) {
 
 function renderGovernanceHistoryList(history = [], state) {
   if (!history.length) {
-    return '<p class="muted small">No governance history entries yet.</p>';
+    return '<p class="muted">No decisions recorded yet. Decided proposals and provider changes appear here.</p>';
   }
   const proposals = Array.isArray(state?.settings?.governanceProposals) ? state.settings.governanceProposals : [];
   const byId = new Map(proposals.map((proposal) => [proposal.id, proposal]));
   return `
-    <ul class="callout-list">
+    <ul class="discussion-list">
       ${history
         .map((entry) => {
           const label = HISTORY_LABELS[entry.type] || String(entry.type || 'Update').replace(/_/g, ' ');
@@ -190,32 +277,21 @@ function renderGovernanceHistoryList(history = [], state) {
             ? `Proposed by ${renderGovernanceActor(state, proposal.authorHash, proposal.authorHandle, 'a verified member')} · `
             : '';
           const decider = renderGovernanceActor(state, entry.actorHash, entry.actorHandle, 'the provider');
-          const reason = proposal?.reason ? `<p class="muted small">${escapeHtml(proposal.reason)}</p>` : '';
+          const date = formatTimestamp(entry.at);
+          const effect = proposal && entry.type === 'proposal_approved'
+            ? renderRuleChange(proposal.changes || [], { decided: true })
+            : '';
           return `
-            <li class="callout">
-              <strong>${escapeHtml(label)}${title}</strong>
-              ${reason}
-              <p class="muted small">${escapeHtml(entry.summary || '')}</p>
-              <p class="muted small">${proposer}decided by ${decider} · ${escapeHtml(formatTimestamp(entry.at))}</p>
+            <li>
+              <article class="discussion decision-entry ${HISTORY_TONES[entry.type] || ''} stack">
+                <h3>${escapeHtml(label)}${title}</h3>
+                <p class="muted small">${proposer}decided by ${decider}${date ? ` · <time datetime="${escapeHtml(entry.at)}">${escapeHtml(date)}</time>` : ''}</p>
+                ${proposal?.reason ? `<p>${escapeHtml(proposal.reason)}</p>` : ''}
+                ${effect || (entry.summary ? `<p class="muted small">${escapeHtml(entry.summary).replace(/ -&gt; /g, ' → ')}</p>` : '')}
+              </article>
             </li>
           `;
         })
-        .join('')}
-    </ul>
-  `;
-}
-
-function renderChangeList(changes = []) {
-  if (!changes.length) return '';
-  return `
-    <ul class="small">
-      ${changes
-        .map(
-          (change) =>
-            `<li>${escapeHtml(change.label || change.field)}: ${escapeHtml(String(change.from ?? ''))} -> ${escapeHtml(
-              String(change.to ?? ''),
-            )}</li>`,
-        )
         .join('')}
     </ul>
   `;

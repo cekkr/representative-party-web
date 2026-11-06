@@ -127,7 +127,7 @@ This roadmap defines the general-purpose **Web Organization Framework**. Its com
 - Provider-local extension lifecycle is live: `/admin` and `/extensions` discover catalog files, distinguish installed/enabled/active state, persist installed versions and timestamps, flag version drift for updates, and uninstall non-destructively while disabling active hooks.
 
 ## Near-term next steps (Phase 2 focus)
-- Extend the record and activity patterns to People, governance changes, and organization cases. Resolve remaining notification sources to authorized records. [UI roadmap](UI_ROADMAP.md#other-record-pages)
+- People profiles, governance changes, and the organization case now use the record header, section, and context pattern. Next: People pagination, a focused governance change record once members ratify changes, and authorized records for the remaining notification sources. [UI roadmap](UI_ROADMAP.md#other-record-pages)
 - Extend the organization case kernel to shared email intake, bounded outbound replies, and a tracked response time. The live discussion path uses attributed provider visibility and a review date.
 - Protected voice: design the separate audited intake/relay and identity-reveal policy before claiming anonymity; keep raw relay mappings and mediation detail provider-local.
 - Organization layer stores: add versioned commitments, hierarchy/flow edges, authority grants, funds/reconciliation, sector links, mediation, pressure observations, and impact reviews lazily behind their module toggles.

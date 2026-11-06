@@ -1,24 +1,24 @@
-<div class="page-grid page-grid--delegates">
-  <div class="page-main">
-    <section class="panel" data-composer-section="delegate-directory-list" data-section-label="People list">
-      <p class="eyebrow">Delegation</p>
-      <h2>{{directoryActorPlural}} &amp; delegates</h2>
-      <p class="muted small">Browse verified members to find a delegate or follow target — no need to know anyone's hash. {{directoryCount}} shown.</p>
-      {{directoryList}}
-    </section>
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">People</h1>
+    <p class="workspace-heading__summary">Find verified {{directoryActorPlural}} to follow or delegate a topic to. Delegations stay advisory and revocable.</p>
   </div>
-  <aside class="page-aside">
-    <section class="panel" data-composer-section="delegate-directory" data-section-label="Search people">
-      <p class="eyebrow">Directory</p>
-      <h3>Find someone</h3>
-      <form class="form-inline" method="get" action="/delegates" data-enhance="delegate-search">
-        <label class="field">
-          <span>Search</span>
-          <input name="q" value="{{directoryQuery}}" placeholder="handle, role, or hash" />
-        </label>
-        <button class="ghost" type="submit">Search</button>
-      </form>
-      <p class="muted small">Search by handle, role, or hash. Everyone listed is a verified session.</p>
-    </section>
-  </aside>
+  <p class="workspace-heading__actions"><a class="ghost" href="/delegation" data-partial>Your delegations</a></p>
+</header>
+<div class="page-main stack">
+  <section class="panel" id="delegate-search" data-composer-section="delegate-directory" data-section-label="Search people">
+    <form class="collection-search" method="get" action="/delegates" role="search" data-enhance="delegate-search">
+      <label class="field">
+        <span>Search people</span>
+        <input type="search" name="q" value="{{directoryQuery}}" placeholder="Handle or role" />
+      </label>
+      <button class="ghost" type="submit">Search</button>
+      {{directoryClear}}
+    </form>
+  </section>
+  <section class="panel stack" data-composer-section="delegate-directory-list" data-section-label="People list" aria-labelledby="people-results-title">
+    <h2 id="people-results-title">Members</h2>
+    <p class="muted small" aria-live="polite">{{directoryCount}}</p>
+    {{directoryList}}
+  </section>
 </div>

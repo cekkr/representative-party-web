@@ -185,7 +185,7 @@ export function renderProposalWorkspace(proposal, options) {
   };
 }
 
-function renderProposalStage(proposal) {
+export function renderProposalStage(proposal) {
   const stage = normalizeStage(proposal.status);
   return `<span class="pill stage stage--${stage}">${formatStageLabel(stage)}</span>`;
 }

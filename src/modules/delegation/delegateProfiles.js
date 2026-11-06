@@ -54,7 +54,9 @@ export function listPeopleDirectory(state, { query = '' } = {}) {
   return people;
 }
 
-export function buildDelegateProfile(state, delegateHash) {
+// `canReadPetition` lets a viewer-facing caller drop proposals the viewer cannot open
+// (members-only group lanes) from both the counts and the recent list.
+export function buildDelegateProfile(state, delegateHash, { canReadPetition = null } = {}) {
   const normalizedHash = sanitizeText(delegateHash || '', 120);
   const session = normalizedHash ? findSessionByHash(state, normalizedHash) : null;
   const handle = session?.handle || '';
@@ -70,7 +72,11 @@ export function buildDelegateProfile(state, delegateHash) {
   const votes = filterVisibleEntries(state.votes || [], state, (vote) => vote.authorHash === normalizedHash);
   const voteSummary = summarizeVotes(votes);
 
-  const petitions = filterVisibleEntries(state.petitions || [], state, (petition) => petition.authorHash === normalizedHash);
+  const petitions = filterVisibleEntries(
+    state.petitions || [],
+    state,
+    (petition) => petition.authorHash === normalizedHash && (!canReadPetition || canReadPetition(petition)),
+  );
   const discussions = filterVisibleEntries(state.discussions || [], state, (entry) => entry.authorHash === normalizedHash);
   const socialPosts = filterVisibleEntries(state.socialPosts || [], state, (post) => post.authorHash === normalizedHash);
 

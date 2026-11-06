@@ -1705,8 +1705,10 @@ test('Discussion search opens evidence and returns to the same filters with or w
     assert.equal((await page.$$(result)).length, 1);
     await page.focus(result);
     await page.keyboard.press('Enter');
+    // The collection card already carries the evidence link, so wait for the
+    // destination heading before asserting: the enhanced swap may still be in flight.
+    await page.waitForFunction(() => document.querySelector('main h1')?.textContent === 'Healthcare / Waiting lists');
     await page.waitForSelector(`main .topic-card a[href="${evidence}"]`);
-    assert.equal(await page.$eval('main h1', (heading) => heading.textContent), 'Healthcare / Waiting lists');
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 320);
     if (enhanced) assert.equal(await page.evaluate(() => document.activeElement.tagName), 'H1');
     await page.goBack();

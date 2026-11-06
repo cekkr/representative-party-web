@@ -40,7 +40,7 @@
     </section>
   </div>
   <aside class="page-aside">
-    <section class="panel" data-composer-section="delegation-set" data-section-label="Set a delegate">
+    <section class="panel" id="delegation-set" data-composer-section="delegation-set" data-section-label="Set a delegate">
       <p class="eyebrow">Set preference</p>
       <h3>Pick a delegate by topic</h3>
       <form class="stack" method="post" action="/delegation" data-enhance="delegation">
@@ -52,7 +52,7 @@
           </label>
           <label class="field">
             <span>Delegate</span>
-            <input name="delegateHash" list="delegation-people" placeholder="search by handle" autocomplete="off" required />
+            <input name="delegateHash" list="delegation-people" placeholder="search by handle" autocomplete="off" value="{{delegatePrefill}}" required />
           </label>
         </div>
         <p class="muted tiny">Start typing a handle and pick a person. Don't know who? Browse the People directory.</p>

@@ -1,38 +1,28 @@
-<div class="page-grid page-grid--delegate-profile">
-  <div class="page-main">
-    <section class="panel" data-composer-section="delegate-profile-summary" data-section-label="Delegate summary">
-      <p class="eyebrow">Delegate profile</p>
-      {{delegateIdentity}}
-      {{delegateReputation}}
-      {{delegateStats}}
-    </section>
-
-    <section class="panel" data-composer-section="delegate-profile-endorsements" data-section-label="Delegation coverage">
-      <p class="eyebrow">Delegations</p>
-      <h2>Delegation coverage</h2>
-      {{incomingDelegations}}
-      {{outgoingDelegations}}
-    </section>
-
-    <section class="panel" data-composer-section="delegate-profile-delegations" data-section-label="Vote history">
-      <p class="eyebrow">Votes</p>
-      <h2>Vote history</h2>
-      {{voteSummary}}
-    </section>
-
-    <section class="panel" data-composer-section="delegate-profile-votes" data-section-label="Recent activity">
-      <p class="eyebrow">Activity</p>
-      <h2>Recent activity</h2>
-      {{activitySummary}}
-    </section>
+<nav class="topic-breadcrumbs" aria-label="People">
+  <a href="/delegates" data-partial>All people</a>
+</nav>
+<header class="workspace-heading profile-heading">
+  <div class="person-row__id">
+    {{profileAvatar}}
+    <div>
+      <h1 tabindex="-1" class="profile-heading__name">{{profileName}}</h1>
+      <p class="topic-meta">{{profileStatus}}</p>
+      {{profileBio}}
+    </div>
   </div>
-  <aside class="page-aside">
-    <section class="panel" data-composer-section="delegate-profile-history" data-section-label="Group endorsements">
-      <p class="eyebrow">Endorsements</p>
-      <h3>Group endorsements</h3>
-      {{groupEndorsements}}
-      <h3>Election wins</h3>
-      {{electionWins}}
+  {{profileAction}}
+</header>
+<nav class="workspace-sections" aria-label="Profile sections">
+  {{profileSections}}
+</nav>
+<div class="page-grid page-grid--delegate-profile">
+  <div class="page-main stack">
+    {{profileContent}}
+  </div>
+  <aside class="page-aside" aria-label="Profile details">
+    <section class="panel">
+      <h2 class="h3">Details</h2>
+      {{profileDetails}}
     </section>
   </aside>
 </div>
