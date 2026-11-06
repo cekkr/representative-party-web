@@ -4082,6 +4082,10 @@ code {
   text-align: center;
 }
 
+.pager {
+  flex-wrap: wrap;
+}
+
 /* Proposal browse and record views */
 .collection-grid {
   display: grid;
@@ -4303,6 +4307,12 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
 
 .notification-row {
   gap: 0.5rem;
+}
+
+/* Unread keeps its text pill; the accent edge is a second, non-colour-only cue
+   because it changes the row's shape at the leading edge. */
+.notification-row--unread {
+  border-left: 3px solid var(--primary);
 }
 
 /* Inline form feedback (formFeedback.js). A confirmation sits beside the form it

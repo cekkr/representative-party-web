@@ -12,6 +12,10 @@ import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.
 import { renderProposalStage } from '../../../interfaces/http/views/petitionView.js';
 import { getActorLabels, renderActorAvatar, renderActorLabel, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderModuleDisabled } from '../../../interfaces/http/views/moduleGate.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
+
+export const PEOPLE_PAGE_SIZE = 24;
 
 // Profile sections are GET views, like the group and proposal workspaces. The
 // composer keys are historical (see UI_ROADMAP.md section inventory) and stay as-is.
@@ -35,6 +39,7 @@ export async function renderDelegateDirectory({ req, res, state, wantsPartial, u
   const person = getPerson(req, state);
   const query = sanitizeText(url?.searchParams?.get('q') || '', 64);
   const people = listPeopleDirectory(state, { query });
+  const pageInfo = paginate(people, { page: parsePage(url?.searchParams?.get('page')), pageSize: PEOPLE_PAGE_SIZE });
   const actorLabels = getActorLabels(state);
   const countLabel = `${people.length} ${people.length === 1 ? actorLabels.actorLabel : actorLabels.actorLabelPlural}`;
 
@@ -48,7 +53,13 @@ export async function renderDelegateDirectory({ req, res, state, wantsPartial, u
       directoryActorPlural: escapeHtml(actorLabels.actorLabelPlural),
       directoryCount: escapeHtml(query ? `${countLabel} match “${query}”` : `${countLabel} in this Circle`),
       directoryClear: query ? '<a class="ghost" href="/delegates" data-partial>Clear search</a>' : '',
-      directoryList: renderDirectoryList(state, people, actorLabels, { query }),
+      directoryList: renderDirectoryList(state, pageInfo.items, actorLabels, { query }),
+      directoryPager: renderPager(pageInfo, {
+        baseHref: '/delegates',
+        query: { q: query },
+        label: actorLabels.actorLabelPlural || 'members',
+        order: 'directory',
+      }),
     },
     { wantsPartial, title: 'People', state },
   );

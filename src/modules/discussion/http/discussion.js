@@ -8,7 +8,7 @@ import { ensureTopicPath } from '../../topics/registry.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { createNotification } from '../../messaging/notifications.js';
 import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
-import { filterVisibleEntries, findVisibleEntry, stampLocalEntry } from '../../federation/replication.js';
+import { filterVisibleEntries, stampLocalEntry } from '../../federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
@@ -24,7 +24,7 @@ import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.
 import { isModuleEnabled } from '../../circle/modules.js';
 import { isCaseSource } from '../../organization/cases.js';
 import { canonicalizeTopicKey } from '../../topics/topicMatch.js';
-import { discussionHref, isDiscussionPost } from '../discussionLinks.js';
+import { discussionHref, findDiscussionRecord, isDiscussionPost } from '../discussionLinks.js';
 import {
   canPostToGroupLane,
   listPostableGroupLanes,
@@ -181,6 +181,7 @@ async function promoteDiscussion({ res, state, url, body, person, intent }) {
       await createNotification(state, {
         type: 'promotion_requested',
         recipientHash: hash,
+        discussionId: entry.id,
         message: `A member asked to move a discussion up to ${request.targetLabel}.`,
       });
     }
@@ -216,6 +217,7 @@ async function promoteDiscussion({ res, state, url, body, person, intent }) {
       await createNotification(state, {
         type: result.approved ? 'promotion_approved' : 'promotion_declined',
         recipientHash: result.request.byHash,
+        discussionId: entry.id,
         message: result.approved
           ? `Your request to move a discussion up to ${result.request.targetLabel} was approved.`
           : `Your request to move a discussion up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
@@ -255,12 +257,6 @@ function listGroupDeciders(state, group) {
     .filter(Boolean);
 }
 
-function findDiscussionRecord(state, person, id) {
-  const entry = id && findVisibleEntry(state.discussions, state, (item) => item?.id === id && isDiscussionPost(item));
-  if (!entry) return null;
-  const scope = resolveGroupScope(state, person, entry.groupId, { lane: 'discussion' });
-  return scope.ok ? { entry, scope } : null;
-}
 
 async function renderFocusedDiscussion({ res, state, person, wantsPartial, url, postId }) {
   const { entry, scope } = findDiscussionRecord(state, person, postId) || {};

@@ -15,7 +15,17 @@ import {
 } from '../../groups/groups.js';
 import { validateParent } from '../groupTree.js';
 import { readGroupScope } from '../groupScope.js';
-import { groupHref, groupWorkspaceData, renderCategoryDirectory, renderGroupList, renderParentOptions } from './groupView.js';
+import {
+  GROUPS_PAGE_SIZE,
+  groupHref,
+  groupWorkspaceData,
+  listGroupDirectoryRows,
+  renderCategoryDirectory,
+  renderGroupList,
+  renderParentOptions,
+} from './groupView.js';
+import { paginate, parsePage } from '../../../shared/utils/pagination.js';
+import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { ensureTopicPath } from '../../topics/registry.js';
 import { createNotification } from '../../messaging/notifications.js';
 import { normalizeLanes, setGroupPolicy } from '../../groups/groupPolicy.js';
@@ -23,7 +33,7 @@ import { startElection, castElectionVote, pickWinner, closeElection } from '../.
 import { logTransaction } from '../../transactions/registry.js';
 import { sendHtml, sendJson, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { sanitizeText } from '../../../shared/utils/text.js';
+import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
@@ -72,10 +82,18 @@ export async function renderGroups({ req, res, state, wantsPartial, url }) {
     return sendHtml(res, html);
   }
   const canCreate = evaluateAction(state, person, 'post').allowed;
+  const query = sanitizeText(url.searchParams.get('q') || '', 64);
+  const rows = listGroupDirectoryRows(groups, { query });
+  const pageInfo = paginate(rows, { page: parsePage(url.searchParams.get('page')), pageSize: GROUPS_PAGE_SIZE });
+  const countLabel = `${rows.length} ${rows.length === 1 ? 'group' : 'groups'}`;
   const html = await renderPage(
     'groups',
     {
-      groups: renderGroupList(groups),
+      groups: renderGroupList(groups, { rows: pageInfo.items, query }),
+      groupsPager: renderPager(pageInfo, { baseHref: '/groups', query: { q: query }, label: 'groups', order: 'directory' }),
+      groupsQuery: escapeHtml(query),
+      groupsCount: escapeHtml(query ? `${countLabel} match “${query}”` : `${countLabel} in this Circle`),
+      groupsClear: query ? '<a class="ghost" href="/groups" data-partial>Clear search</a>' : '',
       groupCategories: renderCategoryDirectory(state, person),
       parentGroupOptions: renderParentOptions(groups),
       createAction: canCreate ? '<a class="cta" href="#group-create">Create a group</a>' : '',
@@ -281,6 +299,7 @@ export async function createOrJoinGroup({ req, res, state }) {
   await createNotification(state, {
     type: 'group_created',
     recipientHash: person?.pidHash || 'broadcast',
+    groupId: group.id,
     message: `Group "${group.name}" created.`,
   });
   await logTransaction(state, {
@@ -315,6 +334,7 @@ export async function setGroupDelegateRoute({ req, res, state }) {
   await createNotification(state, {
     type: 'group_delegate',
     recipientHash: person?.pidHash || 'broadcast',
+    groupId,
     message: `Updated delegate for topic "${topic}" in group.`,
   });
   await logTransaction(state, {

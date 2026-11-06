@@ -45,7 +45,9 @@ export function renderPreviewPill(entry) {
 
 // Render prev/next pagination controls for a list. `query` holds extra params (e.g. topic
 // filter) to preserve across pages; nothing renders when there is only a single page.
-export function renderPager(pageInfo, { baseHref = '', query = {}, partial = true, label = 'items' } = {}) {
+// Feeds read newest-first, so the default labels are Newer/Older; directories that are
+// not time-ordered pass `order: 'directory'` for Previous/Next.
+export function renderPager(pageInfo, { baseHref = '', query = {}, partial = true, label = 'items', order = 'feed' } = {}) {
   if (!pageInfo || pageInfo.pageCount <= 1) return '';
   const buildHref = (page) => {
     const params = new URLSearchParams();
@@ -58,12 +60,13 @@ export function renderPager(pageInfo, { baseHref = '', query = {}, partial = tru
     return `${baseHref}${qs ? `?${qs}` : ''}`;
   };
   const partialAttr = partial ? ' data-partial' : '';
+  const [prevLabel, nextLabel] = order === 'directory' ? ['← Previous', 'Next →'] : ['← Newer', 'Older →'];
   const prev = pageInfo.hasPrev
-    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page - 1))}"${partialAttr}>← Newer</a>`
-    : '<span class="muted tiny">← Newer</span>';
+    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page - 1))}" rel="prev"${partialAttr}>${prevLabel}</a>`
+    : `<span class="muted tiny" aria-hidden="true">${prevLabel}</span>`;
   const next = pageInfo.hasNext
-    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page + 1))}"${partialAttr}>Older →</a>`
-    : '<span class="muted tiny">Older →</span>';
+    ? `<a class="ghost" href="${escapeHtml(buildHref(pageInfo.page + 1))}" rel="next"${partialAttr}>${nextLabel}</a>`
+    : `<span class="muted tiny" aria-hidden="true">${nextLabel}</span>`;
   const summary = `Page ${pageInfo.page} of ${pageInfo.pageCount} · ${pageInfo.startIndex}-${pageInfo.endIndex} of ${pageInfo.total} ${escapeHtml(label)}`;
   return `
     <nav class="pager" aria-label="Pagination">

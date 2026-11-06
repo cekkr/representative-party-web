@@ -10,6 +10,8 @@ export async function createNotification(state, notification) {
     type: notification.type || 'info',
     recipientHash: notification.recipientHash || 'anonymous',
     petitionId: notification.petitionId || null,
+    discussionId: notification.discussionId || null,
+    groupId: notification.groupId || null,
     message: notification.message || '',
     expiresAt: notification.expiresAt || null,
     createdAt: new Date().toISOString(),

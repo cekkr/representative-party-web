@@ -21,9 +21,29 @@ function groupLink(group, className = '') {
   return `<a ${className ? `class="${className}" ` : ''}href="${escapeHtml(groupHref(group.id))}" data-partial>${escapeHtml(group.name || 'Group')}</a>`;
 }
 
-export function renderGroupList(groups) {
+export const GROUPS_PAGE_SIZE = 20;
+
+// Browse rows for the directory: the branch tree when browsing, a flat list of matches
+// when searching. A match keeps its lineage line, so a branch found by search still
+// says where it sits.
+export function listGroupDirectoryRows(groups = [], { query = '' } = {}) {
+  const rows = buildGroupTree(groups);
+  const needle = String(query || '').trim().toLowerCase();
+  if (!needle) return rows;
+  return rows
+    .filter(({ group }) => [group.name, group.description, ...(group.topics || [])]
+      .some((value) => String(value || '').toLowerCase().includes(needle)))
+    .map(({ group }) => ({ group, depth: 0 }));
+}
+
+export function renderGroupList(groups, { rows, query = '' } = {}) {
   if (!groups.length) return '<p class="muted">No groups yet. Create a group to start a workspace.</p>';
-  const rows = buildGroupTree(groups).map(({ group, depth }) => {
+  const visible = rows || buildGroupTree(groups);
+  if (!visible.length) {
+    // Zero matches recover differently from an empty directory.
+    return `<p class="muted">No group matches “${escapeHtml(query)}”. Search by name, description, or category, or <a href="/groups" data-partial>browse every group</a>.</p>`;
+  }
+  const items = visible.map(({ group, depth }) => {
     const lineage = formatGroupLineage({ groups }, group);
     return `
       <li style="--group-depth: ${Math.min(depth, 3)}">
@@ -39,7 +59,7 @@ export function renderGroupList(groups) {
         </article>
       </li>`;
   });
-  return `<ul class="discussion-list group-tree">${rows.join('')}</ul>`;
+  return `<ul class="discussion-list group-tree">${items.join('')}</ul>`;
 }
 
 function memberCount(group) {

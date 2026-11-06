@@ -1,6 +1,10 @@
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { canReadProposal, proposalHref } from '../../petitions/proposalLinks.js';
+import { discussionHref, findDiscussionRecord } from '../../discussion/discussionLinks.js';
+import { findGroupById } from '../../groups/groups.js';
+import { groupHref } from '../../groups/http/groupView.js';
+import { isModuleEnabled } from '../../circle/modules.js';
 import { getPerson } from '../../identity/person.js';
 import { listNotificationsForPerson, markAllRead } from '../../messaging/notifications.js';
 import { resolveNotificationPreferences } from '../../messaging/outbound.js';
@@ -109,6 +113,33 @@ export function humanizeNotificationType(type = '') {
     .join(' ');
 }
 
+// Resolve the record a notification points at, through the same gate a direct
+// read of that record uses. A source the viewer can no longer open keeps the
+// event readable but withholds its message details and link.
+function resolveNotificationSource(event, state, person, proposals) {
+  if (event.petitionId) {
+    const proposal = proposals.get(event.petitionId);
+    if (!proposal) return { hidden: true, noun: 'proposal' };
+    const view = /comment|mention/.test(event.type) ? 'discussion' : /ballot|^vote/.test(event.type) ? 'ballot' : 'overview';
+    return { href: proposalHref(proposal, { view }), label: 'Open proposal' };
+  }
+  if (event.discussionId) {
+    const record = findDiscussionRecord(state, person, event.discussionId);
+    if (!record) return { hidden: true, noun: 'contribution' };
+    return {
+      href: discussionHref({ groupId: record.scope.groupId ?? null, post: record.entry.id }),
+      label: 'Open contribution',
+    };
+  }
+  if (event.groupId) {
+    const group = isModuleEnabled(state, 'groups') ? findGroupById(state, event.groupId) : null;
+    if (!group) return { hidden: true, noun: 'group' };
+    const view = event.type === 'group_delegate' || event.type === 'group_delegate_set' ? 'decisions' : 'overview';
+    return { href: groupHref(group.id, view), label: 'Open group' };
+  }
+  return {};
+}
+
 function renderNotificationList(list, state, person) {
   if (!list.length) return '<p class="muted">No notifications yet.</p>';
   const proposalIds = new Set(list.map((event) => event.petitionId).filter(Boolean));
@@ -121,21 +152,19 @@ function renderNotificationList(list, state, person) {
     }
   }
   const rows = list.map((event) => {
-    const proposal = proposals.get(event.petitionId);
-    const hidden = event.petitionId && !proposal;
-    const message = hidden ? 'The proposal is unavailable from this inbox.' : event.message;
-    const view = /comment|mention/.test(event.type) ? 'discussion' : /ballot|^vote/.test(event.type) ? 'ballot' : 'overview';
+    const source = resolveNotificationSource(event, state, person, proposals);
+    const message = source.hidden ? `The ${source.noun} is unavailable from this inbox.` : event.message;
     const createdAt = formatTimestamp(event.createdAt);
     const expiresAt = formatTimestamp(event.expiresAt);
     return `
-      <li class="discussion stack notification-row">
+      <li class="discussion stack notification-row${event.read ? '' : ' notification-row--unread'}">
         <div class="discussion__meta">
           <strong>${escapeHtml(humanizeNotificationType(event.type))}</strong>
           ${event.read ? '' : '<span class="pill">Unread</span>'}
           ${createdAt ? `<time class="muted small" datetime="${escapeHtml(event.createdAt)}">${escapeHtml(createdAt)}</time>` : ''}
         </div>
         <p>${escapeHtml(message || '')}</p>
-        ${proposal ? `<a href="${escapeHtml(proposalHref(proposal, { view }))}" data-partial>Open proposal</a>` : ''}
+        ${source.href ? `<a href="${escapeHtml(source.href)}" data-partial>${escapeHtml(source.label)}</a>` : ''}
         ${expiresAt ? `<p class="muted small">Expires ${escapeHtml(expiresAt)}</p>` : ''}
       </li>
     `;
