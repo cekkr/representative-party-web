@@ -1,8 +1,14 @@
-<section class="panel" data-composer-section="error-message">
-  <p class="eyebrow">Flow error</p>
-  <h2>We could not verify your wallet</h2>
-  <p class="muted">{{message}}</p>
+<header class="workspace-heading task-heading">
+  <div>
+    <h1 tabindex="-1">We could not verify your wallet</h1>
+    <p class="workspace-heading__summary">Nothing was stored. You can start the wallet handoff again.</p>
+  </div>
+</header>
+<section class="panel stack task-panel" data-composer-section="error-message" aria-labelledby="error-reason-title">
+  <h2 class="h3" id="error-reason-title">What happened</h2>
+  <p role="alert">{{message}}</p>
   <div class="cta-row">
-    <a class="cta" href="/" data-partial>Start over</a>
+    <a class="cta" href="/auth/eudi" data-partial>Start a new verification</a>
+    <a class="ghost" href="/" data-partial>Back to home</a>
   </div>
 </section>

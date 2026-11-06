@@ -10,13 +10,16 @@ import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { normalizeVerbosityMode, parseBoolean } from '../../../shared/utils/parse.js';
-import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { getActorLabels, renderActorAvatar, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
+import { renderFormErrors, renderFormNotice } from '../../../interfaces/http/views/formFeedback.js';
+import { isModuleEnabled } from '../../circle/modules.js';
+import { getCirclePolicyState } from '../../circle/policy.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import {
   buildProfileValues,
   normalizeProfilePayload,
   renderProfileForm,
-  renderProfileSummary,
   renderUiPreferencesForm,
 } from '../../../interfaces/http/views/profileView.js';
 import { normalizeInterfaceSettings } from '../../../interfaces/http/views/interfaceSettings.js';
@@ -193,7 +196,7 @@ async function renderProfilePage({
   const entrySchemaVersion = Number(profileEntry?.schemaVersion || 0);
   const profileSchemaWarning =
     profileEntry && currentSchemaVersion && entrySchemaVersion < currentSchemaVersion
-      ? `<div class="callout"><p class="muted small">Profile schema updated since your last save (v${entrySchemaVersion} → v${currentSchemaVersion}). Review and resave to keep provider-local fields consistent.</p></div>`
+      ? `<div class="callout is-warning" role="note"><p class="small">The provider changed these fields since your last save (schema v${entrySchemaVersion} → v${currentSchemaVersion}). Review them and save again.</p></div>`
       : '';
   const profileForm = renderProfileForm({
     person,
@@ -204,7 +207,6 @@ async function renderProfilePage({
     consentChecked: Boolean(consentChecked),
     updatedAt,
   });
-  const profileSummary = renderProfileSummary(person, actorLabels);
   const handleForm = renderHandleForm({
     person,
     actorLabels,
@@ -223,17 +225,16 @@ async function renderProfilePage({
     uiSettings: normalizeInterfaceSettings(person?.uiSettings || {}),
     flash: uiFlash,
   });
-  const profileFlash = flash
-    ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>`
-    : '';
+  const profileFlash = renderFormNotice(flash);
+  const heading = renderProfileHeading(state, person, actorLabels);
   const html = await renderPage(
     'profile',
     {
       person,
       personHandle: resolvePersonHandle(person),
       roleLabel: person?.role || 'guest',
+      ...heading,
       profileForm,
-      profileSummary,
       handleForm,
       profileFlash,
       uiPreferencesForm,
@@ -245,30 +246,76 @@ async function renderProfilePage({
   return sendHtml(res, html);
 }
 
+// The record header follows the People profile: avatar, @handle, role and
+// verification state, then one action. A guest sees the verification path.
+function renderProfileHeading(state, person, actorLabels) {
+  if (!person?.sessionId) {
+    return {
+      profileAvatar: '',
+      profileTitle: 'Profile',
+      profileStatus: '<span class="pill ghost">Not verified</span>',
+      profileSummaryLine: escapeHtml(`Verify with your wallet to choose a handle, save provider-local fields, and keep interface defaults for your ${actorLabels?.actorLabel || 'user'} session.`),
+      profileAction: '<p class="workspace-heading__actions"><a class="cta" href="/auth/eudi" data-partial>Verify with your wallet</a></p>',
+      profileDetails: renderContextPanel({
+        guidance: ['Only a blinded hash of your wallet credential is stored. No identity document is retained.'],
+      }),
+    };
+  }
+  const handle = resolvePersonHandle(person, '');
+  const role = person.role || actorLabels?.actorLabel || 'user';
+  const pills = [`<span class="pill ghost">${escapeHtml(role)}</span>`];
+  pills.push(person.banned
+    ? '<span class="pill stance stance--concern">Banned</span>'
+    : '<span class="pill stance stance--support">Verified</span>');
+  const canOpenPublic = Boolean(person.pidHash) && isModuleEnabled(state, 'delegation');
+  const action = canOpenPublic
+    ? `<p class="workspace-heading__actions"><a class="ghost" href="/delegates/${encodeURIComponent(person.pidHash)}" data-partial>View your public profile</a></p>`
+    : '';
+  const policy = getCirclePolicyState(state);
+  const hashCue = person.pidHash ? `${String(person.pidHash).slice(0, 8)}…` : 'unavailable';
+  const verifiedAt = formatTimestamp(person.verifiedAt);
+  return {
+    profileAvatar: person.pidHash ? renderActorAvatar(state, person.pidHash, { size: 'lg' }) : '',
+    profileTitle: handle ? `@${escapeHtml(handle)}` : 'Profile',
+    profileStatus: pills.join(' '),
+    profileSummaryLine: 'Your handle, the fields this provider keeps for you, and your interface defaults.',
+    profileAction: action,
+    profileDetails: renderContextPanel({
+      facts: [
+        { term: 'Handle', value: handle ? `@${handle}` : 'Not set' },
+        { term: 'Role', value: role },
+        { term: 'Hash cue', value: hashCue },
+        verifiedAt ? { term: 'Verified', value: verifiedAt } : null,
+        { term: 'Circle enforcement', value: policy?.enforcement || 'unknown' },
+      ].filter(Boolean),
+      guidance: ['Only a blinded hash of your wallet credential is stored. Your handle can change; the hash cannot.'],
+    }),
+  };
+}
+
 function renderHandleForm({ person, actorLabels, errors = [], value, flash } = {}) {
-  if (!person) {
+  if (!person?.sessionId) {
     return '<p class="muted small">Verify a session to choose a handle.</p>';
   }
   const actorLabel = actorLabels?.actorLabel || 'user';
   const current = escapeHtml(person.handle || '');
   const inputValue = escapeHtml(value ?? person.handle ?? '');
-  const flashBlock = flash ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>` : '';
-  const errorBlock = errors.length
-    ? `<div class="callout warning"><ul class="plain">${errors
-        .map((error) => `<li class="muted small">${escapeHtml(error)}</li>`)
-        .join('')}</ul></div>`
-    : '';
+  const errorId = 'profile-handle-error';
+  const describedBy = errors.length ? `profile-handle-hint ${errorId}` : 'profile-handle-hint';
+  const invalid = errors.length ? ' aria-invalid="true"' : '';
   return `
-    ${flashBlock}
-    ${errorBlock}
-    <form class="stack" method="post" action="/profile" data-enhance="profile-handle">
+    ${renderFormNotice(flash)}
+    ${renderFormErrors(errors, { id: errorId, title: 'Handle not saved' })}
+    <form class="stack" method="post" action="/profile#profile-handle" data-enhance="profile-handle">
       <input type="hidden" name="intent" value="handle" />
       <label class="field">
-        <span>Public handle</span>
-        <input name="handle" value="${inputValue}" placeholder="your-handle" maxlength="30" required />
+        <span>Handle</span>
+        <input id="profile-handle-input" name="handle" value="${inputValue}" placeholder="firstname.lastname" maxlength="30" autocomplete="nickname" spellcheck="false" required aria-describedby="${describedBy}"${invalid} />
       </label>
-      <p class="muted tiny">This is how other ${escapeHtml(actorLabels?.actorLabelPlural || 'users')} see you across the Circle (currently <strong>@${current || actorLabel}</strong>). Letters, numbers, dashes, underscores; 3-30 characters. Your blinded hash stays the canonical identifier.</p>
-      <button class="cta" type="submit">Save handle</button>
+      <p class="muted tiny" id="profile-handle-hint">Currently <strong>@${current || escapeHtml(actorLabel)}</strong>. 3–30 letters, numbers, dashes, underscores, or dots (not at the start or end, and never two in a row).</p>
+      <div class="cta-row">
+        <button class="cta" type="submit">Save handle</button>
+      </div>
     </form>
   `;
 }

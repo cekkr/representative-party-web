@@ -301,11 +301,48 @@ acknowledgement. The searchable queue sits in the rail.
 [Governance controller](src/modules/governance/http/governance.js) ·
 [Case view](src/modules/organization/caseView.js)
 
+`/organization?view=preview` opens with a Back to live cases link and an
+Organization workspace preview heading. A Preview label, the line
+“Illustrative data — nothing here is saved”, and an Open the live case queue
+action sit in that persistent header, outside the optional panels, so hiding
+sections cannot make the preview look live.
+
 **Target.** Add pagination to People when a directory outgrows one page. Give
 governance proposals their own focused record view when member ratification
 lands. Give the organization case a dedicated record URL with history beyond
-acknowledgement as the lazy layer stores arrive. The preview keeps its
-persistent label and return link to the live queue.
+acknowledgement as the lazy layer stores arrive. Replace the preview's
+illustrative cases with Scenario B examples.
+
+### Settings and task pages
+
+**Current.** `/profile` follows the People record header: avatar, `@handle`,
+role and Verified state, and one View your public profile action when People
+is enabled. A guest sees a Profile heading and the Verify action instead of
+empty forms. Fragment links reach three labelled sections: Public handle,
+Provider-local fields, and Interface defaults. Each form posts to
+`/profile#<section>`, so the ordinary and enhanced flows both return to the
+section they changed. A confirmation is a `role="status"` line and a rejection
+is a `role="alert"` summary with an id. The handle input and provider fields
+reference their hint and error through `aria-describedby` and keep the typed
+value. The Session rail shows the handle, role, an 8-character hash cue,
+verification date, and Circle enforcement, never the full blinded hash.
+[Profile controller](src/modules/profile/http/profile.js) ·
+[Form feedback](src/interfaces/http/views/formFeedback.js)
+
+The wallet handoff is a single reading column: heading, numbered steps, the
+Open wallet link with its copyable fallback, then the QR. The link comes first
+in source order because a phone cannot scan its own screen. The Hash-only
+guarantee and Circle policy follow, then Refresh this request (same pending
+session) and Start a new request. The result page reads You are verified,
+offers Choose your handle first, shows only the hash cue that was stored, and
+links Social only when that module is on. A failed callback explains what
+happened and offers Start a new verification.
+[Auth templates](src/modules/auth/templates) ·
+[Recovery page](src/modules/core/templates/error.html)
+
+**Target.** Apply the same section header and inline feedback to admin
+settings. Add a translated wallet-not-installed hint once the verifier reports
+that state.
 
 
 ## 4. Participation, ballots, and activity
@@ -450,11 +487,11 @@ starting point for implementation.
 | [People](src/modules/delegates/templates) `/delegates` | Search-led collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Pagination once directories grow. Profile activity beyond proposals as those records gain lane-aware links. |
 | [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail. | A focused change record once members ratify changes. |
 | [Notifications](src/modules/notifications/templates/notifications.html) `/notifications` | Paginated activity rows, unread state, scoped proposal links, Mark all read, and preferences in the rail. | Resolve other notification sources to their permitted records. |
-| [Profile](src/modules/profile/templates/profile.html) `/profile` | Session and handle, provider-local fields, and Interface controls. | Identity summary followed by clearly separated, labelled settings sections and inline feedback. |
+| [Profile](src/modules/profile/templates/profile.html) `/profile` | Identity header with one action, section links, labelled Public handle, Provider-local fields, and Interface defaults sections with inline status and field errors, and a Session rail. | Optional provider-profile sync across devices. |
 | [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Cases heading, case record header, original message with evidence, acknowledgement form or ordered history, and the searchable queue in the rail. | Case history beyond acknowledgement as layer stores arrive. Retain provider-local scope. |
-| [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Labelled illustrative inbox, pressure map, and operating map. | Persistent preview identity, Scenario B examples, and a clear return to the live case workspace. |
+| [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Persistent preview header with backlink, Preview label, and live-queue action, then the illustrative inbox, pressure map, and operating map. | Scenario B examples in place of the generic illustrative cases. |
 | [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. The inactive Composer entry sits in the page flow on phones. | Apply the settings hierarchy while retaining gates, anchors, and the admin Composer workspace. |
-| [Wallet handoff and result](src/modules/auth/templates) | Offer and result panels in the shared shell. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
+| [Wallet handoff and result](src/modules/auth/templates) | Focused task pages: numbered steps, wallet link before QR, hash-only guarantee, refresh and restart recovery, a result page that leads to Choose your handle, and a recovery page for failed callbacks. | Wallet-not-installed guidance once the verifier reports it. |
 
 
 ## 7. Implementation and section compatibility
@@ -501,7 +538,7 @@ keys have historical names, while their labels identify the content.
 | Groups | Browse `groups-list`, `groups-categories`, `groups-create`. Workspace `group-overview`, `group-members`, `group-decisions`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
 | Governance | `governance-overview` (current rules), `governance-proposals` (open changes and decisions), `governance-propose`. The heading and section links stay visible. |
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
-| Profile | `profile-interface`, `profile-summary`, `profile-fields` |
+| Profile | `profile-interface` (Public handle), `profile-summary` (Provider-local fields), `profile-fields` (Interface defaults). The record header, section links, and Session rail stay outside optional panels. |
 | Admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
 | Auth/core task panels | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. These panels sit outside member Sections. |
 
@@ -513,7 +550,7 @@ keys have historical names, while their labels identify the content.
 | 2. Conversation and collections | Discussion and Forum have searchable collections and focused views linked from Home. Social has in-flow compose, audience, follow filters, and attributed media states. | Find the waiting-list evidence and the free-mandate article in Scenario A. Open a contribution and return to the same search. Reply in Forum and send a media-only Social update with ordinary HTML. Confirm direct attachment and reply access. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
 | 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People profiles, governance changes, and the case record use the header–sections–context pattern. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
-| 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
+| 5. Admin and customization polish | Profile, wallet handoff, and the organization preview are converted, with shared inline form feedback. Next: apply the settings-section header and feedback to admin, then any component palette operations once variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
 The proposal controller checks the stored group lane on deep reads, edits,
 signatures, comments, stage changes, ballots, and promotions. Proposal alert and
@@ -610,6 +647,21 @@ removes an intermittent failure.
 [Record workspace regression](tests/record-workspaces.test.js) ·
 [Governance regression](tests/governance.test.js) ·
 [Case regression](tests/organization-cases.test.js)
+
+### Profile, wallet, and preview verification
+
+HTTP regressions cover the guest and verified Profile headers, the stable
+section keys behind the new anchors, the section-returning form actions, the
+status line after a save, and the alert, `aria-invalid`, and kept value after
+a rejected handle. They check that the rail shows the hash cue but not the
+full hash. The wallet tests cover the steps, QR, deep link and fallback,
+the privacy guarantee, refresh and restart links, the recovery page, and the
+result page without Social when that module is off. The preview test checks
+the persistent header. A browser pass on seeded Scenario A checked Profile in
+dark at desktop, and the wallet handoff, preview, and an enhanced handle
+rejection at 375 px in light with no horizontal overflow. The rejection
+announced its error and returned focus to the handle section.
+[Settings and task regression](tests/settings-task-pages.test.js)
 
 ### Review checklist for presentation changes
 

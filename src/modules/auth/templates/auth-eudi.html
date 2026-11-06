@@ -1,33 +1,44 @@
-<section class="panel" data-composer-section="auth-eudi">
-  <p class="eyebrow">Verifier</p>
-  <h2>Verify with your wallet</h2>
-  <p>Scan the QR on desktop or open the deep link on mobile to return a blinded PID hash. No personal data is stored.</p>
-  <div class="callout">
-    <p class="muted small">{{hashOnlyMessage}}</p>
-    <p class="muted small">{{policyNote}}</p>
-    <p class="muted small">{{resumeHint}}</p>
+<header class="workspace-heading task-heading">
+  <div>
+    <h1 tabindex="-1">Verify with your wallet</h1>
+    <p class="workspace-heading__summary">Your EUDI wallet confirms you are one person. This provider keeps a blinded hash, never your name or documents.</p>
   </div>
-  <div class="grid two">
-    <div>
-      <div class="callout is-verbose">
-        <p class="muted">Session ID</p>
-        <code>{{sessionId}}</code>
-      </div>
-      <div class="cta-row">
-        <a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a>
-        <a class="ghost is-verbose inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Developer shortcut: simulate callback</a>
-      </div>
-      <p class="muted small">If your browser blocks the deep link, copy and paste it:</p>
+</header>
+<section class="panel stack task-panel" data-composer-section="auth-eudi" aria-labelledby="auth-handoff-title">
+  <h2 class="h3" id="auth-handoff-title">Hand off to your wallet</h2>
+  <ol class="task-steps">
+    <li>On a computer, scan the code with your wallet. On this phone, open the wallet link.</li>
+    <li>Approve the request in your wallet.</li>
+    <li>Your wallet sends you back here with the session verified.</li>
+  </ol>
+  <div class="wallet-handoff">
+    <div class="stack wallet-handoff__link">
+      <p class="cta-row"><a class="cta" href="{{deepLink}}" data-deep-link="{{deepLink}}">Open wallet</a></p>
+      <p class="muted small">If your browser blocks the wallet link, copy it into your wallet:</p>
       <code class="deep-link-fallback" data-deep-link-fallback>{{deepLink}}</code>
+      <p class="is-verbose"><a class="ghost inline" href="/auth/callback?session={{sessionId}}&pidHash={{demoHash}}" data-partial>Developer shortcut: simulate callback</a></p>
     </div>
-    <div class="qr">
-      <p class="eyebrow">Desktop QR</p>
-      <img src="{{qrUrl}}" alt="Scan to open wallet" />
-      <p class="muted small">Scan with an EUDI wallet to accept the credential offer.</p>
-    </div>
+    <figure class="qr wallet-handoff__qr">
+      <img src="{{qrUrl}}" alt="QR code that opens the credential request in an EUDI wallet" width="200" height="200" />
+      <figcaption class="muted small">Scan with an EUDI wallet</figcaption>
+    </figure>
+  </div>
+  <div class="callout privacy-guarantee">
+    <strong class="small">Hash-only guarantee</strong>
+    <p class="small">{{hashOnlyMessage}}</p>
+    <p class="muted small">{{policyNote}}</p>
+  </div>
+  <p class="form-notice" role="status">{{resumeHint}}</p>
+  <div class="task-recovery">
+    <h2 class="h3">Something not working?</h2>
+    <ul class="plain small">
+      <li><a href="/auth/eudi?session={{sessionId}}" data-partial>Refresh this request</a> keeps the same session if your wallet timed out.</li>
+      <li><a href="/auth/eudi" data-partial>Start a new request</a> issues a fresh session.</li>
+    </ul>
   </div>
   <details class="note is-verbose">
-    <summary>Credential offer payload</summary>
+    <summary>Request details</summary>
+    <p class="muted small">Session ID <code>{{sessionId}}</code></p>
     <pre>{{offerPreview}}</pre>
   </details>
 </section>

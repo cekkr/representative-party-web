@@ -5,6 +5,7 @@ import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../ident
 import { getPerson } from '../../identity/person.js';
 import { invalidateSessionIndex } from '../../identity/sessions.js';
 import { getCirclePolicyState, resolveDefaultActorRole } from '../../circle/policy.js';
+import { isModuleEnabled } from '../../circle/modules.js';
 import { deriveBaseUrl } from '../../../shared/utils/request.js';
 import { sendHtml } from '../../../shared/utils/http.js';
 import { persistActors, persistLedger, persistSessions } from '../../../infra/persistence/storage.js';
@@ -30,6 +31,7 @@ export async function startAuth({ req, res, state, wantsPartial }) {
         pidHashShort: existing.pidHash?.slice(0, 8) || 'verified',
         ledgerNote: 'Session already verified. Hash present in the Uniqueness Ledger.',
         actorId: existing.actorId || 'actor-resumed',
+        socialNextAction: renderSocialNextAction(state),
         person: { ...existing, sessionId: existing.id, handle: existingHandle, role: existingRole },
       },
       { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
@@ -142,6 +144,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
       pidHashShort: pidHash.slice(0, 8),
       ledgerNote,
       actorId: actor.id,
+      socialNextAction: renderSocialNextAction(state),
       person: { ...verifiedSession, sessionId },
     },
     { wantsPartial, title: `${actorLabels.actorLabelTitle} Verified`, state },
@@ -149,4 +152,11 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
 
   const cookie = buildSessionCookie(sessionId);
   return sendHtml(res, html, { 'Set-Cookie': cookie });
+}
+
+// The result page only offers destinations the deployment has enabled, so a
+// messaging-only Circle never advertises a Social route that answers 403.
+function renderSocialNextAction(state) {
+  if (!isModuleEnabled(state, 'social')) return '';
+  return '<li><a class="ghost" href="/social/feed" data-partial>Open your wall</a></li>';
 }
