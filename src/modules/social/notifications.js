@@ -48,6 +48,7 @@ export async function notifySocialParticipants(state, { post, author, targetSess
     await createNotificationWithOutbound(state, {
       type: payload.type,
       recipientHash,
+      socialPostId: post.id,
       message: payload.message,
     }, { sessionId: payload.sessionId, handle: payload.handle });
   }
@@ -67,6 +68,7 @@ export async function notifyMediaViewRequest(state, { media, viewer } = {}) {
   await createNotificationWithOutbound(state, {
     type: 'social_media_view',
     recipientHash: authorSession.pidHash,
+    socialPostId: media.postId || null,
     message,
   }, { sessionId: authorSession.id, handle: authorSession.handle });
 }

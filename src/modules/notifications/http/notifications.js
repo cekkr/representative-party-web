@@ -5,6 +5,7 @@ import { discussionHref, findDiscussionRecord } from '../../discussion/discussio
 import { findGroupById } from '../../groups/groups.js';
 import { groupHref } from '../../groups/http/groupView.js';
 import { isModuleEnabled } from '../../circle/modules.js';
+import { findReadableSocialPost, socialPostHref } from '../../social/socialLinks.js';
 import { getPerson } from '../../identity/person.js';
 import { listNotificationsForPerson, markAllRead } from '../../messaging/notifications.js';
 import { resolveNotificationPreferences } from '../../messaging/outbound.js';
@@ -136,6 +137,11 @@ function resolveNotificationSource(event, state, person, proposals) {
     if (!group) return { hidden: true, noun: 'group' };
     const view = event.type === 'group_delegate' || event.type === 'group_delegate_set' ? 'decisions' : 'overview';
     return { href: groupHref(group.id, view), label: 'Open group' };
+  }
+  if (event.socialPostId) {
+    const post = isModuleEnabled(state, 'social') ? findReadableSocialPost(state, person, event.socialPostId) : null;
+    if (!post) return { hidden: true, noun: 'update' };
+    return { href: socialPostHref(post.id), label: event.type === 'social_direct' ? 'Open conversation' : 'Open update' };
   }
   return {};
 }

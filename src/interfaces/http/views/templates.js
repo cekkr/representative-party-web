@@ -35,6 +35,7 @@ const TEMPLATE_MODULES = {
   'discussion-post': 'discussion',
   forum: 'forum',
   'forum-thread': 'forum',
+  'social-post': 'social',
   governance: 'governance',
   petitions: 'petitions',
   'petition-workspace': 'petitions',

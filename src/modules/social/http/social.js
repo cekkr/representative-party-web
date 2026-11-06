@@ -25,6 +25,7 @@ import {
   reportMedia,
 } from '../../social/media.js';
 import { notifyMediaViewRequest, notifySocialParticipants } from '../../social/notifications.js';
+import { findReadableSocialPost, socialPostHref } from '../../social/socialLinks.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
@@ -44,6 +45,9 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
     return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'social' });
   }
   const person = getPerson(req, state);
+  if (url.searchParams.has('post')) {
+    return renderFocusedSocialPost({ res, state, person, wantsPartial, url });
+  }
   const requestedType = url.searchParams.get('type');
   const followTypeFilter = person && requestedType ? normalizeFollowType(requestedType) : '';
   const openReplyId = url.searchParams.get('reply') || '';
@@ -101,6 +105,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
         mediaById,
         openReplyId,
         openReshareId,
+        resolveParent: (id) => findReadableSocialPost(state, person, id),
         state,
       }),
       feedPager,
@@ -358,7 +363,65 @@ async function publishSocialPost({ req, res, state, person, body, files }) {
     throw error;
   }
 
-  return sendRedirect(res, '/social/feed');
+  // A reply lands in its conversation; a new update returns to the wall.
+  return sendRedirect(res, replyTo ? socialPostHref(replyTo, { anchor: 'social-replies' }) : '/social/feed');
+}
+
+// One update, its readable parent, and its readable replies oldest-first. The
+// audience gate is the same one replies, reshares, and media use, so a direct
+// message opens only for its two participants.
+async function renderFocusedSocialPost({ res, state, person, wantsPartial, url }) {
+  const postId = sanitizeText(url.searchParams.get('post') || '', 120);
+  const post = findReadableSocialPost(state, person, postId);
+  const permission = evaluateAction(state, person, 'post');
+  if (!post) {
+    const html = await renderPage('social-post', {
+      person,
+      pageKey: 'social',
+      socialPostTitle: 'Update unavailable',
+      socialPostScope: 'This update does not exist or is not shared with you.',
+      socialPostBody: '<p class="muted">This update could not be opened.</p>',
+      socialRepliesHidden: 'hidden',
+    }, { wantsPartial, title: 'Social update', state });
+    return sendHtml(res, html, {}, 404);
+  }
+  const parent = post.replyTo ? findReadableSocialPost(state, person, post.replyTo) : null;
+  const replies = (state.socialPosts || [])
+    .filter((entry) => entry.replyTo === post.id && findReadableSocialPost(state, person, entry.id))
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const handle = post.authorHash ? resolveHandleForHash(state, post.authorHash) : (post.authorHandle || 'anonymous');
+  const direct = post.visibility === 'direct';
+  const renderOptions = {
+    enableActions: permission.allowed,
+    viewerHash: person?.pidHash,
+    mediaById: buildMediaLookup([post, ...replies], state),
+    openReplyId: url.searchParams.get('reply') || '',
+    openReshareId: url.searchParams.get('reshare') || '',
+    resolveParent: (id) => (id === post.id ? post : findReadableSocialPost(state, person, id)),
+    focusedId: post.id,
+    state,
+  };
+  const html = await renderPage('social-post', {
+    person,
+    pageKey: 'social',
+    socialPostTitle: escapeHtml(direct ? `Direct message from @${handle}` : `Update from @${handle}`),
+    socialPostScope: escapeHtml(direct
+      ? 'Only the sender and recipient can read this conversation.'
+      : 'Public update. Replies keep their own audience.'),
+    socialPostParent: parent
+      ? `<p class="muted small">In reply to <a href="${escapeHtml(socialPostHref(parent.id))}" data-partial>@${escapeHtml(resolveHandleForHash(state, parent.authorHash))}</a></p>`
+      : '',
+    socialPostAction: permission.allowed
+      ? `<a class="cta" href="${escapeHtml(socialPostHref(post.id))}&amp;reply=${escapeHtml(encodeURIComponent(post.id))}#social-post-${escapeHtml(post.id)}" data-partial>Reply</a>`
+      : '',
+    socialPostBody: renderSocialPosts([post], renderOptions),
+    socialReplyCount: String(replies.length),
+    socialReplies: replies.length
+      ? renderSocialPosts(replies, { ...renderOptions, enableActions: permission.allowed })
+      : '<p class="muted">No replies yet.</p>',
+    socialRepliesHidden: '',
+  }, { wantsPartial, title: direct ? 'Direct message' : `Update from @${handle}`, state });
+  return sendHtml(res, html);
 }
 
 export async function serveSocialMedia({ req, res, state, params }) {

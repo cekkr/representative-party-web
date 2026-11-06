@@ -12,6 +12,7 @@ export async function createNotification(state, notification) {
     petitionId: notification.petitionId || null,
     discussionId: notification.discussionId || null,
     groupId: notification.groupId || null,
+    socialPostId: notification.socialPostId || null,
     message: notification.message || '',
     expiresAt: notification.expiresAt || null,
     createdAt: new Date().toISOString(),

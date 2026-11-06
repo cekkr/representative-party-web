@@ -21,13 +21,13 @@ test('directory pagers read Previous/Next and keep the active search', () => {
   assert.match(renderPager(paginate([1, 2, 3], { pageSize: 1 }), { baseHref: '/forum' }), /Older →/);
 });
 
-test('migration 27 gives existing notifications explicit source ids', () => {
+test('migrations 27 and 28 give existing notifications explicit source ids', () => {
   const { data } = runMigrations({
     data: { notifications: [{ id: 'n1', type: 'group_created', petitionId: null }] },
     meta: { schemaVersion: 26, migrations: [] },
   });
   assert.deepEqual(data.notifications[0], {
-    id: 'n1', type: 'group_created', petitionId: null, discussionId: null, groupId: null,
+    id: 'n1', type: 'group_created', petitionId: null, discussionId: null, groupId: null, socialPostId: null,
   });
   // Idempotent: running the step again keeps a stored id.
   const again = runMigrations({
