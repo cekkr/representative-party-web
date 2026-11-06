@@ -3221,6 +3221,7 @@ function isHtmlResponse(response) {
       await submitDelegationChoice(form);
       return;
     }
+    let redirectedTo;
     try {
       setAppBusy(true);
       // A plain form POST includes the name/value of the button that submitted it; a bare
@@ -3249,8 +3250,10 @@ function isHtmlResponse(response) {
         options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
       }
       const response = await fetch(url, options);
+      redirectedTo = response.redirected ? response.url : '';
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403 || response.status === 429) {
+        if (response.status === 401 || response.status === 403 || response.status === 429 ||
+            (mode === 'forum' && response.status >= 400 && response.status < 500)) {
           try {
             const payload = await response.json();
             alert(payload.message || payload.error || 'Not allowed for this role.');
@@ -3264,7 +3267,8 @@ function isHtmlResponse(response) {
       if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
-      window.history.pushState({}, '', url);
+      const destination = redirectedTo || url;
+      window.history.pushState({}, '', destination);
       applyUiSettings(readUiSettings());
       initInstallWizard(root);
       syncPageMeta();
@@ -3277,11 +3281,17 @@ function isHtmlResponse(response) {
       initStickyComposerAutoCollapse();
       initPressureWorkspace();
       syncBusyIndicator();
-      focusPageDestination(root, url);
+      focusPageDestination(root, destination);
       triggerDeepLink();
     } catch (error) {
       console.error(error);
-      form.submit();
+      if (redirectedTo) {
+        window.location.href = redirectedTo;
+      } else if (mode === 'forum') {
+        alert('The submission could not be confirmed. Check the forum before trying again.');
+      } else {
+        form.submit();
+      }
     } finally {
       setAppBusy(false);
     }

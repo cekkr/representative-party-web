@@ -64,15 +64,16 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Cachet, election and delegation topics render as their normalised match key (`healthcare / waiting lists`) on group cards, the delegate dashboard, the delegation chain and the delegate inbox ("Topic healthcare"), while the directory and breadcrumbs show the member's casing. Resolve a display label from the topic registry (or the declaring group's `topics`) in one shared helper and use it at every render point; keep the stored key for matching.
 - `/groups` opens with a `Handle: … · Hash: demo-…` line under the heading — a debug-style identity dump the shell already covers. Drop it or fold it into the context-panel chip row.
 - A proposal in the `vote` stage still offers **Sign proposal** to members who have not signed; signatures only matter before quorum, so hide the control (or explain it) once voting opens.
-- Forum threads have no category field, so every article lands on `Forum / general`; give the forum compose form the same Category input and datalist the proposal form has, so long-form pieces join the party's category tree.
 - The petition comment route stores the literal `Argument note` as the title of an untitled rebuttal; the view now treats it as a placeholder (`ownArgumentTitle`). Stop writing it (store an empty title) and drop the view-side special case after a migration clears existing rows.
 - The argument-map node still carries an `Author: @handle` footer (`renderAuthorHashLine`) while every other card uses the byline head; revisit when the argument map gets a richer layout.
 - Extend the destination-heading and anchor focus used by partial navigation to explicit error summaries and changed records on form responses.
 - Canonicalize the URL after an enhanced scoped discussion POST so a reload or bookmark opens the same group lane as the rendered response.
 - Gate the wallet success page's social-wall shortcut on the Social module and provide Discussion as the primary return path in a conversation-only deployment.
 - Replace the shared fallback heading on remaining surfaces with a route-owned heading as their layouts are converted. Coordination currently repeats its workspace title in the first panel.
-- Separate enhanced POST recovery from link fallback in `src/public/app.js`. The catch path calls `form.submit()` even after a response or rendering failure, which can repeat a committed write and omit the named submitter. Recover with a read of the affected record when the write outcome is unknown and verify both submitter intent and one-write behavior.
-- Resolve proposal links and successful POST destinations from one scope-aware canonical GET URL. Current proposal and notification links use a bare fragment on the paginated collection, and several grouped actions return to the Circle list or leave the POST endpoint in browser history. Carry the authorized group and stable item id to the focused view. Verify the same destination in full and partial responses, including after promotion.
+- At 320 px with larger text, the compact shell's status facts wrap into several rows before the Forum heading. Give the required facts a denser layout that still exposes each label and value.
+- The Social composer can wrap “Expand” across lines in the desktop rail. Keep the toggle readable as the heading wraps or place the toggle below the heading when space is limited.
+- Extend Forum's enhanced POST recovery to other forms. A known redirect now falls back to a read of the destination, and Forum preserves inputs on an unconfirmed response. Other forms still fall back to `form.submit()` when there is no known redirect, which can repeat a committed write and omit the named submitter.
+- Resolve proposal links and successful POST destinations from one scope-aware canonical GET URL. Grouped writes return to the resulting lane today. Carry the stable item id to the focused view so that activity and delegation links can open a permitted proposal beyond the first page.
 - Add a shared “illustrative data / template preview / persisted workflow” treatment so prototype organization layers can never be mistaken for live delivery, protected intake, financial execution, or pressure analysis.
 - Define one cross-module vocabulary for acknowledgement, commitment, consultation, accountable decision, execution, protection, escalation, closure, impact, and recurrence; avoid ambiguous generic “assignee” states.
 - Add small-cohort suppression and uncertainty labels to every aggregate pressure visualization before enabling drill-down, preventing protected contributors from being inferred from thin sector/shift slices.
@@ -100,7 +101,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 ## Security follow-ups
 
 - Carry group lane visibility into transaction read and export policy. Home excludes scoped records and restricts audit previews to signed-in provider admins, but raw transaction endpoints can expose lane payloads. Resolve legacy records through their stored source when the audit payload has no group ID, and keep legitimate operator audit access.
-- Scope direct proposal edits, signatures, comments, stage changes, and ballots to the stored record's group lane. These handlers apply Circle action checks after locating the proposal by id and lack a stored group-lane check. Reuse the group rules for focused reads and item-id writes. Add regression coverage for members-only and disabled lanes with direct requests.
+- Apply current proposal lane read access to notification recipients, outbound mention delivery, ballot queues, and exported transaction metadata. Scope checks now cover direct mutations. Existing activity paths can surface proposal titles or topics outside their lane, including after changes in membership or visibility.
 - `POST /circle/peers` (`registerPeer`) accepts anonymous requests, so anyone reachable can add peers to the gossip set. Peers are "hints, not trust anchors" by design, but unauthenticated writes to the peer list still deserve an explicit policy decision (admin-only, or signed peer announcements).
 - `/transactions` and `/transactions/ledger` are world-readable and expose `actorHash`, digests, and payload topics. Blinded hashes are the intended pseudonym, so this is arguably the transparency goal — but it should be a documented decision with a per-provider toggle rather than an implicit default.
 - Internal errors leak raw exception text to clients (`{"error":"internal_error","detail":"error:1E08010C:DECODER routines::unsupported"}`). Log the detail server-side and return an opaque reference id instead.
@@ -131,6 +132,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## Completed
 
+- Forum article rows carry searchable category and text, a reply count, and a stable link. The article view preserves the browse search and page through replies. Publishing accepts an explicit category.
+- Group proposal writes check the stored lane and return to its resulting scope. Delegated group ballots require a holder who belongs to the group.
 - Replaced the height-capped mobile navigation with a native Menu disclosure using the desktop rail's gated link model. Kept jump search and added skip-to-main and destination focus.
 
 - Shared layout declares a local SVG favicon, also served at `/favicon.ico`.

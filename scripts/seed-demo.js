@@ -103,6 +103,7 @@ async function run() {
   // --- Forum: the free-mandate argument (A2.8).
   await form('/forum', {
     title: 'Why software cannot engineer around the free-mandate rule',
+    topic: 'Institutions / Free mandate',
     content:
       'Article 67 of the Constitution says every member of Parliament represents the Nation and serves without a binding mandate. '
       + 'No platform can change that, and none should try. What software can do is make the record impossible to rewrite — '

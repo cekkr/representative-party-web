@@ -531,6 +531,7 @@ hitting it on referendum night, because that is when it will happen for real.
 
 **A2.8** `@sofia.bianchi` — `POST /forum` — **[drive]**
 `title=Why software cannot engineer around the free-mandate rule`
+`topic=Institutions / Free mandate`
 `content=` art. 67 Cost.; the M5S/Rousseau experience as the cautionary tale the
 platform is built against; soft power as the only constitutional path.
 → plus a `POST /forum/comment` (`parentId=...`) from `@tommaso.ricci` asking

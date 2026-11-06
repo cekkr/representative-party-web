@@ -141,9 +141,11 @@ test('forum threads paginate across pages', async (t) => {
   }
 
   const cookie = sessions[0].cookie;
-  const { text: page1 } = await fetchText(`${server.baseUrl}/forum`, { headers: { Cookie: cookie } });
+  const { text: page1 } = await fetchText(`${server.baseUrl}/forum?q=body`, { headers: { Cookie: cookie } });
   assert.match(page1, /Page 1 of 2/);
-  const { text: page2 } = await fetchText(`${server.baseUrl}/forum?page=2`, { headers: { Cookie: cookie } });
+  assert.match(page1, /href="\/forum\?q=body&amp;page=2"/);
+  const { text: page2 } = await fetchText(`${server.baseUrl}/forum?q=body&page=2`, { headers: { Cookie: cookie } });
   assert.match(page2, /Page 2 of 2/);
+  assert.match(page2, /href="\/forum\?thread=[^"]+&amp;q=body&amp;page=2"/);
   assert.notEqual(page1, page2);
 });

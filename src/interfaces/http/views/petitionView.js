@@ -36,6 +36,7 @@ export function renderPetitionList(
 ) {
   const allowDelegation = options.allowDelegation !== false;
   const allowVoting = options.allowVoting !== false;
+  const allowLaneParticipation = options.allowLaneParticipation !== false;
   const allowEditing = options.allowEditing === true;
   const editGate = options.editGate || {};
   const actorLabels = options.actorLabels || {};
@@ -148,26 +149,26 @@ export function renderPetitionList(
           ${
             hasSigned
               ? '<p class="muted small">You already signed.</p>'
-              : `
+              : allowLaneParticipation ? `
           <form class="form-inline" method="post" action="/petitions/sign" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
             <button type="submit" class="ghost">Sign proposal</button>
           </form>
-          `
+          ` : ''
           }
           ${
             voteDisabled
               ? `<p class="muted small">${voteDisabledLabel}</p>`
-              : `
+              : allowLaneParticipation ? `
           <form class="form-inline" method="post" action="/petitions/vote" data-enhance="petitions">
             <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
             ${renderBallotSelect(myResolution, allowDelegation)}
             <button type="submit" class="ghost">${hasDelegatedBallot ? 'Override' : myResolution ? 'Change vote' : 'Vote'}</button>
           </form>
-          `
+          ` : ''
           }
           ${promoteControl}
-          ${renderDiscussionBlock(petition, comments, state)}
+          ${renderDiscussionBlock(petition, comments, state, { allowCommenting: allowLaneParticipation })}
           ${renderDraftUpdateForm(petition, {
             canEdit,
             allowEditing,
@@ -520,7 +521,7 @@ function renderRevisionHistory(petition, state) {
   `;
 }
 
-function renderDiscussionBlock(petition, comments, state) {
+function renderDiscussionBlock(petition, comments, state, { allowCommenting }) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
   // Stored newest-first; a deliberation reads oldest-first so a rebuttal follows the
@@ -543,7 +544,7 @@ function renderDiscussionBlock(petition, comments, state) {
       ${
         disabled
           ? '<p class="muted small">Discussion closed.</p>'
-          : `
+          : allowCommenting ? `
       <form class="stack" method="post" action="/petitions/comment" data-enhance="petitions">
         <input type="hidden" name="petitionId" value="${escapeHtml(petition.id)}" />
         <label class="field">
@@ -580,7 +581,7 @@ function renderDiscussionBlock(petition, comments, state) {
         </label>
         <button class="ghost" type="submit">Post comment</button>
       </form>
-      `
+      ` : ''
       }
     </details>
   `;

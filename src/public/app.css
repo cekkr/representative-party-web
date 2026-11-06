@@ -1301,7 +1301,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
   opacity: 0.6;
 }
 
-.panel {
+.panel,
+.forum-article {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
@@ -1310,7 +1311,8 @@ body[data-composer-mode="on"] .composer-tool__panel {
 }
 
 @container shell-main (max-width: 700px) {
-  .panel {
+  .panel,
+  .forum-article {
     padding: min(var(--pad-card), 1rem);
   }
 }
@@ -2186,6 +2188,56 @@ details.note pre {
 
 .topic-card:hover {
   border-color: var(--border-strong);
+}
+
+.forum-thread-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.forum-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 0.5rem;
+}
+
+.forum-search .field {
+  flex: 1 1 13rem;
+  min-width: 0;
+}
+
+.forum-search input {
+  min-width: 0;
+}
+
+.forum-row,
+.forum-reading {
+  overflow-wrap: anywhere;
+}
+
+.forum-row .topic-head {
+  padding-bottom: 0.9rem;
+}
+
+.forum-row__count {
+  margin-inline-start: auto;
+}
+
+.forum-reading {
+  width: min(100%, 56rem);
+}
+
+.forum-article > p {
+  white-space: pre-wrap;
+}
+
+.page-grid--forum p:empty,
+.forum-reading p:empty {
+  display: none;
 }
 
 .topic-head {

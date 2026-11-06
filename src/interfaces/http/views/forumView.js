@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderActorAvatar, renderActorLabel, resolvePersonHandle } from './actorLabel.js';
+import { renderActorAvatar, renderActorLabel } from './actorLabel.js';
 import {
   renderEmptyState,
   renderEvidenceLinks,
@@ -10,155 +10,123 @@ import {
   resolveTopicBreadcrumb,
 } from './shared.js';
 import { paginate } from '../../../shared/utils/pagination.js';
-import { renderContextPanel } from './contextPanel.js';
+import { forumThreadHref } from '../../../modules/forum/threads.js';
 
-export function renderForum(entries, person, state, options = {}) {
-  const { threads, commentsByThread } = splitForumEntries(entries);
-  const pageInfo = paginate(threads, { page: options.page || 1 });
-  const postGate = options.postGate;
-  return {
-    threads: renderThreads(pageInfo.items, commentsByThread, state, options),
-    threadsPager: renderPager(pageInfo, { baseHref: '/forum', label: 'threads' }),
-    personHandle: resolvePersonHandle(person),
-    composeOpen: options.composeOpen || '',
-    forumContext: renderContextPanel({
-      gates: postGate
-        ? [
-            {
-              label: 'Publish an article',
-              status: postGate.allowed ? 'Allowed' : 'Blocked',
-              allowed: postGate.allowed,
-              reason: postGate.allowed ? '' : postGate.message || postGate.reason || '',
-            },
-          ]
-        : [],
-      facts: [
-        { term: 'Role', value: person?.role || 'guest' },
-        { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
-      ],
-      guidance: ['Use the forum for deeper context and evidence-backed analysis; keep quick takes in the social lane.'],
-    }),
-  };
-}
-
-function renderThreads(threads, commentsByThread, state, { replyOpenId } = {}) {
-  if (!threads.length) {
-    return renderEmptyState('No forum threads yet. Publish an article or analysis.');
-  }
-  const topicCache = new Map();
-  return threads
-    .map((thread) => {
-      const topicLabel = resolveTopicBreadcrumb(thread, state, topicCache);
-      const createdAt = formatTimestamp(thread.createdAt);
-      const threadComments = commentsByThread.get(thread.id) || [];
-      const replyOpen = replyOpenId && replyOpenId === thread.id ? 'open' : '';
-      const safeThreadId = escapeHtml(thread.id);
-      const threadAnchor = `thread-${safeThreadId}`;
-      const replySummary = `Reply (${threadComments.length})`;
-      return `
-        <article class="topic-card" id="${threadAnchor}">
-          <div class="topic-head">
-            ${renderActorAvatar(state, thread.authorHash || 'anonymous')}
-            <div class="topic-info">
-              <div class="topic-byline">
-                <span class="topic-author">${renderActorLabel(state, thread.authorHash || 'anonymous')}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
-              </div>
-              <h3 class="topic-title">${escapeHtml(thread.title || 'Untitled')}</h3>
-              <div class="topic-meta">
-                <span class="topic-breadcrumbs">Forum / ${escapeHtml(topicLabel)}</span>
-                <span class="pill ghost">Replies: ${threadComments.length}</span>
-                ${renderPreviewPill(thread)}
-                ${renderIssuerPill(thread)}
-              </div>
-            </div>
-          </div>
-          <div class="topic-body">
-            <p>${escapeHtml(thread.content)}</p>
-          </div>
-          <div class="reply-list">
-            ${renderComments(threadComments, state)}
-          </div>
-          <details class="reply-composer" ${replyOpen}>
-            <summary>
-              <div class="reply-hint">
-                <div class="reply-hint__meta">
-                  <div class="reply-hint__avatar" aria-hidden="true"></div>
-                  <div>
-                    <div class="reply-hint__title">${replySummary}</div>
-                    <div class="reply-hint__subtitle">Share your view and add evidence when needed.</div>
-                  </div>
-                </div>
-                <span class="reply-hint__cta">Reply</span>
-              </div>
-            </summary>
-            <form class="stack reply-composer__form" method="post" action="/forum/comment" data-enhance="forum">
-              <input type="hidden" name="parentId" value="${safeThreadId}" />
-              <label class="field">
-                <span>Comment</span>
-                <textarea name="content" rows="3" placeholder="Add your view" required></textarea>
-              </label>
-              <label class="field">
-                <span>Evidence / citations (optional)</span>
-                <textarea name="evidenceLinks" rows="2" placeholder="https://example.org/report"></textarea>
-              </label>
-              <p class="muted small">One URL per line.</p>
-              <button class="ghost" type="submit">Comment</button>
-            </form>
-          </details>
-        </article>
-      `;
-    })
-    .join('\n');
-}
-
-function splitForumEntries(entries = []) {
+export function renderForum(entries, state, { q = '', page = 1, postGate } = {}) {
   const threads = [];
-  const commentsByThread = new Map();
-  for (const entry of entries || []) {
-    if (!entry) continue;
+  const replyCounts = new Map();
+  for (const entry of entries) {
     if (entry.parentId) {
-      const list = commentsByThread.get(entry.parentId) || [];
-      list.push(entry);
-      commentsByThread.set(entry.parentId, list);
+      replyCounts.set(entry.parentId, (replyCounts.get(entry.parentId) || 0) + 1);
     } else {
       threads.push(entry);
     }
   }
-  // Entries are stored newest-first, which is right for the thread list but wrong inside a
-  // thread: a reply must read after the comment it answers, so comments run oldest-first.
-  for (const list of commentsByThread.values()) {
-    list.sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
-  }
-  return { threads, commentsByThread };
+  const query = q.toLowerCase();
+  const topicCache = new Map();
+  const matches = q ? threads.filter((thread) =>
+    [thread.title, thread.content, resolveTopicBreadcrumb(thread, state, topicCache)]
+      .some((value) => String(value || '').toLowerCase().includes(query)),
+  ) : threads;
+  const pageInfo = paginate(matches, { page });
+  return {
+    forumSearchQuery: escapeHtml(q),
+    forumClearSearch: q ? '<a href="/forum" data-partial>Clear search</a>' : '',
+    threads: pageInfo.items.map((thread) => renderThreadRow(thread, state, {
+      topic: resolveTopicBreadcrumb(thread, state, topicCache),
+      href: forumThreadHref(thread.id, { q, page: pageInfo.page }),
+      replyCount: replyCounts.get(thread.id) || 0,
+    })).join('\n'),
+    threadsEmpty: matches.length ? '' : renderEmptyState(q
+      ? 'No articles match your search.'
+      : postGate?.allowed ? 'No articles yet. Use New article to start a discussion.' : 'No articles yet.'),
+    threadsPager: renderPager(pageInfo, { baseHref: '/forum', query: { q }, label: 'articles' }),
+    forumCreateAction: postGate?.allowed
+      ? '<a class="cta" href="/forum?compose=thread#forum-compose" data-partial>New article</a>'
+      : '',
+    forumComposeHidden: postGate?.allowed ? '' : 'hidden',
+    forumPostingNotice: postGate?.allowed ? '' : escapeHtml(postGate?.message || 'Publishing is unavailable.'),
+  };
+}
+
+function renderThreadRow(thread, state, { topic, href, replyCount }) {
+  const content = String(thread.content || '').replace(/\s+/g, ' ').trim();
+  const excerpt = content.length > 220 ? `${content.slice(0, 219).trimEnd()}…` : content;
+  return `
+    <li>
+      <article class="topic-card forum-row" id="thread-${escapeHtml(thread.id)}">
+        <div class="topic-head">
+          ${renderActorAvatar(state, thread.authorHash || 'anonymous')}
+          <div class="topic-info">
+            <div class="topic-byline">
+              <span class="topic-author">${renderActorLabel(state, thread.authorHash || 'anonymous')}</span>
+              ${renderTimestamp(thread.createdAt)}
+            </div>
+            <h3 class="topic-title"><a href="${escapeHtml(href)}" data-partial>${escapeHtml(thread.title || 'Untitled article')}</a></h3>
+            <p>${escapeHtml(excerpt)}</p>
+            <footer class="topic-meta">
+              <span class="topic-breadcrumbs">${escapeHtml(topic)}</span>
+              ${renderPreviewPill(thread)}
+              ${renderIssuerPill(thread)}
+              <span class="muted small forum-row__count">${replyCount} ${replyCount === 1 ? 'reply' : 'replies'}</span>
+            </footer>
+          </div>
+        </div>
+      </article>
+    </li>`;
+}
+
+export function renderForumThread(thread, comments, state, { q = '', page = 1, postGate } = {}) {
+  const params = new URLSearchParams();
+  if (q) params.set('q', q);
+  if (page > 1) params.set('page', String(page));
+  const query = params.size ? `?${params}` : '';
+  const ordered = comments.slice().sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+  return {
+    forumReturnHref: escapeHtml(`/forum${query}`),
+    threadTitle: escapeHtml(thread.title || 'Untitled article'),
+    threadAnchor: `thread-${escapeHtml(thread.id)}`,
+    threadTopic: escapeHtml(resolveTopicBreadcrumb(thread, state)),
+    threadId: escapeHtml(thread.id),
+    threadByline: `
+      ${renderActorAvatar(state, thread.authorHash || 'anonymous')}
+      <span class="topic-author">${renderActorLabel(state, thread.authorHash || 'anonymous')}</span>
+      ${renderTimestamp(thread.createdAt)}
+      ${renderPreviewPill(thread)}
+      ${renderIssuerPill(thread)}
+    `,
+    threadContent: escapeHtml(thread.content),
+    threadReplies: ordered.length ? renderComments(ordered, state) : renderEmptyState('No replies yet.'),
+    threadReplyCount: ordered.length,
+    threadReplyAction: postGate?.allowed ? '<a class="cta" href="#forum-reply">Write a reply</a>' : '',
+    threadReplyFormHidden: postGate?.allowed ? '' : 'hidden',
+    threadReplyNotice: postGate?.allowed ? '' : escapeHtml(postGate?.message || 'Replying is unavailable.'),
+    threadReplyPostHref: escapeHtml(`/forum/comment${query}`),
+  };
+}
+
+function renderTimestamp(value) {
+  const date = formatTimestamp(value);
+  return date ? `<time class="topic-time muted small" datetime="${escapeHtml(new Date(value).toISOString())}">${date}</time>` : '';
 }
 
 function renderComments(comments, state) {
-  if (!comments.length) {
-    return renderEmptyState('No comments yet.', { size: 'small' });
-  }
-  return comments
-    .map((comment) => {
-      const createdAt = formatTimestamp(comment.createdAt);
-      const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
-      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
-      const evidenceBlock = renderEvidenceLinks(evidenceLinks);
-      return `
-        <article class="reply-card">
-          ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
-          <div class="reply-card__content">
-            <div class="reply-card__meta">
-              <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
-              ${createdAt ? `<span class="muted small">${createdAt}</span>` : ''}
-              ${evidencePill}
-              ${renderPreviewPill(comment)}
-              ${renderIssuerPill(comment)}
-            </div>
-            <p class="reply-card__text">${escapeHtml(comment.content)}</p>
-            ${evidenceBlock}
+  return comments.map((comment) => {
+    const evidenceLinks = Array.isArray(comment.evidenceLinks) ? comment.evidenceLinks : [];
+    return `
+      <article class="reply-card" id="reply-${escapeHtml(comment.id)}">
+        ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
+        <div class="reply-card__content">
+          <div class="reply-card__meta">
+            <span class="topic-author">${renderActorLabel(state, comment.authorHash || 'anonymous')}</span>
+            ${renderTimestamp(comment.createdAt)}
+            ${renderPreviewPill(comment)}
+            ${renderIssuerPill(comment)}
           </div>
-        </article>
-      `;
-    })
-    .join('\n');
+          <p class="reply-card__text">${escapeHtml(comment.content)}</p>
+          ${renderEvidenceLinks(evidenceLinks)}
+        </div>
+      </article>
+    `;
+  }).join('\n');
 }

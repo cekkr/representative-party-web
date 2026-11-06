@@ -1,0 +1,36 @@
+<div class="page-main forum-reading stack">
+  <a href="{{forumReturnHref}}" data-partial>Back to Forum articles</a>
+  <header class="workspace-heading" id="{{threadAnchor}}">
+    <div>
+      <p class="topic-breadcrumbs">{{threadTopic}}</p>
+      <h1 tabindex="-1">{{threadTitle}}</h1>
+    </div>
+    {{threadReplyAction}}
+  </header>
+  <article class="forum-article stack">
+    <div class="topic-byline">{{threadByline}}</div>
+    <p>{{threadContent}}</p>
+  </article>
+  <section class="panel stack" id="forum-replies" data-composer-section="forum-replies" data-section-label="Article replies">
+    <h2>Replies <span class="muted small">({{threadReplyCount}})</span></h2>
+    <div class="stack">{{threadReplies}}</div>
+    <p class="muted">{{threadReplyNotice}}</p>
+    <details class="form-toggle reply-composer" id="forum-reply" open {{threadReplyFormHidden}}>
+      <summary>Write a reply</summary>
+      <form class="stack" method="post" action="{{threadReplyPostHref}}" data-enhance="forum">
+        <input type="hidden" name="parentId" value="{{threadId}}" />
+        <label class="field">
+          <span>Reply</span>
+          <textarea name="content" rows="3" maxlength="800" required></textarea>
+        </label>
+        <label class="field">
+          <span>Evidence or citations (optional)</span>
+          <textarea name="evidenceLinks" rows="2" placeholder="One URL per line"></textarea>
+        </label>
+        <div class="cta-row">
+          <button class="cta" type="submit">Post reply</button>
+        </div>
+      </form>
+    </details>
+  </section>
+</div>

@@ -6,21 +6,21 @@ import { ensureTopicPath } from '../../topics/registry.js';
 import { evaluateAction, getCirclePolicyState } from '../../circle/policy.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { persistDiscussions } from '../../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../federation/replication.js';
+import { filterVisibleEntries, findVisibleEntry, stampLocalEntry } from '../../federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
-import { parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
-import { renderForum } from '../../../interfaces/http/views/forumView.js';
+import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
+import { renderForum, renderForumThread } from '../../../interfaces/http/views/forumView.js';
 import { parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { recordRateLimit } from '../../ops/metrics.js';
+import { getTopicConfig } from '../../topics/topicGardenerClient.js';
+import { getTopicPreferences } from '../../topics/preferences.js';
+import { buildTopicOptions, renderTopicDatalist } from '../../../interfaces/http/views/topicHelpers.js';
+import { forumThreadHref, isForumThread } from '../threads.js';
 
-export async function renderForumRoute({ req, res, state, wantsPartial, url }) {
-  return renderForumPage({ req, res, state, wantsPartial, url });
-}
-
-export async function postThread({ req, res, state, wantsPartial }) {
+export async function postThread({ req, res, state }) {
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
@@ -46,7 +46,7 @@ export async function postThread({ req, res, state, wantsPartial }) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
   const policy = getCirclePolicyState(state);
-  const classifiedTopic = await classifyTopic(`${title} ${content}`, state);
+  const classifiedTopic = sanitizeText(body.topic || '', 80) || await classifyTopic(`${title} ${content}`, state);
   const topicResult = await ensureTopicPath(state, classifiedTopic, { source: 'forum' });
   const topic = topicResult.topic?.label || classifiedTopic || 'general';
   const topicPath = topicResult.path?.length ? topicResult.path.map((entry) => entry.label) : [];
@@ -72,13 +72,10 @@ export async function postThread({ req, res, state, wantsPartial }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { threadId: entry.id, topic },
   });
-  if (wantsPartial) {
-    return renderForumPage({ req, res, state, wantsPartial, person, url: new URL(req.url, `http://${req.headers.host}`) });
-  }
-  return sendRedirect(res, '/forum');
+  return sendRedirect(res, forumThreadHref(entry.id));
 }
 
-export async function postComment({ req, res, state, wantsPartial }) {
+export async function postComment({ req, res, state, url }) {
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
@@ -104,7 +101,7 @@ export async function postComment({ req, res, state, wantsPartial }) {
   if (!parentId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
-  const parent = state.discussions.find((d) => d.id === parentId && !d.parentId);
+  const parent = findForumThread(state, parentId);
   if (!parent) {
     return sendJson(res, 404, { error: 'thread_not_found' });
   }
@@ -139,31 +136,51 @@ export async function postComment({ req, res, state, wantsPartial }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { threadId: parentId, evidenceCount: evidenceLinks.length },
   });
-  if (wantsPartial) {
-    return renderForumPage({ req, res, state, wantsPartial, person, url: new URL(req.url, `http://${req.headers.host}`) });
+  return sendRedirect(res, forumThreadHref(parent.id, readCollectionQuery(url.searchParams)));
+}
+
+export async function renderForumRoute({ req, res, state, wantsPartial, url }) {
+  const person = getPerson(req, state);
+  const query = readCollectionQuery(url.searchParams);
+  const threadId = sanitizeText(url.searchParams.get('thread') || url.searchParams.get('reply') || '', 120);
+  const postGate = evaluateAction(state, person, 'post');
+  const thread = threadId ? findForumThread(state, threadId) : null;
+  if (thread) {
+    const comments = filterVisibleEntries(state.discussions, state, (entry) =>
+      !entry.groupId && !entry.petitionId && entry.parentId === thread.id,
+    );
+    const html = await renderPage('forum-thread', {
+      ...renderForumThread(thread, comments, state, { ...query, postGate }),
+      person,
+      pageKey: 'forum',
+    }, { wantsPartial, title: 'Forum', state });
+    return sendHtml(res, html);
   }
-  return sendRedirect(res, '/forum');
+
+  const entries = filterVisibleEntries(state.discussions, state, (entry) =>
+    !entry.groupId && !entry.petitionId && (entry.parentId || isForumThread(entry)),
+  );
+  const topicConfig = getTopicConfig(state);
+  const html = await renderPage('forum', {
+    ...renderForum(entries, state, { ...query, postGate }),
+    person,
+    forumNotice: threadId ? 'That article could not be found.' : '',
+    workspaceCreateHref: postGate.allowed ? '/forum?compose=thread#forum-compose' : '',
+    composeOpen: url.searchParams.has('compose') ? 'open' : '',
+    topicDatalist: renderTopicDatalist(buildTopicOptions({
+      anchors: topicConfig.anchors,
+      pinned: topicConfig.pinned,
+      preferences: getTopicPreferences(state, person),
+      entries,
+    })),
+  }, { wantsPartial, title: 'Forum', state });
+  return sendHtml(res, html, {}, threadId ? 404 : 200);
 }
 
-async function renderForumPage({ req, res, state, wantsPartial, person, url }) {
-  const activePerson = person || getPerson(req, state);
-  const resolvedUrl = url || new URL(req.url, `http://${req.headers.host}`);
-  const composeOpen = resolvedUrl.searchParams.get('compose') ? 'open' : '';
-  const replyOpenId = resolvedUrl.searchParams.get('reply') || '';
-  const page = parsePage(resolvedUrl.searchParams.get('page'));
-  const forumEntries = filterForumEntries(state);
-  const postGate = evaluateAction(state, activePerson, 'post');
-  const forumData = renderForum(forumEntries, activePerson, state, { composeOpen, replyOpenId, page, postGate });
-  forumData.person = activePerson;
-  forumData.workspaceCreateHref = postGate.allowed ? '/forum?compose=thread#forum-compose' : '';
-  const html = await renderPage('forum', forumData, { wantsPartial, title: 'Forum', state });
-  return sendHtml(res, html);
+function readCollectionQuery(searchParams) {
+  return { q: sanitizeText(searchParams.get('q') || '', 120), page: parsePage(searchParams.get('page')) };
 }
 
-function filterForumEntries(state) {
-  return filterVisibleEntries(state.discussions, state, (entry) => {
-    if (entry.petitionId) return false;
-    if (entry.stance === 'article' || entry.stance === 'comment') return true;
-    return Boolean(entry.parentId);
-  });
+function findForumThread(state, id) {
+  return findVisibleEntry(state.discussions, state, (entry) => entry.id === id && isForumThread(entry));
 }

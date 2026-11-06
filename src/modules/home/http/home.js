@@ -3,6 +3,7 @@ import { canAdministerProvider } from '../../identity/privileges.js';
 import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../circle/policy.js';
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
 import { matchesGroupScope } from '../../groups/groupScope.js';
+import { forumThreadHref, isForumThread } from '../../forum/threads.js';
 import {
   countVisibleEntries,
   describeProfile,
@@ -390,7 +391,7 @@ function formatConversationItem(item = {}) {
       title: entry.title || 'Forum article',
       summary: buildSnippet(entry.content || '', 110),
       meta: `${resolveTopic(entry)} · ${createdAt}`,
-      href: '/forum',
+      href: forumThreadHref(entry.id),
       partial: true,
       pills: [{ label: 'Forum' }],
     };
@@ -518,10 +519,6 @@ function isDiscussionEntry(entry = {}) {
   if (entry.parentId) return false;
   if (entry.stance === 'article' || entry.stance === 'comment') return false;
   return matchesGroupScope(entry, null);
-}
-
-function isForumThread(entry = {}) {
-  return !entry.petitionId && !entry.parentId && entry.stance === 'article';
 }
 
 function resolveTopic(entry = {}) {

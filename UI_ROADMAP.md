@@ -91,9 +91,12 @@ different sequence from the visible layout. [Current grid](src/public/app.css) �
 previews, followed by enabled work lanes and supporting context. Circle-wide
 discussion and proposal previews exclude group lanes. Discussion puts its
 scope and Create action before the feed, with the topic filter next to results
-and the compose form in the supporting rail. Other collections retain their
-existing layouts. [Home partials](src/modules/home/templates/partials) ·
-[Discussion partials](src/modules/discussion/templates/partials)
+and the compose form in the supporting rail. Forum has searchable article rows,
+a category field in the compose rail, and a focused reading view linked directly
+from Home and the results. Search and page survive opening an article, replying,
+and returning to the collection. [Home partials](src/modules/home/templates/partials) ·
+[Discussion partials](src/modules/discussion/templates/partials) ·
+[Forum templates](src/modules/forum/templates)
 
 **Target.** Follow Citizen OS's collection pattern. Home begins with a short
 workspace header, then small named collections with a few real entries and a
@@ -162,7 +165,10 @@ previous view and scope. Keep existing anchor links and bookmarks working.
 **Current.** `/petitions` serves a scoped, stage-filtered and paginated list with
 full proposal cards, plus a deliberation feed and a compose/filter/delegate rail.
 Existing proposal cards carry evidence, votes, discussion, revisions, and
-moderation controls. [Controller](src/modules/petitions/http/petitions.js) ·
+moderation controls. Item-id writes check the stored proposal's lane and return
+to the resulting group scope after success. Public lanes allow outsiders to
+browse, with group membership required for proposal participation.
+[Controller](src/modules/petitions/http/petitions.js) ·
 [Template](src/modules/petitions/templates/petitions.html) ·
 [Proposal view](src/interfaces/http/views/petitionView.js)
 
@@ -394,9 +400,9 @@ starting point for implementation.
 | [Core shell and topbar](src/modules/core/templates/partials) | Grouped desktop rail, native compact Menu, current location, skip target, and shared status. | Extend the page-heading and contextual action pattern as each surface is converted. |
 | [Home](src/modules/home/templates/home.html) `/` | Persistent workspace heading, scoped conversation previews first, and supporting access and operator sections. | Refine previews into named destination collections with consistent cards and direct links to their full views. |
 | [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Persistent scope header and compose jump, topic filter beside the feed, scoped empty states, and a supporting compose rail. | Refine authored rows and stable links as part of the conversation slice. |
-| [Forum](src/modules/forum/templates/forum.html) `/forum` | Thread list, reply forms, and compose rail. | Compact list rows and a focused reading order. Keep replies chronological and restore the reply target after posting. |
+| [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Wall, typed follows and filters, compose, and media controls. | Distinct post and media states, visible audience, and accessible compose with one scroll path. |
-| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Rich cards, deliberation feed, compose and filters. | Summary collection plus selected proposal workspace with Overview, Discussion, History, and Ballot as applicable. |
+| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Rich cards, deliberation feed, compose and filters. Item-id writes use stored-lane access and redirect grouped actions to the resulting scope. | Summary collection plus selected proposal workspace with Overview, Discussion, History, and Ballot as applicable. |
 | [Groups](src/modules/groups/templates/groups.html) `/groups` | Group tree, categories, elections, roles, and settings. | Browse plus focused group identity, links to scoped lanes, Members and Decisions views, and contextual management. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballots, preferences, effective chains, and recommendations. | Task rows with topic, named holder, deadline/resolution, and scoped proposal link. Put recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Searchable directory and profile with coverage, votes, and activity. | Summary cards or rows, then a record header with readable accountability sections and separate endorsement context. |
@@ -444,7 +450,7 @@ keys have historical names, while their labels identify the content.
 | --- | --- |
 | Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops`. Workspace heading sits outside these panels. |
 | Social | `social-wall`, `social-compose`, `social-controls`, `social-follows` |
-| Forum | `forum-threads`, `forum-compose` |
+| Forum | Browse `forum-threads`, `forum-compose`. Focused article `forum-replies`. Both use the `forum` page key. The article and heading stay visible outside optional sections. |
 | Discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. Scope and page heading sit outside these panels. |
 | Proposals | `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates` |
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
@@ -462,18 +468,17 @@ keys have historical names, while their labels identify the content.
 | Slice | Implementation boundary | Acceptance |
 | --- | --- | --- |
 | 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
-| 2. Conversation and collections | Home previews, list/row/card variants, search and filter placement, contribution and reply anatomy. Carry to Forum and Social. | In Scenario A, find the waiting-list evidence and open an attributed forum discussion from the list. Follow the replies in order and post one with and without enhancement. Retain the active search/scope through refresh and Back. |
-| 3. Proposal browse and workspace | Authorize focused reads and direct writes against the stored group scope first. Resolve a canonical, scope-aware GET URL for full and partial paths. Then split browse, overview, deliberation, history, and ballot presentation. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
+| 2. Conversation and collections | Forum browse and focused replies are implemented. Home links to individual articles. Discussion and Social still have collection and contribution refinements ahead. | In Scenario A, find the waiting-list evidence and open an attributed forum article from search. Follow replies in order and post one with and without enhancement. Retain the active search and scope through refresh and Back. |
+| 3. Proposal browse and workspace | Direct writes now check the stored group lane. Next, apply the read gate to a canonical proposal GET URL for full and partial requests, then split browse, overview, deliberation, history, and ballot presentation. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
 | 4. Groups, activity, and other records | Focused group sections and lane links, activity deep links, People and delegation, then governance and cases. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
 | 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
-For a scoped proposal implementation, check the stored group's lane and
-permission before each item-id mutation, including draft edit, sign, comment,
-stage change, and vote. Keep any stricter action gate. A submitted query or
-form value cannot establish membership. Following a successful action, resolve
-the record's canonical GET location from its resulting scope. On a move, the
-old scope must be checked again if someone opens the old link. Carry out the
-scope checks before wiring the new view to activity or delegation links.
+The proposal controller checks the stored group lane before edits, signatures,
+comments, stage changes, ballots, and promotions. A submitted query or form
+value cannot establish membership. Grouped actions now return to the resulting
+lane. Once a focused view exists, redirect to the item itself and check the
+current lane again when someone follows an old link after a move. Carry out the
+focused read and activity visibility checks before publishing new deep links.
 [Group scope](src/modules/groups/groupScope.js) ·
 [Proposal controller](src/modules/petitions/http/petitions.js) ·
 [Optimization backlog](OPTIMIZATIONS.md)
@@ -487,6 +492,15 @@ The Scenario A walkthrough passed and refreshed the README captures. The pilot
 pages were checked in light and dark at desktop, 800 px, 390 px, and 320 px,
 including large text and reduced motion. The separate Scenario B review
 covered the attributed source, acknowledged case, review date, and preview.
+
+### Forum and proposal lane verification
+
+The Forum browser regression covers keyboard search, article focus, replies with
+and without JavaScript, and returning to the same search. The Scenario A driver
+finds the free-mandate article in the collection and captures the article with its
+two attributed replies. The proposal HTTP regression covers forged scope fields,
+public and members-only lanes, a disabled lane, and full and partial group redirects.
+[Forum browser regression](tests/ui.test.js) · [Proposal lane regression](tests/petition-scope.test.js)
 
 ### Review checklist for presentation changes
 

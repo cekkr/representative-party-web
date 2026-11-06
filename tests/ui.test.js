@@ -1651,3 +1651,59 @@ test('organization case details stay ahead of the queue and fit a phone viewport
   assert.ok(layout.scrollWidth <= layout.width, 'the case and queue fit the viewport');
   assert.ok(layout.caseTop < layout.queueTop, 'the case precedes its queue');
 });
+
+test('Forum preserves the search and article through enhanced and native reply forms', { timeout: 60000 }, async (t) => {
+  const port = await getAvailablePort();
+  const { baseUrl, stop } = await startServer({ port, extraEnv: { ENFORCE_CIRCLE: 'true' } });
+  t.after(stop);
+  const session = await createVerifiedSession(baseUrl, { pidHash: 'sofia-bianchi' });
+  const article = await postForm(`${baseUrl}/forum`, {
+    title: 'Why software cannot engineer around the free-mandate rule',
+    topic: 'Institutions / Free mandate',
+    content: 'Art. 67 Cost. guarantees a free mandate.',
+  }, session);
+  const articleUrl = new URL(article.url);
+  assert.ok(articleUrl.searchParams.get('thread'));
+  articleUrl.searchParams.set('q', 'free mandate');
+
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 700 });
+  await setSessionCookie(page, baseUrl, session.sessionId);
+  await page.goto(`${baseUrl}/forum`);
+  await page.type('input[name="q"]', 'free mandate');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => new URL(location.href).searchParams.has('q'));
+  await page.waitForSelector('#forum-threads h3 a');
+  await page.focus('#forum-threads h3 a');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction((url) => location.href === url && document.activeElement?.tagName === 'H1', {}, articleUrl.href);
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 390);
+  await page.goBack();
+  await page.waitForSelector('#forum-threads h3 a');
+  assert.equal(await page.$eval('input[name="q"]', (input) => input.value), 'free mandate');
+  await page.click('#forum-threads h3 a');
+  await page.waitForSelector('#forum-reply');
+
+  const field = '#forum-reply textarea[name="content"]';
+  await page.type(field, 'How does the pact differ from a party whip?');
+  await page.click('#forum-reply button[type="submit"]');
+  await page.waitForFunction(() => document.querySelector('#forum-replies .reply-card')?.textContent.includes('party whip'));
+  assert.equal(page.url(), articleUrl.href);
+
+  await page.setJavaScriptEnabled(false);
+  await page.reload();
+  await page.type(field, 'The seat stays yours either way.');
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('#forum-reply button[type="submit"]'),
+  ]);
+  assert.equal(page.url(), articleUrl.href);
+  assert.deepEqual(await page.$$eval('#forum-replies .reply-card__text', (nodes) => nodes.map((node) => node.textContent)), [
+    'How does the pact differ from a party whip?',
+    'The seat stays yours either way.',
+  ]);
+  await Promise.all([page.waitForNavigation(), page.click('.forum-reading > a')]);
+  assert.equal(await page.$eval('input[name="q"]', (input) => input.value), 'free mandate');
+});

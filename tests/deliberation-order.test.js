@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { renderForum } from '../src/interfaces/http/views/forumView.js';
+import { renderForumThread } from '../src/interfaces/http/views/forumView.js';
 import { renderPetitionList } from '../src/interfaces/http/views/petitionView.js';
 
 // Scenario A (A2.8, A3.6/A3.9/A3.11): a reply must read after what it answers, a rebuttal
@@ -24,9 +24,9 @@ test('forum replies read oldest-first inside a thread', () => {
     { id: 'c1', parentId: 't1', content: 'QUESTION: is the pact a whip by another name?', authorHash: 'hash-tommaso', createdAt: '2026-09-28T10:01:00.000Z' },
     { id: 't1', title: 'Why software cannot engineer around the free-mandate rule', content: 'Art. 67.', authorHash: 'hash-sofia', createdAt: '2026-09-28T10:00:00.000Z' },
   ];
-  const { threads } = renderForum(entries, null, state);
-  assert.ok(threads.indexOf('QUESTION') > 0, 'the question renders');
-  assert.ok(threads.indexOf('QUESTION') < threads.indexOf('ANSWER'), 'the answer follows the question');
+  const { threadReplies } = renderForumThread(entries[2], entries.slice(0, 2), state);
+  assert.ok(threadReplies.indexOf('QUESTION') > 0, 'the question renders');
+  assert.ok(threadReplies.indexOf('QUESTION') < threadReplies.indexOf('ANSWER'), 'the answer follows the question');
 });
 
 test('proposal discussion runs oldest-first, names the parent claim, and puts the form after the notes', () => {

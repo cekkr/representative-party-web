@@ -33,6 +33,7 @@ const TEMPLATE_MODULES = {
   'verification-complete': 'auth',
   discussion: 'discussion',
   forum: 'forum',
+  'forum-thread': 'forum',
   governance: 'governance',
   petitions: 'petitions',
   groups: 'groups',

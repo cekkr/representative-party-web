@@ -445,6 +445,7 @@ const TOPIC = {
   primaryCare: 'Healthcare / Primary care',
   minimumWage: 'Labour / Minimum wage',
   autonomy: 'Institutions / Differentiated autonomy',
+  freeMandate: 'Institutions / Free mandate',
   iusScholae: 'Citizenship / Ius scholae',
   landUse: 'Environment / Land consumption',
 };
@@ -669,6 +670,7 @@ async function journeyForum(browser) {
   const sofia = await member(browser, 'sofia.bianchi');
   await visit(sofia, '/forum');
   await typeInto(sofia, '#forum-compose input[name="title"]', title);
+  await typeInto(sofia, '#forum-compose input[name="topic"]', TOPIC.freeMandate);
   await typeInto(
     sofia,
     '#forum-compose textarea[name="content"]',
@@ -676,26 +678,34 @@ async function journeyForum(browser) {
   );
   await submitNear(sofia, '#forum-compose input[name="title"]');
   if (!(await expectText(sofia, title, 'the article is published under a verified byline'))) return;
+  const articlePath = new URL(sofia.url()).pathname + new URL(sofia.url()).search;
 
   const tommaso = await member(browser, 'tommaso.ricci');
   await visit(tommaso, '/forum');
-  if (await typeInCard(tommaso, 'article', title, 'textarea[name="content"]',
+  await typeInto(tommaso, '#forum-threads input[name="q"]', 'free mandate');
+  await submitNear(tommaso, '#forum-threads input[name="q"]');
+  if (!(await clickText(tommaso, '#forum-threads h3 a', title))) return;
+  const replyField = '#forum-reply textarea[name="content"]';
+  if (await typeInto(tommaso, replyField,
     'How is the ethical pact different from a party whip? If diverging costs you re-selection, is that not a mandate by other means?')) {
-    await submitNear(tommaso, 'form[action="/forum/comment"] textarea[name="content"]');
+    await submitNear(tommaso, replyField);
   }
 
-  await visit(sofia, '/forum');
-  if (await typeInCard(sofia, 'article', title, 'textarea[name="content"]',
+  await visit(sofia, articlePath);
+  if (await typeInto(sofia, replyField,
     'The difference is who can compel. A whip can throw you out of the group mid-term; the pact can only publish your vote next to ours and ask for your reasons. The seat stays yours either way — the members decide at re-selection, in the open.')) {
-    await submitNear(sofia, 'form[action="/forum/comment"] textarea[name="content"]');
+    await submitNear(sofia, replyField);
   }
 
-  await visit(tommaso, '/forum');
+  await tommaso.reload();
   await expectText(tommaso, 'mandate by other means', 'the member’s objection sits under the article');
   await expectText(tommaso, 'who can compel', 'the author answers in the same thread');
   await shot(tommaso, 'party-forum', 'The long-form lane: the constitutional lawyer’s case for the free mandate (art. 67 Cost.), a member asking whether the ethical pact is a whip by another name, and the answer — argued in the open, attributed on both sides.', {
-    focus: '#forum-threads',
+    focus: '.forum-reading',
   });
+  await clickText(tommaso, '.forum-reading > a', 'Back to Forum articles');
+  const search = await tommaso.$eval('#forum-threads input[name="q"]', (input) => input.value);
+  if (search !== 'free mandate') record('The forum return link lost the active search.');
 }
 
 /** A3 — A proposal earns its way to a vote: outline, revision, quorum, argument map, a revised text. */

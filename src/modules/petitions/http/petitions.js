@@ -4,7 +4,7 @@ import { getPerson } from '../../identity/person.js';
 import { classifyTopic } from '../../topics/classification.js';
 import { ensureTopicPath } from '../../topics/registry.js';
 import { resolveDelegation } from '../../delegation/delegation.js';
-import { recommendDelegationForPerson } from '../../groups/groups.js';
+import { findGroupById, recommendDelegationForPerson } from '../../groups/groups.js';
 import { evaluateAction, getEffectivePolicy } from '../../circle/policy.js';
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
 import { createNotification, createNotificationWithOutbound } from '../../messaging/notifications.js';
@@ -14,7 +14,7 @@ import { resolveNotificationPreferences } from '../../messaging/outbound.js';
 import { extractMentions } from '../../social/posts.js';
 import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
 import { buildVoteEnvelope } from '../../votes/voteEnvelope.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../federation/replication.js';
+import { filterVisibleEntries, findVisibleEntry, stampLocalEntry } from '../../federation/replication.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
@@ -131,7 +131,10 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
   const composeParams = new URLSearchParams({ compose: 'proposal' });
   if (activeGroupId) composeParams.set('group', activeGroupId);
   if (stageFilter !== 'all') composeParams.set('stage', stageFilter);
-  const canCompose = petitionGate.allowed && canPostToGroupLane(state, person, scope.ok ? scope.group : null, 'petitions');
+  const canParticipate = canPostToGroupLane(state, person, scope.ok ? scope.group : null, 'petitions');
+  const canCompose = petitionGate.allowed && canParticipate;
+  const canVote = voteGate.allowed && canParticipate;
+  const membershipNotice = canParticipate ? '' : 'Join the group to participate in its proposal lane.';
   const html = await renderPage(
     'petitions',
     {
@@ -142,15 +145,15 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
         gates: [
           {
             label: 'Draft proposals',
-            status: petitionGate.allowed ? 'Allowed' : 'Blocked',
-            allowed: petitionGate.allowed,
-            reason: petitionGate.allowed ? '' : petitionGate.message || petitionGate.reason,
+            status: canCompose ? 'Allowed' : 'Blocked',
+            allowed: canCompose,
+            reason: petitionGate.allowed ? membershipNotice : petitionGate.message || petitionGate.reason,
           },
           {
             label: 'Vote on proposals',
-            status: voteGate.allowed ? 'Allowed' : 'Blocked',
-            allowed: voteGate.allowed,
-            reason: voteGate.allowed ? '' : voteGate.message || voteGate.reason,
+            status: canVote ? 'Allowed' : 'Blocked',
+            allowed: canVote,
+            reason: voteGate.allowed ? membershipNotice : voteGate.message || voteGate.reason,
           },
         ],
         facts: [
@@ -172,7 +175,8 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       petitionsList: renderPetitionList(petitionsPageInfo.items, votes, signatures, person, moderateGate.allowed, commentsByPetition, {
         allowDelegation: delegationEnabled,
         allowVoting: modules.votes,
-        allowEditing: petitionGate.allowed,
+        allowLaneParticipation: canParticipate,
+        allowEditing: canCompose,
         editGate: petitionGate,
         actorLabels,
         state,
@@ -203,6 +207,29 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
     { wantsPartial, title: 'Proposals & Votes', state },
   );
   return sendHtml(res, html);
+}
+
+function requirePetitionAction(res, state, person, petitionId, { requireMembership = true } = {}) {
+  const petition = findVisibleEntry(state.petitions, state, (item) => item.id === petitionId);
+  if (!petition) {
+    sendJson(res, 404, { error: 'petition_not_found' });
+    return null;
+  }
+  // A submitted group cannot authorize an action. Always check the record's current lane.
+  const scope = resolveGroupScope(state, person, petition.groupId, { lane: 'petitions' });
+  if (!scope.ok) {
+    sendJson(res, scope.error === 'group_not_found' ? 404 : 403, { error: scope.error, message: scope.message });
+    return null;
+  }
+  if (requireMembership && !canPostToGroupLane(state, person, scope.group, 'petitions')) {
+    sendJson(res, 403, { error: 'group_membership_required', message: 'Join the group to participate in its proposal lane.' });
+    return null;
+  }
+  return petition;
+}
+
+function redirectToPetitionLane(res, groupId) {
+  return sendRedirect(res, groupId ? `/petitions?group=${encodeURIComponent(groupId)}` : '/petitions');
 }
 
 function renderPetitionScopeTabs({ state, person, activeGroupId }) {
@@ -426,6 +453,7 @@ export async function submitPetition({ req, res, state, wantsPartial }) {
     });
   }
 
+  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
@@ -458,10 +486,8 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
 
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);
-  const petition = state.petitions.find((p) => p.id === petitionId);
-  if (!petition) {
-    return sendJson(res, 404, { error: 'petition_not_found' });
-  }
+  const petition = requirePetitionAction(res, state, person, petitionId);
+  if (!petition) return;
   if (!isEditableStage(petition.status)) {
     return sendJson(res, 400, { error: 'petition_locked', message: 'Draft editing is closed once voting opens.' });
   }
@@ -534,6 +560,7 @@ export async function updatePetitionDraft({ req, res, state, wantsPartial }) {
     payload: { revisionId: revision.id, note: revision.note || null, topic },
   });
 
+  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
@@ -558,10 +585,8 @@ export async function castVote({ req, res, state, wantsPartial }) {
   const petitionId = sanitizeText(body.petitionId || '', 120);
   let choice = sanitizeText(body.choice || '', 16) || 'abstain';
 
-  const exists = state.petitions.find((p) => p.id === petitionId);
-  if (!exists) {
-    return sendJson(res, 404, { error: 'petition_not_found' });
-  }
+  const exists = requirePetitionAction(res, state, person, petitionId);
+  if (!exists) return;
   if (!isVotingStage(exists.status)) {
     return sendJson(res, 400, { error: 'petition_closed', message: 'Proposal not open for votes.' });
   }
@@ -579,6 +604,13 @@ export async function castVote({ req, res, state, wantsPartial }) {
       topicPath: exists.topicPath,
     });
     if (delegation?.delegateHash) {
+      const group = exists.groupId ? findGroupById(state, exists.groupId) : null;
+      if (group && !canPostToGroupLane(state, { pidHash: delegation.delegateHash }, group, 'petitions')) {
+        return sendJson(res, 403, {
+          error: 'delegate_outside_group_lane',
+          message: 'Your delegate cannot vote in this group lane. Choose a vote yourself or select a delegate who belongs to the group.',
+        });
+      }
       delegateBallot = buildDelegatedBallot({
         delegateHash: delegation.delegateHash,
         via: delegation.via || 'direct',
@@ -672,6 +704,7 @@ export async function castVote({ req, res, state, wantsPartial }) {
     });
   }
 
+  if (exists.groupId) return redirectToPetitionLane(res, exists.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
@@ -691,7 +724,7 @@ function describeBallotDeadline(deadline) {
 // Move a group's proposal one level up: to the parent group, or to the Circle when the
 // group is top level. The proposal keeps its id, so its signatures, comments and votes come
 // with it rather than being forked.
-export async function promotePetition({ req, res, state, wantsPartial }) {
+export async function promotePetition({ req, res, state }) {
   if (!isModuleEnabled(state, 'petitions')) {
     return sendModuleDisabledJson({ res, moduleKey: 'petitions', state });
   }
@@ -699,7 +732,8 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
   const body = await readRequestBody(req);
   const intent = sanitizeText(body.intent || 'promote', 24);
   const petitionId = sanitizeText(body.petitionId || '', 120);
-  const entry = (state.petitions || []).find((item) => item.id === petitionId);
+  const entry = requirePetitionAction(res, state, person, petitionId, { requireMembership: false });
+  if (!entry) return;
 
   if (intent === 'promote-request') {
     const request = applyPromotionRequest(state, person, {
@@ -728,7 +762,7 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
         message: `A member asked to move proposal "${entry.title}" up to ${request.targetLabel}.`,
       });
     }
-    return finishPetitionPromotion({ req, res, state, wantsPartial, groupId: entry.groupId });
+    return redirectToPetitionLane(res, entry.groupId);
   }
 
   if (intent === 'promote-decide') {
@@ -766,13 +800,7 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
           : `Your request to move "${entry.title}" up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
       });
     }
-    return finishPetitionPromotion({
-      req,
-      res,
-      state,
-      wantsPartial,
-      groupId: result.approved ? result.toGroupId : entry.groupId,
-    });
+    return redirectToPetitionLane(res, result.approved ? result.toGroupId : entry.groupId);
   }
 
   const decision = applyPromotion(state, person, { kind: 'petition', entry });
@@ -795,14 +823,7 @@ export async function promotePetition({ req, res, state, wantsPartial }) {
     petitionId,
     message: `Proposal "${entry.title}" was moved up to ${decision.targetLabel}.`,
   });
-  return finishPetitionPromotion({ req, res, state, wantsPartial, groupId: decision.toGroupId });
-}
-
-async function finishPetitionPromotion({ req, res, state, wantsPartial, groupId }) {
-  if (wantsPartial) {
-    return renderPetitions({ req, res, state, wantsPartial: true });
-  }
-  return sendRedirect(res, groupId ? `/petitions?group=${encodeURIComponent(groupId)}` : '/petitions');
+  return redirectToPetitionLane(res, decision.toGroupId);
 }
 
 // Group admins and lane moderators — the people who may decide a request.
@@ -831,10 +852,8 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
   if (!validStatus.includes(status)) {
     return sendJson(res, 400, { error: 'invalid_status' });
   }
-  const petition = state.petitions.find((p) => p.id === petitionId);
-  if (!petition) {
-    return sendJson(res, 404, { error: 'petition_not_found' });
-  }
+  const petition = requirePetitionAction(res, state, person, petitionId, { requireMembership: false });
+  if (!petition) return;
   const wasVoting = isVotingStage(petition.status);
   const willVote = isVotingStage(status);
   const willClose = status === 'closed';
@@ -867,6 +886,7 @@ export async function updatePetitionStatus({ req, res, state, wantsPartial }) {
     },
   });
 
+  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
@@ -884,14 +904,13 @@ export async function signPetitionRoute({ req, res, state, wantsPartial }) {
   }
   const body = await readRequestBody(req);
   const petitionId = sanitizeText(body.petitionId || '', 120);
-  const petition = state.petitions.find((p) => p.id === petitionId);
-  if (!petition) {
-    return sendJson(res, 404, { error: 'petition_not_found' });
-  }
+  const petition = requirePetitionAction(res, state, person, petitionId);
+  if (!petition) return;
   if (hasSigned(petitionId, person, state)) {
     return sendJson(res, 400, { error: 'already_signed' });
   }
   await signPetition({ petition, person, state });
+  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true });
   }
@@ -931,10 +950,8 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   if (!petitionId || !content) {
     return sendJson(res, 400, { error: 'missing_fields' });
   }
-  const petition = state.petitions.find((p) => p.id === petitionId);
-  if (!petition) {
-    return sendJson(res, 404, { error: 'petition_not_found' });
-  }
+  const petition = requirePetitionAction(res, state, person, petitionId);
+  if (!petition) return;
   if (petition.status === 'closed') {
     return sendJson(res, 400, { error: 'petition_closed', message: 'Discussion closed for this proposal.' });
   }
@@ -982,6 +999,7 @@ export async function postPetitionComment({ req, res, state, wantsPartial, url }
   });
   await notifyPetitionAuthor(state, { petition, commenter: person, petitionId, content });
   await notifyPetitionMentions(state, { petition, commenter: person, petitionId, content });
+  if (petition.groupId) return redirectToPetitionLane(res, petition.groupId);
   if (wantsPartial) {
     return renderPetitions({ req, res, state, wantsPartial: true, url });
   }
