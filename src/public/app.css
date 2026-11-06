@@ -4430,3 +4430,52 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
   background: hsl(var(--warning-hsl) / 0.14);
   font-weight: 600;
 }
+
+.form-notice.is-warning {
+  border-left-color: hsl(var(--warning-hsl));
+  background: hsl(var(--warning-hsl) / 0.12);
+}
+
+/* Admin index: the settings document's table of contents, grouped by the work an
+   operator recognizes. Each group is a label and a wrapping row of section links. */
+.admin-index {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.admin-index__groups,
+.admin-index__links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-index__groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
+.admin-index__label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-index__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+}
+
+.admin-index__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}

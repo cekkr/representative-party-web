@@ -98,6 +98,13 @@ import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPreviewPill } from '../../../interfaces/http/views/shared.js';
+import { renderFormErrors } from '../../../interfaces/http/views/formFeedback.js';
+import {
+  adminFormAction,
+  buildAdminSectionNotices,
+  renderAdminIndex,
+  resolveAdminIntentSection,
+} from '../adminSections.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 
@@ -127,8 +134,9 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       ? sendAdminRequiredJson({ res, person })
       : renderAdminRequired({ res, state, wantsPartial, person });
   }
+  const flashSection = resolveAdminIntentSection(intent);
   const renderWithPerson = (viewModel) =>
-    renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person } });
+    renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person, flashSection } });
   if (intent === 'session') {
     const result = await updateSession(state, body);
     return renderWithPerson(result);
@@ -328,13 +336,52 @@ async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const person = viewModel.person || null;
   const personHandle = resolvePersonHandle(person);
   const roleLabel = person?.role || 'guest';
-  const adminView = buildAdminViewModel(state, { ...viewModel, availableExtensions });
+  const adminView = escapeAdminFormValues(buildAdminViewModel(state, { ...viewModel, availableExtensions }));
+  const hasErrors = Object.entries(viewModel)
+    .some(([key, value]) => key.endsWith('Errors') && typeof value === 'string' && value.trim());
+  const notices = buildAdminSectionNotices({ flash: viewModel.flash, section: viewModel.flashSection, hasErrors });
   const html = await renderPage(
     'admin',
-    { ...adminView, person, personHandle, roleLabel, adminBootstrapNotice: buildAdminBootstrapNotice(state) },
+    {
+      ...adminView,
+      ...notices,
+      adminIndex: renderAdminIndex(),
+      person,
+      personHandle,
+      roleLabel,
+      adminBootstrapNotice: buildAdminBootstrapNotice(state),
+    },
     { wantsPartial, title: 'Admin - Circle Settings', state },
   );
   return sendHtml(res, html);
+}
+
+// Keys interpolated into input values and textarea bodies. The template engine
+// inserts strings verbatim, and these hold operator- or member-supplied text (a
+// member's provider-local profile fields reach `attributesPayloadValue`), so they
+// are escaped here, once, rather than at each of their many construction sites.
+const ADMIN_FORM_VALUE_KEYS = [
+  'circleName', 'policyId', 'adminContact', 'issuer', 'preferredPeer', 'notes',
+  'topicGardenerUrl', 'topicAnchors', 'topicPinned',
+  'sessionIdValue', 'sessionHandleValue',
+  'providerFieldsValue', 'attributesSessionId', 'attributesPayloadValue',
+  'composerThemeCss', 'composerQuickActionsOrder', 'composerSideNavOrder', 'composerAsideWidth',
+  'rateLimitOverridesValue', 'opsMetricsIntervalValue', 'opsMetricsRetentionValue',
+  'governanceQuorumDefault', 'governanceDiscussionWindowDays', 'governanceVoteWindowDays',
+  'governanceReviewWindowHours', 'governanceDelegationDecayDays', 'governanceDelegateVoteWindowDays',
+  'governanceNotes',
+  'providerBlindRingId', 'providerBlindRingEpoch', 'providerBlindRingMaxSize', 'providerBlindRingKeys',
+  'providerBlindAuditThreshold', 'providerBlindAuditMaxScopeDays', 'providerBlindAuditMembers',
+  'providerBlindTransportMaxHops', 'providerBlindTransportTimeoutMs', 'providerBlindTransportRelays',
+];
+
+function escapeAdminFormValues(view) {
+  const next = { ...view };
+  for (const key of ADMIN_FORM_VALUE_KEYS) {
+    if (next[key] === undefined || next[key] === null) continue;
+    next[key] = escapeHtml(String(next[key]));
+  }
+  return next;
 }
 
 /**
@@ -2063,7 +2110,7 @@ function renderTopicRenameList(topics = []) {
             ${reason}
             ${requestedAt}
           </div>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-rename-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2074,7 +2121,7 @@ function renderTopicRenameList(topics = []) {
               <button class="ghost" type="submit">Accept rename</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-rename-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2123,7 +2170,7 @@ function renderTopicMergeList(topics = [], state) {
             ${targetPreview}
             <p class="muted small">Merging archives the source topic and redirects breadcrumbs to the target.</p>
           </details>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-merge-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2139,7 +2186,7 @@ function renderTopicMergeList(topics = [], state) {
               <button class="ghost" type="submit">Accept merge</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-merge-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2177,7 +2224,7 @@ function renderTopicSplitList(topics = [], state) {
             ${splitPreview}
             <p class="muted small">Splitting creates child topics under the current topic path.</p>
           </details>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-split-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2196,7 +2243,7 @@ function renderTopicSplitList(topics = [], state) {
               <button class="ghost" type="submit">Accept split</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-split-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2246,7 +2293,7 @@ function renderTopicAnchorSuggestionList(entries = []) {
             ${reason}
             ${requestedAt}
           </div>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-anchor-accept" />
             <input type="hidden" name="topicKey" value="${keyValue}" />
             <input type="hidden" name="action" value="${escapeHtml(action)}" />
@@ -2256,7 +2303,7 @@ function renderTopicAnchorSuggestionList(entries = []) {
               <button class="ghost" type="submit">Accept</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-anchor-dismiss" />
             <input type="hidden" name="topicKey" value="${keyValue}" />
             <input type="hidden" name="action" value="${escapeHtml(action)}" />
@@ -2785,7 +2832,7 @@ function renderGovernanceProposalDecisionList(proposals = []) {
           const controls =
             status === 'open'
               ? `
-                <form class="cta-row" method="post" action="/admin" data-enhance="admin">
+                <form class="cta-row" method="post" action="${adminFormAction('governance-settings')}" data-enhance="admin">
                   <input type="hidden" name="intent" value="governance-proposal-decision" />
                   <input type="hidden" name="proposalId" value="${escapeHtml(proposal.id)}" />
                   <button class="cta" type="submit" name="decision" value="approve">Approve</button>
@@ -2990,7 +3037,7 @@ function renderSocialMediaList(entries = []) {
           <p class="muted small">Post ID: ${escapeHtml(entry.postId || 'n/a')}</p>
           <p class="muted small">Type: ${escapeHtml(entry.contentType || 'unknown')} · ${formatBytes(entry.size || 0)}${name}</p>
           ${lastViewRequest ? `<p class="muted small">Last view request: ${escapeHtml(lastViewRequest)}</p>` : ''}
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="${adminFormAction('social-media')}" data-enhance="admin">
             <input type="hidden" name="intent" value="media-moderate" />
             <input type="hidden" name="mediaId" value="${escapeHtml(entry.id)}" />
             <div class="form-grid">
@@ -3076,9 +3123,7 @@ function renderRateLimitDefaults(defaults = {}) {
 }
 
 function renderRateLimitErrors(errors = []) {
-  if (!errors || !errors.length) return '';
-  const items = errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('');
-  return `<ul class="stack small">${items}</ul>`;
+  return renderFormErrors(errors, { title: 'Rate limits' });
 }
 
 function formatRateLimitOverrides(overrides = {}) {
@@ -3390,14 +3435,7 @@ function renderPeerHealthOptions(peerHealth = {}, peers = new Set()) {
 }
 
 function renderValidationErrors(errors = [], { title = 'Validation issues' } = {}) {
-  if (!errors.length) return '';
-  const items = errors.map((error) => `<li>${escapeHtml(String(error))}</li>`).join('');
-  return `
-    <div class="callout">
-      <p class="muted small">${escapeHtml(title)}</p>
-      <ul class="plain">${items}</ul>
-    </div>
-  `;
+  return renderFormErrors(errors, { title });
 }
 
 function formatGossipStatus(status = {}) {

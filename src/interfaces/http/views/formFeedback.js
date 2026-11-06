@@ -6,11 +6,14 @@ import { escapeHtml } from '../../../shared/utils/text.js';
 // Both render as ordinary HTML, so the ordinary POST → re-render flow and the
 // enhanced partial swap announce the same message.
 
-export function renderFormNotice(message, { id } = {}) {
+// `tone: 'warning'` marks an outcome that did not apply (a skipped or refused
+// change). It stays a status line; field-level problems belong in renderFormErrors.
+export function renderFormNotice(message, { id, tone = 'success' } = {}) {
   const text = String(message || '').trim();
   if (!text) return '';
   const idAttr = id ? ` id="${escapeHtml(id)}"` : '';
-  return `<p class="form-notice" role="status"${idAttr}>${escapeHtml(text)}</p>`;
+  const toneClass = tone === 'warning' ? ' is-warning' : '';
+  return `<p class="form-notice${toneClass}" role="status"${idAttr}>${escapeHtml(text)}</p>`;
 }
 
 export function renderFormErrors(errors = [], { id, title = 'Please fix the following' } = {}) {

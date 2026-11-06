@@ -490,7 +490,7 @@ async function journeyArrive(browser) {
   // not happen (multi-method ballots are Phase 3).
   await visit(admin, '/admin');
   const configured = await admin.evaluate(() => {
-    const form = [...document.querySelectorAll('form[action="/admin"]')].find((f) =>
+    const form = [...document.querySelectorAll('form[action^="/admin"]')].find((f) =>
       f.querySelector('input[name="intent"][value="governance"]'),
     );
     if (!form) return false;

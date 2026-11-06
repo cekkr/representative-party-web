@@ -1,6 +1,7 @@
-<section class="panel" id="extensions" data-composer-section="extensions" data-section-label="Extensions">
+<section class="panel settings-section" id="extensions" tabindex="-1" data-composer-section="extensions" data-section-label="Extensions">
   <p class="eyebrow">Extensions</p>
   <h2>Extension lifecycle</h2>
+  {{adminNotice_extensions}}
   <p class="muted small">Discover provider-local extensions, record installed versions, then enable or disable their runtime hooks. Uninstalling deregisters an extension without deleting its source file.</p>
   <form class="stack" method="post" action="/extensions" data-enhance="extensions">
     <div class="stack">{{extensionsList}}</div>
@@ -11,11 +12,12 @@
   </form>
 </section>
 
-<section class="panel" id="session-overrides" data-composer-section="session-overrides" data-section-label="Session overrides">
+<section class="panel settings-section" id="session-overrides" tabindex="-1" data-composer-section="session-overrides" data-section-label="Session overrides">
   <p class="eyebrow">Session overrides</p>
   <h2>Roles and bans</h2>
+  {{adminNotice_session_overrides}}
   <p class="muted small">Update a session role/handle or ban a handle to exercise Circle gates without editing JSON manually.</p>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
+  <form class="stack" method="post" action="/admin#session-overrides" data-enhance="admin">
     <input type="hidden" name="intent" value="session" />
     <div class="form-grid">
       <label class="field">

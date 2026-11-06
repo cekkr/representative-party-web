@@ -43,14 +43,14 @@ function deriveHandle(pidHash, role = 'user') {
 }
 
 async function getAdminForm(page, intent) {
-  const intentSelector = `form[action="/admin"] input[name="intent"][value="${intent}"]`;
+  const intentSelector = `form[action^="/admin"] input[name="intent"][value="${intent}"]`;
   const intentField = await page.$(intentSelector);
   assert.ok(intentField, `expected admin form for ${intent}`);
   return intentField.evaluateHandle((node) => node.closest('form'));
 }
 
 async function getAdminFormByAction(page, { intent, action }) {
-  const forms = await page.$$('form[action="/admin"]');
+  const forms = await page.$$('form[action^="/admin"]');
   for (const form of forms) {
     const matches = await form.evaluate((node, intentValue, actionValue) => {
       const intentField = node.querySelector('input[name="intent"]');
@@ -945,7 +945,7 @@ test('UI mysql adapter keeps discussion, interface defaults, and module toggles 
     await petitionsToggle.evaluate((el) => el.click());
   }
   const modulesResponse = pageFirst.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const modulesButton = await modulesForm.$('button[type="submit"]');
   await modulesButton.click();
@@ -1329,7 +1329,7 @@ test('UI admin can update rate limits and session overrides', { timeout: 60000 }
   await rateTextarea.click({ clickCount: 3 });
   await rateTextarea.type(overrides);
   const rateResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const rateButton = await rateLimitForm.$('button[type="submit"]');
   await rateButton.click();
@@ -1345,7 +1345,7 @@ test('UI admin can update rate limits and session overrides', { timeout: 60000 }
   const roleSelect = await sessionForm.$('select[name="sessionRole"]');
   await roleSelect.select('moderator');
   const sessionResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const sessionButton = await sessionForm.$('button[type="submit"]');
   await sessionButton.click();
@@ -1395,7 +1395,7 @@ test('UI admin module toggles update navigation and access', { timeout: 60000 },
   }
 
   const modulesResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const modulesButton = await modulesForm.$('button[type="submit"]');
   await modulesButton.click();
@@ -1501,7 +1501,7 @@ test('UI admin reviews topic anchor suggestions and logs history', { timeout: 60
   await anchorLabel.click({ clickCount: 3 });
   await anchorLabel.type('Climate');
   const promoteResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const promoteButton = await promoteForm.$('button[type="submit"]');
   await promoteButton.click();
@@ -1520,7 +1520,7 @@ test('UI admin reviews topic anchor suggestions and logs history', { timeout: 60
   assert.ok(confirmArchive);
   await confirmArchive.click();
   const archiveResponse = page.waitForResponse(
-    (response) => response.url().endsWith('/admin') && response.request().method() === 'POST',
+    (response) => new URL(response.url()).pathname === '/admin' && response.request().method() === 'POST',
   );
   const archiveButton = await archiveForm.$('button[type="submit"]');
   await archiveButton.click();

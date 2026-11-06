@@ -340,9 +340,22 @@ happened and offers Start a new verification.
 [Auth templates](src/modules/auth/templates) ·
 [Recovery page](src/modules/core/templates/error.html)
 
-**Target.** Apply the same section header and inline feedback to admin
-settings. Add a translated wallet-not-installed hint once the verifier reports
-that state.
+`/admin` opens with a Provider administration heading, a summary naming the
+Circle, and an Export audit log (JSON) link. That link is a plain link, never
+`data-partial`. A grouped index follows: Setup, Modules and appearance, Policy,
+Structure, Federation, Observability, and People and extensions. It links the
+20 existing section anchors, which remain the Composer keys. Every admin form
+posts to `/admin#<section>`, and [`adminSections.js`](src/modules/admin/adminSections.js)
+maps each intent to its section. The confirmation renders in that section
+instead of at the top of the page. A change that did not apply uses the warning
+tone. Validation and rate-limit errors use the shared alert summary. Values
+echoed into admin inputs and textareas are HTML-escaped in one pass. This
+includes member-supplied provider fields, which previously reached the
+attribute textarea unescaped.
+
+**Target.** Add a translated wallet-not-installed hint once the verifier
+reports that state. Return a structured outcome from admin handlers instead
+of reading the tone from their wording.
 
 
 ## 4. Participation, ballots, and activity
@@ -490,7 +503,7 @@ starting point for implementation.
 | [Profile](src/modules/profile/templates/profile.html) `/profile` | Identity header with one action, section links, labelled Public handle, Provider-local fields, and Interface defaults sections with inline status and field errors, and a Session rail. | Optional provider-profile sync across devices. |
 | [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Cases heading, case record header, original message with evidence, acknowledgement form or ordered history, and the searchable queue in the rail. | Case history beyond acknowledgement as layer stores arrive. Retain provider-local scope. |
 | [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Persistent preview header with backlink, Preview label, and live-queue action, then the illustrative inbox, pressure map, and operating map. | Scenario B examples in place of the generic illustrative cases. |
-| [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. The inactive Composer entry sits in the page flow on phones. | Apply the settings hierarchy while retaining gates, anchors, and the admin Composer workspace. |
+| [Admin](src/modules/admin/templates/admin.html) `/admin` | Page heading with audit export, grouped index of the 20 anchored sections, forms that return to their section, and section-local status and error feedback. The inactive Composer entry sits in the page flow on phones. | Structured handler outcomes and Composer palette operations once variants settle. |
 | [Wallet handoff and result](src/modules/auth/templates) | Focused task pages: numbered steps, wallet link before QR, hash-only guarantee, refresh and restart recovery, a result page that leads to Choose your handle, and a recovery page for failed callbacks. | Wallet-not-installed guidance once the verifier reports it. |
 
 
@@ -539,7 +552,7 @@ keys have historical names, while their labels identify the content.
 | Governance | `governance-overview` (current rules), `governance-proposals` (open changes and decisions), `governance-propose`. The heading and section links stay visible. |
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
 | Profile | `profile-interface` (Public handle), `profile-summary` (Provider-local fields), `profile-fields` (Interface defaults). The record header, section links, and Session rail stay outside optional panels. |
-| Admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
+| Admin | The heading and grouped index sit outside the panels. `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
 | Auth/core task panels | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. These panels sit outside member Sections. |
 
 ## 8. Delivery order and acceptance
@@ -550,7 +563,7 @@ keys have historical names, while their labels identify the content.
 | 2. Conversation and collections | Discussion and Forum have searchable collections and focused views linked from Home. Social has in-flow compose, audience, follow filters, and attributed media states. | Find the waiting-list evidence and the free-mandate article in Scenario A. Open a contribution and return to the same search. Reply in Forum and send a media-only Social update with ordinary HTML. Confirm direct attachment and reply access. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
 | 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People profiles, governance changes, and the case record use the header–sections–context pattern. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
-| 5. Admin and customization polish | Profile, wallet handoff, and the organization preview are converted, with shared inline form feedback. Next: apply the settings-section header and feedback to admin, then any component palette operations once variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
+| 5. Admin and customization polish | Profile, wallet handoff, the organization preview, and admin use the settings-section pattern with shared inline form feedback. Next: component palette operations once variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
 The proposal controller checks the stored group lane on deep reads, edits,
 signatures, comments, stage changes, ballots, and promotions. Proposal alert and
@@ -662,6 +675,17 @@ dark at desktop, and the wallet handoff, preview, and an enhanced handle
 rejection at 375 px in light with no horizontal overflow. The rejection
 announced its error and returned focus to the handle section.
 [Settings and task regression](tests/settings-task-pages.test.js)
+
+The admin regression checks the single heading, that all 20 index links
+resolve to tagged sections, and that no form posts to bare `/admin`. A module
+save is confirmed only inside Modules. A rejected rate-limit override shows a
+warning status and an alert summary. A save that requires verification still
+reads as success. Quotes and markup in the Circle name and in an echoed
+attribute payload are escaped. Enhanced submissions now leave the fragment out
+of the request and reapply it for focus. The browser tests and the Scenario A
+driver find admin forms by an `/admin` prefix. A Scenario A browser pass checked the index at
+a narrow width in dark and an enhanced Rate limits save in light. Focus and
+the confirmation both landed in that section.
 
 ### Review checklist for presentation changes
 

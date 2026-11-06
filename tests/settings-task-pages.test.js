@@ -106,3 +106,48 @@ test('The organization preview keeps its preview identity outside optional panel
   assert.match(header, /href="\/organization" data-partial>Open the live case queue/);
   assert.match(html, /href="\/organization" data-partial>Back to live cases/);
 });
+
+test('Admin is an indexed settings document whose notices land beside the submitted form', async (t) => {
+  const port = await getAvailablePort();
+  const { baseUrl, stop } = await startServer({ port, dataAdapter: 'memory' });
+  t.after(stop);
+
+  // First run: no admin exists, so /admin is open (and says so).
+  const page = mainOf((await fetchText(`${baseUrl}/admin`)).text);
+  assert.equal(page.match(/<h1\b/g)?.length, 1);
+  assert.match(page, /<h1[^>]*>Provider administration<\/h1>/);
+  assert.match(page, /data-admin-bootstrap/);
+  const index = page.match(/<nav class="admin-index" aria-label="Admin settings">([\s\S]*?)<\/nav>/)?.[1] || '';
+  const anchors = [...index.matchAll(/href="#([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(anchors.length, 20);
+  for (const id of anchors) {
+    assert.match(page, new RegExp(`<section class="panel settings-section" id="${id}" tabindex="-1" data-composer-section="${id}"`), id);
+  }
+  // Every admin form returns to its own section.
+  assert.doesNotMatch(page, /action="\/admin"/);
+  assert.match(section(page, 'rate-limits'), /action="\/admin#rate-limits"/);
+
+  // A success renders only in the section that submitted it.
+  const modules = mainOf(await (await postForm(`${baseUrl}/admin`, { intent: 'modules', social: 'on' })).text());
+  assert.match(section(modules, 'modules'), /<p class="form-notice" role="status">Module toggles updated\./);
+  assert.doesNotMatch(section(modules, 'circle-settings'), /form-notice/);
+
+  // A rejection is a warning status plus an alert summary in the same section.
+  const limits = mainOf(await (await postForm(`${baseUrl}/admin`, { intent: 'rate-limits', rateLimitOverrides: 'nonsense' })).text());
+  const limitsSection = section(limits, 'rate-limits');
+  assert.match(limitsSection, /<p class="form-notice is-warning" role="status">Rate limits not saved/);
+  assert.match(limitsSection, /class="callout is-warning form-errors" role="alert"/);
+
+  // "required for posting" is a success, not a refusal.
+  const saved = mainOf(await (await postForm(`${baseUrl}/admin`, {
+    intent: 'settings', requireVerification: 'on', circleName: 'Rete "Civica" <Nazionale>',
+  })).text());
+  assert.match(section(saved, 'circle-settings'), /<p class="form-notice" role="status">Settings saved/);
+  // Operator and member text is escaped inside form values.
+  assert.match(saved, /name="circleName" value="Rete &quot;Civica&quot; &lt;Nazionale&gt;"/);
+  const echoed = mainOf(await (await postForm(`${baseUrl}/admin`, {
+    intent: 'profile-attributes', attributesSessionId: 'missing', attributesPayload: '</textarea><script>alert(1)</script>',
+  })).text());
+  assert.doesNotMatch(echoed, /<script>alert\(1\)<\/script>/);
+  assert.match(section(echoed, 'provider-profiles'), /form-notice is-warning" role="status">Session &quot;missing&quot; not found/);
+});
