@@ -1250,7 +1250,7 @@ test('UI petition revisions and freeze state update', { timeout: 60000 }, async 
   assert.match(focused, /Revision used for the ballot/);
 });
 
-test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async (t) => {
+test('UI groups open focused views after enhanced creation and ordinary HTML membership changes', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
   t.after(async () => server.stop());
@@ -1268,18 +1268,32 @@ test('UI groups allow creation and join/leave flows', { timeout: 60000 }, async 
   await setSessionCookie(page, server.baseUrl, memberSession.sessionId);
   await page.goto(`${server.baseUrl}/groups`, { waitUntil: 'networkidle0' });
 
-  await page.type('form[action="/groups"] input[name="name"]', 'Energy Circle');
-  await page.type('form[action="/groups"] input[name="topics"]', 'energy,climate');
-  await page.type('form[action="/groups"] textarea[name="description"]', 'Group for UI coverage.');
+  await page.type('form[action="/groups"] input[name="name"]', 'Public Healthcare Circle');
+  await page.type('form[action="/groups"] input[name="topics"]', 'Healthcare, Healthcare / Waiting lists');
+  await page.type('form[action="/groups"] textarea[name="description"]', 'Delegates and priorities on waiting times and healthcare work.');
   await page.click('form[action="/groups"] button.cta[type="submit"]');
-  await page.waitForFunction(() => document.body.textContent.includes('Energy Circle'));
+  await page.waitForFunction(() => document.body.textContent.includes('Public Healthcare Circle'));
 
+  const groupId = new URL(page.url()).searchParams.get('group');
+  assert.ok(groupId);
+  await page.click('nav[aria-label="Group sections"] a[href$="view=members"]');
+  await page.waitForSelector('[data-composer-section="group-members"]');
+  await page.waitForFunction(() => document.activeElement === document.querySelector('main h1'));
+  await page.setJavaScriptEnabled(false);
+  await page.reload();
   const leaveAction = await page.$('form[action="/groups"] input[name="action"][value="leave"]');
   assert.ok(leaveAction);
   const leaveForm = await leaveAction.evaluateHandle((node) => node.closest('form'));
   const leaveButton = await leaveForm.$('button[type="submit"]');
-  await leaveButton.click();
-  await page.waitForFunction(() => document.querySelector('form[action="/groups"] input[name="action"][value="join"]'));
+  await Promise.all([page.waitForNavigation(), leaveButton.click()]);
+  assert.equal(new URL(page.url()).searchParams.get('view'), 'members');
+  const joinAction = await page.$('form[action="/groups"] input[name="action"][value="join"]');
+  assert.ok(joinAction);
+  const joinForm = await joinAction.evaluateHandle((node) => node.closest('form'));
+  const joinButton = await joinForm.$('button[type="submit"]');
+  await Promise.all([page.waitForNavigation(), joinButton.click()]);
+  assert.equal(new URL(page.url()).searchParams.get('group'), groupId);
+  assert.ok(await page.$('input[name="action"][value="leave"]'));
 });
 
 test('UI admin can update rate limits and session overrides', { timeout: 60000 }, async (t) => {

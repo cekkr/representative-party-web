@@ -183,7 +183,7 @@ test('declining records the reason and leaves the item where it was', () => {
   assert.equal(entry.promotionRequests[0].reason, 'Still a branch matter.');
 });
 
-test('only someone who could promote may decide a request', () => {
+test('a requester cannot decide or move their own open request after becoming a lane moderator', async () => {
   const state = partyState();
   const entry = { id: 'd1', groupId: 'tank' };
   applyPromotionRequest(state, { pidHash: 'carla' }, { kind: 'discussion', entry });
@@ -192,13 +192,19 @@ test('only someone who could promote may decide a request', () => {
   assert.equal(byRequester.ok, false, 'the asker cannot approve their own request');
   assert.equal(byRequester.error, 'group_admin_required');
 
+  assert.equal((await setGroupMemberRole({
+    groupId: 'tank', memberHash: 'carla', role: 'laneModerator', state,
+  })).ok, true);
   const result = applyPromotionDecision(state, { pidHash: 'carla' }, {
     kind: 'discussion',
     entry,
     decision: 'approve',
   });
   assert.equal(result.ok, false);
+  assert.equal(result.error, 'own_promotion_request');
+  assert.equal(applyPromotion(state, { pidHash: 'carla' }, { kind: 'discussion', entry }).error, 'own_promotion_request');
   assert.equal(entry.groupId, 'tank');
+  assert.equal(getOpenPromotionRequest(entry)?.status, 'open');
 });
 
 test('an approval blocked by a closed parent lane leaves the request open', () => {
@@ -206,16 +212,18 @@ test('an approval blocked by a closed parent lane leaves the request open', () =
   policyOf(state, 'party').lanes = { discussion: false };
   const entry = { id: 'd1', groupId: 'tank' };
   applyPromotionRequest(state, { pidHash: 'carla' }, { kind: 'discussion', entry });
+  const pending = { ...getOpenPromotionRequest(entry) };
 
   const result = applyPromotionDecision(state, { pidHash: 'bruno' }, {
     kind: 'discussion',
     entry,
     decision: 'approve',
+    reason: 'Ready to move.',
   });
   assert.equal(result.ok, false);
   assert.equal(result.error, 'parent_lane_disabled');
   assert.equal(entry.groupId, 'tank');
-  assert.equal(getOpenPromotionRequest(entry)?.status, 'open', 'the ask is not silently consumed');
+  assert.deepEqual(getOpenPromotionRequest(entry), pending, 'a blocked approval leaves the request intact');
 });
 
 // --- branch election roll-up -------------------------------------------------

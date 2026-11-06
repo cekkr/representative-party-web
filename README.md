@@ -15,14 +15,9 @@ This repository is a Node.js SSR application that starts as a usable discussion,
 
 The demo deployment is the framework's civic mode — the representative-party model of `principle-docs/RepresentativeParties.md`, played out as Scenario A of `principle-docs/SimulationScenarios.md`. Members of *Rete Civica Nazionale* — a **fictional** Italian civic party — take real Italian policy questions from a message to a decision, under strict Circle enforcement (**one verified person = one voice**). The copy is English; the party's legal order stays Italian and real (`Law 120/2007` and `Law 107/2024` on intramoenia and CUP monitoring, the PNGLA priority classes, judgment `192/2024` on differentiated autonomy, art. 67 of the Constitution on the free mandate). The people and the institution are invented.
 
-Every screenshot below is produced by `scripts/party-journeys.js`, which drives these flows through the interface — one browser session per member, clicking the controls and typing into the fields — and asserts the outcome at each step, so a broken flow fails the run instead of quietly producing a nice picture.
+Run `npm run screenshots:readme` after `npm install` to refresh the walkthrough. The command starts an isolated strict-Circle deployment on a temporary loopback port, drives the party journeys through the browser, and replaces the images after the assertions pass and the captures match the README links.
 
-```bash
-ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
-  DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh    # terminal 1
-BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party \
-  node scripts/party-journeys.js                                      # terminal 2
-```
+![The party home workspace with recent conversations and proposals](md-assets/party/party-home.png)
 
 | | |
 |:--|:--|
@@ -32,6 +27,7 @@ BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party \
 | ![Version history showing three attributed revisions](md-assets/party/party-revisions.png)<br>**Deliberation changes the text** — draft → the economist's cap revision → the author's answer to the concerns, each revision attributed, noted, and diffable. | ![Frozen proposal with dissenting tally](md-assets/party/party-vote.png)<br>**6 · Opening a vote is deliberate** — the party secretary's attributed, timestamped pre-vote freeze; votes are cast against text that can no longer move, and the tally records the `no`. |
 | ![Effective delegation chain](md-assets/party/party-delegation.png)<br>**7 · Delegation is liquid and readable** — the "explain my influence" chain `You → @giulia.ferrero → @marco.deluca`, chosen by `@handle`, topic-scoped, revocable, and decay-aware. | ![Ranked group election won on transfers](md-assets/party/party-election.png)<br>**8 · Choosing people, on transfers** — the economist leads first preferences, but the frontline nurse wins in round two: the first-preference leader loses, as ranked transfers exist to allow. |
 | ![A party circle with a topic-focused branch](md-assets/party/party-branch-groups.png)<br>**9 · Structure can grow without inheriting power** — the *Waiting Lists Workshop* sits beneath the *Public Healthcare Circle* but keeps its own membership and delegate cachets. The tree describes where work happens; it does not manufacture authority. | ![The group category and delegate directory](md-assets/party/party-categories.png)<br>**Who works on what** — declared categories become a browsable directory of the groups covering them and the people they put forward. A member can delegate from the directory, then override that advice at any time. |
+| ![A group workspace showing parent lineage and its discussion lane](md-assets/party/party-group-overview.png)<br>**Work in a branch** — the *Waiting Lists Workshop* shows its lineage, category, and members-only discussion lane. | ![A group workspace roster with administrator role controls](md-assets/party/party-group-members.png)<br>**See who can act** — Members lists the branch roster and its roles. The group administrator assigns lane moderation to `@sofia.bianchi`. |
 | ![A members-only discussion inside a branch](md-assets/party/party-group-lane.png)<br>**10 · Working notes can stay internal** — optional group lanes are off by default. This members-only branch note stays out of the Circle-wide feed until someone asks to move it up. | ![A promoted discussion retaining its history](md-assets/party/party-promotion.png)<br>**A member asks; a lane moderator decides** — the note moves to the parent circle with a visible provenance stamp. It is a move, not a copy, so the thread keeps its id and its replies travel with it. |
 | ![A delegated ballot waiting outside the tally](md-assets/party/party-delegated-ballot.png)<br>**11 · A delegated ballot is not an abstention** — `@davide.villa` delegates the broad `Healthcare` category and it reaches a `Healthcare / Primary care` proposal. While the delegate still has time, the ballot is shown as awaiting and stays outside every tally bucket; he can override it. | ![A delegate inbox showing an assigned ballot and deadline](md-assets/party/party-delegate-inbox.png)<br>**The delegate sees what is riding on them** — `@giulia.ferrero` gets the proposal, who handed it to her, and the five-day countdown. If the window lapses the ballot becomes an abstention; until then it remains pending. |
 | ![People directory listing members by handle](md-assets/party/party-delegates.png)<br>**12 · Accountability is soft power** — members browse People by `@handle`, never by pasting a hash; delegates rank first. | ![A delegate's public accountability dashboard](md-assets/party/party-delegate-profile.png)<br>**The accountability dashboard** — a provider-local public bio, delegations received and set, vote history, and group endorsements, beside an **advisory** (never binding) deliberation score. |
@@ -98,6 +94,7 @@ The code keeps this distinction explicit so deployments can start lightweight an
 - **Liquid representation**: topic‑scoped delegation with revocable overrides. A delegation on a category also covers its subcategories, narrowest match first — and proposals carry the category their author chose, so those delegations actually reach them.
 - **Delegated ballots with a deadline**: handing your vote to your delegate records a real ballot, not an abstention. It resolves through the delegate's own vote (transitively), stays uncounted while it waits, lapses to abstain if the delegate misses the window (`delegateVoteWindowDays`, default 5), and you can override it yourself at any time.
 - **Branch groups**: a group can be a subgroup of another — a party with a think tank, a working wing, or an alternative line. Nesting is structural, not authority: a branch keeps its own membership and cachets.
+- **Group workspaces**. Open a group from the directory to see its lineage, readable discussion and proposal lanes, member roles, and delegate decisions. Eligible managers get a separate Settings view.
 - **Group categories + directory**: groups declare the categories they discuss, and `/groups` answers "who works on what" — each category, the groups covering it, and who they put forward — with one-click delegation.
 - **Optional group lanes**: a group can switch on its own internal discussion and proposal lanes (off by default, members-only or public to read). Internal items stay out of the Circle feed until promoted.
 - **Promote to the upper level**: a group discussion or proposal can be moved to the parent group, or to the whole Circle. It is a move, not a copy — comments, signatures and votes travel with it. Ordinary members can *request* a promotion; group admins and lane moderators decide, and a decline carries a reason.
@@ -164,6 +161,9 @@ npm start
 The standalone script seeds a local KV store, generates signing keys if missing, and prints a one-click admin login link (user: `admin`, password: `admin`). Signing keys are exported as PEM **text** — passing a file path leaves envelopes unsigned and `/admin` reports the key as ignored rather than loaded.
 
 ```bash
+# Refresh all README screenshots from an isolated Scenario A deployment
+npm run screenshots:readme
+
 # The demo deployment: a strict-Circle party (Scenario A: Rete Civica Nazionale)
 ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
   DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh

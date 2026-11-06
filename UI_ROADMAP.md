@@ -245,21 +245,23 @@ status strip. Reuse the existing opt-in key on the corresponding logical panel.
 
 ### Groups
 
-**Current.** `/groups` combines a branch tree, category directory, creation,
-elections, and policy controls. Discussion and proposal lanes reuse their own
-routes with `?group=` when enabled. [Group template](src/modules/groups/templates/groups.html) ·
+**Current.** `/groups` lists linked group summaries in branch order and a
+linked category directory. Open `/groups?group=<id>` for the group heading,
+parent lineage, membership, lane visibility, and an eligible join or leave action.
+Overview links to readable, enabled Discussion and Proposals lanes and to child
+groups. Members shows the roster to group members and eligible managers. Decisions
+shows delegate elections and preferred delegates, with voting and election
+management gated separately. Group admins and eligible Circle moderators can open
+Settings. Group form submissions redirect to the relevant section in both HTML
+flows. The source lane names the destination before a promotion is approved.
+[Browse template](src/modules/groups/templates/groups.html) ·
+[Workspace template](src/modules/groups/templates/group-workspace.html) ·
 [Scope resolver](src/modules/groups/groupScope.js)
 
-**Target.** Keep the tree and category directory as discovery views. On opening
-a group, show **parent lineage → group name/description → membership, visibility
-and viewer role → available join or manage action → workspace links**. Follow
-the Citizen OS split between group content and people. Link to the existing
-scoped Discussion and Proposals lanes. Give Members and Decisions distinct
-areas within the group, and show governance settings only to eligible viewers.
-Retain contextual requests in the source scope, name the destination before a
-promotion is confirmed, and preserve the item, history, and audit trail after
-the move. Group lineage describes structure. The UI derives membership and
-authority separately for every group.
+**Target.** Add search and pagination when the group directory needs them, and
+make the decision context easier to scan as more elections accumulate. Keep
+contextual promotion requests in the source lane. Group lineage describes
+structure. Membership and authority are checked independently for each group.
 
 ### Other record pages
 
@@ -410,7 +412,7 @@ starting point for implementation.
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Wall, typed follows and filters, compose, and media controls. | Distinct post and media states, visible audience, and accessible compose with one scroll path. |
 | [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Reads and writes use the stored lane. | Refine discussion filters, ballot timing context, and SSR form recovery. |
-| [Groups](src/modules/groups/templates/groups.html) `/groups` | Group tree, categories, elections, roles, and settings. | Browse plus focused group identity, links to scoped lanes, Members and Decisions views, and contextual management. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. | Search and pagination for discovery and clearer activity within a group. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Searchable directory and profile with coverage, votes, and activity. | Summary cards or rows, then a record header with readable accountability sections and separate endorsement context. |
 | [Governance](src/modules/governance/templates/governance.html) `/governance` | Constitution, change proposals, decisions, and propose rail. | State the current rule and proposed change together, then show the attributed decision and its effect. |
@@ -463,7 +465,7 @@ keys have historical names, while their labels identify the content.
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
 | People | `delegate-directory-list`, `delegate-directory`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` |
-| Groups | `groups-list`, `groups-categories`, `groups-create` |
+| Groups | Browse `groups-list`, `groups-categories`, `groups-create`. Workspace `group-overview`, `group-members`, `group-decisions`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
 | Governance | `governance-overview`, `governance-proposals`, `governance-propose` |
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
 | Profile | `profile-interface`, `profile-summary`, `profile-fields` |
@@ -477,7 +479,7 @@ keys have historical names, while their labels identify the content.
 | 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
 | 2. Conversation and collections | Forum browse and focused replies are implemented. Home links to individual articles. Discussion and Social still have collection and contribution refinements ahead. | In Scenario A, find the waiting-list evidence and open an attributed forum article from search. Follow replies in order and post one with and without enhancement. Retain the active search and scope through refresh and Back. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
-| 4. Groups, activity, and other records | Proposal activity and delegation deep links are implemented. Focused group sections and lane links, People, governance, and cases follow. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
+| 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People, governance, and case refinements follow. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
 | 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
 The proposal controller checks the stored group lane on deep reads, edits,
@@ -511,6 +513,22 @@ frozen ballot and exercises the proposal alert read loop. A separate browser
 pass checked the member surfaces in both themes at desktop, 800 × 600, 390 px,
 and 320 px with large text.
 [Forum browser regression](tests/ui.test.js) · [Proposal lane regression](tests/petition-scope.test.js)
+
+### Group workspace verification
+
+Scenario A opens the branch workspace, assigns a lane moderator in Members,
+reads the ranked election result in Decisions, and follows the scoped Discussion
+link. The lane moderator sees the exact parent destination before approval.
+The browser regression checks focus after enhanced navigation and membership
+changes with JavaScript off. HTTP coverage checks public and members-only lane
+links, both HTML response modes, and Settings access after role changes.
+The member surfaces were reviewed at 1440 × 900, 800 × 600, 390 × 844, and
+320 × 700 in dark and light. The 320 px check opened group Settings disclosures
+with larger text. The separate ASL case checks cover provider-local acknowledgement
+and phone reflow.
+[Group HTTP regression](tests/group-workspace.test.js) ·
+[Promotion regression](tests/group-roles-promotion.test.js) ·
+[Browser suite](tests/ui.test.js)
 
 ### Review checklist for presentation changes
 

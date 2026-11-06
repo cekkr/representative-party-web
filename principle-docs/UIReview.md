@@ -22,12 +22,12 @@ do **not** let it become the product's default face.
 
 ```bash
 # 1. Fresh, seeded, strict-Circle party deployment
-rm -rf .local/standalone
-ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
+STANDALONE_DIR="$(mktemp -d)" HOST=127.0.0.1 \
+  ENFORCE_CIRCLE=true CIRCLE_POLICY_ID=rete-civica-nazionale CIRCLE_NAME="Rete Civica Nazionale" \
   DATA_VALIDATION_LEVEL=strict DATA_PREVIEW=false ./run-standalone.sh   # terminal 1
 
-# 2. Seed + drive + capture the member journey (asserts each step, writes 20 images)
-BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party node scripts/party-journeys.js
+# 2. Drive and capture the member journey on the running server for review
+BASE_URL=http://127.0.0.1:3000 node scripts/party-journeys.js
 ```
 
 3. Open the live UI and walk every member-facing page: `/discussion`, `/forum`,
@@ -35,7 +35,8 @@ BASE_URL=http://127.0.0.1:3000 OUT_DIR=md-assets/party node scripts/party-journe
    plus `/` and `/organization`. Look at each with the checklist below.
 4. Fix defects in source (templates / `app.css` / view helpers), restart, re-verify.
 5. Regenerate committed images and confirm they match the README prose
-   (`OUT_DIR=md-assets/party node scripts/party-journeys.js`). The README carries only
+   (`npm run screenshots:readme`). This command starts a separate temporary
+   deployment and replaces the linked images after the full browser run passes. The README carries only
    Scenario A captures; `scripts/user-journeys.js` is an organization-operations
    regression driver and writes to `.local/journeys`, not to `md-assets/`.
 6. Run `npm run test:ui` (and the focused view tests) before committing.

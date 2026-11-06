@@ -1,0 +1,18 @@
+<nav class="topic-breadcrumbs" aria-label="Group lineage">
+  <a href="/groups" data-partial>All groups</a>
+  {{groupLineage}}
+</nav>
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">{{groupTitle}}</h1>
+    {{groupSummary}}
+    <div class="topic-meta">{{groupStatus}}</div>
+  </div>
+  {{groupMembership}}
+</header>
+<nav class="workspace-sections" aria-label="Group sections">
+  {{groupSections}}
+</nav>
+<div class="page-main">
+  {{groupContent}}
+</div>

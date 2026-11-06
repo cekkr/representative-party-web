@@ -459,10 +459,12 @@ async function journeyGroups(browser) {
 
   const koen = await member(browser, 'koen');
   await visit(koen, '/groups');
+  await clickText(koen, 'main a', 'Night shift coordination');
+  await settle(koen);
   const joined = await clickText(koen, 'button', 'Join', { optional: true });
   if (joined) {
     await expectText(koen, 'Leave', 'joining a group flips the control to Leave');
-    await shot(koen, 'group-joined', 'Another member joins the group and can act inside it.', { focus: '[data-composer-section="groups-list"]' });
+    await shot(koen, 'group-joined', 'Another member joins the group and can act inside it.', { focus: '[data-composer-section="group-overview"]' });
   } else {
     const controls = await koen.evaluate(() =>
       [...document.querySelectorAll('main button')].map((b) => (b.textContent || '').trim()).slice(0, 12),

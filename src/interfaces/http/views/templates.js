@@ -39,6 +39,8 @@ const TEMPLATE_MODULES = {
   'petition-workspace': 'petitions',
   'petition-unavailable': 'petitions',
   groups: 'groups',
+  'group-workspace': 'groups',
+  'group-unavailable': 'groups',
   delegation: 'delegation',
   'delegate-profile': 'delegates',
   'delegate-directory': 'delegates',

@@ -3224,7 +3224,7 @@ function isHtmlResponse(response) {
       return;
     }
     const action = new URL(form.getAttribute('action') || window.location.href, document.baseURI);
-    const recordForm = mode === 'forum' || mode === 'petitions' || action.pathname === '/petitions/promote';
+    const recordForm = ['forum', 'groups', 'petitions'].includes(mode) || action.pathname === '/petitions/promote';
     let redirectedTo;
     try {
       setAppBusy(true);

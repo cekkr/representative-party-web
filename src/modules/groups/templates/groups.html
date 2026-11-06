@@ -1,13 +1,15 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Groups</h1>
+    <p class="workspace-heading__summary">Find working groups, their branches, and the categories they cover.</p>
+  </div>
+  {{createAction}}
+</header>
 <div class="page-grid page-grid--groups">
   <div class="page-main">
-    <section class="panel" data-composer-section="groups-list" data-section-label="Available groups">
-      <p class="eyebrow">Groups</p>
-      <h2>Think tanks &amp; cohorts</h2>
-      <p class="muted small is-verbose">Handle: {{personHandle}} · Hash: {{personHash}}</p>
-      <p class="muted small is-verbose">{{circlePolicyNote}}</p>
-      <div class="discussion-list">
-        {{groups}}
-      </div>
+    <section class="panel stack" data-composer-section="groups-list" data-section-label="Available groups">
+      <h2>Working groups</h2>
+      {{groups}}
     </section>
 
     <section class="panel" data-composer-section="groups-categories" data-section-label="Category directory">
@@ -18,9 +20,8 @@
     </section>
   </div>
   <aside class="page-aside">
-    <section class="panel" data-composer-section="groups-create" data-section-label="Create a group">
-      <p class="eyebrow">Groups</p>
-      <h3>Create a group</h3>
+    <section class="panel" id="group-create" data-composer-section="groups-create" data-section-label="Create a group" {{createHidden}}>
+      <h2>Create a group</h2>
       <form class="stack" method="post" action="/groups" data-enhance="groups">
         <input type="hidden" name="action" value="create" />
         <div class="form-grid">

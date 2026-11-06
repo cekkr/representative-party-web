@@ -17,6 +17,7 @@ const MAX_CATEGORIES = 60;
 
 export function buildCategoryDirectory(state, { limit = MAX_CATEGORIES } = {}) {
   const groups = filterVisibleEntries(state?.groups || [], state);
+  const visibleIds = new Set(groups.map(({ id }) => id));
   const byCategory = new Map();
 
   const add = (rawLabel, group, entry) => {
@@ -37,6 +38,7 @@ export function buildCategoryDirectory(state, { limit = MAX_CATEGORIES } = {}) {
         name: group.name || 'Group',
         depth: getGroupDepth(state, group),
         lineage: listAncestorGroups(state, group)
+          .filter(({ id }) => visibleIds.has(id))
           .slice()
           .reverse()
           .map((ancestor) => ancestor.name || 'Group'),

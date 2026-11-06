@@ -152,8 +152,8 @@ export function renderPromotionRequestControls(entry, options = {}, { action, id
         <form class="form-inline" method="post" action="${escapeHtmlSafe(action)}" data-enhance="promotion-decision">
           <input type="hidden" name="intent" value="promote-decide" />
           <input type="hidden" name="${escapeHtmlSafe(idField)}" value="${escapeHtmlSafe(String(entry.id))}" />
-          <input name="reason" placeholder="Reason (optional)" />
-          <button type="submit" name="decision" value="approve" class="ghost">Approve move up</button>
+          <input name="reason" aria-label="Decision reason" placeholder="Reason (optional)" />
+          <button type="submit" name="decision" value="approve" class="ghost">Approve move to ${escapeHtmlSafe(decision.targetLabel)}</button>
           <button type="submit" name="decision" value="decline" class="ghost">Decline</button>
         </form>
       `);
@@ -167,7 +167,7 @@ export function renderPromotionRequestControls(entry, options = {}, { action, id
         <form class="form-inline" method="post" action="${escapeHtmlSafe(action)}" data-enhance="promotion-request">
           <input type="hidden" name="intent" value="promote-request" />
           <input type="hidden" name="${escapeHtmlSafe(idField)}" value="${escapeHtmlSafe(String(entry.id))}" />
-          <input name="note" placeholder="Why should this move up?" />
+          <input name="note" aria-label="Reason for requesting the move" placeholder="Why should this move up?" />
           <button type="submit" class="ghost">Ask to move up to ${escapeHtmlSafe(request.targetLabel)}</button>
         </form>
       `);

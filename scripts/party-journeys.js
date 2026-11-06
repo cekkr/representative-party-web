@@ -1029,8 +1029,6 @@ async function journeyElection(browser) {
   console.log('\n— groups: a ranked election won on transfers');
   const irene = await member(browser, 'irene.fabbri');
   await visit(irene, '/groups');
-  // Scoped to the create panel: once groups exist, each card carries its own categories
-  // form, and an unscoped selector types into the first group's instead.
   await typeInto(irene, '[data-composer-section="groups-create"] input[name="name"]', CIRCLE_NAME);
   await typeInto(irene, '[data-composer-section="groups-create"] input[name="topics"]', `${TOPIC.waitingLists},${TOPIC.minimumWage}`);
   await typeInto(irene, '[data-composer-section="groups-create"] textarea[name="description"]', 'Delegates and priorities on waiting times and healthcare work.');
@@ -1038,26 +1036,13 @@ async function journeyElection(browser) {
   const created = await expectText(irene, CIRCLE_NAME, 'the group is created');
   if (!created) return;
 
-  const groupId = await irene.evaluate(() => {
-    const form = [...document.querySelectorAll('form[action="/groups"]')].find((f) => f.querySelector('input[name="action"][value="startElection"]'));
-    return form?.querySelector('input[name="groupId"]')?.value || null;
-  });
+  const groupId = new URL(irene.url()).searchParams.get('group');
   if (!groupId) {
-    record('could not read the new group id');
+    record('the create form did not open the new group workspace');
     return;
   }
 
-  // Vote mode + prompt-on-conflict: the honest settings.
-  await irene.evaluate((id) => {
-    const form = [...document.querySelectorAll('form[action="/groups/policy"]')].find((f) => f.querySelector(`input[name="groupId"][value="${id}"]`));
-    if (form) {
-      form.closest('details')?.setAttribute('open', 'open');
-      form.querySelector('select[name="electionMode"]').value = 'vote';
-      form.querySelector('select[name="conflictRule"]').value = 'prompt_user';
-      form.querySelector('button[type="submit"]').click();
-    }
-  }, groupId);
-  await settle(irene);
+  await setGroupPolicy(irene, groupId, { electionMode: 'vote', conflictRule: 'prompt_user' });
 
   // Members join so the ballots below are cast by genuinely distinct sessions.
   const voters = ['marco.deluca', 'giulia.ferrero', 'valentina.sanna', 'tommaso.ricci', 'davide.villa', 'ahmed.ben.salah', 'luca.esposito', 'nadia.hamdi', 'anna.conti', 'paolo.greco'];
@@ -1066,7 +1051,7 @@ async function journeyElection(browser) {
   }
 
   // irene starts the election by @handle (the controller resolves to hashes).
-  await visit(irene, '/groups');
+  await visit(irene, `/groups?group=${groupId}&view=decisions`);
   await irene.evaluate((id, topic) => {
     const form = [...document.querySelectorAll('form[action="/groups"]')].find((f) => f.querySelector('input[name="action"][value="startElection"]') && f.querySelector(`input[name="groupId"][value="${id}"]`));
     form?.closest('details')?.setAttribute('open', 'open');
@@ -1092,7 +1077,7 @@ async function journeyElection(browser) {
   ];
   for (const [handle, first, second] of ballots) {
     const page = await member(browser, handle);
-    await visit(page, '/groups');
+    await visit(page, `/groups?group=${groupId}&view=decisions`);
     await selectOptionByLabel(page, 'form select[name="candidateHash"]', first);
     if (second) await selectOptionByLabel(page, 'form select[name="secondChoiceHash"]', second);
     await page.evaluate(() => {
@@ -1102,33 +1087,33 @@ async function journeyElection(browser) {
     await settle(page);
   }
 
-  // irene closes it and the winner surfaces on the card.
-  await visit(irene, '/groups');
+  // irene closes it and reads the outcome in Decisions.
+  await visit(irene, `/groups?group=${groupId}&view=decisions`);
   await irene.evaluate(() => {
     const form = [...document.querySelectorAll('form[action="/groups"]')].find((f) => f.querySelector('input[name="action"][value="closeElection"]'));
     form?.querySelector('button[type="submit"]')?.click();
   });
   await settle(irene);
-  await visit(irene, '/groups');
-  await openDetails(irene, 'Delegate election');
-  await expectText(irene, 'giulia.ferrero', 'the winner surfaces on the group card');
+  await visit(irene, `/groups?group=${groupId}&view=decisions`);
+  await expectText(irene, 'giulia.ferrero', 'the winner surfaces in Decisions');
   await expectText(irene, 'rounds 2', 'the election was decided on a second-round transfer');
   await shot(irene, 'party-election', 'A ranked delegate election, won on transfers: the first-preference leader (the economist, most delegated weight in the party) loses to the frontline nurse once eliminated ballots transfer — method ranked, rounds 2.', {
-    focus: '[data-composer-section="groups-list"]',
+    focus: '[data-composer-section="group-decisions"]',
   });
 }
 
-/** Reads the id of the group card whose name matches, from any form that carries it. */
+/** Reads the group id from its directory link. */
 async function findGroupIdByName(page, name) {
   return page.evaluate((want) => {
     const cards = [...document.querySelectorAll('article')];
     const card = cards.find((c) => (c.querySelector('h3')?.textContent || '').toLowerCase().includes(want.toLowerCase()));
-    return card?.querySelector('input[name="groupId"]')?.value || null;
+    const link = card?.querySelector('h3 a');
+    return link ? new URL(link.href).searchParams.get('group') : null;
   }, name);
 }
 
 async function joinGroup(page, groupId) {
-  await visit(page, '/groups');
+  await visit(page, `/groups?group=${groupId}`);
   await page.evaluate((id) => {
     const form = [...document.querySelectorAll('form[action="/groups"]')].find(
       (f) => f.querySelector('input[name="action"][value="join"]') && f.querySelector(`input[name="groupId"][value="${id}"]`),
@@ -1140,7 +1125,7 @@ async function joinGroup(page, groupId) {
 
 /** Applies a group's policy form (lanes, visibility, election mode, roll-up) in one submit. */
 async function setGroupPolicy(page, groupId, patch) {
-  await visit(page, '/groups');
+  await visit(page, `/groups?group=${groupId}&view=settings`);
   const applied = await page.evaluate(
     (id, values) => {
       const form = [...document.querySelectorAll('form[action="/groups/policy"]')].find((f) =>
@@ -1183,6 +1168,7 @@ async function journeyBranchGroups(browser) {
   }
 
   // The parent declares the broad categories it covers.
+  await visit(irene, `/groups?group=${parentId}&view=settings`);
   await irene.evaluate((id, topics) => {
     const form = [...document.querySelectorAll('form[action="/groups/topics"]')].find((f) =>
       f.querySelector(`input[name="groupId"][value="${id}"]`),
@@ -1214,16 +1200,14 @@ async function journeyBranchGroups(browser) {
     return null;
   }
   await expectText(irene, `Branch of ${CIRCLE_NAME}`, 'the branch shows its lineage, not just a name');
-  await expectText(irene, `Branches: ${BRANCH_NAME}`, 'the parent lists its branches');
-  const branchCategories = await irene.evaluate((want) => {
-    const card = [...document.querySelectorAll('article')].find((c) => (c.querySelector('h3')?.textContent || '').includes(want));
-    return card?.querySelector('form[action="/groups/topics"] input[name="topics"]')?.value || '';
-  }, BRANCH_NAME);
+  await visit(irene, `/groups?group=${parentId}`);
+  await expectText(irene, BRANCH_NAME, 'the parent links to its branch');
+  await visit(irene, `/groups?group=${branchId}&view=settings`);
+  const branchCategories = await irene.$eval('form[action="/groups/topics"] input[name="topics"]', (input) => input.value);
   if (branchCategories.includes(CATEGORY.waitingLists)) ok('the branch declares its own subcategory at creation');
   else record(`the branch declared "${branchCategories}" instead of ${CATEGORY.waitingLists}`);
 
   // The branch puts the elected nurse forward on its own subcategory.
-  await visit(irene, '/groups');
   await irene.evaluate((id, topic) => {
     const form = [...document.querySelectorAll('form[action="/groups/delegate"]')].find((f) =>
       f.querySelector(`input[name="groupId"][value="${id}"]`),
@@ -1292,7 +1276,7 @@ async function journeyGroupLane(browser, ids) {
   }
 
   // sofia moderates the lane without being able to change what the group *is*.
-  await visit(irene, '/groups');
+  await visit(irene, `/groups?group=${branchId}&view=members`);
   const roleSet = await irene.evaluate(
     (id, handleFragment) => {
       const forms = [...document.querySelectorAll('form[action="/groups/roles"]')].filter((f) =>
@@ -1311,9 +1295,16 @@ async function journeyGroupLane(browser, ids) {
   if (!roleSet) record('the branch roles panel did not offer sofia a role control');
   await settle(irene);
 
+  await expectText(irene, 'Members and roles', 'the role change returns to Members');
+  await shot(irene, 'party-group-members', 'The branch has a separate roster and role controls for its administrators.');
+
   // A working note that belongs to the branch, not yet to the party.
   const nadia = await member(browser, 'nadia.hamdi');
-  await visit(nadia, `/discussion?group=${branchId}`);
+  await visit(nadia, `/groups?group=${branchId}`);
+  await expectText(nadia, 'Members-only lanes', 'the group workspace states the lane visibility');
+  await shot(nadia, 'party-group-overview', 'A branch workspace shows its lineage, membership, categories, and the available group discussion lane.');
+  await clickText(nadia, 'main a', 'Group discussion');
+  await settle(nadia);
   await typeInto(nadia, '#discussion-compose input[name="topic"]', CATEGORY.waitingLists);
   await selectOptionByLabel(nadia, '#discussion-compose select[name="groupId"]', BRANCH_NAME);
   await selectOption(nadia, '#discussion-compose select[name="stance"]', 'proposal');
@@ -1354,6 +1345,7 @@ async function journeyGroupLane(browser, ids) {
   // sofia — lane moderator, not admin — decides.
   const sofia = await member(browser, 'sofia.bianchi');
   await visit(sofia, `/discussion?group=${branchId}`);
+  await expectText(sofia, `Approve move to ${CIRCLE_NAME}`, 'the approval names the destination before the move');
   const approved = await sofia.evaluate(() => {
     const form = document.querySelector('form[data-enhance="promotion-decision"]');
     const button = [...(form?.querySelectorAll('button') || [])].find((b) => b.value === 'approve');
@@ -1640,6 +1632,12 @@ async function main() {
     if (wanted('ballots')) await journeyDelegatedBallot(browser);
     if (wanted('accountability')) await journeyAccountability(browser);
     if (wanted('governance')) await journeyGovernance(browser);
+    if (wanted('workspace')) {
+      const giulia = await member(browser, 'giulia.ferrero');
+      await visit(giulia, '/');
+      await expectText(giulia, 'Waiting lists', 'Home leads into the party conversation');
+      await shot(giulia, 'party-home', 'The member workspace leads with recent conversations and enabled civic work.');
+    }
   } finally {
     if (process.env.KEEP !== '1') await browser.close();
   }

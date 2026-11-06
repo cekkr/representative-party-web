@@ -57,6 +57,12 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## UX Consistency
 
+- Paginate group browse and election history when the collections grow. A group deep link should keep its directory search and page for the return trip.
+- Preserve open settings disclosures after a successful write so the saved values are visible immediately.
+- Review the last-admin rule for membership removal. The role editor protects the last admin, while leaving a group can still remove that role.
+- At large text sizes on phones, group and feed headings can fall below the initial screen. Explore a more compact shared status strip that keeps every required accountability fact available.
+
+
 - Omit the redundant “Updated” byline when a proposal’s latest timestamp is its creation time.
 - Old fragment-only proposal bookmarks scroll to the summary on their original collection page. The server receives no fragment, so old bookmarks outside the current collection cannot resolve directly. Prefer canonical proposal URLs in every producer.
 - Preserve the newly submitted proposal note as a focus target after enhanced POST. Today the successful redirect opens Discussion and focuses its heading. An explicit note destination would shorten the return on long discussions.
@@ -99,6 +105,8 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## Security follow-ups
 
+- Reuse the proposal source-visibility check for Discussion promotion endpoints. Check the stored post and active source lane before evaluating promotion authority, and review direct group writes against hidden preview records.
+
 - Carry group lane visibility into transaction read and export policy. Home excludes scoped records and restricts audit previews to signed-in provider admins, but raw transaction endpoints can expose lane payloads. Resolve legacy records through their stored source when the audit payload has no group ID, and keep legitimate operator audit access.
 - Apply proposal lane read access to exported transaction metadata and other profile/activity consumers. Proposal comment notifications and outbound mentions, inbox display, and delegate ballot queues now check the proposal’s current lane.
 - `POST /circle/peers` (`registerPeer`) accepts anonymous requests, so anyone reachable can add peers to the gossip set. Peers are "hints, not trust anchors" by design, but unauthenticated writes to the peer list still deserve an explicit policy decision (admin-only, or signed peer announcements).
@@ -130,6 +138,9 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Pilot libp2p gossipsub channels for social-lane event replication (with bounded replay + signature checks) to reduce HTTP gossip overhead on high-churn feeds.
 
 ## Completed
+
+- Group browse renders summary rows without building each group's election, roster, and policy controls. Those sections render on their own group URLs.
+
 
 - Proposal browse renders summary cards. A focused Ballot tallies only votes for its record. Canonical links, return filters, and stored-lane access apply to focused views, successful writes, proposal alerts, and delegation queues. The Ballot links to the exact frozen revision.
 - New untitled rebuttals store an empty title. Old “Argument note” placeholders are read compatibly, and replies link to the named source claim.
@@ -216,7 +227,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Possible: `listBallotsAwaitingDelegate` and `listDelegatedBallotsForOwner` each rebuild the full petition map and vote index per call, and `/delegation` calls both on every render. They could share one index built once per request.
 - Group internal lanes reuse the existing `/discussion` and `/petitions` surfaces through a `?group=` scope instead of duplicating them, so pagination, evidence, stances, quorum, votes and delegated ballots all work inside a group with no second implementation to keep in sync.
 - Promotion moves an item rather than copying it, so a promoted proposal keeps its id and its comment thread, signatures and votes rather than forking into two divergent records of one decision.
-- Possible: `buildCategoryDirectory` walks every group, cachet and closed election on each `/groups` render, and `pickWinner` re-tallies each election every time. The result changes only when a group, cachet or election changes — caching it by a cheap fingerprint (as peer capability snapshots already do) would cut the work on deployments with many groups.
+- Possible: `buildCategoryDirectory` walks every group, cachet and closed election on each directory render, and `pickWinner` re-tallies each election every time. The result changes only when a group, cachet or election changes — caching it by a cheap fingerprint (as peer capability snapshots already do) would cut the work on deployments with many groups.
 - Possible: `renderGroupList` calls `getGroupDepth`/`listAncestorGroups` per group, each of which re-walks the ancestor chain; `buildGroupTree` already knows every depth, so passing it through would remove the repeated walks.
 - Possible: `listReadableGroupLanes`/`listPostableGroupLanes` run `getGroupPolicy` per group per render, and `/discussion` and `/petitions` each call both. One resolved policy map per request would serve every call.
 - Possible: promotion is admin-only, so a member who thinks a branch discussion belongs at the parent level has no way to ask. A promotion *request* (visible to group admins, auditable, declinable) would keep the decision with the admin while giving members a path — the same soft-power shape the rest of the product uses.

@@ -1416,7 +1416,8 @@ the doc keeps those as case descriptors.
   `scripts/seed-demo.js` first. A seeded store is useful for manual exploration
   and screenshots, but it cannot pass this execution contract.
 - `scripts/party-journeys.js` is the current Scenario A browser walkthrough and
-  the source of every README capture (20 images in `md-assets/party/`). It drives
+  the source of the 23 walkthrough captures in `md-assets/party/`. Refresh them
+  with `npm run screenshots:readme`, which uses a temporary strict-Circle store. It drives
   A1 (arrival, roles, the A.0 constitution, delegate bios), A2 (discussion,
   forum, social), A3 (proposal, revision, quorum, argument map, the revision that
   answers its own deliberation, freeze, vote), A5, A6.2/A6.3, branch groups,

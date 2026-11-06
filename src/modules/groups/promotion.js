@@ -62,6 +62,9 @@ export function evaluatePromotion(state, person, { kind, entry } = {}) {
       resolved,
     );
   }
+  if (getOpenPromotionRequest(entry)?.byHash === person.pidHash) {
+    return refuse('own_promotion_request', 'Another moderator must decide your promotion request.', resolved);
+  }
   // Promoting into a parent whose matching lane is switched off would drop the item onto a
   // surface nobody in that group can reach.
   const lane = kind === 'petition' ? 'petitions' : 'discussion';
@@ -184,6 +187,9 @@ export function evaluatePromotionDecision(state, person, { kind, entry } = {}) {
       resolved,
     );
   }
+  if (request.byHash === person.pidHash) {
+    return refuse('own_promotion_request', 'Another moderator must decide your promotion request.', resolved);
+  }
   return { ok: true, ...resolved, request };
 }
 
@@ -191,26 +197,16 @@ export function applyPromotionDecision(state, person, { kind, entry, decision: v
   const decision = evaluatePromotionDecision(state, person, { kind, entry });
   if (!decision.ok) return decision;
 
+  const approved = verdict === 'approve';
+  const result = approved ? applyPromotion(state, person, { kind, entry }) : decision;
+  if (!result.ok) return result;
+
   const request = decision.request;
+  request.status = approved ? 'approved' : 'declined';
   request.decidedAt = new Date().toISOString();
   request.decidedByHash = person?.pidHash || null;
   request.reason = String(reason || '').slice(0, 240);
-
-  if (verdict !== 'approve') {
-    request.status = 'declined';
-    return { ...decision, ok: true, approved: false, request };
-  }
-
-  const promoted = applyPromotion(state, person, { kind, entry });
-  if (!promoted.ok) {
-    // The request stays open: the blocker (a closed parent lane, say) is fixable, and
-    // silently marking it approved would lose the ask.
-    delete request.decidedAt;
-    delete request.decidedByHash;
-    return promoted;
-  }
-  request.status = 'approved';
-  return { ...promoted, ok: true, approved: true, request };
+  return { ...result, approved, request };
 }
 
 export function describePromotionTrail(entry) {
