@@ -66,12 +66,19 @@ test('collapsed composer tool does not swallow clicks on the page', { timeout: 6
 
   // The social composer must actually accept input for an admin.
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
-  const textarea = await page.$('.composer__input textarea');
+  await page.click('#social-compose summary');
+  const textarea = await page.$('#social-compose textarea');
   assert.ok(textarea, 'expected the social composer textarea');
   await textarea.click();
   await page.keyboard.type('Admin can reach the composer.');
-  const typed = await page.evaluate(() => document.querySelector('.composer__input textarea')?.value || '');
+  const typed = await textarea.evaluate((input) => input.value);
   assert.equal(typed, 'Admin can reach the composer.', 'composer must receive typed input');
+
+  await page.setViewport({ width: 320, height: 600 });
+  await page.goto(`${server.baseUrl}/social/feed?compose=post#social-compose`, { waitUntil: 'networkidle0' });
+  assert.equal(await page.$eval('.composer-tool', (tool) => getComputedStyle(tool).position), 'static');
+  await page.$eval('#social-compose button', (button) => button.scrollIntoView({ block: 'end' }));
+  assert.deepEqual(await controlsCoveredByComposerTool(page), []);
 
   // The tool itself must still open.
   await page.goto(`${server.baseUrl}/`, { waitUntil: 'networkidle0' });

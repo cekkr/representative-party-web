@@ -5,6 +5,7 @@ import { evaluateAction, getCirclePolicyState, getEffectivePolicy } from '../../
 import { isModuleEnabled, resolveModuleSettings } from '../../circle/modules.js';
 import { matchesGroupScope } from '../../groups/groupScope.js';
 import { forumThreadHref, isForumThread } from '../../forum/threads.js';
+import { discussionHref, isDiscussionPost } from '../../discussion/discussionLinks.js';
 import {
   countVisibleEntries,
   describeProfile,
@@ -402,7 +403,7 @@ function formatConversationItem(item = {}) {
       title: resolveTopic(entry),
       summary: buildSnippet(entry.content || '', 110),
       meta: `${createdAt} · ${entry.stance || 'discussion'}`,
-      href: '/discussion',
+      href: discussionHref({ post: entry.id }),
       partial: true,
       pills: [{ label: 'Discussion' }],
     };
@@ -516,10 +517,7 @@ function displayPetitionStage(value) {
 }
 
 function isDiscussionEntry(entry = {}) {
-  if (entry.petitionId) return false;
-  if (entry.parentId) return false;
-  if (entry.stance === 'article' || entry.stance === 'comment') return false;
-  return matchesGroupScope(entry, null);
+  return isDiscussionPost(entry) && matchesGroupScope(entry, null);
 }
 
 function resolveTopic(entry = {}) {

@@ -1,15 +1,23 @@
 <section class="panel" id="discussion-filters" aria-label="Feed filters" data-composer-section="discussion-filters" data-section-label="Feed filters">
-  <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
-    {{discussionFilterScope}}
-    <label class="field">
-      <span>Filter by topic</span>
-      <select name="topic">
-        <option value="" {{topicFilterSelectedAll}}>All topics</option>
-        {{topicFilterOptions}}
-      </select>
-    </label>
-    <div class="cta-row">
-      <button class="ghost" type="submit">Apply filter</button>
-    </div>
-  </form>
+  <details class="form-toggle collection-filters" {{discussionFiltersOpen}}>
+    <summary>Search and filter <span class="muted small">{{discussionFilterSummary}}</span></summary>
+    <form class="form-grid" method="get" action="/discussion" data-enhance="discussion-filter">
+      {{discussionFilterScope}}
+      <label class="field">
+        <span>Search contributions</span>
+        <input type="search" name="q" value="{{discussionSearch}}" maxlength="120" />
+      </label>
+      <label class="field">
+        <span>Topic</span>
+        <select name="topic">
+          <option value="" {{topicFilterSelectedAll}}>All topics</option>
+          {{topicFilterOptions}}
+        </select>
+      </label>
+      <div class="cta-row">
+        <button class="ghost" type="submit">Apply filters</button>
+        {{discussionClearFilters}}
+      </div>
+    </form>
+  </details>
 </section>

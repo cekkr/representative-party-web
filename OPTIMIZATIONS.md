@@ -3,6 +3,8 @@
 This file tracks follow-up ideas that are out of scope for the current patch but would further improve performance, reduce redundancy, or tighten UX consistency.
 
 ## Performance
+
+- Measure Discussion search and topic filter cost as the shared conversation store grows. The current filter walks the visible lane and caches topic paths per request. Preserve the same lane and preview checks if indexing the search.
 - Lazy-render organization layer detail after the active tab (especially hierarchy maps and pressure analytics) so email-only deployments do not pay the HTML/DOM cost of disabled preview panels on every `/organization` request.
 - Cache permission-safe organization-pressure aggregates by scope + time window and invalidate them from case/commitment/sector writes instead of rescanning all cases for every organizational-mirror render.
 - Maintain incremental volume/velocity/persistence/spread counters per sector and reporting window once live pressure analytics land; retain raw component access for explainability rather than caching only a composite score.
@@ -57,6 +59,9 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## UX Consistency
 
+- Give Discussion promotion alerts and Social reply or mention alerts stable record links. Check the current record audience before including a link or its details. Social currently links a reply's parent when it appears on the same visible page.
+- Recover invalid ordinary Social and Discussion submissions in context. Preserve safe text fields and guide the member through selecting an attachment again when needed.
+
 - Paginate group browse and election history when the collections grow. A group deep link should keep its directory search and page for the return trip.
 - Preserve open settings disclosures after a successful write so the saved values are visible immediately.
 - Review the last-admin rule for membership removal. The role editor protects the last admin, while leaving a group can still remove that role.
@@ -105,7 +110,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 
 ## Security follow-ups
 
-- Reuse the proposal source-visibility check for Discussion promotion endpoints. Check the stored post and active source lane before evaluating promotion authority, and review direct group writes against hidden preview records.
+- Review remaining direct group writes for references to hidden preview records. Discussion now resolves the stored post and readable source lane before evaluating promotion authority.
 
 - Carry group lane visibility into transaction read and export policy. Home excludes scoped records and restricts audit previews to signed-in provider admins, but raw transaction endpoints can expose lane payloads. Resolve legacy records through their stored source when the audit payload has no group ID, and keep legitimate operator audit access.
 - Apply proposal lane read access to exported transaction metadata and other profile/activity consumers. Proposal comment notifications and outbound mentions, inbox display, and delegate ballot queues now check the proposal’s current lane.
@@ -126,6 +131,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Extend the scenario journey harnesses into the causal replay contract in `principle-docs/SimulationScenarios.md`: fresh store, deterministic per-agent manifests, one isolated session and interaction per child event, virtual-clock events, before/after assertions, and a machine-readable trace. Page inactive agent contexts out to bounded session snapshots so the 250-person quorum cohort remains CI-affordable without sharing identity or bulk-seeding state.
 
 ## Storage & IO
+- Allow tests and temporary deployments to set an isolated root for stored Social attachments as well as upload staging. The current attachment root is shared by servers started from the same checkout.
 - Store organization case extensions in module-owned collections created lazily (`commitments`, `flowEdges`, `authorityGrants`, `funds`, `sectorLinks`, `mediation`, `pressureObservations`, `impactReviews`) while keeping the source message and minimal case envelope canonical.
 - Separate protected identity/relay mappings and mediation evidence from general case storage with stricter retention, access logging, export, and deletion policies; never include them in ordinary gossip snapshots.
 - Move to incremental snapshotting for large JSON stores to reduce write amplification.
@@ -205,7 +211,7 @@ This file tracks follow-up ideas that are out of scope for the current patch but
 - Surfaced optional-endpoint skip cache summaries in `/admin` and `/health` for replication observability.
 - Added an outbound endpoint skip cache (`/circle/gossip`, `/votes/gossip`, `/transactions/gossip`) so repeated push runs avoid retrying peers that currently return module-disabled/gossip-disabled responses.
 - Cached peer capability lookups per gossip push tick so payload selection reuses the same snapshot across ledger/votes/transactions routing.
-- Auto-collapsed the sticky social composer while scrolling down, keeping wall content visible without hiding manual expand controls.
+- Put Social compose in a native disclosure in the normal scroll flow. The existing auto-collapse setting applies to an empty composer after it scrolls out of view.
 - Added a top-bar Interface settings panel with browser-local persistence (text scale, motion, compact nav, composer auto-collapse preference, partial-navigation mode) and non-blocking UI toasts for enhanced flows.
 - Added side-nav jump filtering with `Ctrl/Cmd+K` and `/` shortcuts for faster practical navigation in large module configurations.
 - Added shared `paginate`/`renderPager` helpers and applied SSR pagination (page size 20, query-preserving prev/next) across the discussion, petitions, forum-thread, and social-feed lists so large datasets no longer render in full.

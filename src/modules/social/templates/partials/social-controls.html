@@ -1,17 +1,19 @@
-<section class="panel" id="social-controls" data-composer-section="social-controls" data-section-label="Feed filters">
-  <p class="eyebrow">Feed controls</p>
-  <h3>Filter the social feed</h3>
-  <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
-    <label class="field">
-      <span>Filter by follow type</span>
-      <select name="type">
-        <option value="" {{followTypeSelectedAll}}>{{followTypeAllLabel}}</option>
-        {{followTypeOptions}}
-      </select>
-    </label>
-    <div class="cta-row">
-      <button class="ghost" type="submit">Apply filter</button>
-    </div>
-  </form>
-  <p class="muted small">Use follow types to keep urgent updates separate from long-tail interest posts.</p>
+<section class="panel" id="social-controls" aria-label="Feed filters" data-composer-section="social-controls" data-section-label="Feed filters" {{socialFollowsHidden}}>
+  <details class="form-toggle collection-filters" {{socialFilterOpen}}>
+    <summary>Filter by follow type <span class="muted small">{{socialFilterSummary}}</span></summary>
+    <form class="form-grid" method="get" action="/social/feed" data-enhance="social-filter">
+      <label class="field">
+        <span>Follow type</span>
+        <select name="type">
+          <option value="" {{followTypeSelectedAll}}>{{followTypeAllLabel}}</option>
+          {{followTypeOptions}}
+        </select>
+      </label>
+      <div class="cta-row">
+        <button class="ghost" type="submit">Apply filter</button>
+        {{socialClearFilter}}
+      </div>
+    </form>
+    <p class="muted small">Your updates and direct messages appear with every follow type.</p>
+  </details>
 </section>

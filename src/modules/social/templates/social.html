@@ -1,10 +1,18 @@
+<header class="workspace-heading">
+  <div>
+    <h1 tabindex="-1">Social feed</h1>
+    <p class="workspace-heading__summary">{{socialScope}}</p>
+    <p class="muted small social-posting-notice">{{socialPostingNotice}}</p>
+  </div>
+  <div class="workspace-heading__actions">{{socialPrimaryAction}}</div>
+</header>
 <div class="page-grid page-grid--social">
-  <div class="page-main">
+  <div class="page-main stack">
+    {{> social-controls}}
     {{> social-wall}}
   </div>
-  <aside class="page-aside">
+  <aside class="page-aside" aria-label="Social tools">
     {{> social-composer}}
-    {{> social-controls}}
     {{> social-follows}}
   </aside>
 </div>

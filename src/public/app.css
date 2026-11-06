@@ -917,16 +917,9 @@ main {
   gap: var(--gap-stack);
 }
 
-#discussion-filters .form-grid {
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: end;
-}
-
-#discussion-filters .cta-row {
-  margin: 0;
-}
-
-body:has(#discussion-compose:is([data-member-hidden="true"], [hidden])) [data-discussion-compose-link] {
+body:has(#discussion-compose:is([data-member-hidden="true"], [hidden])) [data-discussion-compose-link],
+body:has(#social-compose:is([data-member-hidden="true"], [hidden])) [data-social-compose-link],
+body:has(#social-follows:is([data-member-hidden="true"], [hidden])) [data-social-follows-link] {
   display: none;
 }
 
@@ -1346,8 +1339,7 @@ body[data-composer-mode="on"] .composer-tool__panel {
    Capping the rail with overflow:auto clipped an expanded compose form so its own
    submit button sat outside the rail's visible box. Making the rail sticky instead is
    worse: a sticky element taller than the viewport pins at `top` and then stops
-   moving, so its lower half cannot be scrolled to at all. Only a genuinely short,
-   fixed-height panel may pin itself — see .sticky-composer. */
+   moving, so its lower half cannot be scrolled to at all. */
 .page-aside {
   display: flex;
   flex-direction: column;
@@ -1632,31 +1624,6 @@ ul.plain li:last-child {
   margin-bottom: 0.35rem;
 }
 
-/* Social posts reuse the feed head (avatar + byline); pull the card padding onto the
-   head so the avatar sits flush like discussion/forum, and align body text under it. */
-.social-post {
-  padding: 0;
-  overflow: hidden;
-}
-
-.social-post .topic-head {
-  padding: 0.85rem 1.05rem 0.4rem;
-}
-
-.social-post > p,
-.social-post > .callout,
-.social-post > .media-stack,
-.social-post > .discussion__meta,
-.social-post > details,
-.social-post > .muted {
-  margin-left: 1.05rem;
-  margin-right: 1.05rem;
-}
-
-.social-post > *:last-child {
-  margin-bottom: 0.9rem;
-}
-
 /* Row lists (People directory, follows, endorsements) render as aligned rows with a
    left identity block and right-aligned actions — not an unstyled vertical stack. */
 .list-stack {
@@ -1780,183 +1747,59 @@ ul.plain li:last-child {
   margin-top: 0.5rem;
 }
 
-.composer-panel {
-  position: relative;
-}
-
-.composer__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.composer__toggle {
-  font-size: 0.85rem;
-  padding: 0.35rem 0.7rem;
-  border-radius: 999px;
-}
-
-.sticky-composer {
-  position: sticky;
-  top: 1rem;
-  z-index: 5;
-}
-
-.composer {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  max-height: 190px;
-  overflow: hidden;
-  transition: max-height 0.2s ease;
-}
-
-.composer-panel[data-compose-state="open"] .composer,
-.composer-panel:focus-within .composer {
-  max-height: 720px;
-}
-
-.composer__row {
-  display: flex;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.composer__avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, hsl(var(--marker-hsl) / 0.2), hsl(var(--primary-h) var(--primary-s) 50% / 0.3));
-  border: 1px solid var(--border);
-  flex: 0 0 auto;
-}
-
-.composer__input {
-  flex: 1 1 auto;
-  background: var(--overlay-soft);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
-  padding: 0.55rem 0.85rem;
-}
-
-.composer__input textarea {
+#social-compose input[type="file"] {
+  min-width: 0;
   width: 100%;
-  border: none;
-  outline: none;
-  resize: vertical;
-  background: transparent;
-  color: var(--text);
-  font-size: 1rem;
-  line-height: 1.4;
-  min-height: 52px;
+  padding: 0.5rem;
+  font-size: 0.875rem;
 }
 
-.composer__meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+.social-audience {
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
 }
 
-.composer__expandable {
+.social-audience legend {
+  padding: 0 0.25rem;
+}
+
+.social-posting-notice:empty,
+.collection-filters summary span:empty {
   display: none;
-  flex-direction: column;
-  gap: 0.75rem;
 }
 
-.composer-panel[data-compose-state="open"] .composer__expandable,
-.composer-panel:focus-within .composer__expandable {
-  display: flex;
-}
-
-.composer__who {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.composer__handle {
-  font-weight: 600;
-}
-
-.composer__notes {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-}
-
-.composer__controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-}
-
-.composer__chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--overlay-soft);
-  color: var(--text);
-  font-size: 0.9rem;
-}
-
-.composer__chip select,
-.composer__chip input {
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 0.9rem;
-  outline: none;
-}
-
-.composer__chip input {
-  min-width: 160px;
-}
-
-.composer__action {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.75rem;
-  border-radius: 0.85rem;
-  border: 1px solid var(--border);
-  background: var(--overlay-softer);
-  color: var(--muted);
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.composer__action:hover {
-  border-color: var(--accent);
-  color: var(--text);
-}
-
-.composer__file {
-  position: absolute;
-  width: 1px;
-  height: 1px;
+.panel > details.collection-filters {
+  margin-top: 0;
   padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
+  background: transparent;
   border: 0;
 }
 
-.composer__footer {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
+details.collection-filters:not([open]) > summary {
+  margin-bottom: 0;
+}
+
+details.collection-filters .form-grid {
+  align-items: end;
+}
+
+details.collection-filters .cta-row {
+  margin: 0;
+}
+
+ul.discussion-list,
+ul.wall-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.contribution-link {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 .stack {
@@ -2479,6 +2322,32 @@ details.form-toggle.form-toggle--inline {
   display: flex;
   flex-direction: column;
   gap: 0.85rem;
+}
+
+.social-post__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.75rem;
+}
+
+.social-post__actions details.form-toggle {
+  margin-top: 0;
+}
+
+.social-post__actions details.form-toggle[open] {
+  flex: 1 0 100%;
+  min-width: 0;
+}
+
+.social-post__actions details.form-toggle:not([open]) {
+  border: 0;
+  background: transparent;
+  padding: 0.5rem 0.65rem;
+}
+
+.social-post__actions details.form-toggle:not([open]) > summary {
+  margin-bottom: 0;
+  color: var(--link);
 }
 
 .stats .stat__value {
@@ -4091,14 +3960,6 @@ code {
 }
 
 @media (max-width: 720px) {
-  .sticky-composer {
-    position: static;
-  }
-
-  .composer {
-    max-height: none;
-  }
-
   /* Fallback for engines without container queries; the @container rule above is what
      normally collapses the page grid, and it triggers earlier because it measures the
      content column rather than the viewport. */
@@ -4110,10 +3971,6 @@ code {
     padding: min(var(--pad-card), 1rem);
   }
 
-  .composer__chip input {
-    min-width: 120px;
-  }
-
   .reply-hint__subtitle {
     max-width: 220px;
   }
@@ -4121,6 +3978,19 @@ code {
   .composer-tool {
     right: 1rem;
     bottom: 1rem;
+  }
+
+  body[data-composer-mode="off"] .composer-tool {
+    position: static;
+    margin-bottom: var(--gap-stack);
+  }
+
+  body[data-composer-mode="off"] .composer-tool__bar {
+    cursor: default;
+  }
+
+  body[data-composer-mode="off"] .composer-tool__bar-actions {
+    display: none;
   }
 
   .composer-tool__panel {

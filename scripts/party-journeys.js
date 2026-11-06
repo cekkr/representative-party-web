@@ -580,11 +580,19 @@ async function journeyDiscussion(browser) {
     evidence: EVIDENCE.method,
   });
 
-  await visit(giulia, '/discussion');
+  await visit(giulia, '/discussion?topic=Healthcare');
   await expectText(giulia, TOPIC.waitingLists, 'the waiting-list thread carries five attributed notes');
   await shot(giulia, 'party-discussion', 'Deliberation before any vote: lived experience, corroborated by data and checked — each note stance-tagged and attributed to a verified person.', {
-    focus: '.discussion-list',
+    focus: '.page-grid--discussion .page-main',
   });
+  await visit(giulia, '/discussion?topic=Healthcare&q=survey-method');
+  await clickText(giulia, '#discussion-feed .contribution-link', TOPIC.waitingLists);
+  await expectText(giulia, 'Median, not worst case', 'search opens the contribution with the survey method');
+  if (new URL(giulia.url()).searchParams.has('post')) ok('the evidence note has its own address');
+  else record('the evidence note did not open independently of the feed');
+  await clickText(giulia, 'main a', 'Back to Discussion');
+  if (new URL(giulia.url()).searchParams.get('q') === 'survey-method') ok('returning keeps the evidence search');
+  else record('returning from the evidence note dropped the evidence search');
 
   // A2.3/A2.4/A2.9/A2.10 — the minimum-wage thread: the dissent has to be reasonable,
   // and evidence reframes what any proposal will have to answer.
@@ -1546,6 +1554,7 @@ async function journeyGovernance(browser) {
  */
 async function journeySocial(browser) {
   console.log('\n— social: the lane stays social (posts, typed follows, a reshare)');
+  const freeMandateUpdate = 'I wrote about the free mandate in Forum. Article 67 gives us a way to hold representatives accountable without turning the party into a whip.';
   const posts = [
     ['anna.conti', 'Referendum night at the stalls: low turnout, but plenty of under-30s asking about ius scholae. The issue is there; the law is not.'],
     ['giulia.ferrero', 'Ward full again today. The intramoenia proposal is almost ready, though — if your circle still has signatures to collect, now is the time.'],
@@ -1557,6 +1566,7 @@ async function journeySocial(browser) {
     ['anna.conti', 'Reminder: ius scholae assembly on Wednesday, remote attendance too. Bring questions, not flags.'],
     ['valentina.sanna', 'Chart of PNGLA waiting times by priority class coming soon. Follow me on “interest” if you want the preview.'],
     ['luca.esposito', 'I do not agree with everything here, but the level of debate is something else compared with the usual social groups. People actually argue.'],
+    ['sofia.bianchi', freeMandateUpdate],
   ];
   for (const [handle, content] of posts) {
     const page = await member(browser, handle);
@@ -1572,32 +1582,40 @@ async function journeySocial(browser) {
     ['nadia.hamdi', 'interest'],
     ['ahmed.ben.salah', 'alerts'],
     ['paolo.greco', 'circle'],
+    ['luca.esposito', 'circle'],
+    ['sofia.bianchi', 'info'],
   ];
   for (const [handle, type] of follows) {
     await follow(anna, { handle, type });
   }
 
-  // A2.14 — a reshare with commentary (best-effort: the reshare form lives in a
-  // per-post disclosure on the wall; if it is not reachable, the run continues).
-  await visit(anna, '/social/feed');
-  await anna.evaluate(() => {
-    const cards = [...document.querySelectorAll('.social-post')];
-    const card = cards.find((c) => (c.textContent || '').includes('waiting times by priority class'));
-    const details = card && [...card.querySelectorAll('details')].find((d) => /reshare/i.test(d.querySelector('summary')?.textContent || ''));
-    if (!details) return;
-    details.open = true;
-    const form = details.querySelector('form');
-    const ta = form?.querySelector('textarea[name="content"]');
-    if (ta) ta.value = 'Read this before talking about an “imperative mandate” at the bar.';
-    const btn = form?.querySelector('button[type="submit"], button:not([type])');
-    if (btn) btn.click();
-  });
-  await settle(anna);
+  // A2.14 — Luca reshares Sofia's article update.
+  const luca = await member(browser, 'luca.esposito');
+  await follow(luca, { handle: 'sofia.bianchi', type: 'info' });
+  await visit(luca, '/social/feed');
+  const original = await luca.$$eval('.social-post', (cards, update) =>
+    cards.find((card) => card.querySelector('.topic-body > p')?.textContent === update)?.id,
+  freeMandateUpdate);
+  const commentary = 'Read this before talking about an “imperative mandate” at the bar.';
+  if (original) {
+    const field = `#${original} form[data-enhance="social-reshare"] textarea`;
+    await typeInto(luca, field, commentary);
+    await submitNear(luca, field);
+  } else {
+    record('Luca could not find Sofia’s free-mandate update');
+  }
 
   await visit(anna, '/social/feed');
   await expectText(anna, 'ius scholae', 'the social lane is populated and scoped to followed people');
+  const reshareMatches = await anna.$$eval('.social-post', (cards, note) =>
+    cards.some((card) => card.querySelector('.topic-author .actor')?.textContent === '@luca.esposito' &&
+      card.querySelector('.topic-body > p')?.textContent === note &&
+      card.querySelector('.callout .actor')?.textContent === '@sofia.bianchi'),
+  commentary);
+  if (reshareMatches) ok('Luca’s commentary attributes Sofia’s original update');
+  else record('Anna did not see Luca’s attributed reshare of Sofia’s update');
   await shot(anna, 'party-social', 'The social lane stays social: short attributed updates from followed people, typed follows (circle/interest/info/alerts), and a reshare — visibly not a vote.', {
-    focus: '#social-wall',
+    focus: '.page-grid--social .page-main',
   });
 }
 

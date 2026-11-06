@@ -1,39 +1,44 @@
-<section class="panel" id="social-follows" data-composer-section="social-follows" data-section-label="Follows">
-  <p class="eyebrow">Relationships</p>
-  <h3>Manage follows</h3>
-  <form class="stack" method="post" action="/social/follow" data-enhance="social-follow">
-    <div class="form-grid">
-      <label class="field">
-        <span>Handle</span>
-        <input name="handle" list="follow-people" placeholder="search by handle" autocomplete="off" required />
-      </label>
-      <label class="field">
-        <span>Follow type</span>
-        <input name="type" list="follow-types" placeholder="circle / interest / info / alerts" />
-      </label>
-    </div>
-    <div class="cta-row">
-      <button class="cta" type="submit">Follow</button>
-    </div>
-  </form>
-  <form class="stack" method="post" action="/social/unfollow" data-enhance="social-unfollow">
-    <div class="form-grid">
-      <label class="field">
-        <span>Handle to unfollow</span>
-        <input name="handle" list="follow-people" placeholder="search by handle" autocomplete="off" required />
-      </label>
-    </div>
-    <div class="cta-row">
-      <button class="ghost" type="submit">Unfollow</button>
-    </div>
-  </form>
-  <datalist id="follow-types">
-    {{followTypeDatalistOptions}}
-  </datalist>
-  <datalist id="follow-people">
-    {{followPeopleDatalist}}
-  </datalist>
+<section class="panel" id="social-follows" data-composer-section="social-follows" data-section-label="Follows" {{socialFollowsHidden}}>
+  <h2>Your network</h2>
+  <p class="muted small">{{socialFollowSummary}}</p>
   <div class="list-stack">
     {{followList}}
   </div>
+  <details class="form-toggle" {{socialFollowFormHidden}}>
+    <summary>Manage follows</summary>
+    <div class="stack">
+      <form class="stack" method="post" action="/social/follow" data-enhance="social-follow">
+        <div class="form-grid">
+          <label class="field">
+            <span>Handle</span>
+            <input name="handle" list="follow-people" placeholder="search by handle" autocomplete="off" required />
+          </label>
+          <label class="field">
+            <span>Follow type</span>
+            <input name="type" list="follow-types" placeholder="circle / interest / info / alerts" />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button class="cta" type="submit">Follow</button>
+        </div>
+      </form>
+      <form class="stack" method="post" action="/social/unfollow" data-enhance="social-unfollow">
+        <div class="form-grid">
+          <label class="field">
+            <span>Handle to unfollow</span>
+            <input name="handle" list="follow-people" placeholder="search by handle" autocomplete="off" required />
+          </label>
+        </div>
+        <div class="cta-row">
+          <button class="ghost" type="submit">Unfollow</button>
+        </div>
+      </form>
+      <datalist id="follow-types">
+        {{followTypeDatalistOptions}}
+      </datalist>
+      <datalist id="follow-people">
+        {{followPeopleDatalist}}
+      </datalist>
+    </div>
+  </details>
 </section>

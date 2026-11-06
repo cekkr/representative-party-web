@@ -580,6 +580,7 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await setSessionCookie(page, server.baseUrl, aliceSession.sessionId);
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
 
+  await page.click('#social-follows summary');
   await page.type('form[action="/social/follow"] input[name="handle"]', bobHandle);
   await page.type('form[action="/social/follow"] input[name="type"]', 'interest');
   await page.click('form[action="/social/follow"] button[type="submit"]');
@@ -587,35 +588,16 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Bob update for follow'));
   await page.waitForFunction(() => document.body.textContent.includes('Follow: interest'));
 
-  await page.evaluate(() => {
-    const details = document.querySelector('#social-wall details.form-toggle');
-    if (details) details.open = true;
-  });
+  await page.click('#social-controls summary');
   await page.select('form[action="/social/feed"] select[name="type"]', 'alerts');
-  await page.$eval('form[action="/social/feed"]', (form) => {
-    if (form.requestSubmit) {
-      form.requestSubmit();
-    } else {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    }
-  });
+  await page.click('#social-controls button[type="submit"]');
   await page.waitForFunction(() => {
     const feed = document.querySelector('.wall-feed');
-    return feed && feed.textContent.includes('No posts visible yet');
+    return feed && feed.textContent.includes('No updates match this follow type');
   });
 
-  await page.evaluate(() => {
-    const details = document.querySelector('#social-wall details.form-toggle');
-    if (details) details.open = true;
-  });
   await page.select('form[action="/social/feed"] select[name="type"]', 'interest');
-  await page.$eval('form[action="/social/feed"]', (form) => {
-    if (form.requestSubmit) {
-      form.requestSubmit();
-    } else {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    }
-  });
+  await page.click('#social-controls button[type="submit"]');
   await page.waitForFunction(() => {
     const feed = document.querySelector('.wall-feed');
     return feed && feed.textContent.includes('Bob update for follow');
@@ -638,7 +620,7 @@ test('UI social feed supports follows, filters, and reshares', { timeout: 60000 
   await page.waitForFunction(() => document.body.textContent.includes('Reshared from'));
 });
 
-test('UI auto-collapses the sticky social composer on scroll', { timeout: 60000 }, async (t) => {
+test('UI auto-collapses an empty social composer and keeps a draft open', { timeout: 60000 }, async (t) => {
   const port = await getAvailablePort();
   const server = await startServer({ port, dataAdapter: 'memory' });
   t.after(async () => server.stop());
@@ -659,24 +641,26 @@ test('UI auto-collapses the sticky social composer on scroll', { timeout: 60000 
   t.after(async () => browser.close());
 
   const page = await browser.newPage();
+  await page.setViewport({ width: 1440, height: 800 });
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, session.sessionId);
   await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => {
-    const panel = document.querySelector('#social-compose');
-    return panel && panel.dataset.composeState === 'open';
-  });
+  await page.waitForSelector('#social-compose details[open]');
 
   await page.evaluate(() => {
     window.scrollTo({ top: 1400, behavior: 'auto' });
     window.dispatchEvent(new Event('scroll'));
   });
 
-  await page.waitForFunction(() => {
-    const panel = document.querySelector('#social-compose');
-    const toggle = panel?.querySelector('[data-compose-toggle]');
-    return panel && toggle && panel.dataset.composeState === 'collapsed' && /expand/i.test(toggle.textContent || '');
-  });
+  await page.waitForSelector('#social-compose details:not([open])');
+  await page.reload({ waitUntil: 'networkidle0' });
+  const field = '#social-compose textarea[name="content"]';
+  await page.type(field, 'A short draft');
+  await page.$eval(field, (input) => input.blur());
+  await page.evaluate(() => window.scrollBy(0, 1400));
+  await page.waitForFunction(() => document.getElementById('social-compose').getBoundingClientRect().bottom < 0);
+  assert.equal(await page.$eval(field, (input) => input.value), 'A short draft');
+  assert.ok(await page.$('#social-compose details[open]'));
 });
 
 test('UI interface settings and nav filter improve practical navigation', { timeout: 60000 }, async (t) => {
@@ -697,10 +681,7 @@ test('UI interface settings and nav filter improve practical navigation', { time
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, session.sessionId);
   await page.goto(`${server.baseUrl}/social/feed?compose=post`, { waitUntil: 'networkidle0' });
-  await page.waitForFunction(() => {
-    const panel = document.querySelector('#social-compose');
-    return panel && panel.dataset.composeState === 'open';
-  });
+  await page.waitForSelector('#social-compose details[open]');
 
   await page.click('[data-ui-settings-toggle]');
   await page.waitForSelector('[data-ui-settings-panel]:not([hidden])');
@@ -727,8 +708,7 @@ test('UI interface settings and nav filter improve practical navigation', { time
     window.dispatchEvent(new Event('scroll'));
   });
   await new Promise((resolve) => setTimeout(resolve, 300));
-  const composeState = await page.$eval('#social-compose', (el) => el.dataset.composeState);
-  assert.equal(composeState, 'open');
+  assert.ok(await page.$('#social-compose details[open]'));
 
   await page.keyboard.down('Control');
   await page.keyboard.press('KeyK');
@@ -1055,11 +1035,13 @@ test('UI social feed supports media uploads with locked view and report blocking
   const server = await startServer({
     port,
     dataAdapter: 'memory',
-    extraEnv: { SOCIAL_MEDIA_REPORT_THRESHOLD: '1' },
+    extraEnv: { SOCIAL_MEDIA_REPORT_THRESHOLD: '1', SOCIAL_MEDIA_UPLOADS_ROOT: path.join(tempDir, 'uploads') },
   });
   t.after(async () => server.stop());
 
   const authorSession = await createVerifiedSession(server.baseUrl, { pidHash: 'media-ui-author' });
+  const recipient = await createVerifiedSession(server.baseUrl, { pidHash: 'anna-conti' });
+  const outsider = await createVerifiedSession(server.baseUrl, { pidHash: 'luca-esposito' });
 
   const browser = await puppeteer.launch({
     headless: 'new',
@@ -1068,16 +1050,24 @@ test('UI social feed supports media uploads with locked view and report blocking
   t.after(async () => browser.close());
 
   const page = await browser.newPage();
+  await page.setViewport({ width: 390, height: 600 });
   await configurePage(page, server.baseUrl);
   await setSessionCookie(page, server.baseUrl, authorSession.sessionId);
+  await page.setJavaScriptEnabled(false);
   await page.goto(`${server.baseUrl}/social/feed`, { waitUntil: 'networkidle0' });
 
-  await page.type('form[action="/social/post"] textarea[name="content"]', 'Media post with locked view');
+  await page.focus('main [data-social-compose-link]');
+  await Promise.all([page.waitForNavigation(), page.keyboard.press('Enter')]);
+  await page.select('#social-compose select[name="visibility"]', 'direct');
+  await page.type('#social-compose input[name="targetHandle"]', deriveHandle(recipient.pidHash));
   const fileInput = await page.$('form[action="/social/post"] input[name="media"]');
   assert.ok(fileInput);
   await fileInput.uploadFile(mediaPath);
-  await page.click('form[action="/social/post"] button[type="submit"]');
+  await Promise.all([page.waitForNavigation(), page.click('#social-compose button[type="submit"]')]);
   await page.waitForSelector('.media-card.locked');
+  assert.equal(new URL(page.url()).pathname, '/social/feed');
+  assert.match(await page.$eval('.social-post', (post) => post.textContent), /Direct to @user-anna/);
+  const parentId = await page.$eval('input[name="replyTo"]', (input) => input.value);
 
   const requestHref = await page.$eval(
     'a[href^="/social/media/"][href*="view=1"]',
@@ -1086,6 +1076,20 @@ test('UI social feed supports media uploads with locked view and report blocking
   assert.ok(requestHref);
   const mediaId = requestHref.split('/').pop().split('?')[0];
   assert.ok(mediaId);
+
+  const forbiddenView = await fetch(`${server.baseUrl}${requestHref}`, { headers: { Cookie: outsider.cookie } });
+  assert.equal(forbiddenView.status, 404);
+  const forbiddenReport = await postForm(`${server.baseUrl}/social/media/report`, { mediaId }, outsider);
+  assert.equal(forbiddenReport.status, 404);
+  const reply = { replyTo: parentId, visibility: 'public', content: 'Can we use this at the banchetto?' };
+  const forbiddenReply = await postForm(`${server.baseUrl}/social/reply`, reply, outsider);
+  assert.equal(forbiddenReply.status, 404);
+  assert.equal((await postForm(`${server.baseUrl}/social/reply`, reply, recipient)).status, 200);
+  const outsiderFeed = await fetchText(`${server.baseUrl}/social/feed`);
+  assert.doesNotMatch(outsiderFeed.text, /Can we use this at the banchetto/);
+  const authorFeed = await fetchText(`${server.baseUrl}/social/feed`, { headers: { Cookie: authorSession.cookie } });
+  assert.match(authorFeed.text, /Can we use this at the banchetto/);
+  assert.match(authorFeed.text, /Direct to you/);
 
   const lockedStatus = await page.evaluate(async (id) => {
     const response = await fetch(`/social/media/${id}`);
@@ -1100,13 +1104,10 @@ test('UI social feed supports media uploads with locked view and report blocking
   assert.equal(viewResult.status, 200);
   assert.ok(viewResult.type.includes('image/'));
 
-  await page.$eval('form[data-enhance="social-media-report"]', (form) => {
-    if (form.requestSubmit) {
-      form.requestSubmit();
-    } else {
-      form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    }
-  });
+  await Promise.all([
+    page.waitForNavigation(),
+    page.click('form[data-enhance="social-media-report"] button'),
+  ]);
   await page.waitForSelector('.media-card.blocked');
   assert.equal(await page.$('form[data-enhance="social-reshare"]'), null);
 
@@ -1593,6 +1594,7 @@ test('compose forms stay reachable at a short viewport', { timeout: 60000 }, asy
     { url: '/discussion?compose=post', form: '#discussion-compose form' },
     { url: '/forum?compose=thread', form: 'form[action="/forum"]' },
     { url: '/petitions?compose=proposal', form: '#petitions-compose form' },
+    { url: '/social/feed?compose=post', form: '#social-compose form' },
   ];
 
   for (const { url, form } of surfaces) {
@@ -1601,6 +1603,7 @@ test('compose forms stay reachable at a short viewport', { timeout: 60000 }, asy
     await configurePage(page, server.baseUrl);
     await setSessionCookie(page, server.baseUrl, session.sessionId);
     await page.goto(`${server.baseUrl}${url}`, { waitUntil: 'networkidle0' });
+    page.on('dialog', (dialog) => dialog.accept());
 
     const button = await page.$(`${form} button[type="submit"]`);
     assert.ok(button, `expected a submit button on ${url}`);
@@ -1666,6 +1669,51 @@ test('organization case details stay ahead of the queue and fit a phone viewport
   }));
   assert.ok(layout.scrollWidth <= layout.width, 'the case and queue fit the viewport');
   assert.ok(layout.caseTop < layout.queueTop, 'the case precedes its queue');
+});
+
+test('Discussion search opens evidence and returns to the same filters with or without JavaScript', { timeout: 60000 }, async (t) => {
+  const { baseUrl, stop } = await startServer({ port: await getAvailablePort(), extraEnv: { ENFORCE_CIRCLE: 'true' } });
+  t.after(stop);
+  const session = await createVerifiedSession(baseUrl, { pidHash: 'giulia-ferrero' });
+  const evidence = 'https://example.rcn.it/waiting-lists/survey-method';
+  assert.equal((await postForm(`${baseUrl}/discussion`, {
+    topic: 'Healthcare / Waiting lists',
+    content: 'The cardiology waiting time is a median from 14 health authorities.',
+    evidenceLinks: evidence,
+  }, session)).status, 200);
+  assert.equal((await postForm(`${baseUrl}/discussion`, {
+    topic: 'Labour / Minimum wage',
+    content: 'The CNEL figures show why collective-agreement coverage matters.',
+  }, session)).status, 200);
+
+  const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  t.after(() => browser.close());
+  const page = await browser.newPage();
+  await page.setViewport({ width: 320, height: 700 });
+  const filters = '#discussion-filters';
+  const result = '#discussion-feed .contribution-link';
+  const query = 'survey-method';
+  for (const enhanced of [true, false]) {
+    await page.setJavaScriptEnabled(enhanced);
+    await page.goto(`${baseUrl}/discussion`);
+    await page.focus(`${filters} summary`);
+    await page.keyboard.press('Enter');
+    await page.type(`${filters} input[type="search"]`, query);
+    await page.select(`${filters} select[name="topic"]`, 'Healthcare');
+    await page.click(`${filters} button[type="submit"]`);
+    await page.waitForFunction((q) => new URL(location.href).searchParams.get('q') === q, {}, query);
+    assert.equal((await page.$$(result)).length, 1);
+    await page.focus(result);
+    await page.keyboard.press('Enter');
+    await page.waitForSelector(`main .topic-card a[href="${evidence}"]`);
+    assert.equal(await page.$eval('main h1', (heading) => heading.textContent), 'Healthcare / Waiting lists');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 320);
+    if (enhanced) assert.equal(await page.evaluate(() => document.activeElement.tagName), 'H1');
+    await page.goBack();
+    await page.waitForSelector(result);
+    assert.equal(await page.$eval(`${filters} input[type="search"]`, (input) => input.value), query);
+    assert.equal(await page.$eval(`${filters} select[name="topic"]`, (select) => select.value), 'Healthcare');
+  }
 });
 
 test('Forum preserves the search and article through enhanced and native reply forms', { timeout: 60000 }, async (t) => {

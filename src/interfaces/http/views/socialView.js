@@ -1,32 +1,32 @@
 import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderActorAvatar, renderActorLabel } from './actorLabel.js';
+import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
 import { renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
 
-export function renderSocialPosts(
-  posts,
-  { enableReplies = false, followTypeByHash, mediaById, openReplyId, openReshareId, state } = {},
-) {
+export function renderSocialPosts(posts, options = {}) {
   if (!posts || posts.length === 0) {
-    return renderSocialOnboarding();
+    return renderSocialOnboarding(options);
   }
 
-  return posts
+  const { enableActions, viewerHash, followTypeByHash, mediaById, openReplyId, openReshareId, state } = options;
+  const pagePosts = new Map(posts.map((post) => [post.id, post]));
+  const rows = posts
     .map((post) => {
       const followType = followTypeByHash?.get?.(post.authorHash);
       const followTypePill = followType ? `<span class="pill ghost">Follow: ${escapeHtml(followType)}</span>` : '';
-      const visibilityPill =
-        post.visibility === 'direct'
-          ? '<span class="pill warning">Direct</span>'
-          : '<span class="pill ghost">Public</span>';
+      const direct = post.visibility === 'direct';
+      const recipient = direct && post.targetHash ? renderActorLabel(state, post.targetHash, { showHash: false }) : 'recipient';
+      const visibilityPill = direct
+        ? `<span class="pill warning">${post.targetHash === viewerHash ? 'Direct to you' : `Direct to ${recipient}`}</span>`
+        : '<span class="pill ghost">Public</span>';
       const replyPill = post.replyTo ? `<span class="pill ghost">Reply</span>` : '';
       const resharePill = post.reshareOf ? `<span class="pill ghost">Reshare</span>` : '';
       const previewPill = renderPreviewPill(post);
       const inboundPill = post.activityPub?.inbound ? '<span class="pill ghost">ActivityPub</span>' : '';
       const createdAt = formatTimestamp(post.createdAt);
       const contentBlock = post.content ? `<p>${escapeHtml(post.content)}</p>` : '';
-      const reshareBlock = renderReshare(post, mediaById);
-      const mediaBlock = renderMediaAttachments(post.mediaIds || [], mediaById);
+      const reshareBlock = renderReshare(post, options);
+      const mediaBlock = renderMediaAttachments(post.mediaIds || [], options);
       const mediaHasBlocked =
         hasBlockedMediaIds(post.mediaIds || [], mediaById) || hasBlockedMediaIds(post.reshare?.mediaIds || [], mediaById);
       const tagsLine = renderTags(post.tags || []);
@@ -34,14 +34,16 @@ export function renderSocialPosts(
       const authorLabel = post.authorHash
         ? renderActorLabel(state, post.authorHash)
         : `<span class="actor">@${escapeHtml(post.authorHandle || 'anonymous')}</span>`;
+      const parent = pagePosts.get(post.replyTo);
+      const parentHandle = parent && resolveHandleForHash(state, parent.authorHash);
       return `
-        <article class="discussion social-post">
+        <li><article class="topic-card social-post" id="social-post-${escapeHtml(post.id)}" tabindex="-1">
           <div class="topic-head">
             ${renderActorAvatar(state, post.authorHash || post.authorHandle || 'anonymous', { size: 'sm' })}
             <div class="topic-info">
               <div class="topic-byline">
                 <span class="topic-author">${authorLabel}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
+                ${createdAt ? `<time class="topic-time muted small" datetime="${escapeHtml(String(post.createdAt))}">${createdAt}</time>` : ''}
               </div>
               <div class="topic-meta">
                 ${visibilityPill}
@@ -50,48 +52,48 @@ export function renderSocialPosts(
                 ${previewPill}
                 ${inboundPill}
                 ${followTypePill}
-                ${renderIssuerPill(post)}
+                ${renderIssuerPill(post, { localIssuer: state?.issuer })}
               </div>
             </div>
           </div>
-          ${contentBlock}
-          ${mediaBlock}
-          ${reshareBlock}
-          ${
-            post.visibility === 'direct' && post.targetHandle
-              ? `<p class="muted small">To: ${escapeHtml(post.targetHandle)}</p>`
-              : ''
-          }
-          ${post.replyTo ? `<p class="muted small">Replying to ${escapeHtml(post.replyTo)}</p>` : ''}
-          ${mentionsLine}
-          ${tagsLine}
-          ${enableReplies ? renderReplyForm(post, { open: openReplyId === post.id }) : ''}
-          ${enableReplies && !mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
-        </article>
+          <div class="topic-body">
+            ${parentHandle ? `<p class="muted small">Reply to <a href="#social-post-${escapeHtml(encodeURIComponent(parent.id))}">@${escapeHtml(parentHandle)}</a></p>` : ''}
+            ${contentBlock}
+            ${mediaBlock}
+            ${reshareBlock}
+            ${mentionsLine}
+            ${tagsLine}
+            ${enableActions ? `<div class="social-post__actions">
+              ${renderReplyForm(post, { open: openReplyId === post.id, state, viewerHash })}
+              ${!mediaHasBlocked ? renderReshareForm(post, { open: openReshareId === post.id }) : ''}
+            </div>` : ''}
+          </div>
+        </article></li>
       `;
     })
     .join('\n');
+  return `<ul class="wall-feed">${rows}</ul>`;
 }
 
-function renderSocialOnboarding() {
+function renderSocialOnboarding({ followTypeFilter, createHref, canManageFollows }) {
+  if (followTypeFilter) {
+    return `<div class="wall-feed onboarding-card">
+      <h3>No updates match this follow type</h3>
+      <p><a href="/social/feed" data-partial>Show all updates</a></p>
+    </div>`;
+  }
   return `
-    <div class="onboarding-card">
-      <p class="eyebrow">Social feed</p>
-      <h3>No posts visible yet</h3>
-      <ul class="plain small">
-        <li>Follow handles to populate this feed.</li>
-        <li>Publish short updates for quick coordination.</li>
-        <li>Use direct visibility for private exchanges.</li>
-      </ul>
+    <div class="wall-feed onboarding-card">
+      <h3>No updates yet</h3>
       <div class="onboarding-actions">
-        <a class="cta" href="#social-compose">Share an update</a>
-        <a class="ghost" href="#social-follows">Follow a handle</a>
+        ${createHref ? `<a class="ghost" href="${escapeHtml(createHref)}" data-social-compose-link data-partial>Share an update</a>` : ''}
+        ${canManageFollows ? '<a class="ghost" href="#social-follows" data-social-follows-link>Follow a handle</a>' : ''}
       </div>
     </div>
   `;
 }
 
-export function renderFollowList(follows) {
+export function renderFollowList(follows, state) {
   if (!follows || follows.length === 0) {
     return renderEmptyState('You are not following anyone yet. Add a handle to tailor your wall.');
   }
@@ -101,9 +103,9 @@ export function renderFollowList(follows) {
       const createdAt = formatTimestamp(edge.createdAt);
       return `
         <div class="list-row">
-          <div>
-            <p class="small">${escapeHtml(edge.targetHandle || edge.targetHash)}</p>
-            <p class="muted tiny">${escapeHtml(edge.targetHash)}</p>
+          <div class="topic-byline">
+            ${renderActorAvatar(state, edge.targetHash, { size: 'sm' })}
+            ${renderActorLabel(state, edge.targetHash)}
           </div>
           <div>
             <span class="pill ghost">${escapeHtml(edge.type)}</span>
@@ -115,8 +117,9 @@ export function renderFollowList(follows) {
     .join('\n');
 }
 
-function renderReplyForm(post, { open = false } = {}) {
-  const targetValue = post.authorHandle ? escapeHtml(post.authorHandle) : '';
+function renderReplyForm(post, { open = false, state, viewerHash }) {
+  const direct = post.visibility === 'direct';
+  const recipient = direct && (post.authorHash === viewerHash ? post.targetHash : post.authorHash);
   const openAttr = open ? 'open' : '';
   return `
     <details class="form-toggle form-toggle--inline" ${openAttr}>
@@ -124,34 +127,36 @@ function renderReplyForm(post, { open = false } = {}) {
       <form class="stack" method="post" action="/social/reply" data-enhance="social-reply">
         <input type="hidden" name="replyTo" value="${escapeHtml(post.id)}" />
         <label class="field">
-          <span class="muted small">Reply</span>
-          <textarea name="content" rows="2" placeholder="Reply to ${escapeHtml(post.authorHandle || 'author')}" required></textarea>
+          <span>Reply</span>
+          <textarea name="content" rows="2" maxlength="560" required></textarea>
         </label>
+        ${direct ? `<p class="muted small">Direct to ${renderActorLabel(state, recipient, { showHash: false })}</p>` : `
         <div class="form-grid">
           <label class="field">
-            <span>Visibility</span>
+            <span>Audience</span>
             <select name="visibility">
-              <option value="public" selected>Public</option>
+              <option value="public">Public</option>
               <option value="direct">Direct</option>
             </select>
           </label>
           <label class="field">
-            <span>Direct to (handle, optional)</span>
-            <input name="targetHandle" value="${targetValue}" placeholder="@handle" />
+            <span>Recipient handle for direct replies</span>
+            <input name="targetHandle" placeholder="@handle" maxlength="64" />
           </label>
-        </div>
+        </div>`}
         <button class="ghost" type="submit">Send reply</button>
       </form>
     </details>
   `;
 }
 
-function renderReshare(post, mediaById) {
+function renderReshare(post, options) {
   if (!post.reshare) return '';
-  const author = escapeHtml(post.reshare.authorHandle ? `@${post.reshare.authorHandle}` : post.reshare.authorHash || 'unknown');
+  const author = post.reshare.authorHash ? renderActorLabel(options.state, post.reshare.authorHash)
+    : escapeHtml(post.reshare.authorHandle ? `@${post.reshare.authorHandle}` : 'unknown');
   const content = escapeHtml(post.reshare.content || '');
   const created = formatTimestamp(post.reshare.createdAt);
-  const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], mediaById);
+  const mediaBlock = renderMediaAttachments(post.reshare.mediaIds || [], options);
   return `
     <div class="callout">
       <p class="muted small">Reshared from ${author}${created ? ` · ${created}` : ''}</p>
@@ -190,7 +195,7 @@ function renderReshareForm(post, { open = false } = {}) {
   `;
 }
 
-function renderMediaAttachments(mediaIds = [], mediaById) {
+function renderMediaAttachments(mediaIds, { mediaById, enableActions, viewerHash }) {
   if (!mediaIds.length) return '';
   const cards = mediaIds
     .map((mediaId) => {
@@ -217,10 +222,10 @@ function renderMediaAttachments(mediaIds = [], mediaById) {
           <div class="media-card locked">
             <p class="muted small">Locked media · ${label}${name}</p>
             <p class="muted tiny">Viewing requires an explicit request.</p>
-            <div class="cta-row">
-              <a class="ghost" href="/social/media/${escapeHtml(media.id)}?view=1" target="_blank" rel="noreferrer">Request view</a>
-              ${renderMediaReportForm(media)}
-            </div>
+            ${enableActions ? `<div class="cta-row">
+              <a class="ghost" href="/social/media/${escapeHtml(media.id)}?view=1" target="_blank" rel="noreferrer">Request view<span class="sr-only"> (opens a new tab)</span></a>
+              ${viewerHash ? renderMediaReportForm(media) : ''}
+            </div>` : ''}
           </div>
         `;
       }
@@ -232,10 +237,8 @@ function renderMediaAttachments(mediaIds = [], mediaById) {
       return `
         <div class="media-card">
           <p class="muted small">${label}${name}</p>
-          ${mediaTag}
-          <div class="cta-row">
-            ${renderMediaReportForm(media)}
-          </div>
+          ${enableActions ? mediaTag : '<p class="muted small">Viewing is unavailable for this session.</p>'}
+          ${enableActions && viewerHash ? renderMediaReportForm(media) : ''}
         </div>
       `;
     })

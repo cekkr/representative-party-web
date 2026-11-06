@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { stat, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { getPerson } from '../../identity/person.js';
@@ -16,7 +16,7 @@ import {
   removeFollowEdge,
   summarizeFollows,
 } from '../../social/followGraph.js';
-import { buildFeed, createPost, findPost, invalidatePostIndex } from '../../social/posts.js';
+import { buildFeed, canReadSocialPost, createPost, findPost, invalidatePostIndex } from '../../social/posts.js';
 import {
   createMedia,
   findMedia,
@@ -30,25 +30,22 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readMultipartForm, readRequestBody, deriveBaseUrl } from '../../../shared/utils/request.js';
 import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
-import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { renderFollowList, renderSocialPosts } from '../../../interfaces/http/views/socialView.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
-import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from '../../../interfaces/http/views/actorLabel.js';
+import { findSessionByHash } from '../../identity/sessions.js';
 import { recordRateLimit } from '../../ops/metrics.js';
-import { renderCalloutRow } from '../../../interfaces/http/views/shared.js';
 
 export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   if (!isModuleEnabled(state, 'social')) {
     return renderModuleDisabled({ req, res, state, wantsPartial, moduleKey: 'social' });
   }
   const person = getPerson(req, state);
-  const followTypeFilter = url.searchParams.get('type') || '';
-  const composeState = url.searchParams.get('compose') ? 'open' : '';
-  const composeToggleLabel = composeState === 'open' ? 'Collapse' : 'Expand';
-  const composeToggleExpanded = composeState === 'open' ? 'true' : 'false';
+  const requestedType = url.searchParams.get('type');
+  const followTypeFilter = person && requestedType ? normalizeFollowType(requestedType) : '';
   const openReplyId = url.searchParams.get('reply') || '';
   const openReshareId = url.searchParams.get('reshare') || '';
   const followStats = summarizeFollows(state, person?.pidHash);
@@ -63,42 +60,43 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   const followTypeByHash = followStats.followTypeByHash;
   const followTypeCounts = followStats.followTypeCounts;
   const followTypeList = buildFollowTypeList(followTypeCounts);
+  const filterTypes = followTypeFilter && !followTypeList.includes(followTypeFilter)
+    ? [...followTypeList, followTypeFilter]
+    : followTypeList;
   const mediaById = buildMediaLookup(feedPage.items, state);
   const permission = evaluateAction(state, person, 'post');
-  const postingReason = permission.allowed ? '' : permission.message || permission.reason || '';
-  const postingReasonLine = renderCalloutRow(postingReason);
+  const composeParams = new URLSearchParams();
+  if (followTypeFilter) composeParams.set('type', followTypeFilter);
+  if (feedPage.page > 1) composeParams.set('page', feedPage.page);
+  composeParams.set('compose', 'post');
+  const workspaceCreateHref = permission.allowed ? `/social/feed?${composeParams}#social-compose` : '';
+  const canManageFollows = Boolean(person && permission.allowed);
 
   const html = await renderPage(
     'social',
     {
       person,
-      personHandle: resolvePersonHandle(person),
-      roleLabel: person?.role || 'guest',
-      workspaceCreateHref: permission.allowed ? '/social/feed?compose=post#social-compose' : '',
-      postingStatus: permission.allowed ? 'Posting allowed.' : 'Posting blocked.',
-      postingReasonLine,
-      socialContext: renderContextPanel({
-        gates: [
-          {
-            label: 'Posting',
-            status: permission.allowed ? 'Allowed' : 'Blocked',
-            allowed: permission.allowed,
-            reason: postingReason,
-          },
-        ],
-        facts: [
-          { term: 'Handle', value: resolvePersonHandle(person) || 'Not signed in' },
-          { term: 'Role', value: person?.role || 'guest' },
-          { term: 'Following', value: allFollows.length },
-          { term: 'Followers', value: followStats.followerCount },
-        ],
-        guidance: ['This lane stays conversational; proposals and votes remain the formal decision track.'],
-      }),
-      followCount: allFollows.length,
-      followerCount: followStats.followerCount,
-      followList: renderFollowList(allFollows),
+      workspaceCreateHref,
+      socialScope: person ? 'Updates from your network and direct messages.' : 'Public updates.',
+      socialPrimaryAction: workspaceCreateHref
+        ? `<a class="cta" href="${escapeHtml(workspaceCreateHref)}" data-social-compose-link data-partial>New update</a>`
+        : permission.reason === 'verification_required'
+          ? '<a class="cta" href="/auth/eudi" data-partial>Verify to post</a>' : '',
+      socialPostingNotice: permission.allowed ? '' : escapeHtml(permission.message || 'Posting is unavailable.'),
+      socialComposerHidden: permission.allowed ? '' : 'hidden',
+      socialComposerActor: permission.allowed && person?.pidHash
+        ? `${renderActorAvatar(state, person.pidHash, { size: 'sm' })} ${renderActorLabel(state, person.pidHash)}`
+        : 'Posting as a guest',
+      socialFollowsHidden: person ? '' : 'hidden',
+      socialFollowFormHidden: canManageFollows ? '' : 'hidden',
+      socialFollowSummary: `${allFollows.length} following · ${followStats.followerCount} followers`,
+      followList: renderFollowList(allFollows, state),
       feedList: renderSocialPosts(feedPage.items, {
-        enableReplies: Boolean(person),
+        enableActions: permission.allowed,
+        viewerHash: person?.pidHash,
+        createHref: workspaceCreateHref,
+        canManageFollows,
+        followTypeFilter,
         followTypeByHash,
         mediaById,
         openReplyId,
@@ -106,15 +104,15 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
         state,
       }),
       feedPager,
-      followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: followTypeList }),
+      followTypeOptions: renderFollowTypeOptions(followTypeFilter, followTypeCounts, { types: filterTypes }),
       followTypeDatalistOptions: renderFollowTypeOptions('', followTypeCounts, { includeCounts: false, types: followTypeList }),
-      followPeopleDatalist: renderFollowPeopleOptions(state, person),
-      followTypeFilter,
+      followPeopleDatalist: canManageFollows ? renderFollowPeopleOptions(state, person) : '',
+      socialFilterSummary: followTypeFilter ? ` · ${escapeHtml(followTypeFilter)}` : '',
+      socialFilterOpen: followTypeFilter ? 'open' : '',
+      socialClearFilter: followTypeFilter ? '<a href="/social/feed" data-partial>Clear filter</a>' : '',
       followTypeSelectedAll: followTypeFilter ? '' : 'selected',
       followTypeAllLabel: buildFollowTypeAllLabel(allFollows.length),
-      composeState,
-      composeToggleLabel,
-      composeToggleExpanded,
+      composeState: url.searchParams.has('compose') ? 'open' : '',
     },
     { wantsPartial, title: 'Social feed', state },
   );
@@ -122,7 +120,7 @@ export async function renderSocialFeed({ req, res, state, wantsPartial, url }) {
   return sendHtml(res, html);
 }
 
-export async function postSocialMessage({ req, res, state, wantsPartial, url }) {
+export async function postSocialMessage({ req, res, state }) {
   if (!isModuleEnabled(state, 'social')) {
     return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
@@ -210,12 +208,22 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
   } else {
     body = await readRequestBody(req);
   }
+
+  try {
+    return await publishSocialPost({ req, res, state, person, body, files });
+  } finally {
+    // The multipart reader hands ownership of its temporary files to this handler.
+    await Promise.allSettled(files.filter((file) => file.tempPath).map((file) => unlink(file.tempPath)));
+  }
+}
+
+async function publishSocialPost({ req, res, state, person, body, files }) {
   const content = body.content || '';
   const replyTo = body.replyTo || null;
   const reshareOf = sanitizeText(body.reshareOf || '', 120) || null;
   const isReshare = Boolean(reshareOf);
   const mediaFiles = files.filter((file) => file.fieldName === 'media');
-  const visibility = isReshare ? 'public' : body.visibility === 'direct' ? 'direct' : 'public';
+  let visibility = isReshare ? 'public' : body.visibility === 'direct' ? 'direct' : 'public';
   const targetHandleInput = sanitizeText(body.targetHandle || '', 64);
   let targetHash = '';
   let targetHandle = '';
@@ -234,7 +242,7 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
 
   if (isReshare) {
     resharePost = findPost(state, reshareOf);
-    if (!resharePost) {
+    if (!canReadSocialPost(state, person, resharePost)) {
       return sendJson(res, 404, { error: 'missing_reshare', message: 'Cannot reshare: original post not found.' });
     }
     if (resharePost.visibility === 'direct') {
@@ -245,20 +253,24 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
     }
   }
 
-  if (!isReshare && (visibility === 'direct' || targetHandleInput)) {
+  const parent = replyTo ? findPost(state, replyTo) : null;
+  if (replyTo && !canReadSocialPost(state, person, parent)) {
+    return sendJson(res, 404, { error: 'missing_parent', message: 'Cannot reply: parent post not found.' });
+  }
+  if (parent?.visibility === 'direct') {
+    visibility = 'direct';
+    targetHash = parent.authorHash === person?.pidHash ? parent.targetHash : parent.authorHash;
+    targetSession = findSessionByHash(state, targetHash);
+    targetHandle = targetHash ? resolveHandleForHash(state, targetHash) : '';
+  } else if (visibility === 'direct') {
     targetSession = findSessionByHandle(state, targetHandleInput || '');
     if (!targetSession) {
       return sendJson(res, 404, { error: 'target_not_found', message: 'Target handle not found for direct post.' });
     }
     targetHash = targetSession.pidHash;
     targetHandle = targetSession.handle || targetHandleInput || '';
-  }
-
-  if (replyTo) {
-    const parent = findPost(state, replyTo);
-    if (!parent) {
-      return sendJson(res, 404, { error: 'missing_parent', message: 'Cannot reply: parent post not found.' });
-    }
+  } else if (!isReshare && targetHandleInput) {
+    return sendJson(res, 400, { error: 'audience_mismatch', message: 'Choose Direct to send to a recipient handle.' });
   }
 
   try {
@@ -346,10 +358,6 @@ export async function postSocialMessage({ req, res, state, wantsPartial, url }) 
     throw error;
   }
 
-  if (wantsPartial) {
-    return renderSocialFeed({ req, res, state, wantsPartial, url });
-  }
-
   return sendRedirect(res, '/social/feed');
 }
 
@@ -359,14 +367,14 @@ export async function serveSocialMedia({ req, res, state, params }) {
   }
   const mediaId = params?.mediaId || '';
   const media = findMedia(state, mediaId);
-  if (!media) {
+  const person = getPerson(req, state);
+  if (!media || !canReadSocialPost(state, person, findPost(state, media.postId))) {
     return sendJson(res, 404, { error: 'media_not_found', message: 'Media not found.' });
   }
   if (media.status === 'blocked') {
     return sendJson(res, 451, { error: 'media_blocked', message: 'Media blocked by provider policy.' });
   }
 
-  const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
     return sendJson(res, 403, { error: permission.reason, message: permission.message || 'Viewing blocked.' });
@@ -444,7 +452,7 @@ export async function serveSocialMedia({ req, res, state, params }) {
   return createReadStream(filePath).pipe(res);
 }
 
-export async function reportSocialMedia({ req, res, state, wantsPartial, url }) {
+export async function reportSocialMedia({ req, res, state }) {
   if (!isModuleEnabled(state, 'social')) {
     return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
@@ -474,7 +482,7 @@ export async function reportSocialMedia({ req, res, state, wantsPartial, url }) 
   const body = await readRequestBody(req);
   const mediaId = sanitizeText(body.mediaId || '', 120);
   const media = findMedia(state, mediaId);
-  if (!media) {
+  if (!media || !canReadSocialPost(state, person, findPost(state, media.postId))) {
     return sendJson(res, 404, { error: 'media_not_found', message: 'Media not found.' });
   }
 
@@ -503,14 +511,10 @@ export async function reportSocialMedia({ req, res, state, wantsPartial, url }) 
     });
   }
 
-  if (wantsPartial) {
-    return renderSocialFeed({ req, res, state, wantsPartial, url });
-  }
-
   return sendRedirect(res, '/social/feed');
 }
 
-export async function followHandle({ req, res, state, wantsPartial, url }) {
+export async function followHandle({ req, res, state }) {
   if (!isModuleEnabled(state, 'social')) {
     return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
@@ -547,14 +551,10 @@ export async function followHandle({ req, res, state, wantsPartial, url }) {
     payload: { targetHash: targetSession.pidHash, type: followType },
   });
 
-  if (wantsPartial) {
-    return renderSocialFeed({ req, res, state, wantsPartial, url });
-  }
-
   return sendRedirect(res, '/social/feed');
 }
 
-export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
+export async function unfollowHandle({ req, res, state }) {
   if (!isModuleEnabled(state, 'social')) {
     return sendModuleDisabledJson({ res, moduleKey: 'social', state });
   }
@@ -584,10 +584,6 @@ export async function unfollowHandle({ req, res, state, wantsPartial, url }) {
     actorHash: person.pidHash,
     payload: { targetHash: targetSession.pidHash },
   });
-
-  if (wantsPartial) {
-    return renderSocialFeed({ req, res, state, wantsPartial, url });
-  }
 
   return sendRedirect(res, '/social/feed');
 }

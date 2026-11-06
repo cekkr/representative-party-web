@@ -1,10 +1,5 @@
-<section class="panel" id="social-wall" data-composer-section="social-wall" data-section-label="Feed">
-  <p class="eyebrow">Social feed</p>
-  <h2>Network feed</h2>
-  <p class="is-verbose">Updates from followed {{actorLabelPlural}}, ordered for quick coordination and conversational context.</p>
-  {{socialContext}}
-  <div class="wall-feed">
-    {{feedList}}
-  </div>
+<section class="panel" id="social-wall" aria-labelledby="social-wall-title" data-composer-section="social-wall" data-section-label="Feed">
+  <h2 id="social-wall-title">Latest updates</h2>
+  {{feedList}}
   {{feedPager}}
 </section>

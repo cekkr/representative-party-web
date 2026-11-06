@@ -8,21 +8,23 @@ import { ensureTopicPath } from '../../topics/registry.js';
 import { logTransaction } from '../../transactions/registry.js';
 import { createNotification } from '../../messaging/notifications.js';
 import { persistDiscussions, persistProfileAttributes } from '../../../infra/persistence/storage.js';
-import { filterVisibleEntries, stampLocalEntry } from '../../federation/replication.js';
+import { filterVisibleEntries, findVisibleEntry, stampLocalEntry } from '../../federation/replication.js';
 import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared/utils/http.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { consumeRateLimit, resolveRateLimitActor } from '../../identity/rateLimit.js';
 import { recordRateLimit } from '../../ops/metrics.js';
-import { renderDiscussionList } from '../../../interfaces/http/views/discussionView.js';
+import { renderDiscussionList, renderDiscussionPost } from '../../../interfaces/http/views/discussionView.js';
 import { getActorLabels, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
-import { renderPager } from '../../../interfaces/http/views/shared.js';
+import { renderPager, resolveTopicBreadcrumb } from '../../../interfaces/http/views/shared.js';
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { buildTopicOptions, renderTopicDatalist, renderTopicFilterOptions } from '../../../interfaces/http/views/topicHelpers.js';
 import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { isModuleEnabled } from '../../circle/modules.js';
 import { isCaseSource } from '../../organization/cases.js';
+import { canonicalizeTopicKey } from '../../topics/topicMatch.js';
+import { discussionHref, isDiscussionPost } from '../discussionLinks.js';
 import {
   canPostToGroupLane,
   listPostableGroupLanes,
@@ -42,11 +44,15 @@ import {
 
 export async function renderDiscussion({ req, res, state, wantsPartial, url }) {
   const person = getPerson(req, state);
+  const postId = sanitizeText(url.searchParams.get('post') || '', 120);
+  if (url.searchParams.has('post')) {
+    return renderFocusedDiscussion({ res, state, person, wantsPartial, url, postId });
+  }
   const html = await renderDiscussionShell({ state, person, wantsPartial, url });
   return sendHtml(res, html);
 }
 
-export async function postDiscussion({ req, res, state, wantsPartial, url }) {
+export async function postDiscussion({ req, res, state, url }) {
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
   const intent = body.intent || 'post';
@@ -60,15 +66,12 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
     }
     storeTopicPreferences(state, person, body.topics || '');
     await persistProfileAttributes(state);
-    if (wantsPartial) {
-      const html = await renderDiscussionShell({ state, person, wantsPartial, url });
-      return sendHtml(res, html);
-    }
-    return sendRedirect(res, '/discussion');
+    const groupId = readGroupScope(url.searchParams);
+    return sendRedirect(res, discussionHref({ ...readBrowse(url), groupId }));
   }
 
   if (intent === 'promote' || intent === 'promote-request' || intent === 'promote-decide') {
-    return promoteDiscussion({ req, res, state, wantsPartial, url, body, person, intent });
+    return promoteDiscussion({ res, state, url, body, person, intent });
   }
 
   const permission = evaluateAction(state, person, 'post');
@@ -99,7 +102,7 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
       message: scope.message,
     });
   }
-  if (scope.scoped && !listPostableGroupLanes(state, person, 'discussion').some((g) => g.id === scope.groupId)) {
+  if (!canPostToGroupLane(state, person, scope.group, 'discussion')) {
     return sendJson(res, 403, {
       error: 'group_membership_required',
       message: 'Join the group to post in its internal discussion.',
@@ -142,19 +145,18 @@ export async function postDiscussion({ req, res, state, wantsPartial, url }) {
     payload: { discussionId: entry.id, topic, stance, evidenceCount: evidenceLinks.length, groupId: scope.groupId },
   });
 
-  if (wantsPartial) {
-    const html = await renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride: scope.groupId });
-    return sendHtml(res, html);
-  }
-
-  return sendRedirect(res, scope.groupId ? `/discussion?group=${encodeURIComponent(scope.groupId)}` : '/discussion');
+  return sendRedirect(res, discussionHref({ groupId: scope.groupId }));
 }
 
 // Move a group's discussion one level up: to the parent group, or to the Circle when the
 // group is already top level.
-async function promoteDiscussion({ req, res, state, wantsPartial, url, body, person, intent = 'promote' }) {
+async function promoteDiscussion({ res, state, url, body, person, intent }) {
   const discussionId = sanitizeText(body.discussionId || '', 120);
-  const entry = (state.discussions || []).find((item) => item.id === discussionId);
+  const record = findDiscussionRecord(state, person, discussionId);
+  if (!record) {
+    return sendJson(res, 404, { error: 'entry_not_found', message: 'Contribution not found.' });
+  }
+  const { entry } = record;
 
   if (intent === 'promote-request') {
     const request = applyPromotionRequest(state, person, {
@@ -182,7 +184,7 @@ async function promoteDiscussion({ req, res, state, wantsPartial, url, body, per
         message: `A member asked to move a discussion up to ${request.targetLabel}.`,
       });
     }
-    return finishDiscussionPromotion({ req, res, state, wantsPartial, url, person, groupId: entry.groupId });
+    return finishDiscussionPromotion(res, url, entry);
   }
 
   if (intent === 'promote-decide') {
@@ -219,15 +221,7 @@ async function promoteDiscussion({ req, res, state, wantsPartial, url, body, per
           : `Your request to move a discussion up was declined${result.request.reason ? `: ${result.request.reason}` : '.'}`,
       });
     }
-    return finishDiscussionPromotion({
-      req,
-      res,
-      state,
-      wantsPartial,
-      url,
-      person,
-      groupId: result.approved ? result.toGroupId : entry.groupId,
-    });
+    return finishDiscussionPromotion(res, url, entry);
   }
 
   const decision = applyPromotion(state, person, { kind: 'discussion', entry });
@@ -243,15 +237,14 @@ async function promoteDiscussion({ req, res, state, wantsPartial, url, body, per
     actorHash: person?.pidHash || 'anonymous',
     payload: { discussionId, fromGroupId: decision.fromGroupId, toGroupId: decision.toGroupId },
   });
-  return finishDiscussionPromotion({ req, res, state, wantsPartial, url, person, groupId: decision.toGroupId });
+  return finishDiscussionPromotion(res, url, entry);
 }
 
-async function finishDiscussionPromotion({ res, state, wantsPartial, url, person, groupId }) {
-  if (wantsPartial) {
-    const html = await renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride: groupId ?? null });
-    return sendHtml(res, html);
-  }
-  return sendRedirect(res, groupId ? `/discussion?group=${encodeURIComponent(groupId)}` : '/discussion');
+function finishDiscussionPromotion(res, url, entry) {
+  const groupId = entry.groupId || null;
+  const browse = readGroupScope(url.searchParams) === groupId ? readBrowse(url) : {};
+  const post = url.searchParams.get('post') === entry.id ? entry.id : '';
+  return sendRedirect(res, discussionHref({ ...browse, groupId, post }));
 }
 
 // Group admins and lane moderators — the people who may decide a request.
@@ -262,11 +255,42 @@ function listGroupDeciders(state, group) {
     .filter(Boolean);
 }
 
-async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOverride }) {
+function findDiscussionRecord(state, person, id) {
+  const entry = id && findVisibleEntry(state.discussions, state, (item) => item?.id === id && isDiscussionPost(item));
+  if (!entry) return null;
+  const scope = resolveGroupScope(state, person, entry.groupId, { lane: 'discussion' });
+  return scope.ok ? { entry, scope } : null;
+}
+
+async function renderFocusedDiscussion({ res, state, person, wantsPartial, url, postId }) {
+  const { entry, scope } = findDiscussionRecord(state, person, postId) || {};
+  const groupId = scope?.groupId ?? null;
+  const browse = readBrowse(url);
+  if (entry && readGroupScope(url.searchParams) !== groupId) {
+    return sendRedirect(res, discussionHref({ groupId, post: entry.id }));
+  }
+  const html = await renderPage('discussion-post', {
+    person,
+    pageKey: 'discussion',
+    discussionReturnHref: escapeHtml(discussionHref({ ...browse, groupId })),
+    discussionPostHeading: entry ? escapeHtml(resolveTopicBreadcrumb(entry, state)) : 'Contribution unavailable',
+    discussionScopeLabel: scope ? escapeHtml(describeScope(scope)) : '',
+    discussionPost: entry
+      ? renderDiscussionPost(entry, state, {
+        ...discussionPostOptions(state, person, groupId),
+        actionHref: discussionHref({ ...browse, groupId, post: entry.id }),
+        focused: true,
+      })
+      : '<p class="muted">This contribution could not be opened.</p>',
+  }, { wantsPartial, title: 'Discussion', state });
+  return sendHtml(res, html, {}, entry ? 200 : 404);
+}
+
+async function renderDiscussionShell({ state, person, wantsPartial, url }) {
   const permission = evaluateAction(state, person, 'post');
   const actorLabels = getActorLabels(state);
 
-  const requestedGroup = scopeOverride !== undefined ? scopeOverride : readGroupScope(url?.searchParams);
+  const requestedGroup = readGroupScope(url.searchParams);
   const scope = resolveGroupScope(state, person, requestedGroup, { lane: 'discussion' });
   // A refused scope falls back to the Circle feed with the reason stated, rather than
   // rendering an empty list that looks like the group simply has nothing to say.
@@ -275,19 +299,16 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
   const scopeNotice = scope.ok ? '' : scope.message;
   const canPostHere = permission.allowed && canPostToGroupLane(state, person, activeGroup, 'discussion');
 
-  const baseEntries = filterVisibleEntries(state.discussions, state, (entry) => {
-    if (entry.petitionId) return false;
-    if (entry.parentId) return false;
-    if (entry.stance === 'article' || entry.stance === 'comment') return false;
-    return matchesGroupScope(entry, activeGroupId);
-  });
-  const topicFilterKey = normalizeTopicFilter(url?.searchParams?.get('topic') || '');
-  const filterParams = new URLSearchParams();
-  if (activeGroupId) filterParams.set('group', activeGroupId);
-  const clearFilterHref = activeGroupId ? `/discussion?${filterParams}` : '/discussion';
-  if (topicFilterKey !== 'all') filterParams.set('topic', topicFilterKey);
-  filterParams.set('compose', 'post');
-  const workspaceCreateHref = canPostHere ? `/discussion?${filterParams}#discussion-compose` : '';
+  const baseEntries = filterVisibleEntries(state.discussions, state, (entry) =>
+    isDiscussionPost(entry) && matchesGroupScope(entry, activeGroupId),
+  );
+  const browse = readBrowse(url);
+  const { q, topic: topicFilter } = browse;
+  const topicFilterKey = canonicalizeTopicKey(topicFilter);
+  const clearFilterHref = q || topicFilter ? discussionHref({ groupId: activeGroupId }) : '';
+  const workspaceCreateHref = canPostHere
+    ? `${discussionHref({ ...browse, groupId: activeGroupId, compose: true })}#discussion-compose`
+    : '';
   const topicConfig = getTopicConfig(state);
   const topicPreferences = getTopicPreferences(state, person);
   const topicOptions = buildTopicOptions({
@@ -296,28 +317,34 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
     preferences: topicPreferences,
     entries: baseEntries,
   });
-  const hasSelectedTopic = topicOptions.some((topic) => normalizeTopicKey(topic) === topicFilterKey);
-  const filterOptions = topicFilterKey === 'all' || hasSelectedTopic ? topicOptions : [topicFilterKey, ...topicOptions];
-  const discussionEntries =
-    topicFilterKey === 'all'
-      ? baseEntries
-      : baseEntries.filter((entry) => normalizeTopicKey(entry.topic) === topicFilterKey);
-
-  const pageInfo = paginate(discussionEntries, { page: parsePage(url?.searchParams?.get('page')) });
-  let caseAction;
-  if (!activeGroupId && person?.pidHash && permission.allowed && isModuleEnabled(state, 'coordination')) {
-    const caseIds = new Map(state.organizationCases.map((entry) => [entry.sourceMessageId, entry.caseId]));
-    caseAction = (entry) => {
-      if (!isCaseSource(entry)) return null;
-      const caseId = caseIds.get(entry.id);
-      return caseId
-        ? { href: `/organization?case=${encodeURIComponent(caseId)}`, label: 'View case' }
-        : { href: `/organization?source=${encodeURIComponent(entry.id)}`, label: 'Open a case' };
-    };
-  }
+  const topicCache = new Map();
+  const filterOptions = new Map();
+  const search = q.toLowerCase();
+  const pathsByLabel = new Map();
+  const discussionEntries = baseEntries.filter((entry) => {
+    const label = resolveTopicBreadcrumb(entry, state, topicCache);
+    if (!pathsByLabel.has(label)) {
+      const path = label.split('/').map((part) => part.trim());
+      const keys = path.map((_, index) => {
+        const breadcrumb = path.slice(0, index + 1).join(' / ');
+        const key = canonicalizeTopicKey(breadcrumb);
+        filterOptions.set(key, breadcrumb);
+        return key;
+      });
+      pathsByLabel.set(label, keys);
+    }
+    const topicKeys = pathsByLabel.get(label);
+    const matchesTopic = !topicFilterKey || topicKeys.includes(topicFilterKey) ||
+      canonicalizeTopicKey(entry.topic) === topicFilterKey;
+    const evidenceLinks = Array.isArray(entry.evidenceLinks) ? entry.evidenceLinks : [];
+    return matchesTopic && (!search || [label, entry.content, ...evidenceLinks]
+      .some((value) => String(value || '').toLowerCase().includes(search)));
+  });
+  if (topicFilter && !filterOptions.has(topicFilterKey)) filterOptions.set(topicFilterKey, topicFilter);
+  const pageInfo = paginate(discussionEntries, { page: browse.page });
   const discussionPager = renderPager(pageInfo, {
     baseHref: '/discussion',
-    query: { topic: topicFilterKey === 'all' ? '' : topicFilterKey, group: activeGroupId || '' },
+    query: { q, topic: topicFilter, group: activeGroupId || '' },
     label: 'posts',
   });
 
@@ -327,9 +354,7 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
       person,
       personHandle: resolvePersonHandle(person),
       workspaceCreateHref,
-      discussionScopeLabel: activeGroup
-        ? `${escapeHtml(activeGroup.name || 'Group')} · ${scope.policy.lanesVisibility === 'public' ? 'Public to read' : 'Members only'}`
-        : 'Whole Circle',
+      discussionScopeLabel: escapeHtml(describeScope(scope)),
       discussionPrimaryAction: renderPrimaryAction(workspaceCreateHref, permission),
       discussionContext: renderContextPanel({
         gates: canPostHere ? [] : [
@@ -347,31 +372,64 @@ async function renderDiscussionShell({ state, person, wantsPartial, url, scopeOv
           : [],
       }),
       discussionList: renderDiscussionList(pageInfo.items, state, {
+        ...discussionPostOptions(state, person, activeGroupId),
         groupId: activeGroupId,
         createHref: workspaceCreateHref,
-        clearFilterHref: topicFilterKey === 'all' ? '' : clearFilterHref,
-        caseAction,
-        promotable: (entry) => evaluatePromotion(state, person, { kind: 'discussion', entry }),
-        requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'discussion', entry }),
-        decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'discussion', entry }),
+        clearFilterHref,
+        browse: { ...browse, page: pageInfo.page },
+        actionHref: discussionHref({ ...browse, groupId: activeGroupId }),
+        topicCache,
       }),
       discussionPager,
-      discussionScopeTabs: renderScopeTabs({ state, person, activeGroupId, lane: 'discussion', baseHref: '/discussion' }),
+      discussionScopeTabs: renderScopeTabs({ state, person, activeGroupId, q, topic: topicFilter }),
       discussionScopeNotice: scopeNotice ? `<p class="muted small">${escapeHtml(scopeNotice)}</p>` : '',
       discussionFilterScope: activeGroupId
         ? `<input type="hidden" name="group" value="${escapeHtml(activeGroupId)}">`
         : '',
       discussionGroupPicker: renderGroupLanePicker(state, person, 'discussion', activeGroupId),
-      topicFilterOptions: renderTopicFilterOptions(filterOptions, topicFilterKey),
-      topicFilterSelectedAll: topicFilterKey === 'all' ? 'selected' : '',
+      discussionSearch: escapeHtml(q),
+      discussionFilterSummary: escapeHtml([q && `“${q}”`, filterOptions.get(topicFilterKey)].filter(Boolean).join(' · ')),
+      discussionClearFilters: clearFilterHref ? `<a href="${escapeHtml(clearFilterHref)}" data-partial>Clear filters</a>` : '',
+      discussionFiltersOpen: clearFilterHref ? 'open' : '',
+      discussionPreferencesHref: escapeHtml(discussionHref({ ...browse, groupId: activeGroupId })),
+      topicFilterOptions: renderTopicFilterOptions(
+        [...filterOptions.values()].sort((a, b) => a.localeCompare(b, 'en')),
+        normalizeTopicKey(filterOptions.get(topicFilterKey)),
+      ),
+      topicFilterSelectedAll: topicFilterKey ? '' : 'selected',
       topicDatalist: renderTopicDatalist(topicOptions),
       topicPreferencesValue: formatTopicList(topicPreferences),
       topicAnchors: formatTopicList(topicConfig.anchors || []),
       topicPinned: formatTopicList(topicConfig.pinned || []) || 'none',
-      composeState: canPostHere ? (url?.searchParams?.get('compose') ? 'open' : '') : 'hidden',
+      composeState: canPostHere ? (url.searchParams.has('compose') ? 'open' : '') : 'hidden',
     },
     { wantsPartial, title: 'Discussion', state },
   );
+}
+
+function discussionPostOptions(state, person, groupId) {
+  let caseAction;
+  if (!groupId && person?.pidHash && evaluateAction(state, person, 'post').allowed && isModuleEnabled(state, 'coordination')) {
+    const caseIds = new Map(state.organizationCases.map((entry) => [entry.sourceMessageId, entry.caseId]));
+    caseAction = (entry) => {
+      if (!isCaseSource(entry)) return null;
+      const caseId = caseIds.get(entry.id);
+      return caseId
+        ? { href: `/organization?case=${encodeURIComponent(caseId)}`, label: 'View case' }
+        : { href: `/organization?source=${encodeURIComponent(entry.id)}`, label: 'Open a case' };
+    };
+  }
+  return {
+    caseAction,
+    promotable: (entry) => evaluatePromotion(state, person, { kind: 'discussion', entry }),
+    requestable: (entry) => evaluatePromotionRequest(state, person, { kind: 'discussion', entry }),
+    decidable: (entry) => evaluatePromotionDecision(state, person, { kind: 'discussion', entry }),
+  };
+}
+
+function describeScope(scope) {
+  if (!scope.ok || !scope.group) return 'Whole Circle';
+  return `${scope.group.name || 'Group'} · ${scope.policy.lanesVisibility === 'public' ? 'Public to read' : 'Members only'}`;
 }
 
 function renderPrimaryAction(createHref, permission) {
@@ -386,15 +444,15 @@ function renderPrimaryAction(createHref, permission) {
 
 // Lane tabs: the Circle feed plus every group lane this member can read. Rendered as links
 // so the scope survives without JavaScript.
-function renderScopeTabs({ state, person, activeGroupId, lane, baseHref }) {
-  const groups = listReadableGroupLanes(state, person, lane);
+function renderScopeTabs({ state, person, activeGroupId, q, topic }) {
+  const groups = listReadableGroupLanes(state, person, 'discussion');
   if (!groups.length) return '';
   const tab = (href, label, active) =>
     `<a class="pill${active ? '' : ' ghost'}" href="${escapeHtml(href)}"${active ? ' aria-current="page"' : ''} data-partial>${escapeHtml(label)}</a>`;
-  const tabs = [tab(baseHref, 'Whole Circle', !activeGroupId)];
+  const tabs = [tab(discussionHref({ q, topic }), 'Whole Circle', !activeGroupId)];
   for (const group of groups) {
     tabs.push(
-      tab(`${baseHref}?group=${encodeURIComponent(group.id)}`, group.name || 'Group', activeGroupId === group.id),
+      tab(discussionHref({ groupId: group.id, q, topic }), group.name || 'Group', activeGroupId === group.id),
     );
   }
   return `<nav class="workspace-switcher discussion__meta" aria-label="Discussion scopes">${tabs.join('')}</nav>`;
@@ -422,8 +480,11 @@ function renderGroupLanePicker(state, person, lane, activeGroupId) {
   `;
 }
 
-function normalizeTopicFilter(value) {
-  const normalized = normalizeTopicKey(value);
-  if (!normalized || normalized === 'all') return 'all';
-  return normalized;
+function readBrowse(url) {
+  const topic = sanitizeText(url.searchParams.get('topic') || '', 160);
+  return {
+    q: sanitizeText(url.searchParams.get('q') || '', 120),
+    topic: topic.toLowerCase() === 'all' ? '' : topic,
+    page: parsePage(url.searchParams.get('page')),
+  };
 }

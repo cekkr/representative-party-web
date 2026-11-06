@@ -75,17 +75,23 @@ test('discussion list paginates across pages', async (t) => {
     );
   }
 
-  const countPosts = (html) => (html.match(/Pager post number/g) || []).length;
+  const countPosts = (html) => (html.match(/<article class="topic-card">/g) || []).length;
   const cookie = sessions[0].cookie;
+  const browse = `${server.baseUrl}/discussion?q=Pager&topic=general`;
 
-  const { text: page1 } = await fetchText(`${server.baseUrl}/discussion`, { headers: { Cookie: cookie } });
+  const { text: page1 } = await fetchText(browse, { headers: { Cookie: cookie } });
   assert.match(page1, /Page 1 of 2/);
+  assert.match(page1, /href="\/discussion\?q=Pager&amp;topic=general&amp;page=2"/);
   assert.equal(countPosts(page1), 20, 'first page is a full window of 20');
 
-  const { text: page2 } = await fetchText(`${server.baseUrl}/discussion?page=2`, { headers: { Cookie: cookie } });
+  const { text: page2 } = await fetchText(`${browse}&page=2`, { headers: { Cookie: cookie } });
   assert.match(page2, /Page 2 of 2/);
   assert.equal(countPosts(page2), 3, 'remaining posts on page 2');
   assert.notEqual(page1, page2);
+  const post = page2.match(/page=2&amp;post=([^"]+)/)?.[1];
+  assert.ok(post);
+  const { text: focused } = await fetchText(`${browse}&page=2&post=${post}`, { headers: { Cookie: cookie } });
+  assert.match(focused, /href="\/discussion\?q=Pager&amp;topic=general&amp;page=2"[^>]*>Back to Discussion/);
 });
 
 test('social feed paginates across pages', async (t) => {

@@ -32,6 +32,7 @@ const TEMPLATE_MODULES = {
   'auth-eudi': 'auth',
   'verification-complete': 'auth',
   discussion: 'discussion',
+  'discussion-post': 'discussion',
   forum: 'forum',
   'forum-thread': 'forum',
   governance: 'governance',

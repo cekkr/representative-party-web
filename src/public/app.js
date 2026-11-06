@@ -2619,7 +2619,7 @@ function initUiSettingsPanel() {
     applyUiSettings(settings);
     syncBusyIndicator();
     if (window.location.pathname === '/social/feed') {
-      initStickyComposerAutoCollapse();
+      initSocialComposerAutoCollapse();
     }
   };
 
@@ -2711,7 +2711,7 @@ function initUiSettingsPanel() {
     syncInputs();
     syncBusyIndicator();
     if (window.location.pathname === '/social/feed') {
-      initStickyComposerAutoCollapse();
+      initSocialComposerAutoCollapse();
     }
     showToast('Using session defaults.', { tone: 'success', timeoutMs: 1800 });
   };
@@ -3020,55 +3020,26 @@ function initInstallWizard(root) {
   syncFromHash();
 }
 
-function setComposePanelState(panel, { open, focus = false } = {}) {
-  if (!panel) return;
-  const toggle = panel.querySelector('[data-compose-toggle]');
-  const isOpen = Boolean(open);
-  panel.dataset.composeState = isOpen ? 'open' : 'collapsed';
-  if (toggle) {
-    toggle.setAttribute('aria-expanded', String(isOpen));
-    toggle.textContent = isOpen ? 'Collapse' : 'Expand';
-  }
-  if (isOpen) {
-    if (focus) {
-      const firstField = panel.querySelector('textarea, input, select');
-      if (firstField && typeof firstField.focus === 'function') {
-        firstField.focus();
-      }
-    }
-    return;
-  }
-  const focused = panel.querySelector(':focus');
-  if (focused && typeof focused.blur === 'function') {
-    focused.blur();
-  }
-}
-
-function initStickyComposerAutoCollapse() {
+function initSocialComposerAutoCollapse() {
   if (typeof window.__composeAutoCleanup === 'function') {
     window.__composeAutoCleanup();
     window.__composeAutoCleanup = null;
   }
   if (document.body?.dataset?.uiComposerAutocollapse === 'off') return;
   const panel = document.getElementById('social-compose');
-  if (!panel) return;
-  const toggle = panel.querySelector('[data-compose-toggle]');
-  if (!toggle) return;
-  let lastY = window.scrollY || window.pageYOffset || 0;
-  let lastTick = 0;
+  const disclosure = panel?.querySelector('details');
+  if (!disclosure || panel.hidden) return;
+  const form = disclosure.querySelector('form');
+  let lastY = window.scrollY;
   const onScroll = () => {
-    if (window.location.pathname !== '/social/feed') return;
-    const now = Date.now();
-    if (now - lastTick < 120) return;
-    lastTick = now;
-    const currentY = window.scrollY || window.pageYOffset || 0;
+    const currentY = window.scrollY;
     const delta = currentY - lastY;
     lastY = currentY;
-    if (panel.dataset.composeState !== 'open') return;
-    if (panel.matches(':focus-within')) return;
-    if (currentY < 140) return;
-    if (delta < 56) return;
-    setComposePanelState(panel, { open: false, focus: false });
+    if (!disclosure.open || panel.matches(':focus-within') || delta < 56 ||
+        panel.getBoundingClientRect().bottom > 0) return;
+    const { content, media, visibility, targetHandle } = form.elements;
+    if (content.value || media.files.length || visibility.value === 'direct' || targetHandle.value) return;
+    disclosure.open = false;
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.__composeAutoCleanup = () => window.removeEventListener('scroll', onScroll);
@@ -3130,7 +3101,7 @@ function isHtmlResponse(response) {
   initNavFilter();
   initVerbosityToggle();
   initComposerTool();
-  initStickyComposerAutoCollapse();
+  initSocialComposerAutoCollapse();
   initPressureWorkspace();
   syncBusyIndicator();
 
@@ -3164,7 +3135,7 @@ function isHtmlResponse(response) {
       initNavFilter();
       initVerbosityToggle();
       initComposerTool();
-      initStickyComposerAutoCollapse();
+      initSocialComposerAutoCollapse();
       initPressureWorkspace();
       syncBusyIndicator();
       const disclosure = document.querySelector('[data-nav-disclosure]');
@@ -3188,24 +3159,6 @@ function isHtmlResponse(response) {
       window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}#pressure-layer-${key}`);
       return;
     }
-    const toggle = event.target.closest('[data-compose-toggle]');
-    if (!toggle) return;
-    event.preventDefault();
-    const panel = toggle.closest('[data-compose-state]');
-    if (!panel) return;
-    const current = panel.dataset.composeState || 'collapsed';
-    const isOpen = current === 'open';
-    setComposePanelState(panel, { open: !isOpen, focus: !isOpen });
-  });
-
-  document.addEventListener('change', (event) => {
-    const input = event.target;
-    if (!(input instanceof HTMLInputElement)) return;
-    if (input.type !== 'file' || !input.hasAttribute('data-media-toggle')) return;
-    const form = input.closest('form');
-    const textarea = form?.querySelector('textarea[data-media-required]');
-    if (!textarea) return;
-    textarea.required = !(input.files && input.files.length > 0);
   });
 
   document.addEventListener('submit', async (event) => {
@@ -3224,7 +3177,9 @@ function isHtmlResponse(response) {
       return;
     }
     const action = new URL(form.getAttribute('action') || window.location.href, document.baseURI);
-    const recordForm = ['forum', 'groups', 'petitions'].includes(mode) || action.pathname === '/petitions/promote';
+    const recordForm = ['forum', 'groups', 'petitions'].includes(mode) ||
+      (form.method.toUpperCase() === 'POST' &&
+        (action.pathname === '/discussion' || action.pathname.startsWith('/social/') || action.pathname === '/petitions/promote'));
     let redirectedTo;
     try {
       setAppBusy(true);
@@ -3281,7 +3236,7 @@ function isHtmlResponse(response) {
       initNavFilter();
       initVerbosityToggle();
       initComposerTool();
-      initStickyComposerAutoCollapse();
+      initSocialComposerAutoCollapse();
       initPressureWorkspace();
       syncBusyIndicator();
       focusPageDestination(root, destination);

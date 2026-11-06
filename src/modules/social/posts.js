@@ -112,9 +112,7 @@ export function buildFeed(state, person, { followType, follows } = {}) {
   if (!person) {
     const feed = [];
     for (const post of posts) {
-      if (!post) continue;
-      if (!allowPreviews && post?.validationStatus === 'preview') continue;
-      if (post.visibility === 'direct') continue;
+      if (!isPostVisible(post, '', allowPreviews)) continue;
       feed.push(post);
       if (feed.length >= 80) break;
     }
@@ -132,18 +130,23 @@ export function buildFeed(state, person, { followType, follows } = {}) {
 
   const feed = [];
   for (const post of posts) {
-    if (!post) continue;
-    if (!allowPreviews && post?.validationStatus === 'preview') continue;
-    const isAuthorFollowed = followedHashes.has(post.authorHash);
-    const isDirect = post.visibility === 'direct';
-    const isRecipient = post.targetHash && post.targetHash === ownHash;
-    if (isDirect && !(post.authorHash === ownHash || isRecipient)) continue;
-    if (!isDirect && !isAuthorFollowed) continue;
+    if (!isPostVisible(post, ownHash, allowPreviews)) continue;
+    if (post.visibility !== 'direct' && !followedHashes.has(post.authorHash)) continue;
     feed.push(post);
     if (feed.length >= 120) break;
   }
 
   return feed;
+}
+
+export function canReadSocialPost(state, person, post) {
+  return isPostVisible(post, person?.pidHash, getReplicationProfile(state).allowPreviews);
+}
+
+function isPostVisible(post, viewerHash, allowPreviews) {
+  if (!post || (!allowPreviews && post.validationStatus === 'preview')) return false;
+  return post.visibility !== 'direct' ||
+    Boolean(viewerHash && (post.authorHash === viewerHash || post.targetHash === viewerHash));
 }
 
 export function findPost(state, postId) {

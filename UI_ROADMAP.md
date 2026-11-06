@@ -90,8 +90,12 @@ different sequence from the visible layout. [Current grid](src/public/app.css) �
 **Current.** Home leads with its workspace heading and real conversation
 previews, followed by enabled work lanes and supporting context. Circle-wide
 discussion and proposal previews exclude group lanes. Discussion puts its
-scope and Create action before the feed, with the topic filter next to results
-and the compose form in the supporting rail. Forum has searchable article rows,
+scope and Create action before the feed, with a native disclosure for searching
+text and evidence and filtering a topic subtree. The compose form stays in the
+supporting rail. Home and Discussion link to individual contributions, where
+the stored lane controls access and the return link restores the search and page.
+Social places follow filters above updates and shows the audience at the point of
+sending. Forum has searchable article rows,
 a category field in the compose rail, and a focused reading view linked directly
 from Home and the results. Search and page survive opening an article, replying,
 and returning to the collection. [Home partials](src/modules/home/templates/partials) ·
@@ -408,9 +412,9 @@ starting point for implementation.
 | --- | --- | --- |
 | [Core shell and topbar](src/modules/core/templates/partials) | Grouped desktop rail, native compact Menu, current location, skip target, and shared status. | Extend the page-heading and contextual action pattern as each surface is converted. |
 | [Home](src/modules/home/templates/home.html) `/` | Persistent workspace heading, scoped conversation previews first, and supporting access and operator sections. | Refine previews into named destination collections with consistent cards and direct links to their full views. |
-| [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Persistent scope header and compose jump, topic filter beside the feed, scoped empty states, and a supporting compose rail. | Refine authored rows and stable links as part of the conversation slice. |
+| [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Scope header, searchable feed with topic-subtree filters, scoped empty states, and focused contributions with evidence and gated actions. | Add reply relationships and use contribution links in authorized activity. |
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
-| [Social](src/modules/social/templates/social.html) `/social/feed` | Wall, typed follows and filters, compose, and media controls. | Distinct post and media states, visible audience, and accessible compose with one scroll path. |
+| [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall, adjacent follow filters, and native compose with audience and attachment controls. Direct media and replies follow the source audience. | Resolve social activity to permitted records and add inline recovery for ordinary forms. |
 | [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Reads and writes use the stored lane. | Refine discussion filters, ballot timing context, and SSR form recovery. |
 | [Groups](src/modules/groups/templates/groups.html) `/groups` | Branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. | Search and pagination for discovery and clearer activity within a group. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
@@ -420,7 +424,7 @@ starting point for implementation.
 | [Profile](src/modules/profile/templates/profile.html) `/profile` | Session and handle, provider-local fields, and Interface controls. | Identity summary followed by clearly separated, labelled settings sections and inline feedback. |
 | [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Linked source, case and acknowledgement workflow, searchable queue. | Case header, original source and evidence, acknowledgement/history, and a secondary queue. Retain provider-local scope. |
 | [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Labelled illustrative inbox, pressure map, and operating map. | Persistent preview identity, Scenario B examples, and a clear return to the live case workspace. |
-| [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. | Keep the settings workspace single-column. Apply visual hierarchy and fix narrow Composer overlap while retaining gates and anchor links. |
+| [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. The inactive Composer entry sits in the page flow on phones. | Apply the settings hierarchy while retaining gates, anchors, and the admin Composer workspace. |
 | [Wallet handoff and result](src/modules/auth/templates) | Offer and result panels in the shared shell. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
 
 
@@ -458,9 +462,9 @@ keys have historical names, while their labels identify the content.
 | Module | Explicit section keys |
 | --- | --- |
 | Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops`. Workspace heading sits outside these panels. |
-| Social | `social-wall`, `social-compose`, `social-controls`, `social-follows` |
+| Social | `social-wall`, `social-compose`, `social-controls`, `social-follows`. The header stays visible. Filters sit in the main column. |
 | Forum | Browse `forum-threads`, `forum-compose`. Focused article `forum-replies`. Both use the `forum` page key. The article and heading stay visible outside optional sections. |
-| Discussion | `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. Scope and page heading sit outside these panels. |
+| Discussion | Browse `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. The focused contribution uses the same `discussion` page key. Its heading, scope, and content stay visible outside optional panels. |
 | Proposals | Browse `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates`. Workspace `petition-overview`, `petitions-discussion`, `petition-history`, `petition-ballot`, `petition-details`. Both use the `petitions` page key. |
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
@@ -477,7 +481,7 @@ keys have historical names, while their labels identify the content.
 | Slice | Implementation boundary | Acceptance |
 | --- | --- | --- |
 | 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
-| 2. Conversation and collections | Forum browse and focused replies are implemented. Home links to individual articles. Discussion and Social still have collection and contribution refinements ahead. | In Scenario A, find the waiting-list evidence and open an attributed forum article from search. Follow replies in order and post one with and without enhancement. Retain the active search and scope through refresh and Back. |
+| 2. Conversation and collections | Discussion and Forum have searchable collections and focused views linked from Home. Social has in-flow compose, audience, follow filters, and attributed media states. | Find the waiting-list evidence and the free-mandate article in Scenario A. Open a contribution and return to the same search. Reply in Forum and send a media-only Social update with ordinary HTML. Confirm direct attachment and reply access. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
 | 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People, governance, and case refinements follow. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
 | 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
@@ -513,6 +517,35 @@ frozen ballot and exercises the proposal alert read loop. A separate browser
 pass checked the member surfaces in both themes at desktop, 800 × 600, 390 px,
 and 320 px with large text.
 [Forum browser regression](tests/ui.test.js) · [Proposal lane regression](tests/petition-scope.test.js)
+
+### Discussion and Social verification
+
+- [x] Discussion search checks body text, topic breadcrumbs, and evidence links
+  in the selected lane. The parent topic includes its descendants. The browser
+  test opens the waiting-list evidence at 320 px and returns to the selected
+  query and topic with enhanced and ordinary HTML navigation.
+- [x] Focused contribution links check current lane and preview visibility.
+  Full and partial reads with a missing or forged lane hint withhold private
+  content. Promotion writes use the same source gate. After promotion the
+  same id resolves in its new lane.
+- [x] Social compose uses a native disclosure in the normal scroll flow. Tests
+  cover keyboard entry to compose and a media-only direct upload without
+  JavaScript. Direct replies retain the conversation audience, and an outsider
+  cannot reply to the original or view or report its media by id.
+- [x] Stable section keys, theme tokens, and the Interface auto-collapse
+  preference carry over. The compose test checks reachability at 800 × 600
+  and the draft test keeps a filled disclosure open when scrolling past it.
+- [x] The inactive admin Composer stays in the document flow at 320 px so
+  it cannot cover member controls. Entering Composer still opens its tools.
+
+The standing review walked the member surfaces in both themes at 1440 × 900,
+800 × 600, 390 × 844, and 320 × 700. The smallest pass used large text and
+reduced motion. The separate Scenario B pass covered the acknowledged case
+and its evidence, the review date, and the preview at desktop and phone widths.
+
+[Discussion access regression](tests/home.test.js) ·
+[Composer overlay regression](tests/composer-overlay.test.js) ·
+[Browser regressions](tests/ui.test.js)
 
 ### Group workspace verification
 

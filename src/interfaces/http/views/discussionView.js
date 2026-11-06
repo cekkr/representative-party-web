@@ -8,6 +8,7 @@ import {
   renderPromotionRequestControls,
   resolveTopicBreadcrumb,
 } from './shared.js';
+import { discussionHref } from '../../../modules/discussion/discussionLinks.js';
 import { describePromotionTrail } from '../../../modules/groups/promotion.js';
 
 export function renderDiscussionList(entries, state, options = {}) {
@@ -15,53 +16,53 @@ export function renderDiscussionList(entries, state, options = {}) {
     return renderDiscussionOnboarding(options);
   }
 
-  const topicCache = new Map();
-  return entries
-    .map((entry) => {
-      const topicLabel = resolveTopicBreadcrumb(entry, state, topicCache);
-      const createdAt = formatTimestamp(entry.createdAt);
-      const evidenceLinks = Array.isArray(entry.evidenceLinks) ? entry.evidenceLinks : [];
-      const evidencePill = evidenceLinks.length ? '<span class="pill ghost">Evidence</span>' : '';
-      const evidenceBlock = renderEvidenceLinks(evidenceLinks);
-      const stance = entry.stance ? `<span class="pill stance stance--${escapeHtml(String(entry.stance))}">${escapeHtml(entry.stance)}</span>` : '';
-      const promotionNote = describePromotionTrail(entry);
-      const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
-      const promote = renderPromoteControl(entry, options);
-      const caseAction = options.caseAction?.(entry);
-      const promotionRequests = renderPromotionRequestControls(entry, options, {
-        action: '/discussion',
-        idField: 'discussionId',
-      });
-      return `
-        <article class="topic-card">
-          <div class="topic-head">
-            ${renderActorAvatar(state, entry.authorHash)}
-            <div class="topic-info">
-              <div class="topic-byline">
-                <span class="topic-author">${renderActorLabel(state, entry.authorHash)}</span>
-                ${createdAt ? `<span class="topic-time muted small">${createdAt}</span>` : ''}
-              </div>
-              <div class="topic-meta">
-                <span class="topic-breadcrumbs">Discussion / ${escapeHtml(topicLabel)}</span>
-                ${stance}
-                ${evidencePill}
-                ${promotionPill}
-                ${renderPreviewPill(entry)}
-                ${renderIssuerPill(entry)}
-              </div>
-            </div>
+  const posts = entries.map((entry) => `<li>${renderDiscussionPost(entry, state, options)}</li>`);
+  return `<ul class="discussion-list">${posts.join('')}</ul>`;
+}
+
+export function renderDiscussionPost(entry, state, options = {}) {
+  const topicLabel = escapeHtml(resolveTopicBreadcrumb(entry, state, options.topicCache));
+  const summary = String(entry.content || '').slice(0, 75);
+  const href = discussionHref({ ...options.browse, groupId: entry.groupId, post: entry.id });
+  const createdAt = formatTimestamp(entry.createdAt);
+  const evidenceLinks = Array.isArray(entry.evidenceLinks) ? entry.evidenceLinks : [];
+  const evidenceBlock = renderEvidenceLinks(evidenceLinks);
+  const stance = entry.stance ? `<span class="pill stance stance--${escapeHtml(String(entry.stance))}">${escapeHtml(entry.stance)}</span>` : '';
+  const promotionNote = describePromotionTrail(entry);
+  const promotionPill = promotionNote ? `<span class="pill ghost">${escapeHtml(promotionNote)}</span>` : '';
+  const promote = renderPromoteControl(entry, options);
+  const caseAction = options.caseAction?.(entry);
+  const promotionRequests = renderPromotionRequestControls(entry, options, {
+    action: options.actionHref || '/discussion',
+    idField: 'discussionId',
+  });
+  return `
+    <article class="topic-card">
+      <div class="topic-head">
+        ${renderActorAvatar(state, entry.authorHash)}
+        <div class="topic-info">
+          <div class="topic-byline">
+            <span class="topic-author">${renderActorLabel(state, entry.authorHash)}</span>
+            ${createdAt ? `<time class="topic-time muted small" datetime="${escapeHtml(String(entry.createdAt))}">${createdAt}</time>` : ''}
           </div>
-          <div class="topic-body">
-            <p>${escapeHtml(entry.content)}</p>
-            ${evidenceBlock}
-            ${caseAction ? `<a class="pill ghost" href="${escapeHtml(caseAction.href)}" data-partial>${escapeHtml(caseAction.label)}</a>` : ''}
-            ${promote}
-            ${promotionRequests}
+          <div class="topic-meta">
+            ${options.focused ? '' : `<a class="topic-breadcrumbs contribution-link" href="${escapeHtml(href)}" data-partial>${topicLabel}<span class="sr-only"> · ${escapeHtml(summary)}</span></a>`}
+            ${stance}
+            ${promotionPill}
+            ${renderPreviewPill(entry)}
+            ${renderIssuerPill(entry, { localIssuer: state?.issuer })}
           </div>
-        </article>
-      `;
-    })
-    .join('\n');
+        </div>
+      </div>
+      <div class="topic-body">
+        <p>${escapeHtml(entry.content)}</p>
+        ${evidenceBlock}
+        ${caseAction ? `<a class="pill ghost" href="${escapeHtml(caseAction.href)}" data-partial>${escapeHtml(caseAction.label)}</a>` : ''}
+        ${promote}
+        ${promotionRequests}
+      </div>
+    </article>
+  `;
 }
 
 // "Move up a level" is only offered when it would actually succeed — the caller passes a
@@ -72,7 +73,7 @@ function renderPromoteControl(entry, options = {}) {
   const decision = options.promotable(entry);
   if (!decision?.ok) return '';
   return `
-    <form class="form-inline" method="post" action="/discussion" data-enhance="discussion-promote">
+    <form class="form-inline" method="post" action="${escapeHtml(options.actionHref || '/discussion')}" data-enhance="discussion-promote">
       <input type="hidden" name="intent" value="promote" />
       <input type="hidden" name="discussionId" value="${escapeHtml(String(entry.id))}" />
       <button type="submit" class="ghost">Move up to ${escapeHtml(decision.targetLabel)}</button>
@@ -80,13 +81,13 @@ function renderPromoteControl(entry, options = {}) {
   `;
 }
 
-function renderDiscussionOnboarding({ groupId, createHref, clearFilterHref }) {
+function renderDiscussionOnboarding({ groupId, createHref, clearFilterHref, browse }) {
   if (clearFilterHref) {
     return `
       <div class="onboarding-card">
-        <h3>No posts match this topic</h3>
+        <h3>${browse?.q ? 'No posts match these filters' : 'No posts match this topic'}</h3>
         <div class="onboarding-actions">
-          <a class="ghost" href="${escapeHtml(clearFilterHref)}" data-partial>Clear topic filter</a>
+          <a class="ghost" href="${escapeHtml(clearFilterHref)}" data-partial>${browse?.q ? 'Clear filters' : 'Clear topic filter'}</a>
         </div>
       </div>
     `;

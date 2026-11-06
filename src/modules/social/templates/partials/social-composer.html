@@ -1,72 +1,34 @@
-<section class="panel composer-panel sticky-composer" id="social-compose" data-compose-state="{{composeState}}" data-composer-section="social-compose" data-section-label="Composer">
-  <div class="composer__header">
-    <div>
-      <p class="eyebrow">Composer</p>
-      <h2>Share a short update</h2>
-    </div>
-    <button
-      class="ghost composer__toggle"
-      type="button"
-      data-compose-toggle
-      aria-expanded="{{composeToggleExpanded}}"
-    >
-      {{composeToggleLabel}}
-    </button>
-  </div>
-  <form class="composer" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">
-    <div class="composer__row">
-      <div class="composer__avatar" aria-hidden="true"></div>
-      <div class="composer__input">
-        <textarea
-          name="content"
-          rows="2"
-          placeholder="Share an update or question."
-          required
-          data-media-required
-        ></textarea>
-      </div>
-    </div>
-    <div class="composer__meta">
-      <div class="composer__who">
-        <span class="composer__handle">{{personHandle}}</span>
-        <span class="pill ghost">{{roleLabel}}</span>
-      </div>
-      <div class="composer__cta">
-        <button class="cta" type="submit">Post</button>
-      </div>
-    </div>
-    <div class="composer__expandable">
-      <div class="composer__notes">
-        <p class="muted small">{{postingStatus}}</p>
-        {{postingReasonLine}}
-      </div>
-      <div class="composer__controls">
-        <label class="composer__chip">
-          <span>Visibility</span>
-          <select name="visibility">
-            <option value="public" selected>Public to your follows</option>
-            <option value="direct">Direct (private) to handle</option>
+<section class="panel" id="social-compose" tabindex="-1" aria-labelledby="social-compose-title" data-composer-section="social-compose" data-section-label="Composer" {{socialComposerHidden}}>
+  <h2 id="social-compose-title">Share a short update</h2>
+  <details class="form-toggle" {{composeState}}>
+    <summary>Write an update</summary>
+    <form class="stack" method="post" action="/social/post" data-enhance="social-post" enctype="multipart/form-data">
+      <div class="topic-byline">{{socialComposerActor}}</div>
+      <label class="field">
+        <span>Update</span>
+        <textarea name="content" rows="3" maxlength="560" aria-describedby="social-upload-note"></textarea>
+      </label>
+      <label class="field">
+        <span>Photo or video (optional)</span>
+        <input name="media" type="file" accept="image/*,video/*" aria-describedby="social-upload-note" />
+      </label>
+      <p class="muted small" id="social-upload-note">Add text, one attachment, or both. Attachments stay with this provider and viewers request access.</p>
+      <fieldset class="stack social-audience">
+        <legend>Audience</legend>
+        <label class="field">
+          <span>Who can read this?</span>
+          <select name="visibility" aria-describedby="social-audience-note">
+            <option value="public">Public</option>
+            <option value="direct">Direct</option>
           </select>
         </label>
-        <label class="composer__chip composer__chip--input">
-          <span>Direct to</span>
-          <input name="targetHandle" placeholder="@handle" />
+        <p class="muted small" id="social-audience-note">Visitors can read public updates. A direct update goes to one handle.</p>
+        <label class="field">
+          <span>Recipient handle for direct updates</span>
+          <input name="targetHandle" placeholder="@handle" maxlength="64" />
         </label>
-        <input
-          class="composer__file"
-          id="social-media"
-          name="media"
-          type="file"
-          accept="image/*,video/*"
-          data-media-toggle
-        />
-        <label class="composer__action" for="social-media">Photo/Video</label>
-      </div>
-      <div class="composer__footer">
-        <span class="muted small is-verbose">Keep this lane for quick coordination; formal decisions stay in proposals/votes.</span>
-        <span class="muted small is-verbose">Uploads stay with this provider; viewers request access before viewing.</span>
-        <a class="ghost" href="/auth/eudi" data-partial>Verify with wallet</a>
-      </div>
-    </div>
-  </form>
+        <button class="cta" type="submit">Send update</button>
+      </fieldset>
+    </form>
+  </details>
 </section>
