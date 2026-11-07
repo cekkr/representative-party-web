@@ -5,7 +5,8 @@ import {
   uninstallExtension,
 } from '../../../modules/extensions/registry.js';
 import { persistSettings } from '../../../infra/persistence/storage.js';
-import { sendJson } from '../../../shared/utils/http.js';
+import { sendJson, sendRedirect } from '../../../shared/utils/http.js';
+import { FORM_OUTCOME, isHtmlFormPost, setFlashNotice } from '../views/formOutcome.js';
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
@@ -29,7 +30,15 @@ export async function toggleExtension({ req, res, state }) {
   if (!canAdministerProvider(person, state)) {
     return sendAdminRequiredJson({ res, person });
   }
-  const body = await readRequestBody(req);
+  const body = await readRequestBody(req, { repeated: ['extensions'] });
+  // The admin form is an ordinary HTML form: it returns to the Extensions section
+  // with a notice whose tone follows the outcome. JSON clients keep the JSON contract.
+  const htmlForm = isHtmlFormPost(req);
+  const reply = (status, payload, code) => {
+    if (!htmlForm) return sendJson(res, status, payload);
+    setFlashNotice(res, 'extensions', code);
+    return sendRedirect(res, '/admin#extensions');
+  };
   const lifecycle = normalizeLifecycle(body);
   if (lifecycle) {
     try {
@@ -42,35 +51,43 @@ export async function toggleExtension({ req, res, state }) {
         installations: state.settings?.extensionInstallations || [],
       });
       const available = await listAvailableExtensions(state);
-      return sendJson(res, 200, {
+      const code = lifecycle.intent === 'uninstall'
+        ? 'uninstalled'
+        : result?.updated ? 'updated' : 'installed';
+      return reply(200, {
         lifecycle: lifecycle.intent,
         result,
         available,
         enabled: state.settings?.extensions || [],
         active: (state.extensions?.active || []).map((ext) => ext.id),
-      });
+      }, code);
     } catch (error) {
-      return sendJson(res, extensionErrorStatus(error), {
+      return reply(extensionErrorStatus(error), {
         error: error.code || 'extension_lifecycle_failed',
         message: error.message,
-      });
+      }, EXTENSION_ERROR_CODES[error?.code] || 'lifecycle-failed');
     }
   }
 
-  const list = normalizeList(body, state.settings?.extensions || []);
+  // An HTML form with every box unticked posts no `extensions` pair at all; the
+  // hidden marker says the list was submitted and is empty.
+  const submitted = htmlForm && body.extensionsForm && body.extensions === undefined
+    ? { ...body, extensions: [] }
+    : body;
+  const list = normalizeList(submitted, state.settings?.extensions || []);
   if (!list) {
-    return sendJson(res, 400, { error: 'missing_extensions' });
+    return reply(400, { error: 'missing_extensions' }, 'missing');
   }
 
   const available = await listAvailableExtensions(state);
   const availableById = new Map(available.map((entry) => [entry.id, entry]));
   const unknown = list.filter((id) => !availableById.has(id));
   if (unknown.length) {
-    return sendJson(res, 400, { error: 'unknown_extensions', extensions: unknown });
+    return reply(400, { error: 'unknown_extensions', extensions: unknown }, 'unknown');
   }
   const uninstalled = list.filter((id) => !availableById.get(id)?.installed);
   if (uninstalled.length) {
-    return sendJson(res, 409, { error: 'extensions_not_installed', extensions: uninstalled });
+    return reply(409, { error: 'extensions_not_installed', extensions: uninstalled }, 'not-installed');
   }
 
   const nextList = [...new Set(list)];
@@ -83,11 +100,36 @@ export async function toggleExtension({ req, res, state }) {
     installations: state.settings?.extensionInstallations || [],
   });
 
-  return sendJson(res, 200, {
-    enabled: nextList,
-    active: (state.extensions?.active || []).map((ext) => ext.id),
-  });
+  const active = (state.extensions?.active || []).map((ext) => ext.id);
+  // Enabled is not active: an enabled hook that failed to load did not apply.
+  const inactive = nextList.filter((id) => !active.includes(id));
+  return reply(200, { enabled: nextList, active }, inactive.length ? 'saved-inactive' : 'saved');
 }
+
+const EXTENSION_ERROR_CODES = {
+  extension_not_found: 'not-found',
+  extension_unavailable: 'unavailable',
+  invalid_extension_id: 'invalid',
+};
+
+// Fixed messages for the admin Extensions section, chosen by code only.
+export const EXTENSION_NOTICES = Object.freeze({
+  saved: { outcome: FORM_OUTCOME.APPLIED, message: 'Enabled extensions saved. Hook changes apply immediately.' },
+  'saved-inactive': {
+    outcome: FORM_OUTCOME.PARTIAL,
+    message: 'Enabled extensions saved, but at least one enabled extension is not active. Check its status below.',
+  },
+  installed: { outcome: FORM_OUTCOME.APPLIED, message: 'Extension installed. Enable it to activate its hooks.' },
+  updated: { outcome: FORM_OUTCOME.APPLIED, message: 'Extension updated to the discovered version.' },
+  uninstalled: { outcome: FORM_OUTCOME.APPLIED, message: 'Extension uninstalled and its hooks disabled. Its source file was kept.' },
+  missing: { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'No extension list was submitted, so nothing changed.' },
+  unknown: { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'An extension in the list was not discovered, so nothing changed.' },
+  'not-installed': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'Install an extension before enabling it. Nothing changed.' },
+  'not-found': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'That extension was not found in the catalog. Nothing changed.' },
+  unavailable: { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'That extension cannot be loaded, so it was not installed.' },
+  invalid: { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'That extension id is not valid. Nothing changed.' },
+  'lifecycle-failed': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'The extension change failed. Nothing was applied.' },
+});
 
 function normalizeList(body, current = []) {
   if (!body) return null;

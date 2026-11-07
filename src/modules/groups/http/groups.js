@@ -37,6 +37,28 @@ import { escapeHtml, sanitizeText } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interfaces/http/views/moduleGate.js';
 import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
+import {
+  prefersHtmlNavigation,
+  renderFlashNotice,
+  setFlashNotice,
+} from '../../../interfaces/http/views/formOutcome.js';
+import { GROUP_NOTICES, groupRefusalCode } from '../groupNotices.js';
+
+// A browser form returns to the group it acted on with a notice whose tone
+// follows the outcome; script clients keep the structured JSON refusal. A
+// refusal points at a readable view (never Settings, which 404s for a
+// non-manager), and a missing record falls back to the directory.
+function refuseGroupForm(req, res, status, payload, href = '/groups', family = '') {
+  if (!prefersHtmlNavigation(req)) return sendJson(res, status, payload);
+  const code = groupRefusalCode(payload?.error, family);
+  setFlashNotice(res, 'groups', code);
+  return sendRedirect(res, code === 'not-found' ? '/groups' : href);
+}
+
+function completeGroupForm(res, href, code) {
+  setFlashNotice(res, 'groups', code);
+  return sendRedirect(res, href);
+}
 
 // Delegates and election candidates may be entered by @handle or by raw hash. Resolve to
 // a canonical pid hash so the stored value is always a hash, and the UI can render @handle.
@@ -76,6 +98,7 @@ export async function renderGroups({ req, res, state, wantsPartial, url }) {
     }
     const html = await renderPage('group-workspace', {
       ...groupWorkspaceData(group, person, state, { view, manage, groups }),
+      groupNotice: renderFlashNotice(req, res, 'groups', GROUP_NOTICES),
       person,
       pageKey: 'groups',
     }, { wantsPartial, title: group.name || 'Group', state });
@@ -98,6 +121,7 @@ export async function renderGroups({ req, res, state, wantsPartial, url }) {
       parentGroupOptions: renderParentOptions(groups),
       createAction: canCreate ? '<a class="cta" href="#group-create">Create a group</a>' : '',
       createHidden: canCreate ? '' : 'hidden',
+      groupsNotice: renderFlashNotice(req, res, 'groups', GROUP_NOTICES),
       person,
     },
     { wantsPartial, title: 'Groups', state },
@@ -113,19 +137,22 @@ export async function createOrJoinGroup({ req, res, state }) {
   const body = await readRequestBody(req);
   const action = body.action || 'create';
   const returnView = ['members', 'decisions'].includes(body.returnView) ? body.returnView : 'overview';
+  const bodyGroupId = sanitizeText(body.groupId || '', 80);
+  let back = bodyGroupId && findGroupById(state, bodyGroupId) ? groupHref(bodyGroupId, returnView) : '/groups';
+  const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);
 
   if (action === 'join') {
     if (!person) {
-      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to join a group.' });
+      return deny(401, { error: 'verification_required', message: 'Login required to join a group.' });
     }
     const permission = evaluateAction(state, person, 'post');
     if (!permission.allowed) {
-      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group join blocked.' });
+      return deny(401, { error: permission.reason, message: permission.message || 'Group join blocked.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
     const groupRef = findGroupById(state, groupId);
     if (!groupRef) {
-      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+      return deny(404, { error: 'group_not_found', message: 'Group not found.' });
     }
     const group = await joinGroup({ groupId, person, state });
     if (group) {
@@ -135,21 +162,21 @@ export async function createOrJoinGroup({ req, res, state }) {
         payload: { groupId },
       });
     }
-    return sendRedirect(res, groupHref(groupId, returnView));
+    return completeGroupForm(res, groupHref(groupId, returnView), group ? 'joined' : 'not-applied');
   }
 
   if (action === 'leave') {
     if (!person) {
-      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to leave a group.' });
+      return deny(401, { error: 'verification_required', message: 'Login required to leave a group.' });
     }
     const permission = evaluateAction(state, person, 'post');
     if (!permission.allowed) {
-      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Group leave blocked.' });
+      return deny(401, { error: permission.reason, message: permission.message || 'Group leave blocked.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
     const groupRef = findGroupById(state, groupId);
     if (!groupRef) {
-      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+      return deny(404, { error: 'group_not_found', message: 'Group not found.' });
     }
     const group = await leaveGroup({ groupId, person, state });
     if (group) {
@@ -159,20 +186,21 @@ export async function createOrJoinGroup({ req, res, state }) {
         payload: { groupId },
       });
     }
-    return sendRedirect(res, groupHref(groupId, returnView));
+    return completeGroupForm(res, groupHref(groupId, returnView), group ? 'left' : 'not-applied');
   }
 
   if (action === 'startElection') {
     if (!person) {
-      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to start elections.' });
+      return deny(401, { error: 'verification_required', message: 'Login required to start elections.' });
     }
     const groupId = sanitizeText(body.groupId || '', 80);
     const group = findGroupById(state, groupId);
     if (!group) {
-      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+      return deny(404, { error: 'group_not_found', message: 'Group not found.' });
     }
+    back = groupHref(groupId, 'decisions');
     if (!canManageGroup(state, person, group)) {
-      return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+      return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
     }
     const topic = sanitizeText(body.topic || 'general', 64);
     const candidates = (body.candidates || '')
@@ -188,28 +216,29 @@ export async function createOrJoinGroup({ req, res, state }) {
         payload: { groupId, electionId: election.id, topic, candidates: candidates.length },
       });
     }
-    return sendRedirect(res, groupHref(groupId, 'decisions'));
+    return completeGroupForm(res, groupHref(groupId, 'decisions'), election ? 'election-started' : 'not-applied');
   }
 
   if (action === 'voteElection') {
     if (!person) {
-      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to vote in a group election.' });
+      return deny(401, { error: 'verification_required', message: 'Login required to vote in a group election.' });
     }
     const permission = evaluateAction(state, person, 'vote');
     if (!permission.allowed) {
-      return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Election voting blocked.' });
+      return deny(401, { error: permission.reason, message: permission.message || 'Election voting blocked.' });
     }
     const electionId = sanitizeText(body.electionId || '', 80);
     const electionRef = (state.groupElections || []).find((entry) => entry.id === electionId);
     if (!electionRef) {
-      return sendJson(res, 404, { error: 'election_not_found', message: 'Election not found.' });
+      return deny(404, { error: 'election_not_found', message: 'Election not found.' });
     }
     const group = findGroupById(state, electionRef.groupId);
     if (!group) {
-      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+      return deny(404, { error: 'group_not_found', message: 'Group not found.' });
     }
+    back = groupHref(group.id, 'decisions');
     if (!isGroupMember(group, person.pidHash)) {
-      return sendJson(res, 401, { error: 'group_membership_required', message: 'Join the group to vote in its elections.' });
+      return deny(401, { error: 'group_membership_required', message: 'Join the group to vote in its elections.' });
     }
     const candidateHash = resolveActorHash(state, sanitizeText(body.candidateHash || '', 80));
     const secondChoiceHash = resolveActorHash(state, sanitizeText(body.secondChoiceHash || '', 80));
@@ -222,24 +251,25 @@ export async function createOrJoinGroup({ req, res, state }) {
         payload: { electionId, candidateHash, secondChoiceHash: secondChoiceHash || null, thirdChoiceHash: thirdChoiceHash || null },
       });
     }
-    return sendRedirect(res, groupHref(group.id, 'decisions'));
+    return completeGroupForm(res, groupHref(group.id, 'decisions'), election ? 'ballot-cast' : 'not-applied');
   }
 
   if (action === 'closeElection') {
     if (!person) {
-      return sendJson(res, 401, { error: 'verification_required', message: 'Login required to close elections.' });
+      return deny(401, { error: 'verification_required', message: 'Login required to close elections.' });
     }
     const electionId = sanitizeText(body.electionId || '', 80);
     const electionRef = (state.groupElections || []).find((entry) => entry.id === electionId);
     if (!electionRef) {
-      return sendJson(res, 404, { error: 'election_not_found', message: 'Election not found.' });
+      return deny(404, { error: 'election_not_found', message: 'Election not found.' });
     }
     const group = findGroupById(state, electionRef.groupId);
     if (!group) {
-      return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+      return deny(404, { error: 'group_not_found', message: 'Group not found.' });
     }
+    back = groupHref(group.id, 'decisions');
     if (!canManageGroup(state, person, group)) {
-      return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+      return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
     }
     const election = await closeElection({ electionId, state });
     let winner = null;
@@ -263,12 +293,13 @@ export async function createOrJoinGroup({ req, res, state }) {
         payload: { electionId, groupId: election.groupId, winner: winner?.candidateHash || null },
       });
     }
-    return sendRedirect(res, groupHref(group.id, 'decisions'));
+    const closedCode = !election ? 'not-applied' : winner ? 'election-closed' : 'election-closed-no-winner';
+    return completeGroupForm(res, groupHref(group.id, 'decisions'), closedCode);
   }
 
   const permission = evaluateAction(state, person, 'post');
   if (!permission.allowed) {
-    return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Not allowed to create group.' });
+    return deny(401, { error: permission.reason, message: permission.message || 'Not allowed to create group.' });
   }
 
   const name = sanitizeText(body.name || '', 120);
@@ -278,10 +309,10 @@ export async function createOrJoinGroup({ req, res, state }) {
   // is validated here for existence, self-reference, cycles and depth.
   const parentCheck = validateParent(state, { parentId: sanitizeText(body.parentId || '', 80) || null });
   if (!parentCheck.ok) {
-    return sendJson(res, parentCheck.error === 'parent_not_found' ? 404 : 400, {
+    return deny(parentCheck.error === 'parent_not_found' ? 404 : 400, {
       error: parentCheck.error,
       message: parentCheck.message,
-    });
+    }, 'parent');
   }
   // Register declared categories in the topic registry so group categories and site
   // categories are the same nested tree, not two vocabularies that drift apart.
@@ -307,7 +338,7 @@ export async function createOrJoinGroup({ req, res, state }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { groupId: group.id, name: group.name },
   });
-  return sendRedirect(res, groupHref(group.id));
+  return completeGroupForm(res, groupHref(group.id), 'created');
 }
 
 export async function setGroupDelegateRoute({ req, res, state }) {
@@ -318,19 +349,21 @@ export async function setGroupDelegateRoute({ req, res, state }) {
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
   const group = findGroupById(state, groupId);
+  const back = group ? groupHref(groupId) : '/groups';
+  const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);
   if (!group) {
-    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    return deny(404, { error: 'group_not_found', message: 'Group not found.' });
   }
   if (!person) {
-    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set delegates.' });
+    return deny(401, { error: 'verification_required', message: 'Login required to set delegates.' });
   }
   if (!canManageGroup(state, person, group)) {
-    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
   }
   const topic = sanitizeText(body.topic || 'general', 64);
   const delegateHash = resolveActorHash(state, sanitizeText(body.delegateHash || '', 80));
   const priority = Number(body.priority || 0);
-  await setGroupDelegate({ groupId, topic, delegateHash, priority, provider: sanitizeText(body.provider || 'local', 64), state });
+  const saved = await setGroupDelegate({ groupId, topic, delegateHash, priority, provider: sanitizeText(body.provider || 'local', 64), state });
   await createNotification(state, {
     type: 'group_delegate',
     recipientHash: person?.pidHash || 'broadcast',
@@ -342,7 +375,7 @@ export async function setGroupDelegateRoute({ req, res, state }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { groupId, topic, delegateHash, priority },
   });
-  return sendRedirect(res, groupHref(groupId, 'settings'));
+  return completeGroupForm(res, groupHref(groupId, 'settings'), saved ? 'delegate-saved' : 'not-applied');
 }
 
 export async function setGroupMemberRoleRoute({ req, res, state }) {
@@ -353,32 +386,34 @@ export async function setGroupMemberRoleRoute({ req, res, state }) {
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
   const group = findGroupById(state, groupId);
+  const back = group ? groupHref(groupId, 'members') : '/groups';
+  const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);
   if (!group) {
-    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    return deny(404, { error: 'group_not_found', message: 'Group not found.' });
   }
   if (!person) {
-    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set group roles.' });
+    return deny(401, { error: 'verification_required', message: 'Login required to set group roles.' });
   }
   // Roles are an admin power on purpose: a lane moderator who could appoint lane moderators
   // would be an admin by another name.
   if (!canManageGroup(state, person, group)) {
-    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
   }
   const memberHash = resolveActorHash(state, sanitizeText(body.memberHash || '', 80));
   const role = sanitizeText(body.role || 'member', 24);
   const result = await setGroupMemberRole({ groupId, memberHash, role, state });
   if (!result.ok) {
-    return sendJson(res, result.error === 'group_not_found' ? 404 : 400, {
+    return deny(result.error === 'group_not_found' ? 404 : 400, {
       error: result.error,
       message: result.message || 'Could not set that role.',
-    });
+    }, 'role');
   }
   await logTransaction(state, {
     type: 'group_role_set',
     actorHash: person?.pidHash || 'anonymous',
     payload: { groupId, memberHash, role },
   });
-  return sendRedirect(res, groupHref(groupId, 'members'));
+  return completeGroupForm(res, groupHref(groupId, 'members'), 'role-saved');
 }
 
 export async function setGroupTopicsRoute({ req, res, state }) {
@@ -389,14 +424,16 @@ export async function setGroupTopicsRoute({ req, res, state }) {
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
   const group = findGroupById(state, groupId);
+  const back = group ? groupHref(groupId) : '/groups';
+  const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);
   if (!group) {
-    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    return deny(404, { error: 'group_not_found', message: 'Group not found.' });
   }
   if (!person) {
-    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to set group categories.' });
+    return deny(401, { error: 'verification_required', message: 'Login required to set group categories.' });
   }
   if (!canManageGroup(state, person, group)) {
-    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
   }
   const topics = (body.topics || '')
     .split(',')
@@ -414,7 +451,7 @@ export async function setGroupTopicsRoute({ req, res, state }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { groupId, topics },
   });
-  return sendRedirect(res, groupHref(groupId, 'settings'));
+  return completeGroupForm(res, groupHref(groupId, 'settings'), 'categories-saved');
 }
 
 export async function updateGroupPolicyRoute({ req, res, state }) {
@@ -425,14 +462,16 @@ export async function updateGroupPolicyRoute({ req, res, state }) {
   const body = await readRequestBody(req);
   const groupId = sanitizeText(body.groupId || '', 80);
   const group = findGroupById(state, groupId);
+  const back = group ? groupHref(groupId) : '/groups';
+  const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);
   if (!group) {
-    return sendJson(res, 404, { error: 'group_not_found', message: 'Group not found.' });
+    return deny(404, { error: 'group_not_found', message: 'Group not found.' });
   }
   if (!person) {
-    return sendJson(res, 401, { error: 'verification_required', message: 'Login required to update group policy.' });
+    return deny(401, { error: 'verification_required', message: 'Login required to update group policy.' });
   }
   if (!canManageGroup(state, person, group)) {
-    return sendJson(res, 401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
+    return deny(401, { error: 'group_admin_required', message: 'Group admin or circle moderator required.' });
   }
   const electionMode = sanitizeText(body.electionMode || 'priority', 32);
   const conflictRule = sanitizeText(body.conflictRule || 'highest_priority', 32);
@@ -457,5 +496,5 @@ export async function updateGroupPolicyRoute({ req, res, state }) {
     actorHash: person?.pidHash || 'anonymous',
     payload: { groupId, electionMode, conflictRule, categoryWeighted, lanes, lanesVisibility, adoptBranchElections },
   });
-  return sendRedirect(res, groupHref(groupId, 'settings'));
+  return completeGroupForm(res, groupHref(groupId, 'settings'), 'policy-saved');
 }

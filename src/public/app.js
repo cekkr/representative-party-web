@@ -273,31 +273,6 @@ function focusPageDestination(root, url) {
   }
 }
 
-async function submitExtensionsForm(form, submitter) {
-  const checkboxes = Array.from(form.querySelectorAll('input[name="extensions"]'));
-  const enabled = checkboxes.filter((box) => box.checked).map((box) => box.value);
-  const lifecycle = submitter?.name === 'lifecycle' ? submitter.value : '';
-  const payload = lifecycle ? { lifecycle } : { extensions: enabled };
-  setAppBusy(true);
-  try {
-    const response = await fetch(form.action, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!response.ok) throw new Error('Extensions update failed');
-    showToast(lifecycle ? 'Extension lifecycle updated. Reloading…' : 'Extensions updated. Reloading…', { tone: 'success' });
-    window.setTimeout(() => {
-      window.location.reload();
-    }, 180);
-  } catch (error) {
-    console.error(error);
-    showToast('Failed to update extensions.', { tone: 'error' });
-  } finally {
-    setAppBusy(false);
-  }
-}
-
 async function submitDelegationChoice(form) {
   const formData = new FormData(form);
   setAppBusy(true);
@@ -3165,13 +3140,9 @@ function isHtmlResponse(response) {
     const form = event.target.closest('form[data-enhance]');
     if (!form) return;
     const mode = form.dataset.enhance || '';
-    const requiresEnhancedSubmit = mode === 'extensions' || mode === 'delegation-conflict';
+    const requiresEnhancedSubmit = mode === 'delegation-conflict';
     if (!isPartialNavigationEnabled() && !requiresEnhancedSubmit) return;
     event.preventDefault();
-    if (form.dataset.enhance === 'extensions') {
-      await submitExtensionsForm(form, event.submitter);
-      return;
-    }
     if (form.dataset.enhance === 'delegation-conflict') {
       await submitDelegationChoice(form);
       return;
@@ -3197,7 +3168,9 @@ function isHtmlResponse(response) {
       const hasFiles = Array.from(formData.values()).some((value) => value instanceof File && value.size > 0);
       const isMultipart = String(form.enctype || '').toLowerCase().includes('multipart/form-data');
       const method = (form.method || 'POST').toUpperCase();
-      const headers = { 'X-Requested-With': 'partial' };
+      // Ask for HTML as a navigating browser would, so a handler that redirects an
+      // ordinary form back to its record with a notice does the same here.
+      const headers = { 'X-Requested-With': 'partial', Accept: 'text/html' };
       let url = action.href;
       const options = { method, headers };
       if (method === 'GET') {
@@ -3229,7 +3202,12 @@ function isHtmlResponse(response) {
       if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
-      const destination = redirectedTo || url;
+      // A fetch's redirected URL never keeps the Location fragment, so a form whose
+      // action names its landing section (`/extensions#extensions`) reapplies it.
+      let destination = redirectedTo || url;
+      if (redirectedTo && action.hash && !new URL(redirectedTo).hash) {
+        destination = `${redirectedTo}${action.hash}`;
+      }
       window.history.pushState({}, '', destination);
       applyUiSettings(readUiSettings());
       initInstallWizard(root);

@@ -373,9 +373,23 @@ partially applied, or not applied. Only an applied outcome without field errors
 reads as a confirmation. An anchor action missing its key, an unconfirmed merge
 or split, and a skipped gossip run are warnings.
 
+`/extensions`, governance proposals, group writes, and delegation
+preferences use the same outcome vocabulary through
+[`formOutcome.js`](src/interfaces/http/views/formOutcome.js). Their writes
+redirect to the canonical record address and set a one-shot cookie naming a
+catalog code. The page they land on renders that code's fixed message in the
+tone its outcome sets, then clears it, so a reload shows nothing. A refusal
+from an ordinary browser form returns to a page the member can read with a
+warning that says nothing changed. A group refusal never points at Settings,
+which a non-manager cannot open, and a missing group falls back to the
+directory. An unknown delegate keeps the typed handle in the Delegate form.
+A rejected governance proposal re-renders with the shared alert summary and
+the typed title and reason. Script clients keep the structured JSON refusal.
+The admin Extensions form works without JavaScript and returns to its section.
+
 **Target.** Add a translated wallet-not-installed hint once the verifier
-reports that state. Give `/extensions` and the governance, group, and
-delegation flash messages the same outcome.
+reports that state. Give petitions, discussion, forum, social, and
+organization refusals the same in-page warning instead of JSON and `alert()`.
 
 
 ## 4. Participation, ballots, and activity
@@ -526,15 +540,15 @@ starting point for implementation.
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall with permalinks, adjacent follow filters, and native compose with audience and attachment controls. A [focused update](src/modules/social/templates/social-post.html) shows its parent and replies under the source audience. | Inline recovery for ordinary forms. |
 | [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Ballot leads with a voting timeline and previews a delegated hand-off. Reads and writes use the stored lane. | Refine discussion filters and SSR form recovery. A binding close date once voting closes on schedule. |
-| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. | Clearer activity and decision history within a group. |
-| [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Clearer activity and decision history within a group. |
+| [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. Set, clear, and renew report their outcome above the panels; an unknown delegate keeps the typed handle. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Search-led, paginated collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Profile activity beyond proposals as those records gain lane-aware links. |
-| [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail. | A focused change record once members ratify changes. |
+| [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail with an outcome notice and the shared alert summary. | A focused change record once members ratify changes. |
 | [Notifications](src/modules/notifications/templates/notifications.html) `/notifications` | Paginated activity rows with a record, lane, and topic line, unread text and edge, gated proposal, contribution, group, and Social update links, Mark all read, and preferences in the rail. | Record titles stored apart from messages. |
 | [Profile](src/modules/profile/templates/profile.html) `/profile` | Identity header with one action, section links, labelled Public handle, Provider-local fields, and Interface defaults sections with inline status and field errors, and a Session rail. | Optional provider-profile sync across devices. |
 | [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Cases heading, case record header, original message with evidence, acknowledgement form or ordered history, and the searchable queue in the rail. | Case history beyond acknowledgement as layer stores arrive. Retain provider-local scope. |
 | [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Persistent preview header with backlink, Preview label, and live-queue action, then the illustrative inbox, pressure map, and operating map. | Scenario B examples in place of the generic illustrative cases. |
-| [Admin](src/modules/admin/templates/admin.html) `/admin` | Page heading with audit export, grouped index of the 20 anchored sections, forms that return to their section, and section-local notices whose tone follows each handler's outcome. The inactive Composer entry sits in the page flow on phones. | Composer palette operations once variants settle. |
+| [Admin](src/modules/admin/templates/admin.html) `/admin` | Page heading with audit export, grouped index of the 20 anchored sections, forms that return to their section, and section-local notices whose tone follows each handler's outcome. Extensions posts as an ordinary form and returns to its section. The inactive Composer entry sits in the page flow on phones. | Composer palette operations once variants settle. |
 | [Wallet handoff and result](src/modules/auth/templates) | Focused task pages: numbered steps, wallet link before QR, hash-only guarantee, refresh and restart recovery, a result page that leads to Choose your handle, and a recovery page for failed callbacks. | Wallet-not-installed guidance once the verifier reports it. |
 
 
@@ -758,6 +772,23 @@ Ballot as a member whose waiting-list delegation forwards through
 375 px in light with no horizontal overflow.
 [Ballot regression](tests/ballot-timing.test.js) ·
 [Admin feedback regression](tests/settings-task-pages.test.js)
+
+### Form outcome verification
+
+A unit test checks that the notice cookie holds only a scoped catalog code,
+that another page's notice stays put, and that a forged or prototype code
+renders nothing. The HTTP regression posts as a navigating browser and
+follows each redirect with the one-shot cookie. It covers group creation and
+joining, a Settings refusal that returns to the Overview with a warning while
+a script client still gets 401 JSON, a missing group, the notice clearing on
+reload, an unknown and a saved delegate, clearing a topic with no delegation,
+a rejected and an accepted governance proposal, and the Extensions form with
+an uninstalled extension and with every box unticked. A seeded Scenario A
+pass saved group categories with enhanced navigation at desktop width, read
+the unknown-delegate warning at 375 px in light and dark with no horizontal
+overflow, and installed an extension from `/admin` with focus landing in the
+Extensions section.
+[Form outcome regression](tests/form-outcomes.test.js)
 
 ### Review checklist for presentation changes
 

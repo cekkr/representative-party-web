@@ -34,16 +34,16 @@
     <section class="panel" id="governance-propose" data-composer-section="governance-propose" data-section-label="Propose a change">
       <h2 class="h3">Propose a change</h2>
       <p class="muted small">{{proposalHelp}}</p>
-      <p class="muted small">{{proposalFlash}}</p>
+      {{proposalNotice}}
       {{proposalErrors}}
-      <form class="stack" method="post" action="/governance/proposals" data-enhance="governance-proposal">
+      <form class="stack" method="post" action="/governance/proposals#governance-propose" data-enhance="governance-proposal">
         <label class="field">
           <span>Proposal title</span>
-          <input name="governanceProposalTitle" placeholder="Adjust quorum for local pilots" {{proposalDisabled}} />
+          <input name="governanceProposalTitle" placeholder="Adjust quorum for local pilots" value="{{proposalTitleValue}}" {{proposalDisabled}} />
         </label>
         <label class="field">
           <span>Reason</span>
-          <textarea name="governanceProposalReason" rows="3" placeholder="Explain why this change is needed" {{proposalDisabled}}></textarea>
+          <textarea name="governanceProposalReason" rows="3" placeholder="Explain why this change is needed" {{proposalDisabled}}>{{proposalReasonValue}}</textarea>
         </label>
         <div class="form-grid">
           <label class="field">

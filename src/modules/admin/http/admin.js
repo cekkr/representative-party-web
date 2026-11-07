@@ -106,6 +106,8 @@ import {
   renderAdminIndex,
   resolveAdminIntentSection,
 } from '../adminSections.js';
+import { takeFlashNotice } from '../../../interfaces/http/views/formOutcome.js';
+import { EXTENSION_NOTICES } from '../../../interfaces/http/controllers/extensions.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 
@@ -114,7 +116,12 @@ export async function renderAdmin({ req, res, state, wantsPartial }) {
   if (!canAdministerProvider(person, state)) {
     return renderAdminRequired({ res, state, wantsPartial, person });
   }
-  return renderAdminPage({ res, state, wantsPartial, viewModel: { flash: null, person } });
+  // An extensions form post redirects here; its notice belongs in Extensions.
+  const notice = takeFlashNotice(req, res, 'extensions', EXTENSION_NOTICES);
+  const viewModel = notice
+    ? { flash: notice.message, outcome: notice.outcome, flashSection: 'extensions', person }
+    : { flash: null, person };
+  return renderAdminPage({ res, state, wantsPartial, viewModel });
 }
 
 export function exportAuditLog({ req, res, state }) {

@@ -1,5 +1,5 @@
 import { escapeHtml } from '../../shared/utils/text.js';
-import { renderFormNotice } from '../../interfaces/http/views/formFeedback.js';
+import { FORM_OUTCOME, renderOutcomeNotice, resolveOutcomeTone } from '../../interfaces/http/views/formOutcome.js';
 
 // The admin page is one long settings document. These groups give it a stable
 // index (the same anchors the partials already use as ids and Composer keys) and
@@ -63,19 +63,13 @@ export function adminNoticeKey(section) {
   return `adminNotice_${String(section).replace(/-/g, '_')}`;
 }
 
-// What an admin handler did, returned beside its message. The tone follows the
-// outcome, never the wording: a handler that says "Confirm the merge first" did
-// not apply anything, however politely it is phrased.
-export const ADMIN_OUTCOME = Object.freeze({
-  APPLIED: 'applied',
-  PARTIAL: 'partial',
-  NOT_APPLIED: 'not_applied',
-});
+// What an admin handler did, returned beside its message. The shared form
+// outcome is the single vocabulary, so admin, extensions, governance, groups and
+// delegation notices all take their tone the same way.
+export const ADMIN_OUTCOME = FORM_OUTCOME;
 
-const OUTCOMES = new Set(Object.values(ADMIN_OUTCOME));
-
-export function resolveAdminNoticeTone(outcome, { hasErrors = false } = {}) {
-  return hasErrors || outcome !== ADMIN_OUTCOME.APPLIED ? 'warning' : 'success';
+export function resolveAdminNoticeTone(outcome, options = {}) {
+  return resolveOutcomeTone(outcome, options);
 }
 
 // Returns the per-section placeholders, plus `adminNotice` for a submission that
@@ -86,8 +80,7 @@ export function buildAdminSectionNotices({ flash, outcome, section, hasErrors = 
   const notices = { adminNotice: '' };
   for (const id of ADMIN_SECTION_IDS) notices[adminNoticeKey(id)] = '';
   if (!flash) return notices;
-  const known = OUTCOMES.has(outcome) ? outcome : ADMIN_OUTCOME.NOT_APPLIED;
-  const html = renderFormNotice(flash, { tone: resolveAdminNoticeTone(known, { hasErrors }) });
+  const html = renderOutcomeNotice(flash, outcome, { hasErrors });
   if (ADMIN_SECTION_IDS.includes(section)) {
     notices[adminNoticeKey(section)] = html;
   } else {

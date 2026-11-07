@@ -3,7 +3,8 @@
   <h2>Extension lifecycle</h2>
   {{adminNotice_extensions}}
   <p class="muted small">Discover provider-local extensions, record installed versions, then enable or disable their runtime hooks. Uninstalling deregisters an extension without deleting its source file.</p>
-  <form class="stack" method="post" action="/extensions" data-enhance="extensions">
+  <form class="stack" method="post" action="/extensions#extensions" data-enhance="admin">
+    <input type="hidden" name="extensionsForm" value="1" />
     <div class="stack">{{extensionsList}}</div>
     <div class="cta-row">
       <button class="cta" type="submit">Apply enabled extensions</button>

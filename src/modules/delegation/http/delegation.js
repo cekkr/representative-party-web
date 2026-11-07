@@ -34,6 +34,33 @@ import { renderModuleDisabled, sendModuleDisabledJson } from '../../../interface
 import { buildTopicOptions, renderTopicDatalist } from '../../../interfaces/http/views/topicHelpers.js';
 import { renderIssuerPill, renderPreviewPill } from '../../../interfaces/http/views/shared.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import {
+  FORM_OUTCOME,
+  prefersHtmlNavigation,
+  renderFlashNotice,
+  setFlashNotice,
+} from '../../../interfaces/http/views/formOutcome.js';
+
+// Fixed messages for delegation preference writes, chosen by code only.
+export const DELEGATION_NOTICES = Object.freeze({
+  saved: { outcome: FORM_OUTCOME.APPLIED, message: 'Delegate saved for that topic. You can still vote yourself on any proposal.' },
+  cleared: { outcome: FORM_OUTCOME.APPLIED, message: 'Delegation cleared for that topic.' },
+  'clear-none': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'You had no delegation on that topic, so nothing changed.' },
+  renewed: { outcome: FORM_OUTCOME.APPLIED, message: 'Delegation renewed. Its decay window starts again today.' },
+  'renew-none': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'There was no delegation on that topic to renew.' },
+  'missing-delegate': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'Pick a person to delegate to. Nothing changed.' },
+  'unknown-delegate': {
+    outcome: FORM_OUTCOME.NOT_APPLIED,
+    message: 'No verified person matches that handle. Browse People to find a delegate. Nothing changed.',
+  },
+  'not-allowed': { outcome: FORM_OUTCOME.NOT_APPLIED, message: 'Your account cannot set delegations right now. Nothing changed.' },
+});
+
+// Post/Redirect/Get for both flows, with the outcome as a one-shot notice.
+function completeDelegationForm(res, code, href = '/delegation') {
+  setFlashNotice(res, 'delegation', code);
+  return sendRedirect(res, href);
+}
 
 export async function resolveConflict({ req, res, state }) {
   if (!isModuleEnabled(state, 'delegation')) {
@@ -88,6 +115,7 @@ export async function renderDelegation({ req, res, state, wantsPartial, url }) {
       delegationStatus: permission.allowed ? 'Delegation preferences enabled.' : permission.message || 'Delegation blocked.',
       delegationReason: permission.allowed ? '' : permission.reason,
       delegationSuggestions,
+      delegationNotice: renderFlashNotice(req, res, 'delegation', DELEGATION_NOTICES),
       effectiveDelegations: renderEffectiveDelegations({ person, state, delegations }),
       delegationList: renderDelegationList(delegations, { decayDays: getDelegationDecayDays(state), state }),
       delegationDecayNote: renderDecayNote(getDelegationDecayDays(state)),
@@ -114,42 +142,41 @@ export async function updateDelegation({ req, res, state, wantsPartial }) {
   }
   const person = getPerson(req, state);
   const permission = evaluateAction(state, person, 'delegate');
+  // A browser form returns to /delegation with the refusal as a notice; script
+  // clients keep the structured JSON refusal.
+  const html = prefersHtmlNavigation(req);
   if (!permission.allowed) {
+    if (html) return completeDelegationForm(res, 'not-allowed');
     return sendJson(res, 401, { error: permission.reason, message: permission.message || 'Delegation not allowed.' });
   }
   const body = await readRequestBody(req);
   const intent = body.intent || 'set';
   const topic = sanitizeText(body.topic || 'general', 64);
   if (intent === 'clear') {
-    await clearDelegation({ person, topic, state });
-    if (wantsPartial) {
-      return renderDelegation({ req, res, state, wantsPartial });
-    }
-    return sendRedirect(res, '/delegation');
+    const { removed } = await clearDelegation({ person, topic, state });
+    return completeDelegationForm(res, removed ? 'cleared' : 'clear-none');
   }
   if (intent === 'renew') {
-    await renewDelegation({ person, topic, state });
-    if (wantsPartial) {
-      return renderDelegation({ req, res, state, wantsPartial });
-    }
-    return sendRedirect(res, '/delegation');
+    const { renewed } = await renewDelegation({ person, topic, state });
+    return completeDelegationForm(res, renewed ? 'renewed' : 'renew-none');
   }
   const rawTarget = sanitizeText(body.delegateHash || '', 80);
   if (!rawTarget) {
+    if (html) return completeDelegationForm(res, 'missing-delegate', '/delegation#delegation-set');
     return sendJson(res, 400, { error: 'missing_delegate', message: 'Pick a person to delegate to.' });
   }
   const resolved = resolveDelegateTarget(state, rawTarget);
   if (!resolved) {
+    // Keep what the member typed: the existing ?delegate= pre-fill puts it back in the form.
+    const retry = `/delegation?delegate=${encodeURIComponent(rawTarget.replace(/^@+/, ''))}#delegation-set`;
+    if (html) return completeDelegationForm(res, 'unknown-delegate', retry);
     return sendJson(res, 404, {
       error: 'unknown_delegate',
       message: 'No verified person matches that handle or hash. Browse People to find a delegate.',
     });
   }
   await setDelegation({ person, topic, delegateHash: resolved, provider: 'manual', state });
-  if (wantsPartial) {
-    return renderDelegation({ req, res, state, wantsPartial });
-  }
-  return sendRedirect(res, '/delegation');
+  return completeDelegationForm(res, 'saved');
 }
 
 

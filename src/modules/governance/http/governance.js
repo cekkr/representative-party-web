@@ -14,10 +14,27 @@ import { formatTimestamp } from '../../../shared/utils/time.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderActorLabel, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
+import { renderFormErrors } from '../../../interfaces/http/views/formFeedback.js';
+import {
+  FORM_OUTCOME,
+  prefersHtmlNavigation,
+  renderFlashNotice,
+  renderOutcomeNotice,
+  setFlashNotice,
+} from '../../../interfaces/http/views/formOutcome.js';
+
+// Fixed messages for the Propose a change panel, chosen by code only.
+export const GOVERNANCE_NOTICES = Object.freeze({
+  'proposal-submitted': {
+    outcome: FORM_OUTCOME.APPLIED,
+    message: 'Change proposal submitted. It stays advisory until the provider decides it.',
+  },
+});
 
 export async function renderGovernance({ req, res, state, wantsPartial }) {
   const person = getPerson(req, state);
-  return renderGovernancePage({ res, state, wantsPartial, person });
+  const proposalNotice = renderFlashNotice(req, res, 'governance', GOVERNANCE_NOTICES);
+  return renderGovernancePage({ res, state, wantsPartial, person, proposalNotice });
 }
 
 export async function proposeGovernanceChange({ req, res, state, wantsPartial }) {
@@ -33,13 +50,18 @@ export async function proposeGovernanceChange({ req, res, state, wantsPartial })
   const body = await readRequestBody(req);
   const result = createGovernanceProposal(state, body, person);
   if (!result.ok) {
-    if (wantsPartial) {
+    // A browser form gets the page back with the errors beside the form; the
+    // typed title and reason stay so the member does not retype them.
+    if (wantsPartial || prefersHtmlNavigation(req)) {
       return renderGovernancePage({
         res,
         state,
         wantsPartial,
         person,
+        status: 400,
+        proposalNotice: renderOutcomeNotice('The proposal was not submitted.', FORM_OUTCOME.NOT_APPLIED),
         proposalErrors: renderProposalErrors(result.errors),
+        draft: body,
       });
     }
     return sendJson(res, 400, { error: 'invalid_governance_proposal', messages: result.errors });
@@ -56,19 +78,15 @@ export async function proposeGovernanceChange({ req, res, state, wantsPartial })
     },
   });
 
-  if (wantsPartial) {
-    return renderGovernancePage({
-      res,
-      state,
-      wantsPartial,
-      person,
-      flash: 'Governance change proposal submitted.',
-    });
-  }
-  return sendRedirect(res, '/governance');
+  // Post/Redirect/Get for both flows: a refresh cannot resubmit the proposal,
+  // and the notice survives the redirect as a one-shot catalog code.
+  setFlashNotice(res, 'governance', 'proposal-submitted');
+  return sendRedirect(res, '/governance#governance-propose');
 }
 
-async function renderGovernancePage({ res, state, wantsPartial, person, flash = '', proposalErrors = '' }) {
+async function renderGovernancePage({
+  res, state, wantsPartial, person, proposalNotice = '', proposalErrors = '', draft = null, status = 200,
+}) {
   const governance = getGovernanceSettings(state);
   const updatedAt = formatTimestamp(governance.updatedAt) || 'Not yet updated';
   const updatedBy = governance.updatedBy || 'admin';
@@ -99,8 +117,10 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
       governanceNotes: escapeHtml(governance.notes || 'No governance notes published yet.'),
       governanceUpdatedAt: escapeHtml(updatedAt),
       governanceUpdatedBy: escapeHtml(updatedBy),
-      proposalFlash: escapeHtml(flash),
+      proposalNotice,
       proposalErrors,
+      proposalTitleValue: escapeHtml(String(draft?.governanceProposalTitle || '').slice(0, 120)),
+      proposalReasonValue: escapeHtml(String(draft?.governanceProposalReason || '').slice(0, 800)),
       proposalDisabled: person ? '' : 'disabled',
       proposalHelp: person
         ? 'Proposals stay advisory until an admin accepts or rejects them.'
@@ -128,7 +148,7 @@ async function renderGovernancePage({ res, state, wantsPartial, person, flash = 
     { wantsPartial, title: 'Governance', state },
   );
 
-  return sendHtml(res, html);
+  return sendHtml(res, html, {}, status);
 }
 
 const RULE_FIELDS = [
@@ -161,12 +181,7 @@ function renderCurrentRules(governance) {
 }
 
 function renderProposalErrors(errors = []) {
-  if (!errors.length) return '';
-  return `
-    <div class="callout warning">
-      ${errors.map((error) => `<p class="muted small">${escapeHtml(error)}</p>`).join('')}
-    </div>
-  `;
+  return renderFormErrors(errors, { id: 'governance-proposal-errors', title: 'The proposal needs changes' });
 }
 
 // Values are stored raw (`0`, `majority`); members read rules.

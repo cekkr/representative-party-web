@@ -15,7 +15,7 @@ const DEFAULT_FILENAME_MAX_BYTES = 256;
 
 export async function readRequestBody(
   req,
-  { maxBytes = REQUEST_BODY.maxBytes, rejectMultipart = REQUEST_BODY.rejectMultipart } = {},
+  { maxBytes = REQUEST_BODY.maxBytes, rejectMultipart = REQUEST_BODY.rejectMultipart, repeated = [] } = {},
 ) {
   const chunks = [];
   const contentType = String(req.headers['content-type'] || '').toLowerCase();
@@ -60,7 +60,13 @@ export async function readRequestBody(
 
   if (type.includes('application/x-www-form-urlencoded')) {
     const params = new URLSearchParams(raw);
-    return Object.fromEntries(params.entries());
+    const fields = Object.fromEntries(params.entries());
+    // A checkbox group posts one pair per ticked box; `Object.fromEntries` keeps
+    // only the last. Callers name the fields they expect to repeat.
+    for (const key of repeated) {
+      if (params.has(key)) fields[key] = params.getAll(key);
+    }
+    return fields;
   }
 
   return { raw };
