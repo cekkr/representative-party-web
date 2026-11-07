@@ -43,7 +43,7 @@ export async function postThread({ req, res, state }) {
   const title = sanitizeText(body.title || '', 160);
   const content = sanitizeText(body.content || '', 1200);
   if (!title || !content) {
-    return sendJson(res, 400, { error: 'missing_fields' });
+    return sendJson(res, 400, { error: 'missing_fields', message: 'Write a title and some text before publishing.' });
   }
   const policy = getCirclePolicyState(state);
   const classifiedTopic = sanitizeText(body.topic || '', 80) || await classifyTopic(`${title} ${content}`, state);
@@ -99,11 +99,11 @@ export async function postComment({ req, res, state, url }) {
   const content = sanitizeText(body.content || '', 800);
   const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   if (!parentId || !content) {
-    return sendJson(res, 400, { error: 'missing_fields' });
+    return sendJson(res, 400, { error: 'missing_fields', message: 'Write a reply before sending.' });
   }
   const parent = findForumThread(state, parentId);
   if (!parent) {
-    return sendJson(res, 404, { error: 'thread_not_found' });
+    return sendJson(res, 404, { error: 'thread_not_found', message: 'That article no longer exists or you can no longer open it.' });
   }
   const policy = getCirclePolicyState(state);
   let topicId = parent.topicId || null;

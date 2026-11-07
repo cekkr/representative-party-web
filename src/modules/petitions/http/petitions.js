@@ -209,7 +209,7 @@ async function renderFocusedProposal({ res, state, wantsPartial, person, query, 
 function requirePetitionAction(res, state, person, petitionId, { requireMembership = true } = {}) {
   const petition = findVisibleEntry(state.petitions, state, (item) => item.id === petitionId);
   if (!petition) {
-    sendJson(res, 404, { error: 'petition_not_found' });
+    sendJson(res, 404, { error: 'petition_not_found', message: 'That proposal no longer exists or you can no longer open it.' });
     return null;
   }
   // A submitted group cannot authorize an action. Always check the record's current lane.
@@ -834,7 +834,7 @@ export async function updatePetitionStatus({ req, res, state }) {
   const quorum = Number(body.quorum || 0);
   const validStatus = ['draft', 'discussion', 'open', 'vote', 'closed'];
   if (!validStatus.includes(status)) {
-    return sendJson(res, 400, { error: 'invalid_status' });
+    return sendJson(res, 400, { error: 'invalid_status', message: 'That stage change is not available.' });
   }
   const petition = requirePetitionAction(res, state, person, petitionId, { requireMembership: false });
   if (!petition) return;
@@ -896,7 +896,7 @@ export async function signPetitionRoute({ req, res, state }) {
   const petition = requirePetitionAction(res, state, person, petitionId);
   if (!petition) return;
   if (hasSigned(petitionId, person, state)) {
-    return sendJson(res, 400, { error: 'already_signed' });
+    return sendJson(res, 400, { error: 'already_signed', message: 'You have already signed this proposal.' });
   }
   await signPetition({ petition, person, state });
   return redirectToProposal(res, petition, 'overview', body);
@@ -933,7 +933,7 @@ export async function postPetitionComment({ req, res, state }) {
   const argumentParentId = sanitizeText(body.argumentParentId || '', 120);
   const evidenceLinks = parseEvidenceLinks(body.evidenceLinks || '');
   if (!petitionId || !content) {
-    return sendJson(res, 400, { error: 'missing_fields' });
+    return sendJson(res, 400, { error: 'missing_fields', message: 'Write a contribution before posting.' });
   }
   const petition = requirePetitionAction(res, state, person, petitionId);
   if (!petition) return;

@@ -387,9 +387,21 @@ A rejected governance proposal re-renders with the shared alert summary and
 the typed title and reason. Script clients keep the structured JSON refusal.
 The admin Extensions form works without JavaScript and returns to its section.
 
+Member write routes for discussion, forum, proposals, social, organization,
+and notifications are marked `browserForm` in the router. When an ordinary
+form gets a 4xx JSON refusal from one of them, the router turns it into a
+redirect to the same-origin page the form was on, with its path and query.
+The shell then renders a fixed notice directly under that page's heading,
+outside any optional panel. An unmapped error reads as a generic refusal
+and never shows its internal name. An enhanced submission keeps the JSON
+refusal, and `app.js` puts the server's message at the top of the form as a
+`role="alert"` warning, leaving everything typed in place. Enhanced forms
+no longer use `alert()`. Groups and delegation follow the same split.
+[Refusal router](src/interfaces/http/views/formRefusals.js)
+
 **Target.** Add a translated wallet-not-installed hint once the verifier
-reports that state. Give petitions, discussion, forum, social, and
-organization refusals the same in-page warning instead of JSON and `alert()`.
+reports that state. Associate refusals with their field where the server
+can name it.
 
 
 ## 4. Participation, ballots, and activity
@@ -477,7 +489,7 @@ with the name.
 | Switch views or filter | Use a real link or GET form. Keep ordinary navigation, history, and link behavior. Keep selected view, current scope, and active filters visible. On a partial swap, focus the destination heading or requested anchor. |
 | Submit a change | Use a real POST form with the clicked button's name and value, including `event.submitter` in enhancement. Show progress without obscuring context and prevent repeated activation while pending. |
 | Mutation succeeds | Return the canonical GET location, with permitted scope and an item anchor as applicable. Full and partial flows resolve to the same page. Keep focus at the changed record or confirmation. |
-| Validation or transport failure | Keep safe entered values and explain how to recover. If the write outcome is uncertain, check the record through GET before offering a retry. Announce errors and keep them beside the relevant controls. |
+| Validation or transport failure | Keep safe entered values and explain how to recover. If the write outcome is uncertain, check the record through GET before offering a retry. Announce errors and keep them beside the relevant controls. Current: an enhanced refusal is an inline alert at the top of its form with the input kept; an ordinary-form refusal returns to its page with a notice under the heading. |
 | Sign-in required, forbidden, or module off | Render the applicable server gate and a safe next action. Keep permission and lane checks authoritative for reads and writes. |
 
 Keep `data-partial` and enhanced HTML navigation scoped to HTML destinations.
@@ -789,6 +801,20 @@ the unknown-delegate warning at 375 px in light and dark with no horizontal
 overflow, and installed an extension from `/admin` with focus landing in the
 Extensions section.
 [Form outcome regression](tests/form-outcomes.test.js)
+
+### Member refusal verification
+
+Unit tests check the same-origin return path, that a foreign or malformed
+Referer falls back to the module page, that enhanced and script requests keep
+JSON, that an unmapped error reads as the generic refusal, and where the
+notice is inserted. The HTTP regression sends a guest Discussion post back to
+its search, refuses an off-site Referer, checks Forum and Social refusals
+without internal error names, and confirms that a success sets no notice.
+A seeded Scenario A pass refused a proposal stage change with enhanced
+navigation, which left the selection in place under an inline alert, and
+then without it, which returned to the proposal with the notice under its
+header. An empty Discussion post at 375 px in light showed the notice under
+the heading with no horizontal overflow.
 
 ### Review checklist for presentation changes
 

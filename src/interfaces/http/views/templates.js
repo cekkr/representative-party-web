@@ -1,3 +1,4 @@
+import { insertPageNotice, renderPageNotice } from './formRefusals.js';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -65,10 +66,12 @@ export async function renderPage(templateName, data = {}, { wantsPartial = false
   // Members can hide module panels for their own view. Honor it server-side so the
   // choice holds without JavaScript; app.js re-applies it live after partial nav.
   const pageBody = applyMemberHiddenSections(renderedBody, memberUi.hiddenSections?.[pageKey]);
-  const body = /<h1\b/i.test(renderedBody) ? pageBody : `
+  const headedBody = /<h1\b/i.test(renderedBody) ? pageBody : `
     <header class="workspace-heading shell-page-heading">
       <h1>${escapeHtml(title)}</h1>
     </header>${pageBody}`;
+  // A refused ordinary form lands back here with a page notice under the heading.
+  const body = insertPageNotice(headedBody, renderPageNotice());
   const composerSettings = state?.settings?.composer || {};
   const pages = composerSettings.pages && typeof composerSettings.pages === 'object' ? composerSettings.pages : {};
   const pageOverrides = pages[pageKey] && typeof pages[pageKey] === 'object' ? pages[pageKey] : {};

@@ -209,6 +209,33 @@ function syncBusyIndicator() {
   indicator.hidden = !busy;
 }
 
+// Inline refusal for an enhanced form: a warning at the top of the form, announced
+// as an alert, with the member's input left exactly as it was.
+function showFormRefusal(form, message) {
+  let notice = form.querySelector(':scope > [data-form-refusal]');
+  if (!notice) {
+    notice = document.createElement('p');
+    notice.className = 'form-notice is-warning';
+    notice.setAttribute('role', 'alert');
+    notice.dataset.formRefusal = '';
+    form.prepend(notice);
+  }
+  notice.textContent = message;
+  notice.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+}
+
+function clearFormRefusal(form) {
+  form.querySelector(':scope > [data-form-refusal]')?.remove();
+}
+
+function defaultRefusalMessage(status) {
+  if (status === 429) return 'You are posting faster than this Circle allows. Wait a moment and send it again.';
+  if (status === 401) return 'Verify your identity to do that. Nothing changed.';
+  if (status === 403) return 'Your account cannot do that here. Nothing changed.';
+  if (status === 404) return 'That record no longer exists or you can no longer open it. Nothing changed.';
+  return 'That was not saved. Nothing changed. Check the form and try again.';
+}
+
 function setAppBusy(active) {
   if (active) {
     appBusyDepth += 1;
@@ -3187,18 +3214,22 @@ function isHtmlResponse(response) {
       const response = await fetch(requestUrl.href, options);
       redirectedTo = response.redirected ? response.url : '';
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403 || response.status === 429 ||
-            (recordForm && response.status >= 400 && response.status < 500)) {
+        // A structured refusal stays beside the form that caused it, and the form
+        // keeps everything the member typed. The server's message is shown as text.
+        const isJson = String(response.headers.get('content-type') || '').includes('application/json');
+        if (response.status >= 400 && response.status < 500 && isJson) {
+          let payload = {};
           try {
-            const payload = await response.json();
-            alert(payload.message || payload.error || 'Not allowed for this role.');
+            payload = await response.json();
           } catch (_error) {
-            alert('Action blocked.');
+            payload = {};
           }
+          showFormRefusal(form, payload.message || defaultRefusalMessage(response.status));
           return;
         }
         throw new Error('Submit failed');
       }
+      clearFormRefusal(form);
       if (!isHtmlResponse(response)) throw new Error('Not an HTML partial');
       const html = await response.text();
       root.innerHTML = html;
@@ -3228,7 +3259,7 @@ function isHtmlResponse(response) {
       if (redirectedTo) {
         window.location.href = redirectedTo;
       } else if (recordForm) {
-        alert('The submission could not be confirmed. Check the record before trying again.');
+        showFormRefusal(form, 'The submission could not be confirmed. Check the record before trying again.');
       } else {
         form.submit();
       }

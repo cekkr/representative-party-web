@@ -119,7 +119,7 @@ export async function postDiscussion({ req, res, state, url }) {
   const policy = getCirclePolicyState(state);
 
   if (!content) {
-    return sendJson(res, 400, { error: 'missing_content' });
+    return sendJson(res, 400, { error: 'missing_content', message: 'Write something before sending.' });
   }
 
   const entry = {

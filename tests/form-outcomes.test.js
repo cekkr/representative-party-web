@@ -12,6 +12,12 @@ import {
   takeFlashNotice,
 } from '../src/interfaces/http/views/formOutcome.js';
 import { ADMIN_OUTCOME } from '../src/modules/admin/adminSections.js';
+import {
+  insertPageNotice,
+  isBrowserNavigation,
+  refusalCode,
+  resolveReturnHref,
+} from '../src/interfaces/http/views/formRefusals.js';
 
 function fakeResponse() {
   const headers = new Map();
@@ -51,7 +57,7 @@ test('flash notices carry a catalog code, never text, and stay with their scope'
 
 // A navigating browser: an ordinary form POST that asks for HTML, with no redirect following,
 // so the test can carry the one-shot cookie to the GET the way a browser would.
-async function browserPost(url, fields, actor) {
+async function browserPost(url, fields, actor, extraHeaders = {}) {
   const response = await fetch(url, {
     method: 'POST',
     redirect: 'manual',
@@ -59,6 +65,7 @@ async function browserPost(url, fields, actor) {
       'Content-Type': 'application/x-www-form-urlencoded',
       Accept: 'text/html,application/xhtml+xml',
       ...(actor ? { Cookie: actor.cookie } : {}),
+      ...extraHeaders,
     },
     body: new URLSearchParams(fields),
   });
@@ -161,4 +168,75 @@ test('group, delegation, governance, and extension forms report their outcome be
   const emptied = await browserPost(`${baseUrl}/extensions`, { extensionsForm: '1' }, operator);
   const emptiedSection = extensionsSection((await follow(baseUrl, emptied, operator)).text);
   assert.match(emptiedSection.match(SUCCESS)?.[1] || '', /Enabled extensions saved/, 'an all-unticked form saves an empty list');
+});
+
+test('a refused browser form returns to its own page, and only a same-origin page', () => {
+  const req = (headers) => ({ headers: { host: 'circle.test', ...headers } });
+  assert.equal(resolveReturnHref(req({ referer: 'http://circle.test/discussion?q=liste#x' }), '/discussion'), '/discussion?q=liste');
+  assert.equal(resolveReturnHref(req({ referer: 'http://elsewhere.test/discussion' }), '/discussion'), '/discussion');
+  assert.equal(resolveReturnHref(req({ referer: 'not a url' }), '/forum'), '/forum');
+  assert.equal(resolveReturnHref(req({}), '/forum'), '/forum');
+
+  assert.equal(isBrowserNavigation(req({ accept: 'text/html' })), true);
+  assert.equal(isBrowserNavigation(req({ accept: 'text/html', 'x-requested-with': 'partial' })), false, 'enhanced forms keep JSON');
+  assert.equal(isBrowserNavigation(req({ accept: '*/*' })), false, 'scripts keep JSON');
+
+  assert.equal(refusalCode('rate_limited'), 'rate-limited');
+  assert.equal(refusalCode('thread_not_found'), 'not-found');
+  assert.equal(refusalCode('some_new_error'), 'refused', 'an unmapped error never leaks its name');
+
+  const notice = '<p id="page-notice">n</p>';
+  assert.equal(
+    insertPageNotice('<nav>a</nav><header><h1>T</h1><p>s</p></header><main>b</main>', notice),
+    `<nav>a</nav><header><h1>T</h1><p>s</p></header>${notice}<main>b</main>`,
+  );
+  assert.equal(insertPageNotice('<section><h1>T</h1><p>b</p></section>', notice), `<section><h1>T</h1>${notice}<p>b</p></section>`);
+  assert.equal(insertPageNotice('<p>b</p>', ''), '<p>b</p>');
+});
+
+test('member write refusals reach an ordinary form as a page notice, not JSON', async (t) => {
+  const port = await getAvailablePort();
+  const { baseUrl, stop } = await startServer({ port, dataAdapter: 'memory', extraEnv: { ENFORCE_CIRCLE: 'true' } });
+  t.after(stop);
+  const giulia = await createVerifiedSession(baseUrl, { pidHash: 'giulia-ferrero' });
+  const pageNotice = /<p class="form-notice is-warning" role="status" id="page-notice">([^<]+)<\/p>/;
+  const from = (path) => ({ Referer: `${baseUrl}${path}` });
+
+  // A guest posting to Discussion returns to the exact search it came from.
+  const guest = await browserPost(`${baseUrl}/discussion`, { content: 'Liste d’attesa a Torino' }, null, from('/discussion?q=liste'));
+  assert.equal(guest.response.status, 303);
+  assert.equal(guest.location, '/discussion?q=liste');
+  const guestPage = await follow(baseUrl, guest);
+  assert.match(guestPage.text.match(pageNotice)?.[1] || '', /Verify your identity|Sign in/);
+  assert.ok(guestPage.text.indexOf('id="page-notice"') > guestPage.text.indexOf('<h1'), 'the notice follows the heading');
+
+  // A forged Referer cannot send the member off-site.
+  const offsite = await browserPost(`${baseUrl}/discussion`, { content: 'x' }, null, { Referer: 'https://evil.test/phish' });
+  assert.equal(offsite.location, '/discussion');
+
+  // Forum and Social refusals name what was wrong without the internal error code.
+  const forum = await browserPost(`${baseUrl}/forum/comment`, { threadId: 'missing', content: '' }, giulia, from('/forum'));
+  assert.equal(forum.location, '/forum');
+  const forumText = (await follow(baseUrl, forum, giulia)).text;
+  assert.match(forumText.match(pageNotice)?.[1] || '', /required fields|no longer exists/);
+  assert.doesNotMatch(forumText, /missing_fields|thread_not_found/);
+  const social = await browserPost(`${baseUrl}/social/post`, { content: '' }, giulia, from('/social/feed'));
+  assert.equal(social.location, '/social/feed');
+  assert.match((await follow(baseUrl, social, giulia)).text.match(pageNotice)?.[1] || '', /Nothing (was posted|changed)/);
+
+  // The enhanced form and script clients keep the structured refusal.
+  const enhanced = await postForm(`${baseUrl}/discussion`, { content: 'x' }, {
+    headers: { Accept: 'text/html' }, partial: true,
+  });
+  assert.equal(enhanced.status, 401);
+  assert.ok((await enhanced.json()).error);
+  const scripted = await postForm(`${baseUrl}/forum/comment`, { threadId: 'missing', content: '' }, giulia);
+  assert.equal(scripted.status, 400);
+
+  // A success is untouched, and the notice is shown once.
+  const posted = await browserPost(`${baseUrl}/discussion`, { content: 'Healthcare waiting lists in Piemonte', topic: 'Healthcare' }, giulia, from('/discussion'));
+  assert.equal(posted.response.status, 303);
+  assert.equal(posted.flash, '');
+  const reload = await fetchText(`${baseUrl}/discussion?q=liste`);
+  assert.doesNotMatch(reload.text, /id="page-notice"/);
 });

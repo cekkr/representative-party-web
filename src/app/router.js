@@ -1,3 +1,8 @@
+import {
+  captureBrowserFormRefusals,
+  isBrowserNavigation,
+  requestContext,
+} from '../interfaces/http/views/formRefusals.js';
 import { URL } from 'node:url';
 
 import { renderAdmin, updateAdmin, exportAuditLog } from '../modules/admin/http/admin.js';
@@ -43,25 +48,25 @@ import { sendNotFound } from '../shared/utils/http.js';
 const routes = [
   { method: 'GET', path: '/', action: renderHome },
   { method: 'GET', path: '/organization', action: renderCoordination },
-  { method: 'POST', path: '/organization', action: updateCoordination },
+  { method: 'POST', path: '/organization', action: updateCoordination, browserForm: '/organization' },
   { method: 'GET', path: '/health', action: renderHealth },
   { method: 'GET', path: '/auth/eudi', action: startAuth },
   { method: 'GET', path: '/auth/callback', action: completeAuth },
   { method: 'GET', path: '/discussion', action: renderDiscussion },
-  { method: 'POST', path: '/discussion', action: postDiscussion },
+  { method: 'POST', path: '/discussion', action: postDiscussion, browserForm: '/discussion' },
   { method: 'GET', path: '/forum', action: renderForumRoute },
-  { method: 'POST', path: '/forum', action: postThread },
-  { method: 'POST', path: '/forum/comment', action: postComment },
+  { method: 'POST', path: '/forum', action: postThread, browserForm: '/forum' },
+  { method: 'POST', path: '/forum/comment', action: postComment, browserForm: '/forum' },
   { method: 'GET', path: '/governance', action: renderGovernance },
   { method: 'POST', path: '/governance/proposals', action: proposeGovernanceChange },
   { method: 'GET', path: '/petitions', action: renderPetitions },
-  { method: 'POST', path: '/petitions', action: submitPetition },
-  { method: 'POST', path: '/petitions/update', action: updatePetitionDraft },
-  { method: 'POST', path: '/petitions/sign', action: signPetitionRoute },
-  { method: 'POST', path: '/petitions/comment', action: postPetitionComment },
-  { method: 'POST', path: '/petitions/vote', action: castVote },
-  { method: 'POST', path: '/petitions/status', action: updatePetitionStatus },
-  { method: 'POST', path: '/petitions/promote', action: promotePetition },
+  { method: 'POST', path: '/petitions', action: submitPetition, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/update', action: updatePetitionDraft, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/sign', action: signPetitionRoute, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/comment', action: postPetitionComment, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/vote', action: castVote, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/status', action: updatePetitionStatus, browserForm: '/petitions' },
+  { method: 'POST', path: '/petitions/promote', action: promotePetition, browserForm: '/petitions' },
   { method: 'GET', path: '/groups', action: renderGroups },
   { method: 'POST', path: '/groups', action: createOrJoinGroup },
   { method: 'POST', path: '/groups/delegate', action: setGroupDelegateRoute },
@@ -73,12 +78,12 @@ const routes = [
   { method: 'GET', path: '/circle/peers', action: listPeers },
   { method: 'POST', path: '/circle/peers', action: registerPeer },
   { method: 'GET', path: '/social/feed', action: renderSocialFeed },
-  { method: 'POST', path: '/social/post', action: postSocialMessage },
-  { method: 'POST', path: '/social/reply', action: postSocialMessage },
-  { method: 'POST', path: '/social/follow', action: followHandle },
-  { method: 'POST', path: '/social/unfollow', action: unfollowHandle },
+  { method: 'POST', path: '/social/post', action: postSocialMessage, browserForm: '/social/feed' },
+  { method: 'POST', path: '/social/reply', action: postSocialMessage, browserForm: '/social/feed' },
+  { method: 'POST', path: '/social/follow', action: followHandle, browserForm: '/social/feed' },
+  { method: 'POST', path: '/social/unfollow', action: unfollowHandle, browserForm: '/social/feed' },
   { method: 'GET', path: '/social/relationships', action: listRelationships },
-  { method: 'POST', path: '/social/media/report', action: reportSocialMedia },
+  { method: 'POST', path: '/social/media/report', action: reportSocialMedia, browserForm: '/social/feed' },
   {
     method: 'GET',
     prefix: '/social/media/',
@@ -91,8 +96,8 @@ const routes = [
   { method: 'GET', path: '/admin', action: renderAdmin },
   { method: 'POST', path: '/admin', action: updateAdmin },
   { method: 'GET', path: '/notifications', action: renderNotifications },
-  { method: 'POST', path: '/notifications/read', action: markNotificationsRead },
-  { method: 'POST', path: '/notifications/preferences', action: updateNotificationPreferences },
+  { method: 'POST', path: '/notifications/read', action: markNotificationsRead, browserForm: '/notifications' },
+  { method: 'POST', path: '/notifications/preferences', action: updateNotificationPreferences, browserForm: '/notifications' },
   { method: 'GET', path: '/profile', action: renderProfile },
   { method: 'POST', path: '/profile', action: updateProfileAttributes },
   { method: 'GET', path: '/delegation', action: renderDelegation },
@@ -160,6 +165,19 @@ const routes = [
 const routesByMethod = buildRouteIndex(routes);
 
 export async function routeRequest(req, res, state) {
+  // The shell reads the request through this context to show a page notice.
+  return requestContext.run({ req, res }, () => dispatchRequest(req, res, state));
+}
+
+// Member write routes marked `browserForm` (with the page to fall back to) return an
+// ordinary form's refusal to the page it came from instead of a raw JSON document.
+function prepareRoute(route, req, res) {
+  if (route.browserForm && isBrowserNavigation(req)) {
+    captureBrowserFormRefusals(req, res, { fallback: route.browserForm });
+  }
+}
+
+async function dispatchRequest(req, res, state) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const wantsPartial = req.headers['x-requested-with'] === 'partial';
   const context = { req, res, url, state, wantsPartial };
@@ -170,12 +188,14 @@ export async function routeRequest(req, res, state) {
   const pathname = url.pathname;
   const exactRoute = methodRoutes.exact.get(pathname);
   if (exactRoute) {
+    prepareRoute(exactRoute, req, res);
     return exactRoute.action(context);
   }
 
   for (const route of methodRoutes.prefixes) {
     if (pathname.startsWith(route.prefix)) {
       const params = route.buildParams ? route.buildParams(pathname, url) : {};
+      prepareRoute(route, req, res);
       return route.action({ ...context, params });
     }
   }

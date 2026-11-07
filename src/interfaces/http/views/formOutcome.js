@@ -71,8 +71,11 @@ export function renderFlashNotice(req, res, scope, catalog, options = {}) {
 }
 
 // A browser navigating with an ordinary form asks for HTML. Script and API
-// clients that post without that Accept keep the structured JSON refusal.
+// clients that post without that Accept keep the structured JSON refusal, and so
+// does the enhanced fetch: app.js shows that message inside the form, which keeps
+// whatever the member typed.
 export function prefersHtmlNavigation(req) {
+  if (req?.headers?.['x-requested-with'] === 'partial') return false;
   return String(req?.headers?.accept || '').toLowerCase().includes('text/html');
 }
 
