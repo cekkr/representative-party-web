@@ -1,4 +1,13 @@
+<header class="workspace-heading admin-heading">
+  <div>
+    <h1 tabindex="-1">Provider administration</h1>
+    <p class="workspace-heading__summary">Settings for {{circleName}} on this provider: Circle policy, modules, structure, federation, and operations. Only provider administrators can open this page.</p>
+  </div>
+  <p class="workspace-heading__actions"><a class="ghost" href="/admin/audit">Export audit log (JSON)</a></p>
+</header>
 {{adminBootstrapNotice}}
+{{adminNotice}}
+{{adminIndex}}
 {{> admin-setup}}
 {{> admin-modules}}
 {{> admin-policy}}

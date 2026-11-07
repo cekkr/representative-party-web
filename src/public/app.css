@@ -4082,6 +4082,10 @@ code {
   text-align: center;
 }
 
+.pager {
+  flex-wrap: wrap;
+}
+
 /* Proposal browse and record views */
 .collection-grid {
   display: grid;
@@ -4103,6 +4107,152 @@ code {
 
 .record-card footer {
   margin-top: 0.75rem;
+}
+
+/* Record headers, stat grids, and collection search shared by People,
+   Governance, and organization cases. */
+.collection-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem 0.75rem;
+}
+
+.collection-search .field {
+  flex: 1 1 16rem;
+  margin: 0;
+}
+
+.person-card .person-row__id {
+  align-items: flex-start;
+}
+
+.person-card h3 {
+  margin: 0 0 0.35rem;
+}
+
+.avatar--lg {
+  width: 64px;
+  height: 64px;
+  font-size: 1.6rem;
+}
+
+.profile-heading .person-row__id {
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.profile-heading__name {
+  margin: 0 0 0.35rem;
+}
+
+.profile-heading__name .actor {
+  font-size: inherit;
+}
+
+.record-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.record-stats__item {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.record-stats__item dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.record-stats__item dd {
+  margin: 0.15rem 0 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.record-stats__item dd.tiny {
+  font-size: 0.75rem;
+  font-weight: 400;
+}
+
+.topic-count-list .list-row,
+.plain > .list-row {
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  flex-wrap: wrap;
+}
+
+h2.h3 {
+  font-size: 1.15rem;
+}
+
+/* Governance: the current rule next to the proposed one. */
+.table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.record-stats--rules .record-stats__item dd {
+  font-size: 1.125rem;
+}
+
+.rule-change {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.rule-change th,
+.rule-change td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.rule-change thead th {
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.rule-change td:last-child {
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+
+.case-history {
+  margin: 0;
+  padding-inline-start: 1.25rem;
+  border-inline-start: 2px solid var(--border);
+  list-style: none;
+}
+
+.case-history > li + li {
+  margin-top: 0.75rem;
+}
+
+.case-heading h2 {
+  margin: 0;
+}
+
+.decision-entry {
+  border-inline-start: 3px solid var(--border-strong);
+}
+
+.decision-entry.is-approved {
+  border-inline-start-color: var(--success);
+}
+
+.decision-entry.is-rejected {
+  border-inline-start-color: var(--danger);
 }
 
 .group-tree,
@@ -4157,4 +4307,237 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
 
 .notification-row {
   gap: 0.5rem;
+}
+
+/* Unread keeps its text pill; the accent edge is a second, non-colour-only cue
+   because it changes the row's shape at the leading edge. */
+.notification-row--unread {
+  border-left: 3px solid var(--primary);
+}
+
+/* Inline form feedback (formFeedback.js). A confirmation sits beside the form it
+   confirms with a marker edge and text; an error is the warning callout. Shape and
+   wording carry the meaning, so colour is never the only cue. */
+.form-notice {
+  margin: 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid hsl(var(--success-hsl));
+  border-radius: var(--radius-sm);
+  background: hsl(var(--success-hsl) / 0.1);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.form-notice:empty {
+  display: none;
+}
+
+.form-errors {
+  margin: 0;
+}
+
+.form-errors p,
+.form-errors ul {
+  margin: 0.35rem 0 0;
+}
+
+.field-error {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+/* Settings pages: each section leads with its own heading and one-line purpose,
+   then its form; sections are separate panels so a member can find, link, and hide
+   them independently. */
+.settings-section {
+  scroll-margin-top: 1rem;
+}
+
+.settings-section__header h2 {
+  margin: 0 0 0.25rem;
+}
+
+.settings-section__header p {
+  margin: 0.15rem 0 0;
+  max-width: 70ch;
+}
+
+.settings-fieldset {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.settings-fieldset legend {
+  padding: 0 0.35rem;
+  font-weight: 600;
+}
+
+/* Focused task pages (wallet handoff, result, recovery): one reading column, the
+   task's steps in order, then privacy facts and recovery. */
+.task-heading,
+.task-panel {
+  width: 100%;
+  max-width: 46rem;
+}
+
+.task-steps {
+  margin: 0;
+  padding-left: 1.4rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.wallet-handoff {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.wallet-handoff__qr {
+  margin: 0;
+}
+
+.wallet-handoff__link > * {
+  margin: 0;
+}
+
+@container shell-main (max-width: 560px) {
+  .wallet-handoff {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wallet-handoff__qr {
+    max-width: 15rem;
+  }
+}
+
+.privacy-guarantee p {
+  margin: 0.3rem 0 0;
+}
+
+.task-recovery h2 {
+  margin: 0 0 0.35rem;
+}
+
+.task-next li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+/* Organization preview identity: the label stays in the persistent header, outside
+   any optional panel, so hiding sections can never make the preview look live. */
+.preview-pill {
+  border-color: hsl(var(--warning-hsl) / 0.6);
+  background: hsl(var(--warning-hsl) / 0.14);
+  font-weight: 600;
+}
+
+.form-notice.is-warning {
+  border-left-color: hsl(var(--warning-hsl));
+  background: hsl(var(--warning-hsl) / 0.12);
+}
+
+/* Admin index: the settings document's table of contents, grouped by the work an
+   operator recognizes. Each group is a label and a wrapping row of section links. */
+.admin-index {
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+
+.admin-index__groups,
+.admin-index__links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-index__groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 13rem), 1fr));
+  gap: 0.75rem 1.25rem;
+}
+
+.admin-index__label {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.admin-index__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 0.75rem;
+}
+
+.admin-index__links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+}
+
+/* Which record a notification is about and where it lives (title · lane · topic). */
+.notification-scope {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notification-scope__title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Ballot timeline: when voting opened or closed, and the windows that apply.
+   A term/value grid that stacks once the column is too narrow for both. */
+.ballot-timing {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.ballot-timing > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.ballot-timing dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ballot-timing dd {
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+@container shell-main (max-width: 420px) {
+  .ballot-timing > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+}
+
+.ballot-delegation {
+  margin: 0;
 }

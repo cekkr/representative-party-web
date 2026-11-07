@@ -1,0 +1,16 @@
+<div class="page-main social-reading stack">
+  <a href="/social/feed" data-partial>Back to Social feed</a>
+  <header class="workspace-heading">
+    <div>
+      <h1 tabindex="-1">{{socialPostTitle}}</h1>
+      <p class="workspace-heading__summary">{{socialPostScope}}</p>
+      {{socialPostParent}}
+    </div>
+    <div class="workspace-heading__actions">{{socialPostAction}}</div>
+  </header>
+  {{socialPostBody}}
+  <section class="panel stack" id="social-replies" aria-labelledby="social-replies-title" data-composer-section="social-replies" data-section-label="Update replies" {{socialRepliesHidden}}>
+    <h2 id="social-replies-title">Replies <span class="muted small">({{socialReplyCount}})</span></h2>
+    {{socialReplies}}
+  </section>
+</div>

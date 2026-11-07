@@ -7,9 +7,19 @@
 </header>
 <div class="page-grid page-grid--groups">
   <div class="page-main">
-    <section class="panel stack" data-composer-section="groups-list" data-section-label="Available groups">
-      <h2>Working groups</h2>
+    <section class="panel stack" id="groups-list" data-composer-section="groups-list" data-section-label="Available groups" aria-labelledby="groups-results-title">
+      <h2 id="groups-results-title">Working groups</h2>
+      <form class="collection-search" method="get" action="/groups" role="search" data-enhance="groups-search">
+        <label class="field">
+          <span>Search groups</span>
+          <input type="search" name="q" value="{{groupsQuery}}" placeholder="Name, purpose, or category" />
+        </label>
+        <button class="ghost" type="submit">Search</button>
+        {{groupsClear}}
+      </form>
+      <p class="muted small" aria-live="polite">{{groupsCount}}</p>
       {{groups}}
+      {{groupsPager}}
     </section>
 
     <section class="panel" data-composer-section="groups-categories" data-section-label="Category directory">

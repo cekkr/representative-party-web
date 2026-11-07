@@ -1,30 +1,52 @@
+<header class="workspace-heading profile-heading">
+  <div class="person-row__id">
+    {{profileAvatar}}
+    <div>
+      <h1 tabindex="-1" class="profile-heading__name">{{profileTitle}}</h1>
+      <p class="topic-meta">{{profileStatus}}</p>
+      <p class="workspace-heading__summary">{{profileSummaryLine}}</p>
+    </div>
+  </div>
+  {{profileAction}}
+</header>
+<nav class="workspace-sections" aria-label="Profile settings">
+  <a href="#profile-handle">Public handle</a>
+  <a href="#profile-attributes">Provider-local fields</a>
+  <a href="#profile-interface-defaults">Interface defaults</a>
+</nav>
 <div class="page-grid page-grid--profile">
-  <div class="page-main">
-    <section class="panel" data-composer-section="profile-interface" data-section-label="Session and handle">
-      <p class="eyebrow">Session</p>
-      <h2>Verified {{actorLabel}}</h2>
-      <p class="muted small">Your handle and hash stay the canonical identifiers across the Party Circle.</p>
-      {{profileSummary}}
-      <h3>Choose your handle</h3>
+  <div class="page-main stack">
+    <section class="panel stack settings-section" id="profile-handle" tabindex="-1" data-composer-section="profile-interface" data-section-label="Public handle" aria-labelledby="profile-handle-title">
+      <header class="settings-section__header">
+        <h2 id="profile-handle-title">Public handle</h2>
+        <p class="muted small">How other {{actorLabelPlural}} see you across the Circle. Your blinded hash stays the canonical identifier.</p>
+      </header>
       {{handleForm}}
     </section>
 
-    <section class="panel" data-composer-section="profile-summary" data-section-label="Provider-local attributes">
-      <p class="eyebrow">Profile</p>
-      <h2>Provider-local attributes</h2>
-      <p class="muted small">These fields live only on this provider and never gossip to peers. They can power notification delivery or contact workflows.</p>
-      <p class="muted small">{{profileSchemaNote}}</p>
+    <section class="panel stack settings-section" id="profile-attributes" tabindex="-1" data-composer-section="profile-summary" data-section-label="Provider-local fields" aria-labelledby="profile-attributes-title">
+      <header class="settings-section__header">
+        <h2 id="profile-attributes-title">Provider-local fields</h2>
+        <p class="muted small">Stored only on this provider and never gossiped to peers. They can power notification delivery or contact workflows.</p>
+        <p class="muted tiny">{{profileSchemaNote}}</p>
+      </header>
       {{profileSchemaWarning}}
       {{profileFlash}}
       {{profileForm}}
     </section>
-  </div>
-  <aside class="page-aside">
-    <section class="panel" data-composer-section="profile-fields" data-section-label="Interface controls">
-      <p class="eyebrow">Interface</p>
-      <h3>Verbosity and runtime controls</h3>
-      <p class="muted small">Tune verbosity plus practical interface defaults without changing Circle-wide settings.</p>
+
+    <section class="panel stack settings-section" id="profile-interface-defaults" tabindex="-1" data-composer-section="profile-fields" data-section-label="Interface defaults" aria-labelledby="profile-interface-title">
+      <header class="settings-section__header">
+        <h2 id="profile-interface-title">Interface defaults</h2>
+        <p class="muted small">Your saved defaults for this session. The topbar Interface panel can still override them in this browser.</p>
+      </header>
       {{uiPreferencesForm}}
+    </section>
+  </div>
+  <aside class="page-aside" aria-label="Session details">
+    <section class="panel">
+      <h2 class="h3">Session</h2>
+      {{profileDetails}}
     </section>
   </aside>
 </div>

@@ -2,13 +2,14 @@ import { escapeHtml, formatBytes } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
 import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
 import { renderEmptyState, renderIssuerPill, renderPreviewPill } from './shared.js';
+import { socialPostHref } from '../../../modules/social/socialLinks.js';
 
 export function renderSocialPosts(posts, options = {}) {
   if (!posts || posts.length === 0) {
     return renderSocialOnboarding(options);
   }
 
-  const { enableActions, viewerHash, followTypeByHash, mediaById, openReplyId, openReshareId, state } = options;
+  const { enableActions, viewerHash, followTypeByHash, mediaById, openReplyId, openReshareId, resolveParent, focusedId, state } = options;
   const pagePosts = new Map(posts.map((post) => [post.id, post]));
   const rows = posts
     .map((post) => {
@@ -34,8 +35,15 @@ export function renderSocialPosts(posts, options = {}) {
       const authorLabel = post.authorHash
         ? renderActorLabel(state, post.authorHash)
         : `<span class="actor">@${escapeHtml(post.authorHandle || 'anonymous')}</span>`;
-      const parent = pagePosts.get(post.replyTo);
+      // The parent is linked only when this viewer can read it. On the focused view
+      // the header already names the parent of the opened update.
+      const parent = post.id === focusedId ? null
+        : pagePosts.get(post.replyTo) || (post.replyTo && resolveParent ? resolveParent(post.replyTo) : null);
       const parentHandle = parent && resolveHandleForHash(state, parent.authorHash);
+      const parentHref = parent && (pagePosts.has(parent.id) || parent.id === focusedId
+        ? `#social-post-${encodeURIComponent(parent.id)}`
+        : socialPostHref(parent.id));
+      const permalink = socialPostHref(post.id);
       return `
         <li><article class="topic-card social-post" id="social-post-${escapeHtml(post.id)}" tabindex="-1">
           <div class="topic-head">
@@ -43,7 +51,9 @@ export function renderSocialPosts(posts, options = {}) {
             <div class="topic-info">
               <div class="topic-byline">
                 <span class="topic-author">${authorLabel}</span>
-                ${createdAt ? `<time class="topic-time muted small" datetime="${escapeHtml(String(post.createdAt))}">${createdAt}</time>` : ''}
+                ${createdAt
+                  ? `<a class="topic-time muted small" href="${escapeHtml(permalink)}" data-partial aria-label="Open update from ${escapeHtml(createdAt)}"><time datetime="${escapeHtml(String(post.createdAt))}">${createdAt}</time></a>`
+                  : `<a class="topic-time muted small" href="${escapeHtml(permalink)}" data-partial>Open update</a>`}
               </div>
               <div class="topic-meta">
                 ${visibilityPill}
@@ -57,7 +67,7 @@ export function renderSocialPosts(posts, options = {}) {
             </div>
           </div>
           <div class="topic-body">
-            ${parentHandle ? `<p class="muted small">Reply to <a href="#social-post-${escapeHtml(encodeURIComponent(parent.id))}">@${escapeHtml(parentHandle)}</a></p>` : ''}
+            ${parentHandle ? `<p class="muted small">Reply to <a href="${escapeHtml(parentHref)}"${parentHref.startsWith('#') ? '' : ' data-partial'}>@${escapeHtml(parentHandle)}</a></p>` : ''}
             ${contentBlock}
             ${mediaBlock}
             ${reshareBlock}

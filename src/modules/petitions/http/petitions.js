@@ -855,6 +855,15 @@ export async function updatePetitionStatus({ req, res, state }) {
   } else if (willVote && !petition.freeze) {
     petition.freeze = buildFreezeSnapshot(petition, person);
   }
+  // Closing records when and by whom, so the Ballot can say when voting ended.
+  // Any other stage clears it: a reopened vote has not closed yet.
+  if (willClose && petition.status !== 'closed') {
+    petition.closedAt = new Date().toISOString();
+    petition.closedBy = person?.pidHash || 'anonymous';
+  } else if (!willClose) {
+    petition.closedAt = null;
+    petition.closedBy = null;
+  }
   petition.status = status;
   petition.quorum = quorum;
   await persistPetitions(state);

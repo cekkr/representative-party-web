@@ -1,6 +1,7 @@
-<section class="panel" id="federation-gossip" data-composer-section="federation-gossip" data-section-label="Gossip sync">
+<section class="panel settings-section" id="federation-gossip" tabindex="-1" data-composer-section="federation-gossip" data-section-label="Gossip sync">
   <p class="eyebrow">Federation</p>
   <h2>Gossip sync</h2>
+  {{adminNotice_federation_gossip}}
   <p class="muted small">Push and pull ledger/vote envelopes on a schedule or manually.</p>
   <p class="muted small">{{gossipDisabledNote}}</p>
   {{gossipOptionalSkipsSummary}}
@@ -10,7 +11,7 @@
       <p class="muted small">Outbound push</p>
       {{gossipPushSummary}}
       {{gossipPushPeers}}
-      <form class="stack" method="post" action="/admin" data-enhance="admin">
+      <form class="stack" method="post" action="/admin#federation-gossip" data-enhance="admin">
         <input type="hidden" name="intent" value="gossip-push" />
         <div class="cta-row">
           <button class="cta" type="submit" data-gossip="push" {{gossipPushDisabledAttr}}>Push gossip now</button>
@@ -22,7 +23,7 @@
       <p class="muted small">Inbound pull</p>
       {{gossipPullSummary}}
       {{gossipPullPeers}}
-      <form class="stack" method="post" action="/admin" data-enhance="admin">
+      <form class="stack" method="post" action="/admin#federation-gossip" data-enhance="admin">
         <input type="hidden" name="intent" value="gossip-pull" />
         <div class="cta-row">
           <button class="cta" type="submit" data-gossip="pull" {{gossipPullDisabledAttr}}>Pull gossip now</button>
@@ -33,7 +34,7 @@
     <div class="callout">
       <p class="muted small">Peer health</p>
       {{peerHealthList}}
-      <form class="stack" method="post" action="/admin" data-enhance="admin">
+      <form class="stack" method="post" action="/admin#federation-gossip" data-enhance="admin">
         <input type="hidden" name="intent" value="peer-health-reset" />
         <label class="field">
           <span>Reset peer health entry</span>
@@ -46,7 +47,7 @@
           <span class="muted small">Entries: {{peerHealthCount}}</span>
         </div>
       </form>
-      <form class="stack" method="post" action="/admin" data-enhance="admin">
+      <form class="stack" method="post" action="/admin#federation-gossip" data-enhance="admin">
         <input type="hidden" name="intent" value="peer-health-reset" />
         <input type="hidden" name="resetAll" value="true" />
         <button class="ghost" type="submit" {{peerHealthResetDisabledAttr}}>Reset all peer health</button>
@@ -55,12 +56,13 @@
   </div>
 </section>
 
-<section class="panel" id="provider-blind" data-composer-section="provider-blind" data-section-label="Provider-blind">
+<section class="panel settings-section" id="provider-blind" tabindex="-1" data-composer-section="provider-blind" data-section-label="Provider-blind">
   <p class="eyebrow">Federation</p>
   <h2>Provider-blind mode</h2>
+  {{adminNotice_provider_blind}}
   <p class="muted small">Hide provider attribution in gossip envelopes while keeping auditability via a quorum reveal.</p>
   {{providerBlindErrors}}
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
+  <form class="stack" method="post" action="/admin#provider-blind" data-enhance="admin">
     <input type="hidden" name="intent" value="provider-blind" />
     <div class="form-grid">
       <label class="field">

@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 26;
+export const LATEST_SCHEMA_VERSION = 29;
 
 const MIGRATIONS = [
   {
@@ -673,6 +673,47 @@ const MIGRATIONS = [
       return {
         ...data,
         organizationCases: Array.isArray(data.organizationCases) ? data.organizationCases : [],
+      };
+    },
+  },
+  {
+    version: 27,
+    description: 'Give notifications explicit discussion and group source ids for inbox record links.',
+    up(data) {
+      return {
+        ...data,
+        notifications: (Array.isArray(data.notifications) ? data.notifications : []).map((entry) => ({
+          ...entry,
+          discussionId: entry?.discussionId ?? null,
+          groupId: entry?.groupId ?? null,
+        })),
+      };
+    },
+  },
+  {
+    version: 28,
+    description: 'Give notifications an explicit Social post source id for inbox record links.',
+    up(data) {
+      return {
+        ...data,
+        notifications: (Array.isArray(data.notifications) ? data.notifications : []).map((entry) => ({
+          ...entry,
+          socialPostId: entry?.socialPostId ?? null,
+        })),
+      };
+    },
+  },
+  {
+    version: 29,
+    description: 'Give proposals explicit closing fields so the Ballot can show when voting ended.',
+    up(data) {
+      return {
+        ...data,
+        petitions: (Array.isArray(data.petitions) ? data.petitions : []).map((entry) => ({
+          ...entry,
+          closedAt: entry?.closedAt ?? null,
+          closedBy: entry?.closedBy ?? null,
+        })),
       };
     },
   },

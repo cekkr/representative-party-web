@@ -6,6 +6,7 @@ import {
   normalizeCommentStance,
 } from '../../../modules/petitions/commentStance.js';
 import {
+  describeLaneScope,
   renderAuthorHashLine,
   renderEmptyState,
   renderEvidenceLinks,
@@ -17,9 +18,14 @@ import {
 import { renderActorAvatar, renderActorLabel, resolveHandleForHash } from './actorLabel.js';
 import {
   buildPetitionVoteIndex,
+  getDelegateVoteWindowDays,
   resolveVoteChoice,
   tallyVotes,
 } from '../../../modules/delegation/delegatedBallots.js';
+import { resolveDelegation } from '../../../modules/delegation/delegation.js';
+import { getGovernanceSettings } from '../../../modules/governance/constitution.js';
+import { canPostToGroupLane } from '../../../modules/groups/groupScope.js';
+import { canonicalizeTopicKey } from '../../../modules/topics/topicMatch.js';
 import { proposalBrowseHref, proposalHref } from '../../../modules/petitions/proposalLinks.js';
 import { describePromotionTrail } from '../../../modules/groups/promotion.js';
 
@@ -83,9 +89,7 @@ export function renderProposalWorkspace(proposal, options) {
   ];
   const ballotAvailable = allowVoting && (stage === 'vote' || stage === 'closed' || Boolean(proposal.freeze));
   if (ballotAvailable || view === 'ballot') sections.push(['ballot', 'Ballot']);
-  const scopeLabel = scope.group
-    ? `${scope.group.name || 'Group'} · ${scope.policy.lanesVisibility === 'public' ? 'Public lane' : 'Members-only lane'}`
-    : 'Whole Circle';
+  const scopeLabel = describeLaneScope(scope);
   const promotionNote = describePromotionTrail(proposal);
   const detail = `
     <section class="panel stack" data-composer-section="petition-details" data-section-label="Proposal details">
@@ -118,6 +122,7 @@ export function renderProposalWorkspace(proposal, options) {
     content = `
       <section class="panel stack" id="proposal-ballot" data-composer-section="petition-ballot" data-section-label="Proposal ballot">
         <h2>Ballot</h2>
+        ${renderBallotTiming(state, proposal, stage, now)}
         ${proposal.freeze
           ? `<h3>Frozen proposal text</h3>
              ${renderFreezeNotice(proposal, state, href('history'), revisions)}
@@ -126,6 +131,7 @@ export function renderProposalWorkspace(proposal, options) {
             ? 'No frozen revision was recorded for this proposal.'
             : 'The proposal has yet to reach voting.'}</p>`}
         ${allowVoting ? renderMyBallot(state, resolution, eligible) : ''}
+        ${eligible && !resolution && options.allowDelegation ? renderDelegationPreview(state, person, proposal, scope) : ''}
         ${eligible ? `
           <form class="form-inline" id="proposal-vote" method="post" action="/petitions/vote" data-enhance="petitions">
             ${formFields}
@@ -185,7 +191,7 @@ export function renderProposalWorkspace(proposal, options) {
   };
 }
 
-function renderProposalStage(proposal) {
+export function renderProposalStage(proposal) {
   const stage = normalizeStage(proposal.status);
   return `<span class="pill stage stage--${stage}">${formatStageLabel(stage)}</span>`;
 }
@@ -270,6 +276,94 @@ function renderBallotSelect(resolution, allowDelegation) {
                 .map(([value, label]) => `<option value="${value}"${value === current ? ' selected' : ''}>${label}</option>`)
                 .join('')}
             </select>`;
+}
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+function renderTimeValue(iso) {
+  const label = formatTimestamp(iso);
+  return label ? `<time datetime="${escapeHtml(iso)}">${escapeHtml(label)}</time>` : '';
+}
+
+// When voting opened and closed, and the constitution's windows that apply to it.
+// The vote window is published guidance: a moderator closes voting, so the page
+// says so rather than implying an automatic deadline.
+function renderBallotTiming(state, proposal, stage, now = Date.now()) {
+  if (stage !== 'vote' && stage !== 'closed') return '';
+  const rows = [];
+  const openedAt = proposal.freeze?.frozenAt;
+  if (openedAt) rows.push(['Voting opened', renderTimeValue(openedAt)]);
+  if (stage === 'closed') {
+    const closedBy = proposal.closedBy && proposal.closedBy !== 'anonymous'
+      ? ` by ${renderActorLabel(state, proposal.closedBy, { showHash: false })}`
+      : '';
+    rows.push(['Voting closed', proposal.closedAt
+      ? `${renderTimeValue(proposal.closedAt)}${closedBy}`
+      : 'Closed before closing times were recorded']);
+  } else {
+    const windowDays = Number(getGovernanceSettings(state).voteWindowDays) || 0;
+    const openedMs = openedAt ? Date.parse(openedAt) : NaN;
+    if (windowDays > 0 && Number.isFinite(openedMs)) {
+      const guideIso = new Date(openedMs + windowDays * DAY_MS).toISOString();
+      const daysLeft = Math.ceil((openedMs + windowDays * DAY_MS - now) / DAY_MS);
+      const remaining = daysLeft > 0 ? ` · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ' · window elapsed';
+      rows.push(['Vote window', `${windowDays} days, until ${renderTimeValue(guideIso)}${remaining}. A moderator closes voting.`]);
+    } else {
+      rows.push(['Vote window', 'None set. A moderator closes voting.']);
+    }
+  }
+  const delegateDays = getDelegateVoteWindowDays(state);
+  rows.push(['Delegate window', delegateDays
+    ? `${delegateDays} day${delegateDays === 1 ? '' : 's'} to vote a ballot handed to a delegate`
+    : 'No deadline for delegated ballots']);
+  return `
+        <dl class="ballot-timing" aria-label="Voting timeline">
+          ${rows.map(([term, value]) => `<div><dt>${term}</dt><dd>${value}</dd></div>`).join('')}
+        </dl>`;
+}
+
+// Before a member chooses, say what "hand to my delegate" would do on this
+// proposal: who would hold the ballot, through which topic, and for how long.
+// Read-only: resolution runs without notifications, and the POST re-resolves.
+function renderDelegationPreview(state, person, proposal, scope) {
+  if (!person?.pidHash) return '';
+  const delegation = resolveDelegation(person, proposal.topic, state, { topicPath: proposal.topicPath });
+  const topicLabel = resolveTopicBreadcrumb(proposal, state);
+  if (!delegation?.delegateHash) {
+    return `
+        <p class="muted small ballot-delegation">No delegation of yours covers ${escapeHtml(topicLabel)}.
+          Handing this ballot to a delegate records an abstention.
+          <a href="/delegation#delegation-set" data-partial>Set a delegation</a></p>`;
+  }
+  const holder = renderActorLabel(state, delegation.delegateHash, { showHash: false });
+  if (scope?.group && !canPostToGroupLane(state, { pidHash: delegation.delegateHash }, scope.group, 'petitions')) {
+    return `
+        <p class="muted small ballot-delegation">Your delegate ${holder} is not a member of this lane,
+          so they cannot hold this ballot. Choose a vote yourself.</p>`;
+  }
+  const days = getDelegateVoteWindowDays(state);
+  const matched = labelMatchedTopic(delegation.matchedTopic || delegation.topic || proposal.topic || 'general', topicLabel);
+  const forwarded = delegation.transitive && delegation.immediateDelegateHash !== delegation.delegateHash
+    ? ` through ${renderActorLabel(state, delegation.immediateDelegateHash, { showHash: false })}`
+    : '';
+  return `
+        <p class="muted small ballot-delegation">Handing this ballot to your delegate gives it to ${holder}${forwarded}
+          under your <strong>${escapeHtml(matched)}</strong> delegation.
+          ${days ? `They have ${days} day${days === 1 ? '' : 's'} to vote.` : 'There is no deadline for them to vote.'}
+          You can vote yourself at any time to override.</p>`;
+}
+
+// A delegation is stored under the key the member typed, lowercased. When it is
+// one of this proposal's own categories, name it as the breadcrumb writes it.
+function labelMatchedTopic(matched, breadcrumb) {
+  const key = canonicalizeTopicKey(matched);
+  const segments = String(breadcrumb || '').split('/').map((segment) => segment.trim()).filter(Boolean);
+  for (let depth = segments.length; depth > 0; depth -= 1) {
+    const prefix = segments.slice(0, depth);
+    if (canonicalizeTopicKey(prefix.join('/')) === key) return prefix.join(' / ');
+    if (canonicalizeTopicKey(segments[depth - 1]) === key) return segments[depth - 1];
+  }
+  return matched;
 }
 
 function renderMyBallot(state, resolution, eligible) {

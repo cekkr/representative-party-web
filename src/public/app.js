@@ -3207,7 +3207,11 @@ function isHtmlResponse(response) {
       } else {
         options.body = hasFiles || isMultipart ? formData : new URLSearchParams(formData);
       }
-      const response = await fetch(url, options);
+      // The fragment names where to land after the swap (`/admin#rate-limits`); it is
+      // never part of the request, so keep it out of the fetch and reapply it below.
+      const requestUrl = new URL(url);
+      requestUrl.hash = '';
+      const response = await fetch(requestUrl.href, options);
       redirectedTo = response.redirected ? response.url : '';
       if (!response.ok) {
         if (response.status === 401 || response.status === 403 || response.status === 429 ||

@@ -1,15 +1,20 @@
-<section class="panel" data-composer-section="verification-complete">
-  <p class="eyebrow">Verification complete</p>
-  <h2>{{actorLabelTitle}} session established</h2>
-  <p>Your session is verified and ready to post.</p>
-  <div class="callout is-verbose">
-    <p class="muted">PID hash (truncated)</p>
-    <code>{{pidHashShort}}…</code>
+<header class="workspace-heading task-heading">
+  <div>
+    <h1 tabindex="-1">You are verified</h1>
+    <p class="workspace-heading__summary">Your {{actorLabel}} session is ready. You can post, sign, and vote where the Circle allows it.</p>
   </div>
-  <p class="muted small is-verbose">ActivityPub actor minted: <code>{{actorId}}</code></p>
-  <p class="muted small is-verbose">{{ledgerNote}}</p>
-  <div class="cta-row">
-    <a class="cta" href="/social/feed" data-partial>Open your wall</a>
-    <a class="ghost" href="/discussion" data-partial>Join discussion</a>
+</header>
+<section class="panel stack task-panel" data-composer-section="verification-complete" aria-labelledby="verification-next-title">
+  <h2 class="h3" id="verification-next-title">What next</h2>
+  <ul class="plain task-next">
+    <li><a class="cta" href="/profile#profile-handle" data-partial>Choose your handle</a> <span class="muted small">Others see you as a handle, never as a hash.</span></li>
+    <li><a class="ghost" href="/discussion" data-partial>Join the discussion</a></li>
+    {{socialNextAction}}
+  </ul>
+  <div class="callout privacy-guarantee">
+    <strong class="small">What was stored</strong>
+    <p class="small">A blinded hash that starts <code>{{pidHashShort}}…</code>. No name, document, or raw credential.</p>
+    <p class="muted small is-verbose">{{ledgerNote}}</p>
+    <p class="muted small is-verbose">ActivityPub actor: <code>{{actorId}}</code></p>
   </div>
 </section>

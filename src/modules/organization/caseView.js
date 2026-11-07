@@ -34,11 +34,11 @@ export function buildCaseView(state, { query, canWork, draft = {}, message }) {
       ? cases.find((entry) => entry.sourceMessageId === sourceId)
       : pageInfo.items[0];
 
-  let detail = '<p>Open a discussion post and choose <strong>Open a case</strong> when the issue needs a review.</p><a class="ghost" href="/discussion" data-partial>Go to discussion</a>';
+  let detail = '<h2>No case selected</h2><p>Open a discussion post and choose <strong>Open a case</strong> when the issue needs a review.</p><a class="ghost" href="/discussion" data-partial>Go to discussion</a>';
   if (selected) {
     detail = renderCase(state, selected, sourceById.get(selected.sourceMessageId), draft);
   } else if (source) {
-    detail = renderPromotion(state, source, draft);
+    detail = '<h2>Open a case</h2>' + renderPromotion(state, source, draft);
   } else if ((caseId || sourceId) && !notice) {
     detail = '<p class="callout">The case or discussion post is unavailable.</p>' + detail;
   }
@@ -124,45 +124,60 @@ function renderPromotion(state, source, draft) {
         <textarea name="consequence" rows="3" maxlength="500" required>${escapeHtml(draft.consequence || '')}</textarea>
       </label>
       <p class="muted small">This case is visible to signed-in users with posting access on this provider.</p>
-      <div class="cta-row"><button type="submit">Open case</button></div>
+      <div class="cta-row"><button class="cta" type="submit">Open case</button></div>
     </form>`;
 }
 
+// Case record: header (summary, voice type, state, review date, who opened it),
+// then the attributed source that stays canonical, then acknowledgement history.
 function renderCase(state, entry, source, draft) {
   const acknowledgement = entry.acknowledgement;
   const review = entry.reviewAt ? formatTimestamp(entry.reviewAt + 'T12:00:00') : '';
+  const opened = formatTimestamp(entry.createdAt);
+  const acknowledged = acknowledgement ? formatTimestamp(acknowledgement.at) : '';
   return `
-    <div>
-      <h3>${escapeHtml(entry.summary)}</h3>
-      <div class="discussion__meta">
-        <span class="pill">${escapeHtml(CASE_VOICE_TYPES[entry.voiceType])}</span>
-        <span class="pill ghost">${caseStatus(entry)}</span>
+    <header class="case-heading stack">
+      <div class="topic-meta">
+        <span class="pill ${entry.state === 'acknowledged' ? 'stance stance--support' : 'stance stance--question'}">${caseStatus(entry)}</span>
+        <span class="pill ghost">${escapeHtml(CASE_VOICE_TYPES[entry.voiceType])}</span>
         ${review ? `<span class="pill ghost">Review on ${review}</span>` : ''}
       </div>
-      <p class="muted small">Opened by ${renderActorLabel(state, entry.createdBy)}</p>
+      <h2 id="case-title">${escapeHtml(entry.summary)}</h2>
+      <p class="muted small">Opened by ${renderActorLabel(state, entry.createdBy)}${opened ? ` · <time datetime="${escapeHtml(entry.createdAt)}">${opened}</time>` : ''}</p>
       <p>${escapeHtml(entry.consequence)}</p>
-    </div>
-    ${renderSource(state, source)}
-    ${acknowledgement ? `
-      <div>
-        <h4>Acknowledgement</h4>
-        <p class="muted small">${renderActorLabel(state, acknowledgement.actorHash)} · ${formatTimestamp(acknowledgement.at)}</p>
-        <p>${escapeHtml(acknowledgement.note)}</p>
-      </div>` : `
-      <form class="stack" method="post" action="/organization">
-        <input type="hidden" name="intent" value="acknowledge" />
-        <input type="hidden" name="caseId" value="${escapeHtml(entry.caseId)}" />
-        <label class="field">
-          <span>Acknowledgement</span>
-          <textarea name="note" rows="3" maxlength="500" required>${escapeHtml(draft.note || '')}</textarea>
-        </label>
-        <label class="field">
-          <span>Review date</span>
-          <input type="date" name="reviewAt" value="${escapeHtml(draft.reviewAt || '')}" required />
-        </label>
-        <p class="muted small">Record receipt and when to revisit the case. Assigning an owner is a separate step.</p>
-        <div class="cta-row"><button type="submit">Acknowledge case</button></div>
-      </form>`}`;
+    </header>
+    <section class="stack" aria-labelledby="case-source-title">
+      <h3 id="case-source-title">Original message</h3>
+      ${renderSource(state, source)}
+    </section>
+    <section class="stack" aria-labelledby="case-history-title">
+      <h3 id="case-history-title">Acknowledgement</h3>
+      ${acknowledgement ? `
+        <ol class="case-history">
+          <li>
+            <p class="small"><strong>Opened</strong> by ${renderActorLabel(state, entry.createdBy, { showHash: false })}${opened ? ` · <time datetime="${escapeHtml(entry.createdAt)}">${opened}</time>` : ''}</p>
+          </li>
+          <li>
+            <p class="small"><strong>Acknowledged</strong> by ${renderActorLabel(state, acknowledgement.actorHash)}${acknowledged ? ` · <time datetime="${escapeHtml(acknowledgement.at)}">${acknowledged}</time>` : ''}</p>
+            <p>${escapeHtml(acknowledgement.note)}</p>
+            ${review ? `<p class="muted small">Review on ${review}</p>` : ''}
+          </li>
+        </ol>` : `
+        <p class="muted small">No one has acknowledged this case yet. Record receipt and when to revisit it. Assigning an owner is a separate step.</p>
+        <form class="stack" method="post" action="/organization">
+          <input type="hidden" name="intent" value="acknowledge" />
+          <input type="hidden" name="caseId" value="${escapeHtml(entry.caseId)}" />
+          <label class="field">
+            <span>Acknowledgement</span>
+            <textarea name="note" rows="3" maxlength="500" required>${escapeHtml(draft.note || '')}</textarea>
+          </label>
+          <label class="field">
+            <span>Review date</span>
+            <input type="date" name="reviewAt" value="${escapeHtml(draft.reviewAt || '')}" required />
+          </label>
+          <div class="cta-row"><button class="cta" type="submit">Acknowledge case</button></div>
+        </form>`}
+    </section>`;
 }
 
 function caseStatus(entry) {

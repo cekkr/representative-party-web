@@ -1,9 +1,10 @@
-<section class="panel" id="modules" data-composer-section="modules" data-section-label="Modules">
+<section class="panel settings-section" id="modules" tabindex="-1" data-composer-section="modules" data-section-label="Modules">
   <p class="eyebrow">Modules</p>
   <h2>Module control center</h2>
+  {{adminNotice_modules}}
   <p class="muted small">Toggle modules by lane so social-community deployments can stay lean while civic governance stays optional.</p>
   <p class="muted small">{{moduleFamilySummary}}</p>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
+  <form class="stack" method="post" action="/admin#modules" data-enhance="admin">
     <input type="hidden" name="intent" value="modules" />
     <div class="stack">{{modulesList}}</div>
     <div class="cta-row">
@@ -19,11 +20,12 @@
   </div>
 </section>
 
-<section class="panel" id="composer" data-composer-section="composer" data-section-label="Composer">
+<section class="panel settings-section" id="composer" tabindex="-1" data-composer-section="composer" data-section-label="Composer">
   <p class="eyebrow">Composer</p>
   <h2>Theme + layout composer</h2>
+  {{adminNotice_composer}}
   <p class="muted small">Early scaffolding: apply custom CSS and reorder navigation/quick actions. Drag-and-drop layout editing ships next.</p>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
+  <form class="stack" method="post" action="/admin#composer" data-enhance="admin">
     <input type="hidden" name="intent" value="composer" />
     <label class="field">
       <span>Quick actions order (comma separated keys)</span>

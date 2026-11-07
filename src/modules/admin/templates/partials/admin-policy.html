@@ -1,8 +1,9 @@
-<section class="panel" id="rate-limits" data-composer-section="rate-limits" data-section-label="Rate limits">
+<section class="panel settings-section" id="rate-limits" tabindex="-1" data-composer-section="rate-limits" data-section-label="Rate limits">
   <p class="eyebrow">Rate limits</p>
   <h2>Identity throttles</h2>
+  {{adminNotice_rate_limits}}
   <p class="muted small">Throttle write-heavy actions per verified handle/session (IP fallback) to curb spam without CAPTCHA.</p>
-  <form class="stack" method="post" action="/admin" data-enhance="admin">
+  <form class="stack" method="post" action="/admin#rate-limits" data-enhance="admin">
     <input type="hidden" name="intent" value="rate-limits" />
     <label class="field">
       <span>Overrides (key:windowSeconds:max)</span>
@@ -22,9 +23,10 @@
   </div>
 </section>
 
-<section class="panel" id="social-media" data-composer-section="social-media" data-section-label="Social media">
+<section class="panel settings-section" id="social-media" tabindex="-1" data-composer-section="social-media" data-section-label="Social media">
   <p class="eyebrow">Social media</p>
   <h2>Media moderation</h2>
+  {{adminNotice_social_media}}
   <p class="muted small">Uploads stay with this provider, lock by default, and can be blocked after mass reports or manual review.</p>
   <p class="muted small">Total media entries: {{socialMediaCount}}</p>
   <div class="stack">
@@ -32,9 +34,10 @@
   </div>
 </section>
 
-<section class="panel" id="upload-cleanup" data-composer-section="upload-cleanup" data-section-label="Upload cleanup">
+<section class="panel settings-section" id="upload-cleanup" tabindex="-1" data-composer-section="upload-cleanup" data-section-label="Upload cleanup">
   <p class="eyebrow">Ops</p>
   <h2>Upload cleanup</h2>
+  {{adminNotice_upload_cleanup}}
   <p class="muted small">Temp upload files are pruned from <code>src/data/uploads</code> based on retention settings.</p>
   <p class="muted small">{{uploadCleanupConfigNote}}</p>
   <div class="stack">

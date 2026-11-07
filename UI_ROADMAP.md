@@ -95,7 +95,10 @@ text and evidence and filtering a topic subtree. The compose form stays in the
 supporting rail. Home and Discussion link to individual contributions, where
 the stored lane controls access and the return link restores the search and page.
 Social places follow filters above updates and shows the audience at the point of
-sending. Forum has searchable article rows,
+sending. Each update's time links to `/social/feed?post=<id>`, a focused view
+with a backlink, the author and audience in the heading, the parent when the
+viewer can read it, and readable replies oldest-first. A reply returns to that
+conversation. A direct message opens only for its two participants. Forum has searchable article rows,
 a category field in the compose rail, and a focused reading view linked directly
 from Home and the results. Search and page survive opening an article, replying,
 and returning to the collection. [Home partials](src/modules/home/templates/partials) ·
@@ -178,8 +181,15 @@ readers. The collection retains each card's original `#petition-<id>` anchor.
 Overview contains the proposal outline, evidence, quorum progress, and eligible
 signing, revision, moderation, and promotion actions. Discussion contains
 oldest-first contributions, parent-claim links, and the argument map. History
-links the exact frozen revision to its ballot. Ballot separates the frozen text,
-personal choice or delegation state, and outcome. Moderation and quorum-driven
+links the exact frozen revision to its ballot. Ballot leads with a voting timeline: when voting opened or closed (and who
+closed it), the constitution's vote window with the days left, and the delegate
+window. The vote window is published guidance, so the timeline says a moderator
+closes voting. The frozen text, personal choice or delegation state, and outcome
+follow. Before an eligible member chooses, Ballot says what handing the ballot
+to a delegate would do: the holder, the intermediate delegate on a transitive
+chain, the matching category, and the delegate's window. It also says when no
+delegation covers the topic, so the hand-off would abstain, and when the
+delegate cannot hold a ballot in this group lane. Moderation and quorum-driven
 voting both record a frozen snapshot. Legacy ballots can identify that a
 snapshot is unavailable. Successful writes return to the applicable record
 view. Public lanes allow outsiders to browse, with membership required for
@@ -188,9 +198,9 @@ participation.
 [Workspace template](src/modules/petitions/templates/petition-workspace.html) ·
 [Proposal view](src/interfaces/http/views/petitionView.js)
 
-**Target.** Add richer discussion filters, field-level recovery for ordinary HTML
-forms, and more explicit timing and delegation context in Ballot as the
-underlying workflow supports it. Keep these region contracts.
+**Target.** Add richer discussion filters and field-level recovery for ordinary
+HTML forms. Show a binding close date in Ballot once a scheduled close exists.
+Keep these region contracts.
 
 | Region | Required order and contents |
 | --- | --- |
@@ -262,21 +272,110 @@ flows. The source lane names the destination before a promotion is approved.
 [Workspace template](src/modules/groups/templates/group-workspace.html) ·
 [Scope resolver](src/modules/groups/groupScope.js)
 
-**Target.** Add search and pagination when the group directory needs them, and
-make the decision context easier to scan as more elections accumulate. Keep
+The directory has a GET search over name, description, and categories. A
+search turns the branch tree into a flat list of matches that keep their
+Branch of lineage line. Both views page 20 groups at a time with Previous and
+Next links that carry the query, and zero matches offer a link back to every
+group.
+
+**Target.** Make the decision context easier to scan as more elections accumulate. Keep
 contextual promotion requests in the source lane. Group lineage describes
 structure. Membership and authority are checked independently for each group.
 
 ### Other record pages
 
-Use the same header–workspace–context hierarchy where it shortens the path
-through a record. A People profile leads with identity and role, followed by
-delegation coverage, votes, and activity. A governance change shows the
-current rule alongside the proposed change and gives the decision its own
-attributed entry. A live organization case leads with its state, review date,
-and original attributed source, then acknowledgement and case history. The
-searchable case queue is secondary. The organization preview has a persistent
-preview label and its own navigation context.
+**Current.** `/delegates` has a People heading, a GET search above the results,
+and a grid of person cards with one `@handle` title link, role, and delegation
+count. The directory pages 24 people at a time with Previous and Next links
+that carry the search. A search with no matches offers a way back to everyone.
+An empty directory explains how members appear. `/delegates/<hash>` opens a record with
+avatar, `@handle` and hash cue, role and status, bio, and one primary action:
+Delegate to the member, or Edit your profile for your own record. Delegate
+pre-fills the existing form at `/delegation#delegation-set`, which still
+resolves and gates the target on POST. Overview, Delegations, Votes, Activity,
+and Endorsements are GET views with `aria-current`. Activity lists only
+proposals the viewer could open, linked to their record. Counts use the same
+lane check. Endorsements link group names and label recommendations and
+elections as advisory. The deliberation score sits in a disclosure. A Details
+rail carries role, status, last activity, and endorsement counts.
+
+`/governance` leads with its heading and a primary Propose a change action.
+Unverified visitors see the verification path. Section links jump to Current
+rules, Change proposals, and Decisions. Current rules are a term/value grid
+with units. Each open proposal shows its byline and reason, then a table of
+the current rule beside the proposed value. Each decision names proposer and
+decider with a semantic date. An approved change shows its Before and After
+values, and an approved or rejected decision has a coloured edge plus its
+text label.
+
+`/organization` leads with a Cases heading and a link to the labelled preview.
+The selected case has a record header with state, voice type, review date, and
+an attributed opening. The original message follows under its own heading.
+Acknowledgement is either the form or an ordered history of opening and
+acknowledgement. The searchable queue sits in the rail.
+[People controller](src/modules/delegates/http/delegates.js) ·
+[Governance controller](src/modules/governance/http/governance.js) ·
+[Case view](src/modules/organization/caseView.js)
+
+`/organization?view=preview` opens with a Back to live cases link and an
+Organization workspace preview heading. A Preview label, the line
+“Illustrative data — nothing here is saved”, and an Open the live case queue
+action sit in that persistent header, outside the optional panels, so hiding
+sections cannot make the preview look live.
+
+**Target.** Give governance proposals their own focused record view when member ratification
+lands. Give the organization case a dedicated record URL with history beyond
+acknowledgement as the lazy layer stores arrive. Replace the preview's
+illustrative cases with Scenario B examples.
+
+### Settings and task pages
+
+**Current.** `/profile` follows the People record header: avatar, `@handle`,
+role and Verified state, and one View your public profile action when People
+is enabled. A guest sees a Profile heading and the Verify action instead of
+empty forms. Fragment links reach three labelled sections: Public handle,
+Provider-local fields, and Interface defaults. Each form posts to
+`/profile#<section>`, so the ordinary and enhanced flows both return to the
+section they changed. A confirmation is a `role="status"` line and a rejection
+is a `role="alert"` summary with an id. The handle input and provider fields
+reference their hint and error through `aria-describedby` and keep the typed
+value. The Session rail shows the handle, role, an 8-character hash cue,
+verification date, and Circle enforcement, never the full blinded hash.
+[Profile controller](src/modules/profile/http/profile.js) ·
+[Form feedback](src/interfaces/http/views/formFeedback.js)
+
+The wallet handoff is a single reading column: heading, numbered steps, the
+Open wallet link with its copyable fallback, then the QR. The link comes first
+in source order because a phone cannot scan its own screen. The Hash-only
+guarantee and Circle policy follow, then Refresh this request (same pending
+session) and Start a new request. The result page reads You are verified,
+offers Choose your handle first, shows only the hash cue that was stored, and
+links Social only when that module is on. A failed callback explains what
+happened and offers Start a new verification.
+[Auth templates](src/modules/auth/templates) ·
+[Recovery page](src/modules/core/templates/error.html)
+
+`/admin` opens with a Provider administration heading, a summary naming the
+Circle, and an Export audit log (JSON) link. That link is a plain link, never
+`data-partial`. A grouped index follows: Setup, Modules and appearance, Policy,
+Structure, Federation, Observability, and People and extensions. It links the
+20 existing section anchors, which remain the Composer keys. Every admin form
+posts to `/admin#<section>`, and [`adminSections.js`](src/modules/admin/adminSections.js)
+maps each intent to its section. The confirmation renders in that section
+instead of at the top of the page. A change that did not apply uses the warning
+tone. Validation and rate-limit errors use the shared alert summary. Values
+echoed into admin inputs and textareas are HTML-escaped in one pass. This
+includes member-supplied provider fields, which previously reached the
+attribute textarea unescaped.
+
+Admin handlers return an explicit outcome beside the message: applied,
+partially applied, or not applied. Only an applied outcome without field errors
+reads as a confirmation. An anchor action missing its key, an unconfirmed merge
+or split, and a skipped gossip run are warnings.
+
+**Target.** Add a translated wallet-not-installed hint once the verifier
+reports that state. Give `/extensions` and the governance, group, and
+delegation flash messages the same outcome.
 
 
 ## 4. Participation, ballots, and activity
@@ -341,10 +440,21 @@ server and give the member a link to the same record after the POST.
 explicit unread cue, permitted proposal links, and local preferences. Mark all
 read returns to the same inbox page. Proposal activity opens the appropriate
 Discussion, Ballot, or Overview view through the same scope gate. A notification
-can remain readable after its source becomes inaccessible. Its proposal
-details and link are withheld. Delegation queues use the same access gate and
-link to the exact Ballot. **Target.** Extend record resolution to non-proposal
-activity and add scoped labels where the source supports them.
+can remain readable after its source becomes inaccessible. Its record
+details and link are withheld. Promotion requests and decisions on a
+discussion carry the contribution id and open it through the same stored-lane
+gate as a focused read. Group creation and delegate changes open the group's
+Overview or Decisions. An unread row has an accent edge beside its Unread
+text. Delegation queues use the same access gate and link to the exact Ballot.
+Mentions, direct messages, reshares, and media view requests open the focused
+Social update through the same audience gate. Each readable row has a scope
+line: the record (proposal title, contribution excerpt, or group name), then its
+lane (Whole Circle, or the group with Public or Members-only lane) and topic.
+A group names its parent branch or reads Top-level group. A Social update says
+Public update or Direct message. The name is left out when the stored message
+already quotes it. A withheld source has no scope line.
+**Target.** Store the record title apart from the message so every row can lead
+with the name.
 [Activity row reference](thirds/citizenos-fe/src/app/shared/components/activity/activity.component.html) ·
 [Notification controller](src/modules/notifications/http/notifications.js)
 
@@ -414,18 +524,18 @@ starting point for implementation.
 | [Home](src/modules/home/templates/home.html) `/` | Persistent workspace heading, scoped conversation previews first, and supporting access and operator sections. | Refine previews into named destination collections with consistent cards and direct links to their full views. |
 | [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Scope header, searchable feed with topic-subtree filters, scoped empty states, and focused contributions with evidence and gated actions. | Add reply relationships and use contribution links in authorized activity. |
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
-| [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall, adjacent follow filters, and native compose with audience and attachment controls. Direct media and replies follow the source audience. | Resolve social activity to permitted records and add inline recovery for ordinary forms. |
-| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Reads and writes use the stored lane. | Refine discussion filters, ballot timing context, and SSR form recovery. |
-| [Groups](src/modules/groups/templates/groups.html) `/groups` | Branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. | Search and pagination for discovery and clearer activity within a group. |
+| [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall with permalinks, adjacent follow filters, and native compose with audience and attachment controls. A [focused update](src/modules/social/templates/social-post.html) shows its parent and replies under the source audience. | Inline recovery for ordinary forms. |
+| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Ballot leads with a voting timeline and previews a delegated hand-off. Reads and writes use the stored lane. | Refine discussion filters and SSR form recovery. A binding close date once voting closes on schedule. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. | Clearer activity and decision history within a group. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
-| [People](src/modules/delegates/templates) `/delegates` | Searchable directory and profile with coverage, votes, and activity. | Summary cards or rows, then a record header with readable accountability sections and separate endorsement context. |
-| [Governance](src/modules/governance/templates/governance.html) `/governance` | Constitution, change proposals, decisions, and propose rail. | State the current rule and proposed change together, then show the attributed decision and its effect. |
-| [Notifications](src/modules/notifications/templates/notifications.html) `/notifications` | Paginated activity rows, unread state, scoped proposal links, Mark all read, and preferences in the rail. | Resolve other notification sources to their permitted records. |
-| [Profile](src/modules/profile/templates/profile.html) `/profile` | Session and handle, provider-local fields, and Interface controls. | Identity summary followed by clearly separated, labelled settings sections and inline feedback. |
-| [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Linked source, case and acknowledgement workflow, searchable queue. | Case header, original source and evidence, acknowledgement/history, and a secondary queue. Retain provider-local scope. |
-| [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Labelled illustrative inbox, pressure map, and operating map. | Persistent preview identity, Scenario B examples, and a clear return to the live case workspace. |
-| [Admin](src/modules/admin/templates/admin.html) `/admin` | Anchored sections in a single column with grouped partials. The inactive Composer entry sits in the page flow on phones. | Apply the settings hierarchy while retaining gates, anchors, and the admin Composer workspace. |
-| [Wallet handoff and result](src/modules/auth/templates) | Offer and result panels in the shared shell. | Focused form-page hierarchy with visible QR, wallet link, hash-only privacy guarantee, and a clear return or recovery action. |
+| [People](src/modules/delegates/templates) `/delegates` | Search-led, paginated collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Profile activity beyond proposals as those records gain lane-aware links. |
+| [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail. | A focused change record once members ratify changes. |
+| [Notifications](src/modules/notifications/templates/notifications.html) `/notifications` | Paginated activity rows with a record, lane, and topic line, unread text and edge, gated proposal, contribution, group, and Social update links, Mark all read, and preferences in the rail. | Record titles stored apart from messages. |
+| [Profile](src/modules/profile/templates/profile.html) `/profile` | Identity header with one action, section links, labelled Public handle, Provider-local fields, and Interface defaults sections with inline status and field errors, and a Session rail. | Optional provider-profile sync across devices. |
+| [Organization cases](src/modules/organization/templates/organization-cases.html) `/organization` | Cases heading, case record header, original message with evidence, acknowledgement form or ordered history, and the searchable queue in the rail. | Case history beyond acknowledgement as layer stores arrive. Retain provider-local scope. |
+| [Organization preview](src/modules/organization/templates/coordination.html) `/organization?view=preview` | Persistent preview header with backlink, Preview label, and live-queue action, then the illustrative inbox, pressure map, and operating map. | Scenario B examples in place of the generic illustrative cases. |
+| [Admin](src/modules/admin/templates/admin.html) `/admin` | Page heading with audit export, grouped index of the 20 anchored sections, forms that return to their section, and section-local notices whose tone follows each handler's outcome. The inactive Composer entry sits in the page flow on phones. | Composer palette operations once variants settle. |
+| [Wallet handoff and result](src/modules/auth/templates) | Focused task pages: numbered steps, wallet link before QR, hash-only guarantee, refresh and restart recovery, a result page that leads to Choose your handle, and a recovery page for failed callbacks. | Wallet-not-installed guidance once the verifier reports it. |
 
 
 ## 7. Implementation and section compatibility
@@ -462,18 +572,18 @@ keys have historical names, while their labels identify the content.
 | Module | Explicit section keys |
 | --- | --- |
 | Home | `home-overview`, `home-lane-conversation`, `home-lane-governance`, `home-lane-federation`, `home-ops`. Workspace heading sits outside these panels. |
-| Social | `social-wall`, `social-compose`, `social-controls`, `social-follows`. The header stays visible. Filters sit in the main column. |
+| Social | `social-wall`, `social-compose`, `social-controls`, `social-follows`. Focused update `social-replies`; both use the `social` page key. The header and opened update stay visible. Filters sit in the main column. |
 | Forum | Browse `forum-threads`, `forum-compose`. Focused article `forum-replies`. Both use the `forum` page key. The article and heading stay visible outside optional sections. |
 | Discussion | Browse `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. The focused contribution uses the same `discussion` page key. Its heading, scope, and content stay visible outside optional panels. |
 | Proposals | Browse `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates`. Workspace `petition-overview`, `petitions-discussion`, `petition-history`, `petition-ballot`, `petition-details`. Both use the `petitions` page key. |
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
-| People | `delegate-directory-list`, `delegate-directory`, `delegate-profile-summary`, `delegate-profile-endorsements`, `delegate-profile-delegations`, `delegate-profile-votes`, `delegate-profile-history` |
-| Groups | Browse `groups-list`, `groups-categories`, `groups-create`. Workspace `group-overview`, `group-members`, `group-decisions`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
-| Governance | `governance-overview`, `governance-proposals`, `governance-propose` |
+| People | Directory `delegate-directory` (search, now above the results), `delegate-directory-list` (results and pager). Profile views: Overview `delegate-profile-summary`, Delegations `delegate-profile-endorsements`, Votes `delegate-profile-delegations`, Activity `delegate-profile-votes`, Endorsements `delegate-profile-history`. The record header, section links, and Details rail stay outside optional panels. |
+| Groups | Browse `groups-list` (search, results, and pager), `groups-categories`, `groups-create`. Workspace `group-overview`, `group-members`, `group-decisions`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
+| Governance | `governance-overview` (current rules), `governance-proposals` (open changes and decisions), `governance-propose`. The heading and section links stay visible. |
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
-| Profile | `profile-interface`, `profile-summary`, `profile-fields` |
-| Admin | `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
+| Profile | `profile-interface` (Public handle), `profile-summary` (Provider-local fields), `profile-fields` (Interface defaults). The record header, section links, and Session rail stay outside optional panels. |
+| Admin | The heading and grouped index sit outside the panels. `circle-settings`, `governance-settings`, `modules`, `composer`, `rate-limits`, `social-media`, `upload-cleanup`, `structure-manager`, `provider-profiles`, `topic-gardener-review`, `federation-gossip`, `provider-blind`, `admin-audit`, `ops-metrics`, `metrics-retention`, `admin-transactions`, `outbound-delivery`, `transaction-summaries`, `extensions`, `session-overrides` |
 | Auth/core task panels | `auth-eudi`, `verification-complete`, `error-message`, `module-disabled`, `admin-required`. These panels sit outside member Sections. |
 
 ## 8. Delivery order and acceptance
@@ -483,8 +593,8 @@ keys have historical names, while their labels identify the content.
 | 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
 | 2. Conversation and collections | Discussion and Forum have searchable collections and focused views linked from Home. Social has in-flow compose, audience, follow filters, and attributed media states. | Find the waiting-list evidence and the free-mandate article in Scenario A. Open a contribution and return to the same search. Reply in Forum and send a media-only Social update with ordinary HTML. Confirm direct attachment and reply access. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
-| 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People, governance, and case refinements follow. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
-| 5. Admin and customization polish | Apply shared styling to settings, fix Composer overlap, and introduce any component palette operations only after variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
+| 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People profiles, governance changes, and the case record use the header–sections–context pattern. People and Groups directories search and paginate. Discussion, group, and Social notifications open their records through the read gate. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
+| 5. Admin and customization polish | Profile, wallet handoff, the organization preview, and admin use the settings-section pattern with shared inline form feedback. Next: component palette operations once variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
 The proposal controller checks the stored group lane on deep reads, edits,
 signatures, comments, stage changes, ballots, and promotions. Proposal alert and
@@ -562,6 +672,92 @@ and phone reflow.
 [Group HTTP regression](tests/group-workspace.test.js) ·
 [Promotion regression](tests/group-roles-promotion.test.js) ·
 [Browser suite](tests/ui.test.js)
+
+### People, governance, and case verification
+
+HTTP regressions cover the People card anatomy and the search with no matches.
+They also cover profile GET views, the unknown-view fallback, the Delegate
+pre-fill, and the self-view Edit action. A members-only lane proposal stays out
+of an outsider's profile counts and Activity but appears for its author.
+Governance coverage checks the guest verification action, the current rule
+beside the proposed value, and Before and After values on an approved decision.
+The Scenario A walkthrough passed and refreshed the People, delegate profile,
+and governance captures. A browser pass at 375 px in light and dark checked
+the profile, Delegate handoff, Governance, and Cases with no horizontal
+overflow. The existing Scenario B case regression covers the restructured
+case record, its review date, and the acknowledgement. The Discussion browser
+test now waits for the destination heading after an enhanced swap, which
+removes an intermittent failure.
+[Record workspace regression](tests/record-workspaces.test.js) ·
+[Governance regression](tests/governance.test.js) ·
+[Case regression](tests/organization-cases.test.js)
+
+### Profile, wallet, and preview verification
+
+HTTP regressions cover the guest and verified Profile headers, the stable
+section keys behind the new anchors, the section-returning form actions, the
+status line after a save, and the alert, `aria-invalid`, and kept value after
+a rejected handle. They check that the rail shows the hash cue but not the
+full hash. The wallet tests cover the steps, QR, deep link and fallback,
+the privacy guarantee, refresh and restart links, the recovery page, and the
+result page without Social when that module is off. The preview test checks
+the persistent header. A browser pass on seeded Scenario A checked Profile in
+dark at desktop, and the wallet handoff, preview, and an enhanced handle
+rejection at 375 px in light with no horizontal overflow. The rejection
+announced its error and returned focus to the handle section.
+[Settings and task regression](tests/settings-task-pages.test.js)
+
+The admin regression checks the single heading, that all 20 index links
+resolve to tagged sections, and that no form posts to bare `/admin`. A module
+save is confirmed only inside Modules. A rejected rate-limit override shows a
+warning status and an alert summary. A save that requires verification still
+reads as success. Quotes and markup in the Circle name and in an echoed
+attribute payload are escaped. Enhanced submissions now leave the fragment out
+of the request and reapply it for focus. The browser tests and the Scenario A
+driver find admin forms by an `/admin` prefix. A Scenario A browser pass checked the index at
+a narrow width in dark and an enhanced Rate limits save in light. Focus and
+the confirmation both landed in that section.
+
+### Directory and inbox verification
+
+HTTP regressions page People at 24 cards with a search that resets paging,
+search Groups by category with a zero-match recovery link, and check the
+directory pager wording. The inbox regression opens a group from its creation
+alert and a members-only contribution from a promotion request and its decline.
+After the requester leaves the lane, the decline stays readable while the
+contribution text and link are withheld. Migration 27 gives stored
+notifications explicit source ids. A seeded Scenario A pass checked the
+Groups search and its empty state at 375 px in light with no horizontal
+overflow, and an enhanced search kept the query in the URL and moved focus to
+the heading.
+[Directory and inbox regression](tests/directory-paging.test.js)
+
+The Social regression opens a public update from its wall permalink and a
+mention alert, follows a reply back to its parent in both HTML response modes,
+and refuses a direct message to a guest and an outsider in both modes while
+both participants can open it and the recipient's inbox links to it. A seeded
+Scenario A pass opened an update from the wall with enhanced navigation,
+replied through the inline form, and checked the conversation at 375 px in
+light with no horizontal overflow.
+[Social update regression](tests/social-post-view.test.js)
+
+### Inbox scope, Ballot timeline, and admin outcome verification
+
+The inbox regressions check the scope line on a public group-lane proposal, a
+members-only contribution, a top-level group, a public mention, and a direct
+message, and that a withheld source shows none of it. The Ballot regression
+opens voting on a Scenario A waiting-list proposal and checks the timeline
+ahead of the frozen text, the parent-category hand-off to a named delegate,
+the abstention warning without a delegation, the readback after a direct vote,
+the closing time and moderator after close, and that reopening clears it.
+Migration 29 adds the closing fields. The admin regression checks a warning
+for an anchor action missing its key and for a skipped gossip run, and a unit
+test covers each outcome and a missing one. A seeded Scenario A pass read the
+Ballot as a member whose waiting-list delegation forwards through
+@giulia.ferrero to @marco.deluca in dark at desktop width, and the inbox at
+375 px in light with no horizontal overflow.
+[Ballot regression](tests/ballot-timing.test.js) ·
+[Admin feedback regression](tests/settings-task-pages.test.js)
 
 ### Review checklist for presentation changes
 

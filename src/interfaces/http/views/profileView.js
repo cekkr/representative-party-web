@@ -1,4 +1,5 @@
 import { escapeHtml } from '../../../shared/utils/text.js';
+import { renderFormErrors, renderFormNotice } from './formFeedback.js';
 
 const FIELD_PREFIX = 'profile_';
 
@@ -36,7 +37,7 @@ export function renderProfileForm({
   const consentLabel = `I consent to storing my provider-local profile fields on this server.`;
   return `
     ${errorsBlock}
-    <form class="stack" method="post" action="/profile" data-enhance="profile">
+    <form class="stack" method="post" action="/profile#profile-attributes" data-enhance="profile">
       ${fields}
       <label class="field checkbox">
         <input type="checkbox" name="profileConsent" ${consentChecked ? 'checked' : ''} required />
@@ -47,25 +48,7 @@ export function renderProfileForm({
       </div>
     </form>
     ${updatedLine}
-    <p class="muted small">Leaving optional fields blank clears them. Values never gossip to peers.</p>
-    <p class="muted small">Only verified ${escapeHtml(actorLabels?.actorLabelPlural || 'users')} can edit profile attributes.</p>
-  `;
-}
-
-export function renderProfileSummary(person, actorLabels) {
-  if (!person) {
-    return `
-      <div class="callout">
-        <p class="muted small">No verified session found for this browser.</p>
-      </div>
-    `;
-  }
-  return `
-    <div class="callout">
-      <p class="muted small">Handle: ${escapeHtml(person.handle || 'unknown')}</p>
-      <p class="muted small">Role: ${escapeHtml(person.role || actorLabels?.actorLabel || 'user')}</p>
-      <p class="muted small">Verified hash: ${escapeHtml(person.pidHash || 'unavailable')}</p>
-    </div>
+    <p class="muted tiny">Leaving an optional field blank clears it. Only verified ${escapeHtml(actorLabels?.actorLabelPlural || 'users')} can edit these fields.</p>
   `;
 }
 
@@ -87,9 +70,7 @@ export function renderUiPreferencesForm({
   const selection = overrideMode || 'default';
   const defaultLabel = defaultMode === 'compact' ? 'Compact' : 'Full';
   const effectiveLabel = effectiveMode === 'compact' ? 'Compact' : 'Full';
-  const flashNote = flash
-    ? `<div class="callout"><p class="muted small">${escapeHtml(flash)}</p></div>`
-    : '';
+  const flashNote = renderFormNotice(flash);
   const normalizedSettings = {
     largeText: uiSettings?.largeText === true,
     reducedMotion: uiSettings?.reducedMotion === true,
@@ -100,7 +81,7 @@ export function renderUiPreferencesForm({
   const checked = (value) => (value ? 'checked' : '');
   return `
     ${flashNote}
-    <form class="stack" method="post" action="/profile" data-enhance="profile">
+    <form class="stack" method="post" action="/profile#profile-interface-defaults" data-enhance="profile">
       <input type="hidden" name="intent" value="ui-preferences" />
       <label class="field">
         <span>UI verbosity</span>
@@ -110,8 +91,8 @@ export function renderUiPreferencesForm({
           <option value="compact" ${selection === 'compact' ? 'selected' : ''}>Compact (hide verbose cues)</option>
         </select>
       </label>
-      <div class="stack">
-        <p class="muted small">Interface defaults (used when browser-local overrides are not set):</p>
+      <fieldset class="stack settings-fieldset">
+        <legend class="small">Comfort and navigation</legend>
         <label class="field checkbox">
           <input type="hidden" name="uiLargeText" value="off" />
           <input type="checkbox" name="uiLargeText" ${checked(normalizedSettings.largeText)} />
@@ -137,12 +118,12 @@ export function renderUiPreferencesForm({
           <input type="checkbox" name="uiPartialNavigation" ${checked(normalizedSettings.partialNavigation)} />
           <span>Fast partial navigation</span>
         </label>
-      </div>
+      </fieldset>
       <div class="cta-row">
-        <button class="ghost" type="submit">Save UI preferences</button>
+        <button class="cta" type="submit">Save interface defaults</button>
       </div>
     </form>
-    <p class="muted small">Current view: ${escapeHtml(effectiveLabel)}.</p>
+    <p class="muted tiny">Current verbosity: ${escapeHtml(effectiveLabel)}.</p>
   `;
 }
 
@@ -176,14 +157,22 @@ function renderProviderField(field, value, errors = []) {
   const label = escapeHtml(field.label || field.key || 'Field');
   const required = field.required ? 'required' : '';
   const key = escapeHtml(field.key || '');
-  const description = field.description ? `<span class="muted small">${escapeHtml(field.description)}</span>` : '';
-  const errorMessages = errors.length ? `<span class="muted small">${escapeHtml(errors.join(', '))}</span>` : '';
-  const invalidAttr = errors.length ? ' aria-invalid="true"' : '';
+  const inputId = `profile-field-${key}`;
+  const describedIds = [];
+  const description = field.description
+    ? `<span class="muted small" id="${inputId}-hint">${escapeHtml(field.description)}</span>`
+    : '';
+  if (field.description) describedIds.push(`${inputId}-hint`);
+  const errorMessages = errors.length
+    ? `<span class="field-error small" id="${inputId}-error">${escapeHtml(errors.join(', '))}</span>`
+    : '';
+  if (errors.length) describedIds.push(`${inputId}-error`);
+  const invalidAttr = `${errors.length ? ' aria-invalid="true"' : ''}${describedIds.length ? ` aria-describedby="${describedIds.join(' ')}"` : ''}`;
   if (field.type === 'boolean') {
     const checked = value ? 'checked' : '';
     return `
       <label class="field checkbox">
-        <input type="checkbox" name="${FIELD_PREFIX}${key}" ${checked}${invalidAttr} />
+        <input id="${inputId}" type="checkbox" name="${FIELD_PREFIX}${key}" ${checked}${invalidAttr} />
         <span>${label}${field.required ? ' (required)' : ''}</span>
         ${description}
         ${errorMessages}
@@ -195,7 +184,7 @@ function renderProviderField(field, value, errors = []) {
   return `
     <label class="field">
       <span>${label}${field.required ? ' (required)' : ''}</span>
-      <input name="${FIELD_PREFIX}${key}" type="${inputType}" value="${escapeHtml(inputValue)}" ${required}${invalidAttr} />
+      <input id="${inputId}" name="${FIELD_PREFIX}${key}" type="${inputType}" value="${escapeHtml(inputValue)}" ${required}${invalidAttr} />
       ${description}
       ${errorMessages}
     </label>
@@ -211,14 +200,7 @@ function resolveInputType(type = '') {
 }
 
 function renderErrors(errors = []) {
-  if (!errors.length) return '';
-  const items = errors.map((error) => `<li>${escapeHtml(String(error))}</li>`).join('');
-  return `
-    <div class="callout">
-      <p class="muted small">Profile validation</p>
-      <ul class="plain">${items}</ul>
-    </div>
-  `;
+  return renderFormErrors(errors, { id: 'profile-attributes-error', title: 'Fields not saved' });
 }
 
 function splitProfileErrors(errors = [], providerFields = []) {

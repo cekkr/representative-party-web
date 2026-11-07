@@ -98,6 +98,14 @@ import { renderPage } from '../../../interfaces/http/views/templates.js';
 import { renderContextPanel } from '../../../interfaces/http/views/contextPanel.js';
 import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
 import { renderPreviewPill } from '../../../interfaces/http/views/shared.js';
+import { renderFormErrors } from '../../../interfaces/http/views/formFeedback.js';
+import {
+  ADMIN_OUTCOME as OUTCOME,
+  adminFormAction,
+  buildAdminSectionNotices,
+  renderAdminIndex,
+  resolveAdminIntentSection,
+} from '../adminSections.js';
 
 const OUTBOUND_SUMMARY_LIMIT = 200;
 
@@ -127,8 +135,9 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       ? sendAdminRequiredJson({ res, person })
       : renderAdminRequired({ res, state, wantsPartial, person });
   }
+  const flashSection = resolveAdminIntentSection(intent);
   const renderWithPerson = (viewModel) =>
-    renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person } });
+    renderAdminPage({ res, state, wantsPartial, viewModel: { ...viewModel, person, flashSection } });
   if (intent === 'session') {
     const result = await updateSession(state, body);
     return renderWithPerson(result);
@@ -180,7 +189,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   if (intent === 'topic-gardener-sync') {
     const summary = await syncTopicGardenerOperations(state, { source: 'admin' });
     const flash = formatTopicGardenerFlash(summary);
-    return renderWithPerson({ flash });
+    return renderWithPerson({ flash, outcome: !summary || summary.reason ? OUTCOME.NOT_APPLIED : OUTCOME.APPLIED });
   }
   if (intent === 'topic-rename-accept') {
     const result = await acceptTopicRename(state, body);
@@ -216,11 +225,11 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
-    return renderWithPerson({ flash: formatGossipFlash(summary) });
+    return renderWithPerson({ flash: formatGossipFlash(summary), outcome: gossipOutcome(summary) });
   }
   if (intent === 'gossip-pull') {
     const summary = await pullGossipNow(state, { reason: 'admin' });
-    return renderWithPerson({ flash: formatGossipFlash(summary) });
+    return renderWithPerson({ flash: formatGossipFlash(summary), outcome: gossipOutcome(summary) });
   }
   if (intent === 'peer-health-reset') {
     const resetAll = parseBoolean(body.resetAll, false);
@@ -233,7 +242,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       await persistSettings(state);
       flash = resetAll ? 'Peer health reset for all peers.' : `Peer health reset for ${result.removed}.`;
     }
-    return renderWithPerson({ flash });
+    return renderWithPerson({ flash, outcome: result.updated ? OUTCOME.APPLIED : OUTCOME.NOT_APPLIED });
   }
 
   const prev = state.settings || {};
@@ -320,7 +329,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     flashParts.push('Wallet verification required for posting.');
   }
 
-  return renderWithPerson({ flash: flashParts.join(' ') });
+  return renderWithPerson({ flash: flashParts.join(' '), outcome: OUTCOME.APPLIED });
 }
 
 async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
@@ -328,13 +337,54 @@ async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const person = viewModel.person || null;
   const personHandle = resolvePersonHandle(person);
   const roleLabel = person?.role || 'guest';
-  const adminView = buildAdminViewModel(state, { ...viewModel, availableExtensions });
+  const adminView = escapeAdminFormValues(buildAdminViewModel(state, { ...viewModel, availableExtensions }));
+  const hasErrors = Object.entries(viewModel)
+    .some(([key, value]) => key.endsWith('Errors') && typeof value === 'string' && value.trim());
+  const notices = buildAdminSectionNotices({
+    flash: viewModel.flash, outcome: viewModel.outcome, section: viewModel.flashSection, hasErrors,
+  });
   const html = await renderPage(
     'admin',
-    { ...adminView, person, personHandle, roleLabel, adminBootstrapNotice: buildAdminBootstrapNotice(state) },
+    {
+      ...adminView,
+      ...notices,
+      adminIndex: renderAdminIndex(),
+      person,
+      personHandle,
+      roleLabel,
+      adminBootstrapNotice: buildAdminBootstrapNotice(state),
+    },
     { wantsPartial, title: 'Admin - Circle Settings', state },
   );
   return sendHtml(res, html);
+}
+
+// Keys interpolated into input values and textarea bodies. The template engine
+// inserts strings verbatim, and these hold operator- or member-supplied text (a
+// member's provider-local profile fields reach `attributesPayloadValue`), so they
+// are escaped here, once, rather than at each of their many construction sites.
+const ADMIN_FORM_VALUE_KEYS = [
+  'circleName', 'policyId', 'adminContact', 'issuer', 'preferredPeer', 'notes',
+  'topicGardenerUrl', 'topicAnchors', 'topicPinned',
+  'sessionIdValue', 'sessionHandleValue',
+  'providerFieldsValue', 'attributesSessionId', 'attributesPayloadValue',
+  'composerThemeCss', 'composerQuickActionsOrder', 'composerSideNavOrder', 'composerAsideWidth',
+  'rateLimitOverridesValue', 'opsMetricsIntervalValue', 'opsMetricsRetentionValue',
+  'governanceQuorumDefault', 'governanceDiscussionWindowDays', 'governanceVoteWindowDays',
+  'governanceReviewWindowHours', 'governanceDelegationDecayDays', 'governanceDelegateVoteWindowDays',
+  'governanceNotes',
+  'providerBlindRingId', 'providerBlindRingEpoch', 'providerBlindRingMaxSize', 'providerBlindRingKeys',
+  'providerBlindAuditThreshold', 'providerBlindAuditMaxScopeDays', 'providerBlindAuditMembers',
+  'providerBlindTransportMaxHops', 'providerBlindTransportTimeoutMs', 'providerBlindTransportRelays',
+];
+
+function escapeAdminFormValues(view) {
+  const next = { ...view };
+  for (const key of ADMIN_FORM_VALUE_KEYS) {
+    if (next[key] === undefined || next[key] === null) continue;
+    next[key] = escapeHtml(String(next[key]));
+  }
+  return next;
 }
 
 /**
@@ -865,7 +915,7 @@ async function updateOpsMetrics(state, body) {
   const errors = [...retentionResult.errors, ...intervalResult.errors];
   if (errors.length) {
     return {
-      flash: 'Ops metrics settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Ops metrics settings not updated.',
       opsMetricsErrors: renderValidationErrors(errors, { title: 'Ops metrics' }),
       opsMetricsRetentionValue: retentionInput || String(prev.retentionHours || ''),
       opsMetricsIntervalValue: intervalInput || String(prev.intervalSeconds || ''),
@@ -888,7 +938,7 @@ async function updateOpsMetrics(state, body) {
   });
   await persistSettings(state);
   return {
-    flash: 'Ops metrics settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Ops metrics settings updated.',
     opsMetricsRetentionValue: String(next.retentionHours),
     opsMetricsIntervalValue: String(next.intervalSeconds),
   };
@@ -968,7 +1018,7 @@ async function updateGovernance(state, body, person) {
 
   if (errors.length) {
     return {
-      flash: 'Governance settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Governance settings not updated.',
       governanceErrors: renderValidationErrors(errors, { title: 'Governance settings' }),
       governanceQuorumDefaultValue: quorumInput || String(prev.quorumDefault),
       governanceDiscussionWindowDaysValue: discussionInput || String(prev.discussionWindowDays),
@@ -1015,7 +1065,7 @@ async function updateGovernance(state, body, person) {
   await persistSettings(state);
 
   return {
-    flash: 'Governance settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Governance settings updated.',
     governanceQuorumDefaultValue: String(next.quorumDefault),
     governanceDiscussionWindowDaysValue: String(next.discussionWindowDays),
     governanceVoteWindowDaysValue: String(next.voteWindowDays),
@@ -1041,7 +1091,7 @@ async function decideGovernanceProposalRoute(state, body, person) {
       result.error === 'already_decided'
         ? 'Governance proposal was already decided.'
         : 'Governance proposal not found.';
-    return { flash: message };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: message };
   }
 
   recordAdminAudit(state, {
@@ -1060,7 +1110,7 @@ async function decideGovernanceProposalRoute(state, body, person) {
   await persistSettings(state);
 
   return {
-    flash:
+    outcome: OUTCOME.APPLIED, flash:
       result.proposal.status === 'approved'
         ? 'Governance proposal approved and defaults updated.'
         : 'Governance proposal rejected.',
@@ -1171,7 +1221,7 @@ async function updateProviderBlind(state, body) {
 
   if (errors.length) {
     return {
-      flash: 'Provider-blind settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Provider-blind settings not updated.',
       providerBlindErrors: renderValidationErrors(errors, { title: 'Provider-blind settings' }),
       providerBlindModeValue: modeInput,
       providerBlindRingIdValue: ringIdInput,
@@ -1229,7 +1279,7 @@ async function updateProviderBlind(state, body) {
   await persistSettings(state);
 
   return {
-    flash: 'Provider-blind settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Provider-blind settings updated.',
   };
 }
 
@@ -1237,7 +1287,7 @@ async function updateSigningKeys(state, body) {
   const confirmed = parseBoolean(body.signingKeysConfirm, false);
   if (!confirmed) {
     return {
-      flash: 'Signing keys not generated. Confirm rotation first.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Signing keys not generated. Confirm rotation first.',
     };
   }
 
@@ -1274,7 +1324,7 @@ async function updateSigningKeys(state, body) {
   await persistSettings(state);
 
   return {
-    flash: `Signing keys generated and saved. Fingerprint: ${fingerprint || 'n/a'}.`,
+    outcome: OUTCOME.APPLIED, flash: `Signing keys generated and saved. Fingerprint: ${fingerprint || 'n/a'}.`,
   };
 }
 
@@ -1285,11 +1335,11 @@ async function updateSession(state, body) {
   const banned = parseBoolean(body.sessionBanned, false);
   const handle = sanitizeText(body.sessionHandle || '', 64);
   if (!sessionId) {
-    return { flash: 'Session ID required to update roles.', sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Session ID required to update roles.', sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
   }
   const session = state.sessions.get(sessionId);
   if (!session) {
-    return { flash: `Session "${sessionId}" not found.`, sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Session "${sessionId}" not found.`, sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
   }
 
   const next = {
@@ -1304,7 +1354,7 @@ async function updateSession(state, body) {
   invalidateSessionIndex(state);
   await persistSessions(state);
   return {
-    flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,
+    outcome: OUTCOME.APPLIED, flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,
     sessionForm: { sessionRole: role, sessionId, sessionHandle: next.handle, banned },
   };
 }
@@ -1343,7 +1393,7 @@ async function updateStructure(state, body) {
     flashParts.push(`Validation: ${errors.join(' ')}`);
   }
   return {
-    flash: flashParts.join(' '),
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash: flashParts.join(' '),
     providerFieldsValue: formatProviderFieldsForTextarea(normalized),
     providerFieldErrors: renderValidationErrors(errors, { title: 'Schema validation' }),
   };
@@ -1354,7 +1404,7 @@ async function updateProfileAttributes(state, body) {
   const payload = body.attributesPayload || '';
   if (!sessionId) {
     return {
-      flash: 'Session ID required to persist profile attributes.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Session ID required to persist profile attributes.',
       attributesPayloadValue: payload,
       profileAttributeErrors: '',
     };
@@ -1362,7 +1412,7 @@ async function updateProfileAttributes(state, body) {
   const session = state.sessions.get(sessionId);
   if (!session) {
     return {
-      flash: `Session "${sessionId}" not found.`,
+      outcome: OUTCOME.NOT_APPLIED, flash: `Session "${sessionId}" not found.`,
       attributesSessionId: sessionId,
       attributesPayloadValue: payload,
       profileAttributeErrors: '',
@@ -1393,7 +1443,7 @@ async function updateProfileAttributes(state, body) {
     flashParts.push(`Validation: ${errors.join(' ')}`);
   }
   return {
-    flash: flashParts.join(' '),
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash: flashParts.join(' '),
     attributesSessionId: sessionId,
     attributesPayloadValue: renderAttributesPayload(entry?.provider),
     profileAttributeErrors: renderValidationErrors(errors, { title: 'Attribute validation' }),
@@ -1429,7 +1479,7 @@ async function updateModules(state, body) {
   if (blocked.length) {
     flash += ` Disabled by dependencies: ${blocked.join('; ')}.`;
   }
-  return { flash };
+  return { flash, outcome: blocked.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED };
 }
 
 async function updateComposerSettings(state, body) {
@@ -1478,7 +1528,7 @@ async function updateComposerSettings(state, body) {
 
   if (errors.length) {
     return {
-      flash: 'Composer settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Composer settings not updated.',
       composerErrors: renderValidationErrors(errors, { title: 'Composer settings' }),
       composerThemeCssValue: limitedCss || prev.themeCss || '',
       composerQuickActionsOrderValue: formatCsvList(quickActionsOrder),
@@ -1509,7 +1559,7 @@ async function updateComposerSettings(state, body) {
   });
   await persistSettings(state);
   return {
-    flash: 'Composer settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Composer settings updated.',
     composerThemeCssValue: next.themeCss || '',
     composerQuickActionsOrderValue: formatCsvList(next.quickActionsOrder),
     composerSideNavOrderValue: formatCsvList(next.sideNavOrder),
@@ -1524,7 +1574,7 @@ async function updateRateLimits(state, body) {
 
   if (!hasOverrides && errors.length) {
     return {
-      flash: 'Rate limits not saved. Fix the errors below.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Rate limits not saved. Fix the errors below.',
       rateLimitOverridesValue: String(raw || ''),
       rateLimitErrors: renderRateLimitErrors(errors),
     };
@@ -1542,7 +1592,7 @@ async function updateRateLimits(state, body) {
     : 'Rate limits saved.';
 
   return {
-    flash,
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash,
     rateLimitOverridesValue: formatRateLimitOverrides(overrides),
     rateLimitErrors: renderRateLimitErrors(errors),
   };
@@ -1553,11 +1603,11 @@ async function moderateMedia(state, body) {
   const status = sanitizeText(body.status || '', 32);
   const reason = sanitizeText(body.reason || '', 160);
   if (!mediaId) {
-    return { flash: 'Media ID required to update status.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Media ID required to update status.' };
   }
   const media = findMedia(state, mediaId);
   if (!media) {
-    return { flash: `Media "${mediaId}" not found.` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Media "${mediaId}" not found.` };
   }
 
   const updated = updateMediaStatus(state, media, { status, reason, moderatorHash: 'admin' });
@@ -1577,7 +1627,7 @@ async function moderateMedia(state, body) {
     },
   });
 
-  return { flash: `Media "${mediaId}" set to ${updated.status}.` };
+  return { outcome: OUTCOME.APPLIED, flash: `Media "${mediaId}" set to ${updated.status}.` };
 }
 
 function buildAdminViewModel(
@@ -2063,7 +2113,7 @@ function renderTopicRenameList(topics = []) {
             ${reason}
             ${requestedAt}
           </div>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-rename-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2074,7 +2124,7 @@ function renderTopicRenameList(topics = []) {
               <button class="ghost" type="submit">Accept rename</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-rename-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2123,7 +2173,7 @@ function renderTopicMergeList(topics = [], state) {
             ${targetPreview}
             <p class="muted small">Merging archives the source topic and redirects breadcrumbs to the target.</p>
           </details>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-merge-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2139,7 +2189,7 @@ function renderTopicMergeList(topics = [], state) {
               <button class="ghost" type="submit">Accept merge</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-merge-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2177,7 +2227,7 @@ function renderTopicSplitList(topics = [], state) {
             ${splitPreview}
             <p class="muted small">Splitting creates child topics under the current topic path.</p>
           </details>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-split-accept" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <label class="field">
@@ -2196,7 +2246,7 @@ function renderTopicSplitList(topics = [], state) {
               <button class="ghost" type="submit">Accept split</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-split-dismiss" />
             <input type="hidden" name="topicId" value="${escapeHtml(topic.id)}" />
             <button class="ghost" type="submit">Dismiss</button>
@@ -2246,7 +2296,7 @@ function renderTopicAnchorSuggestionList(entries = []) {
             ${reason}
             ${requestedAt}
           </div>
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-anchor-accept" />
             <input type="hidden" name="topicKey" value="${keyValue}" />
             <input type="hidden" name="action" value="${escapeHtml(action)}" />
@@ -2256,7 +2306,7 @@ function renderTopicAnchorSuggestionList(entries = []) {
               <button class="ghost" type="submit">Accept</button>
             </div>
           </form>
-          <form class="form-inline" method="post" action="/admin" data-enhance="admin">
+          <form class="form-inline" method="post" action="/admin#topic-gardener-review" data-enhance="admin">
             <input type="hidden" name="intent" value="topic-anchor-dismiss" />
             <input type="hidden" name="topicKey" value="${keyValue}" />
             <input type="hidden" name="action" value="${escapeHtml(action)}" />
@@ -2489,7 +2539,7 @@ async function acceptTopicRename(state, body) {
   const renameLabel = sanitizeText(body.renameLabel || '', 64);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   const result = applyTopicRename(state, topicId, {
     label: renameLabel || topic.pendingRename?.toLabel,
@@ -2497,17 +2547,17 @@ async function acceptTopicRename(state, body) {
     source: 'admin',
   });
   if (!result.updated) {
-    return { flash: `Rename skipped (${result.reason || 'no_change'}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Rename skipped (${result.reason || 'no_change'}).` };
   }
   await persistTopics(state);
-  return { flash: `Renamed topic to "${topic.label}".` };
+  return { outcome: OUTCOME.APPLIED, flash: `Renamed topic to "${topic.label}".` };
 }
 
 async function dismissTopicRename(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingRename) {
-    return { flash: 'No pending rename to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending rename to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2521,7 +2571,7 @@ async function dismissTopicRename(state, body) {
   topic.pendingRename = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic rename dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic rename dismissed.' };
 }
 
 async function acceptTopicMerge(state, body) {
@@ -2530,10 +2580,10 @@ async function acceptTopicMerge(state, body) {
   const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   if (!confirmed) {
-    return { flash: 'Confirm the merge after reviewing the previews.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the merge after reviewing the previews.' };
   }
   const pending = topic.pendingMerge || {};
   let target = null;
@@ -2547,24 +2597,24 @@ async function acceptTopicMerge(state, body) {
     target = findTopicByPathKey(state, pending.toKey);
   }
   if (!target) {
-    return { flash: 'Merge target not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Merge target not found.' };
   }
   const result = applyTopicMerge(state, topic.id, target.id, {
     reason: pending.reason || 'admin_accept',
     source: 'admin',
   });
   if (!result.updated) {
-    return { flash: `Merge skipped (${result.reason || 'no_change'}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Merge skipped (${result.reason || 'no_change'}).` };
   }
   await persistTopics(state);
-  return { flash: `Merged "${topic.label}" into "${target.label}".` };
+  return { outcome: OUTCOME.APPLIED, flash: `Merged "${topic.label}" into "${target.label}".` };
 }
 
 async function dismissTopicMerge(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingMerge) {
-    return { flash: 'No pending merge to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending merge to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2578,7 +2628,7 @@ async function dismissTopicMerge(state, body) {
   topic.pendingMerge = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic merge dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic merge dismissed.' };
 }
 
 async function acceptTopicSplit(state, body) {
@@ -2588,10 +2638,10 @@ async function acceptTopicSplit(state, body) {
   const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   if (!confirmed) {
-    return { flash: 'Confirm the split after reviewing the previews.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the split after reviewing the previews.' };
   }
   const pending = topic.pendingSplit || {};
   const labels = [labelA, labelB].filter(Boolean);
@@ -2605,17 +2655,17 @@ async function acceptTopicSplit(state, body) {
     persist: false,
   });
   if (!result.updated && result.reason) {
-    return { flash: `Split skipped (${result.reason}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Split skipped (${result.reason}).` };
   }
   await persistTopics(state);
-  return { flash: `Created ${result.created || 0} split topic(s).` };
+  return { outcome: OUTCOME.APPLIED, flash: `Created ${result.created || 0} split topic(s).` };
 }
 
 async function dismissTopicSplit(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingSplit) {
-    return { flash: 'No pending split to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending split to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2629,7 +2679,7 @@ async function dismissTopicSplit(state, body) {
   topic.pendingSplit = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic split dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic split dismissed.' };
 }
 
 async function acceptTopicAnchorSuggestion(state, body) {
@@ -2638,19 +2688,19 @@ async function acceptTopicAnchorSuggestion(state, body) {
   const anchorLabel = sanitizeText(body.anchorLabel || '', 64);
   const confirmed = parseBoolean(body.confirm, false);
   if (!topicKey || !action) {
-    return { flash: 'Anchor suggestion missing key or action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion missing key or action.' };
   }
   if (action !== 'promote' && action !== 'archive') {
-    return { flash: 'Unknown anchor action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Unknown anchor action.' };
   }
   if (action === 'archive' && !confirmed) {
-    return { flash: 'Confirm the anchor archive before applying.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the anchor archive before applying.' };
   }
 
   const pending = listPendingAnchorSuggestions(state);
   const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
   if (index < 0) {
-    return { flash: 'Anchor suggestion not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion not found.' };
   }
   const entry = pending[index];
   const topicGardener = state.settings?.topicGardener || {};
@@ -2697,10 +2747,10 @@ async function acceptTopicAnchorSuggestion(state, body) {
   }
 
   if (!updated) {
-    return { flash: `Anchor suggestion applied (no anchor list changes).` };
+    return { outcome: OUTCOME.APPLIED, flash: `Anchor suggestion applied (no anchor list changes).` };
   }
   return {
-    flash: action === 'archive' ? `Anchor "${labelUsed}" archived.` : `Anchor "${labelUsed}" promoted.`,
+    outcome: OUTCOME.APPLIED, flash: action === 'archive' ? `Anchor "${labelUsed}" archived.` : `Anchor "${labelUsed}" promoted.`,
   };
 }
 
@@ -2708,12 +2758,12 @@ async function dismissTopicAnchorSuggestion(state, body) {
   const action = sanitizeText(body.action || '', 24).toLowerCase();
   const topicKey = sanitizeText(body.topicKey || '', 120);
   if (!topicKey || !action) {
-    return { flash: 'Anchor suggestion missing key or action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion missing key or action.' };
   }
   const pending = listPendingAnchorSuggestions(state);
   const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
   if (index < 0) {
-    return { flash: 'Anchor suggestion not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion not found.' };
   }
   const entry = pending[index];
   const topicGardener = state.settings?.topicGardener || {};
@@ -2741,7 +2791,7 @@ async function dismissTopicAnchorSuggestion(state, body) {
     topic.updatedAt = now;
     await persistTopics(state);
   }
-  return { flash: 'Anchor suggestion dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Anchor suggestion dismissed.' };
 }
 
 function recordAdminAudit(state, { action, summary }) {
@@ -2785,7 +2835,7 @@ function renderGovernanceProposalDecisionList(proposals = []) {
           const controls =
             status === 'open'
               ? `
-                <form class="cta-row" method="post" action="/admin" data-enhance="admin">
+                <form class="cta-row" method="post" action="${adminFormAction('governance-settings')}" data-enhance="admin">
                   <input type="hidden" name="intent" value="governance-proposal-decision" />
                   <input type="hidden" name="proposalId" value="${escapeHtml(proposal.id)}" />
                   <button class="cta" type="submit" name="decision" value="approve">Approve</button>
@@ -2990,7 +3040,7 @@ function renderSocialMediaList(entries = []) {
           <p class="muted small">Post ID: ${escapeHtml(entry.postId || 'n/a')}</p>
           <p class="muted small">Type: ${escapeHtml(entry.contentType || 'unknown')} · ${formatBytes(entry.size || 0)}${name}</p>
           ${lastViewRequest ? `<p class="muted small">Last view request: ${escapeHtml(lastViewRequest)}</p>` : ''}
-          <form class="stack" method="post" action="/admin" data-enhance="admin">
+          <form class="stack" method="post" action="${adminFormAction('social-media')}" data-enhance="admin">
             <input type="hidden" name="intent" value="media-moderate" />
             <input type="hidden" name="mediaId" value="${escapeHtml(entry.id)}" />
             <div class="form-grid">
@@ -3076,9 +3126,7 @@ function renderRateLimitDefaults(defaults = {}) {
 }
 
 function renderRateLimitErrors(errors = []) {
-  if (!errors || !errors.length) return '';
-  const items = errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('');
-  return `<ul class="stack small">${items}</ul>`;
+  return renderFormErrors(errors, { title: 'Rate limits' });
 }
 
 function formatRateLimitOverrides(overrides = {}) {
@@ -3390,14 +3438,7 @@ function renderPeerHealthOptions(peerHealth = {}, peers = new Set()) {
 }
 
 function renderValidationErrors(errors = [], { title = 'Validation issues' } = {}) {
-  if (!errors.length) return '';
-  const items = errors.map((error) => `<li>${escapeHtml(String(error))}</li>`).join('');
-  return `
-    <div class="callout">
-      <p class="muted small">${escapeHtml(title)}</p>
-      <ul class="plain">${items}</ul>
-    </div>
-  `;
+  return renderFormErrors(errors, { title });
 }
 
 function formatGossipStatus(status = {}) {
@@ -3423,6 +3464,11 @@ function truncateText(value, max) {
   const text = String(value || '');
   if (text.length <= max) return text;
   return `${text.slice(0, Math.max(0, max - 3))}...`;
+}
+
+function gossipOutcome(summary) {
+  if (!summary || summary.skipped) return OUTCOME.NOT_APPLIED;
+  return summary.errors?.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED;
 }
 
 function formatGossipFlash(summary) {
