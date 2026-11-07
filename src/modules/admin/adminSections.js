@@ -63,22 +63,31 @@ export function adminNoticeKey(section) {
   return `adminNotice_${String(section).replace(/-/g, '_')}`;
 }
 
-// Admin handlers return prose, not a status, so the tone is read from the
-// phrasing they use for a change that did not apply. "Wallet verification
-// required for posting." is a success, hence `ID required` rather than `required`.
-const NOT_APPLIED = /\b(not (updated|saved|generated|found)|ID required|skipped|unavailable|failed|no pending)\b/i;
+// What an admin handler did, returned beside its message. The tone follows the
+// outcome, never the wording: a handler that says "Confirm the merge first" did
+// not apply anything, however politely it is phrased.
+export const ADMIN_OUTCOME = Object.freeze({
+  APPLIED: 'applied',
+  PARTIAL: 'partial',
+  NOT_APPLIED: 'not_applied',
+});
 
-export function resolveAdminNoticeTone(flash, { hasErrors = false } = {}) {
-  return hasErrors || NOT_APPLIED.test(String(flash || '')) ? 'warning' : 'success';
+const OUTCOMES = new Set(Object.values(ADMIN_OUTCOME));
+
+export function resolveAdminNoticeTone(outcome, { hasErrors = false } = {}) {
+  return hasErrors || outcome !== ADMIN_OUTCOME.APPLIED ? 'warning' : 'success';
 }
 
 // Returns the per-section placeholders, plus `adminNotice` for a submission that
 // maps to no known section (it renders under the page heading instead).
-export function buildAdminSectionNotices({ flash, section, hasErrors = false } = {}) {
+// A message without a known outcome is a handler bug; it reads as a warning
+// rather than as a confirmation nobody can verify.
+export function buildAdminSectionNotices({ flash, outcome, section, hasErrors = false } = {}) {
   const notices = { adminNotice: '' };
   for (const id of ADMIN_SECTION_IDS) notices[adminNoticeKey(id)] = '';
   if (!flash) return notices;
-  const html = renderFormNotice(flash, { tone: resolveAdminNoticeTone(flash, { hasErrors }) });
+  const known = OUTCOMES.has(outcome) ? outcome : ADMIN_OUTCOME.NOT_APPLIED;
+  const html = renderFormNotice(flash, { tone: resolveAdminNoticeTone(known, { hasErrors }) });
   if (ADMIN_SECTION_IDS.includes(section)) {
     notices[adminNoticeKey(section)] = html;
   } else {

@@ -2,6 +2,14 @@ import { formatTopicBreadcrumb as formatTopicBreadcrumbFromRegistry } from '../.
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { renderActorLabel } from './actorLabel.js';
 
+// How a record's lane reads to a member: the whole Circle, or a group's lane
+// with its visibility. Takes a resolved scope (`resolveGroupScope` with ok: true).
+export function describeLaneScope(scope) {
+  if (!scope?.group) return 'Whole Circle';
+  const visibility = scope.policy?.lanesVisibility === 'public' ? 'Public lane' : 'Members-only lane';
+  return `${scope.group.name || 'Group'} · ${visibility}`;
+}
+
 export function resolveTopicBreadcrumb(entry, state, cache) {
   const cacheKey = buildTopicCacheKey(entry);
   if (cache && cacheKey && cache.has(cacheKey)) {

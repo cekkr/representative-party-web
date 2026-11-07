@@ -91,6 +91,7 @@ test('inbox rows open discussion and group sources through their read gates', as
 
   const ireneInbox = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: irene.cookie } })).text;
   assert.match(ireneInbox, new RegExp(`href="/groups\\?group=${groupId}" data-partial>Open group`));
+  assert.match(ireneInbox, /<p class="notification-scope muted small">(?:<span class="notification-scope__title">)?(?:Palermo branch(?:<\/span>)? · )?Top-level group<\/p>/);
 
   await postForm(`${baseUrl}/groups`, { action: 'join', groupId }, marco);
   await postForm(`${baseUrl}/discussion`, {
@@ -106,6 +107,7 @@ test('inbox rows open discussion and group sources through their read gates', as
   const requested = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: irene.cookie } })).text;
   assert.match(requested, /Request to move an item up/);
   assert.match(requested, new RegExp(`href="${contributionHref}" data-partial>Open contribution`));
+  assert.match(requested, /“Palermo CUP overshoots the PNGLA limit for class B\.”<\/span> · Palermo branch · Members-only lane · Healthcare \/ Waiting lists/);
 
   assert.equal((await postForm(postUrl, { intent: 'promote-decide', discussionId: postId, decision: 'decline' }, irene)).status, 200);
   const declined = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: marco.cookie } })).text;
@@ -117,5 +119,5 @@ test('inbox rows open discussion and group sources through their read gates', as
   const after = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: marco.cookie } })).text;
   assert.match(after, /Your promotion request was declined/);
   assert.match(after, /The contribution is unavailable from this inbox\./);
-  assert.doesNotMatch(after, /Open contribution/);
+  assert.doesNotMatch(after, /Open contribution|Palermo CUP overshoots/);
 });

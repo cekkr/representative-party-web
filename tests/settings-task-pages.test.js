@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { createVerifiedSession } from './helpers/auth.js';
 import { fetchText, postForm } from './helpers/http.js';
 import { getAvailablePort, startServer } from './helpers/server.js';
+import { ADMIN_OUTCOME, adminNoticeKey, buildAdminSectionNotices } from '../src/modules/admin/adminSections.js';
 
 const mainOf = (html) => html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] || html;
 const section = (html, key) =>
@@ -150,4 +151,22 @@ test('Admin is an indexed settings document whose notices land beside the submit
   })).text());
   assert.doesNotMatch(echoed, /<script>alert\(1\)<\/script>/);
   assert.match(section(echoed, 'provider-profiles'), /form-notice is-warning" role="status">Session &quot;missing&quot; not found/);
+
+  // Tone comes from the handler's outcome, not its wording. An anchor action
+  // missing its key applied nothing, which the old wording rule read as success.
+  const anchor = mainOf(await (await postForm(`${baseUrl}/admin`, { intent: 'topic-anchor-accept' })).text());
+  assert.match(section(anchor, 'topic-gardener-review'), /form-notice is-warning" role="status">Anchor suggestion missing key or action\./);
+  // A gossip run in centralized mode is skipped, not confirmed.
+  const gossip = mainOf(await (await postForm(`${baseUrl}/admin`, { intent: 'gossip-push' })).text());
+  assert.match(section(gossip, 'federation-gossip'), /form-notice is-warning" role="status">Gossip sync skipped/);
+});
+
+test('admin notices take their tone from the structured outcome', () => {
+  const tone = (options) => buildAdminSectionNotices({ flash: 'Done.', section: 'modules', ...options })[adminNoticeKey('modules')];
+  assert.match(tone({ outcome: ADMIN_OUTCOME.APPLIED }), /<p class="form-notice" role="status">/);
+  assert.match(tone({ outcome: ADMIN_OUTCOME.PARTIAL }), /form-notice is-warning/);
+  assert.match(tone({ outcome: ADMIN_OUTCOME.NOT_APPLIED }), /form-notice is-warning/);
+  assert.match(tone({ outcome: ADMIN_OUTCOME.APPLIED, hasErrors: true }), /form-notice is-warning/);
+  // A handler that forgets its outcome cannot read as a confirmation.
+  assert.match(tone({}), /form-notice is-warning/);
 });

@@ -1,9 +1,10 @@
 import { paginate, parsePage } from '../../../shared/utils/pagination.js';
-import { renderPager } from '../../../interfaces/http/views/shared.js';
-import { canReadProposal, proposalHref } from '../../petitions/proposalLinks.js';
+import { describeLaneScope, renderPager, resolveTopicBreadcrumb } from '../../../interfaces/http/views/shared.js';
+import { canReadProposal, proposalHref, resolveProposalScope } from '../../petitions/proposalLinks.js';
 import { discussionHref, findDiscussionRecord } from '../../discussion/discussionLinks.js';
 import { findGroupById } from '../../groups/groups.js';
 import { groupHref } from '../../groups/http/groupView.js';
+import { formatGroupLineage } from '../../groups/groupTree.js';
 import { isModuleEnabled } from '../../circle/modules.js';
 import { findReadableSocialPost, socialPostHref } from '../../social/socialLinks.js';
 import { getPerson } from '../../identity/person.js';
@@ -116,13 +117,25 @@ export function humanizeNotificationType(type = '') {
 
 // Resolve the record a notification points at, through the same gate a direct
 // read of that record uses. A source the viewer can no longer open keeps the
-// event readable but withholds its message details and link.
+// event readable but withholds its message details, scope, and link.
+//
+// `context` names the record and where it lives (title, lane, topic) so a row
+// says which proposal or group it is about before the member opens it. It is
+// built only from a source that passed the gate.
 function resolveNotificationSource(event, state, person, proposals) {
   if (event.petitionId) {
     const proposal = proposals.get(event.petitionId);
     if (!proposal) return { hidden: true, noun: 'proposal' };
     const view = /comment|mention/.test(event.type) ? 'discussion' : /ballot|^vote/.test(event.type) ? 'ballot' : 'overview';
-    return { href: proposalHref(proposal, { view }), label: 'Open proposal' };
+    return {
+      href: proposalHref(proposal, { view }),
+      label: 'Open proposal',
+      context: [
+        quoteTitle(proposal.title),
+        describeLaneScope(resolveProposalScope(state, person, proposal)),
+        resolveTopicBreadcrumb(proposal, state),
+      ],
+    };
   }
   if (event.discussionId) {
     const record = findDiscussionRecord(state, person, event.discussionId);
@@ -130,20 +143,65 @@ function resolveNotificationSource(event, state, person, proposals) {
     return {
       href: discussionHref({ groupId: record.scope.groupId ?? null, post: record.entry.id }),
       label: 'Open contribution',
+      context: [
+        quoteTitle(excerpt(record.entry.content, 72)),
+        describeLaneScope(record.scope),
+        resolveTopicBreadcrumb(record.entry, state),
+      ],
     };
   }
   if (event.groupId) {
     const group = isModuleEnabled(state, 'groups') ? findGroupById(state, event.groupId) : null;
     if (!group) return { hidden: true, noun: 'group' };
     const view = event.type === 'group_delegate' || event.type === 'group_delegate_set' ? 'decisions' : 'overview';
-    return { href: groupHref(group.id, view), label: 'Open group' };
+    const lineage = formatGroupLineage(state, group);
+    return {
+      href: groupHref(group.id, view),
+      label: 'Open group',
+      context: [group.name || 'Group', lineage ? `Branch of ${lineage}` : 'Top-level group'],
+    };
   }
   if (event.socialPostId) {
     const post = isModuleEnabled(state, 'social') ? findReadableSocialPost(state, person, event.socialPostId) : null;
     if (!post) return { hidden: true, noun: 'update' };
-    return { href: socialPostHref(post.id), label: event.type === 'social_direct' ? 'Open conversation' : 'Open update' };
+    return {
+      href: socialPostHref(post.id),
+      label: event.type === 'social_direct' ? 'Open conversation' : 'Open update',
+      context: [
+        quoteTitle(excerpt(post.content, 72)),
+        post.visibility === 'direct' ? 'Direct message' : 'Public update',
+      ],
+    };
   }
   return {};
+}
+
+function excerpt(text, limit) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  if (value.length <= limit) return value;
+  const cut = value.slice(0, limit - 1);
+  const space = cut.lastIndexOf(' ');
+  // Break on a word when one ends reasonably close to the limit.
+  return `${(space > limit * 0.6 ? cut.slice(0, space) : cut).trimEnd()}…`;
+}
+
+function quoteTitle(text) {
+  const value = String(text || '').trim();
+  return value ? `“${value}”` : '';
+}
+
+// The first part names the record. Older messages already quote it, so it is
+// left out then rather than said twice; the lane and topic still follow.
+function renderNotificationContext(context = [], message = '') {
+  const [named, ...scope] = context;
+  const bare = String(named || '').replace(/^“|”$/g, '').replace(/…$/, '');
+  const parts = [bare && !String(message || '').includes(bare) ? named : '', ...scope].filter(Boolean);
+  if (!parts.length) return '';
+  if (!(bare && parts[0] === named)) {
+    return `<p class="notification-scope muted small">${parts.map(escapeHtml).join(' · ')}</p>`;
+  }
+  const [title, ...rest] = parts;
+  return `<p class="notification-scope muted small"><span class="notification-scope__title">${escapeHtml(title)}</span>${rest.map((part) => ` · ${escapeHtml(part)}`).join('')}</p>`;
 }
 
 function renderNotificationList(list, state, person) {
@@ -169,6 +227,7 @@ function renderNotificationList(list, state, person) {
           ${event.read ? '' : '<span class="pill">Unread</span>'}
           ${createdAt ? `<time class="muted small" datetime="${escapeHtml(event.createdAt)}">${escapeHtml(createdAt)}</time>` : ''}
         </div>
+        ${source.hidden ? '' : renderNotificationContext(source.context, message)}
         <p>${escapeHtml(message || '')}</p>
         ${source.href ? `<a href="${escapeHtml(source.href)}" data-partial>${escapeHtml(source.label)}</a>` : ''}
         ${expiresAt ? `<p class="muted small">Expires ${escapeHtml(expiresAt)}</p>` : ''}

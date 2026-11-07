@@ -100,6 +100,7 @@ import { resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.j
 import { renderPreviewPill } from '../../../interfaces/http/views/shared.js';
 import { renderFormErrors } from '../../../interfaces/http/views/formFeedback.js';
 import {
+  ADMIN_OUTCOME as OUTCOME,
   adminFormAction,
   buildAdminSectionNotices,
   renderAdminIndex,
@@ -188,7 +189,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   if (intent === 'topic-gardener-sync') {
     const summary = await syncTopicGardenerOperations(state, { source: 'admin' });
     const flash = formatTopicGardenerFlash(summary);
-    return renderWithPerson({ flash });
+    return renderWithPerson({ flash, outcome: !summary || summary.reason ? OUTCOME.NOT_APPLIED : OUTCOME.APPLIED });
   }
   if (intent === 'topic-rename-accept') {
     const result = await acceptTopicRename(state, body);
@@ -224,11 +225,11 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
   }
   if (intent === 'gossip-push') {
     const summary = await pushGossipNow(state, { reason: 'admin' });
-    return renderWithPerson({ flash: formatGossipFlash(summary) });
+    return renderWithPerson({ flash: formatGossipFlash(summary), outcome: gossipOutcome(summary) });
   }
   if (intent === 'gossip-pull') {
     const summary = await pullGossipNow(state, { reason: 'admin' });
-    return renderWithPerson({ flash: formatGossipFlash(summary) });
+    return renderWithPerson({ flash: formatGossipFlash(summary), outcome: gossipOutcome(summary) });
   }
   if (intent === 'peer-health-reset') {
     const resetAll = parseBoolean(body.resetAll, false);
@@ -241,7 +242,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
       await persistSettings(state);
       flash = resetAll ? 'Peer health reset for all peers.' : `Peer health reset for ${result.removed}.`;
     }
-    return renderWithPerson({ flash });
+    return renderWithPerson({ flash, outcome: result.updated ? OUTCOME.APPLIED : OUTCOME.NOT_APPLIED });
   }
 
   const prev = state.settings || {};
@@ -328,7 +329,7 @@ export async function updateAdmin({ req, res, state, wantsPartial }) {
     flashParts.push('Wallet verification required for posting.');
   }
 
-  return renderWithPerson({ flash: flashParts.join(' ') });
+  return renderWithPerson({ flash: flashParts.join(' '), outcome: OUTCOME.APPLIED });
 }
 
 async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
@@ -339,7 +340,9 @@ async function renderAdminPage({ res, state, wantsPartial, viewModel = {} }) {
   const adminView = escapeAdminFormValues(buildAdminViewModel(state, { ...viewModel, availableExtensions }));
   const hasErrors = Object.entries(viewModel)
     .some(([key, value]) => key.endsWith('Errors') && typeof value === 'string' && value.trim());
-  const notices = buildAdminSectionNotices({ flash: viewModel.flash, section: viewModel.flashSection, hasErrors });
+  const notices = buildAdminSectionNotices({
+    flash: viewModel.flash, outcome: viewModel.outcome, section: viewModel.flashSection, hasErrors,
+  });
   const html = await renderPage(
     'admin',
     {
@@ -912,7 +915,7 @@ async function updateOpsMetrics(state, body) {
   const errors = [...retentionResult.errors, ...intervalResult.errors];
   if (errors.length) {
     return {
-      flash: 'Ops metrics settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Ops metrics settings not updated.',
       opsMetricsErrors: renderValidationErrors(errors, { title: 'Ops metrics' }),
       opsMetricsRetentionValue: retentionInput || String(prev.retentionHours || ''),
       opsMetricsIntervalValue: intervalInput || String(prev.intervalSeconds || ''),
@@ -935,7 +938,7 @@ async function updateOpsMetrics(state, body) {
   });
   await persistSettings(state);
   return {
-    flash: 'Ops metrics settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Ops metrics settings updated.',
     opsMetricsRetentionValue: String(next.retentionHours),
     opsMetricsIntervalValue: String(next.intervalSeconds),
   };
@@ -1015,7 +1018,7 @@ async function updateGovernance(state, body, person) {
 
   if (errors.length) {
     return {
-      flash: 'Governance settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Governance settings not updated.',
       governanceErrors: renderValidationErrors(errors, { title: 'Governance settings' }),
       governanceQuorumDefaultValue: quorumInput || String(prev.quorumDefault),
       governanceDiscussionWindowDaysValue: discussionInput || String(prev.discussionWindowDays),
@@ -1062,7 +1065,7 @@ async function updateGovernance(state, body, person) {
   await persistSettings(state);
 
   return {
-    flash: 'Governance settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Governance settings updated.',
     governanceQuorumDefaultValue: String(next.quorumDefault),
     governanceDiscussionWindowDaysValue: String(next.discussionWindowDays),
     governanceVoteWindowDaysValue: String(next.voteWindowDays),
@@ -1088,7 +1091,7 @@ async function decideGovernanceProposalRoute(state, body, person) {
       result.error === 'already_decided'
         ? 'Governance proposal was already decided.'
         : 'Governance proposal not found.';
-    return { flash: message };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: message };
   }
 
   recordAdminAudit(state, {
@@ -1107,7 +1110,7 @@ async function decideGovernanceProposalRoute(state, body, person) {
   await persistSettings(state);
 
   return {
-    flash:
+    outcome: OUTCOME.APPLIED, flash:
       result.proposal.status === 'approved'
         ? 'Governance proposal approved and defaults updated.'
         : 'Governance proposal rejected.',
@@ -1218,7 +1221,7 @@ async function updateProviderBlind(state, body) {
 
   if (errors.length) {
     return {
-      flash: 'Provider-blind settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Provider-blind settings not updated.',
       providerBlindErrors: renderValidationErrors(errors, { title: 'Provider-blind settings' }),
       providerBlindModeValue: modeInput,
       providerBlindRingIdValue: ringIdInput,
@@ -1276,7 +1279,7 @@ async function updateProviderBlind(state, body) {
   await persistSettings(state);
 
   return {
-    flash: 'Provider-blind settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Provider-blind settings updated.',
   };
 }
 
@@ -1284,7 +1287,7 @@ async function updateSigningKeys(state, body) {
   const confirmed = parseBoolean(body.signingKeysConfirm, false);
   if (!confirmed) {
     return {
-      flash: 'Signing keys not generated. Confirm rotation first.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Signing keys not generated. Confirm rotation first.',
     };
   }
 
@@ -1321,7 +1324,7 @@ async function updateSigningKeys(state, body) {
   await persistSettings(state);
 
   return {
-    flash: `Signing keys generated and saved. Fingerprint: ${fingerprint || 'n/a'}.`,
+    outcome: OUTCOME.APPLIED, flash: `Signing keys generated and saved. Fingerprint: ${fingerprint || 'n/a'}.`,
   };
 }
 
@@ -1332,11 +1335,11 @@ async function updateSession(state, body) {
   const banned = parseBoolean(body.sessionBanned, false);
   const handle = sanitizeText(body.sessionHandle || '', 64);
   if (!sessionId) {
-    return { flash: 'Session ID required to update roles.', sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Session ID required to update roles.', sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
   }
   const session = state.sessions.get(sessionId);
   if (!session) {
-    return { flash: `Session "${sessionId}" not found.`, sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Session "${sessionId}" not found.`, sessionForm: { sessionRole: role, sessionId, sessionHandle: handle, banned } };
   }
 
   const next = {
@@ -1351,7 +1354,7 @@ async function updateSession(state, body) {
   invalidateSessionIndex(state);
   await persistSessions(state);
   return {
-    flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,
+    outcome: OUTCOME.APPLIED, flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,
     sessionForm: { sessionRole: role, sessionId, sessionHandle: next.handle, banned },
   };
 }
@@ -1390,7 +1393,7 @@ async function updateStructure(state, body) {
     flashParts.push(`Validation: ${errors.join(' ')}`);
   }
   return {
-    flash: flashParts.join(' '),
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash: flashParts.join(' '),
     providerFieldsValue: formatProviderFieldsForTextarea(normalized),
     providerFieldErrors: renderValidationErrors(errors, { title: 'Schema validation' }),
   };
@@ -1401,7 +1404,7 @@ async function updateProfileAttributes(state, body) {
   const payload = body.attributesPayload || '';
   if (!sessionId) {
     return {
-      flash: 'Session ID required to persist profile attributes.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Session ID required to persist profile attributes.',
       attributesPayloadValue: payload,
       profileAttributeErrors: '',
     };
@@ -1409,7 +1412,7 @@ async function updateProfileAttributes(state, body) {
   const session = state.sessions.get(sessionId);
   if (!session) {
     return {
-      flash: `Session "${sessionId}" not found.`,
+      outcome: OUTCOME.NOT_APPLIED, flash: `Session "${sessionId}" not found.`,
       attributesSessionId: sessionId,
       attributesPayloadValue: payload,
       profileAttributeErrors: '',
@@ -1440,7 +1443,7 @@ async function updateProfileAttributes(state, body) {
     flashParts.push(`Validation: ${errors.join(' ')}`);
   }
   return {
-    flash: flashParts.join(' '),
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash: flashParts.join(' '),
     attributesSessionId: sessionId,
     attributesPayloadValue: renderAttributesPayload(entry?.provider),
     profileAttributeErrors: renderValidationErrors(errors, { title: 'Attribute validation' }),
@@ -1476,7 +1479,7 @@ async function updateModules(state, body) {
   if (blocked.length) {
     flash += ` Disabled by dependencies: ${blocked.join('; ')}.`;
   }
-  return { flash };
+  return { flash, outcome: blocked.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED };
 }
 
 async function updateComposerSettings(state, body) {
@@ -1525,7 +1528,7 @@ async function updateComposerSettings(state, body) {
 
   if (errors.length) {
     return {
-      flash: 'Composer settings not updated.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Composer settings not updated.',
       composerErrors: renderValidationErrors(errors, { title: 'Composer settings' }),
       composerThemeCssValue: limitedCss || prev.themeCss || '',
       composerQuickActionsOrderValue: formatCsvList(quickActionsOrder),
@@ -1556,7 +1559,7 @@ async function updateComposerSettings(state, body) {
   });
   await persistSettings(state);
   return {
-    flash: 'Composer settings updated.',
+    outcome: OUTCOME.APPLIED, flash: 'Composer settings updated.',
     composerThemeCssValue: next.themeCss || '',
     composerQuickActionsOrderValue: formatCsvList(next.quickActionsOrder),
     composerSideNavOrderValue: formatCsvList(next.sideNavOrder),
@@ -1571,7 +1574,7 @@ async function updateRateLimits(state, body) {
 
   if (!hasOverrides && errors.length) {
     return {
-      flash: 'Rate limits not saved. Fix the errors below.',
+      outcome: OUTCOME.NOT_APPLIED, flash: 'Rate limits not saved. Fix the errors below.',
       rateLimitOverridesValue: String(raw || ''),
       rateLimitErrors: renderRateLimitErrors(errors),
     };
@@ -1589,7 +1592,7 @@ async function updateRateLimits(state, body) {
     : 'Rate limits saved.';
 
   return {
-    flash,
+    outcome: errors.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED, flash,
     rateLimitOverridesValue: formatRateLimitOverrides(overrides),
     rateLimitErrors: renderRateLimitErrors(errors),
   };
@@ -1600,11 +1603,11 @@ async function moderateMedia(state, body) {
   const status = sanitizeText(body.status || '', 32);
   const reason = sanitizeText(body.reason || '', 160);
   if (!mediaId) {
-    return { flash: 'Media ID required to update status.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Media ID required to update status.' };
   }
   const media = findMedia(state, mediaId);
   if (!media) {
-    return { flash: `Media "${mediaId}" not found.` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Media "${mediaId}" not found.` };
   }
 
   const updated = updateMediaStatus(state, media, { status, reason, moderatorHash: 'admin' });
@@ -1624,7 +1627,7 @@ async function moderateMedia(state, body) {
     },
   });
 
-  return { flash: `Media "${mediaId}" set to ${updated.status}.` };
+  return { outcome: OUTCOME.APPLIED, flash: `Media "${mediaId}" set to ${updated.status}.` };
 }
 
 function buildAdminViewModel(
@@ -2536,7 +2539,7 @@ async function acceptTopicRename(state, body) {
   const renameLabel = sanitizeText(body.renameLabel || '', 64);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   const result = applyTopicRename(state, topicId, {
     label: renameLabel || topic.pendingRename?.toLabel,
@@ -2544,17 +2547,17 @@ async function acceptTopicRename(state, body) {
     source: 'admin',
   });
   if (!result.updated) {
-    return { flash: `Rename skipped (${result.reason || 'no_change'}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Rename skipped (${result.reason || 'no_change'}).` };
   }
   await persistTopics(state);
-  return { flash: `Renamed topic to "${topic.label}".` };
+  return { outcome: OUTCOME.APPLIED, flash: `Renamed topic to "${topic.label}".` };
 }
 
 async function dismissTopicRename(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingRename) {
-    return { flash: 'No pending rename to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending rename to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2568,7 +2571,7 @@ async function dismissTopicRename(state, body) {
   topic.pendingRename = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic rename dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic rename dismissed.' };
 }
 
 async function acceptTopicMerge(state, body) {
@@ -2577,10 +2580,10 @@ async function acceptTopicMerge(state, body) {
   const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   if (!confirmed) {
-    return { flash: 'Confirm the merge after reviewing the previews.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the merge after reviewing the previews.' };
   }
   const pending = topic.pendingMerge || {};
   let target = null;
@@ -2594,24 +2597,24 @@ async function acceptTopicMerge(state, body) {
     target = findTopicByPathKey(state, pending.toKey);
   }
   if (!target) {
-    return { flash: 'Merge target not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Merge target not found.' };
   }
   const result = applyTopicMerge(state, topic.id, target.id, {
     reason: pending.reason || 'admin_accept',
     source: 'admin',
   });
   if (!result.updated) {
-    return { flash: `Merge skipped (${result.reason || 'no_change'}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Merge skipped (${result.reason || 'no_change'}).` };
   }
   await persistTopics(state);
-  return { flash: `Merged "${topic.label}" into "${target.label}".` };
+  return { outcome: OUTCOME.APPLIED, flash: `Merged "${topic.label}" into "${target.label}".` };
 }
 
 async function dismissTopicMerge(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingMerge) {
-    return { flash: 'No pending merge to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending merge to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2625,7 +2628,7 @@ async function dismissTopicMerge(state, body) {
   topic.pendingMerge = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic merge dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic merge dismissed.' };
 }
 
 async function acceptTopicSplit(state, body) {
@@ -2635,10 +2638,10 @@ async function acceptTopicSplit(state, body) {
   const confirmed = parseBoolean(body.confirm, false);
   const topic = findTopicById(state, topicId);
   if (!topic) {
-    return { flash: 'Topic not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Topic not found.' };
   }
   if (!confirmed) {
-    return { flash: 'Confirm the split after reviewing the previews.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the split after reviewing the previews.' };
   }
   const pending = topic.pendingSplit || {};
   const labels = [labelA, labelB].filter(Boolean);
@@ -2652,17 +2655,17 @@ async function acceptTopicSplit(state, body) {
     persist: false,
   });
   if (!result.updated && result.reason) {
-    return { flash: `Split skipped (${result.reason}).` };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: `Split skipped (${result.reason}).` };
   }
   await persistTopics(state);
-  return { flash: `Created ${result.created || 0} split topic(s).` };
+  return { outcome: OUTCOME.APPLIED, flash: `Created ${result.created || 0} split topic(s).` };
 }
 
 async function dismissTopicSplit(state, body) {
   const topicId = sanitizeText(body.topicId || '', 120);
   const topic = findTopicById(state, topicId);
   if (!topic?.pendingSplit) {
-    return { flash: 'No pending split to dismiss.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'No pending split to dismiss.' };
   }
   const now = new Date().toISOString();
   appendTopicHistory(topic, {
@@ -2676,7 +2679,7 @@ async function dismissTopicSplit(state, body) {
   topic.pendingSplit = null;
   topic.updatedAt = now;
   await persistTopics(state);
-  return { flash: 'Topic split dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Topic split dismissed.' };
 }
 
 async function acceptTopicAnchorSuggestion(state, body) {
@@ -2685,19 +2688,19 @@ async function acceptTopicAnchorSuggestion(state, body) {
   const anchorLabel = sanitizeText(body.anchorLabel || '', 64);
   const confirmed = parseBoolean(body.confirm, false);
   if (!topicKey || !action) {
-    return { flash: 'Anchor suggestion missing key or action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion missing key or action.' };
   }
   if (action !== 'promote' && action !== 'archive') {
-    return { flash: 'Unknown anchor action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Unknown anchor action.' };
   }
   if (action === 'archive' && !confirmed) {
-    return { flash: 'Confirm the anchor archive before applying.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Confirm the anchor archive before applying.' };
   }
 
   const pending = listPendingAnchorSuggestions(state);
   const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
   if (index < 0) {
-    return { flash: 'Anchor suggestion not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion not found.' };
   }
   const entry = pending[index];
   const topicGardener = state.settings?.topicGardener || {};
@@ -2744,10 +2747,10 @@ async function acceptTopicAnchorSuggestion(state, body) {
   }
 
   if (!updated) {
-    return { flash: `Anchor suggestion applied (no anchor list changes).` };
+    return { outcome: OUTCOME.APPLIED, flash: `Anchor suggestion applied (no anchor list changes).` };
   }
   return {
-    flash: action === 'archive' ? `Anchor "${labelUsed}" archived.` : `Anchor "${labelUsed}" promoted.`,
+    outcome: OUTCOME.APPLIED, flash: action === 'archive' ? `Anchor "${labelUsed}" archived.` : `Anchor "${labelUsed}" promoted.`,
   };
 }
 
@@ -2755,12 +2758,12 @@ async function dismissTopicAnchorSuggestion(state, body) {
   const action = sanitizeText(body.action || '', 24).toLowerCase();
   const topicKey = sanitizeText(body.topicKey || '', 120);
   if (!topicKey || !action) {
-    return { flash: 'Anchor suggestion missing key or action.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion missing key or action.' };
   }
   const pending = listPendingAnchorSuggestions(state);
   const index = pending.findIndex((entry) => entry.key === topicKey && entry.action === action);
   if (index < 0) {
-    return { flash: 'Anchor suggestion not found.' };
+    return { outcome: OUTCOME.NOT_APPLIED, flash: 'Anchor suggestion not found.' };
   }
   const entry = pending[index];
   const topicGardener = state.settings?.topicGardener || {};
@@ -2788,7 +2791,7 @@ async function dismissTopicAnchorSuggestion(state, body) {
     topic.updatedAt = now;
     await persistTopics(state);
   }
-  return { flash: 'Anchor suggestion dismissed.' };
+  return { outcome: OUTCOME.APPLIED, flash: 'Anchor suggestion dismissed.' };
 }
 
 function recordAdminAudit(state, { action, summary }) {
@@ -3461,6 +3464,11 @@ function truncateText(value, max) {
   const text = String(value || '');
   if (text.length <= max) return text;
   return `${text.slice(0, Math.max(0, max - 3))}...`;
+}
+
+function gossipOutcome(summary) {
+  if (!summary || summary.skipped) return OUTCOME.NOT_APPLIED;
+  return summary.errors?.length ? OUTCOME.PARTIAL : OUTCOME.APPLIED;
 }
 
 function formatGossipFlash(summary) {

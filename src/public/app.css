@@ -4489,3 +4489,55 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
   align-items: center;
   min-height: 32px;
 }
+
+/* Which record a notification is about and where it lives (title · lane · topic). */
+.notification-scope {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.notification-scope__title {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Ballot timeline: when voting opened or closed, and the windows that apply.
+   A term/value grid that stacks once the column is too narrow for both. */
+.ballot-timing {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.ballot-timing > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, max-content) minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.ballot-timing dt {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.ballot-timing dd {
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+@container shell-main (max-width: 420px) {
+  .ballot-timing > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.1rem;
+  }
+}
+
+.ballot-delegation {
+  margin: 0;
+}

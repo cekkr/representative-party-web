@@ -94,6 +94,9 @@ test('proposal workspaces, writes and alerts use the stored group lane', async (
   assert.match(html, /Use the published CUP data/);
   const publicInbox = await outsiderInbox();
   assert.match(publicInbox.text, /Conditional intramoenia/);
+  // The row names the proposal and its lane before the reader opens it.
+  // The mention already quotes the title, so the line keeps only lane and topic.
+  assert.match(publicInbox.text, /<p class="notification-scope muted small">Public Healthcare Circle · Public lane · general<\/p>/);
   assert.match(publicInbox.text, new RegExp(`group=${groupId}&amp;proposal=${petitionId}&amp;view=discussion`));
   assert.doesNotMatch(html, /Unauthorized (?:edit|reply)/);
   const open = await write('status', { status: 'open', confirmFreeze: 'on' }, moderator);
@@ -111,7 +114,7 @@ test('proposal workspaces, writes and alerts use the stored group lane', async (
   assert.equal((await setLane('members', true)).status, 200);
   const restrictedInbox = await outsiderInbox();
   assert.match(restrictedInbox.text, /The proposal is unavailable from this inbox/);
-  assert.doesNotMatch(restrictedInbox.text, /Conditional intramoenia|Open proposal/);
+  assert.doesNotMatch(restrictedInbox.text, /Conditional intramoenia|Open proposal|Public Healthcare Circle|notification-scope/);
 
   assert.equal((await setLane('members', false)).status, 200);
   const close = await write('status', { status: 'closed' }, moderator);

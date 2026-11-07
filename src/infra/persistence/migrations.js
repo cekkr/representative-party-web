@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 28;
+export const LATEST_SCHEMA_VERSION = 29;
 
 const MIGRATIONS = [
   {
@@ -699,6 +699,20 @@ const MIGRATIONS = [
         notifications: (Array.isArray(data.notifications) ? data.notifications : []).map((entry) => ({
           ...entry,
           socialPostId: entry?.socialPostId ?? null,
+        })),
+      };
+    },
+  },
+  {
+    version: 29,
+    description: 'Give proposals explicit closing fields so the Ballot can show when voting ended.',
+    up(data) {
+      return {
+        ...data,
+        petitions: (Array.isArray(data.petitions) ? data.petitions : []).map((entry) => ({
+          ...entry,
+          closedAt: entry?.closedAt ?? null,
+          closedBy: entry?.closedBy ?? null,
         })),
       };
     },

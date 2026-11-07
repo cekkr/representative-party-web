@@ -33,6 +33,8 @@ test('a Social update has a focused view gated by its audience, linked from the 
 
   const marcoInbox = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: marco.cookie } })).text;
   assert.match(marcoInbox, /You were mentioned/);
+  // The alert already quotes the update, so the line names only its audience.
+  assert.match(marcoInbox, /<p class="notification-scope muted small">Public update<\/p>/);
   assert.match(marcoInbox, new RegExp(`href="${permalink.replace(/[?]/g, '\\?')}" data-partial>Open update`));
 
   const reply = await postForm(`${baseUrl}/social/reply`, { replyTo: publicId, visibility: 'public', content: 'Flyers printed, 200 copies.' }, marco);
@@ -73,4 +75,5 @@ test('a Social update has a focused view gated by its audience, linked from the 
   }
   const dmInbox = (await fetchText(`${baseUrl}/notifications`, { headers: { Cookie: marco.cookie } })).text;
   assert.match(dmInbox, new RegExp(`href="/social/feed\\?post=${directId}" data-partial>Open conversation`));
+  assert.match(dmInbox, /<p class="notification-scope muted small">Direct message<\/p>/);
 });
