@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 29;
+export const LATEST_SCHEMA_VERSION = 30;
 
 const MIGRATIONS = [
   {
@@ -713,6 +713,30 @@ const MIGRATIONS = [
           ...entry,
           closedAt: entry?.closedAt ?? null,
           closedBy: entry?.closedBy ?? null,
+        })),
+      };
+    },
+  },
+  {
+    version: 30,
+    description: 'Record when a proposal opened for discussion so its discussion window can be measured.',
+    up(data) {
+      // A proposal already in discussion takes the time from its latest audit
+      // entry that moved it there; with none, the opening stays unknown rather
+      // than guessed.
+      const openedAt = new Map();
+      for (const entry of Array.isArray(data.transactions) ? data.transactions : []) {
+        if (entry?.type !== 'petition_status' && entry?.type !== 'petition_quorum') continue;
+        if (entry?.payload?.status !== 'discussion' || !entry.petitionId || !entry.createdAt) continue;
+        const previous = openedAt.get(entry.petitionId);
+        if (!previous || Date.parse(entry.createdAt) > Date.parse(previous)) openedAt.set(entry.petitionId, entry.createdAt);
+      }
+      return {
+        ...data,
+        petitions: (Array.isArray(data.petitions) ? data.petitions : []).map((entry) => ({
+          ...entry,
+          discussionOpenedAt: entry?.discussionOpenedAt
+            ?? (String(entry?.status || '').toLowerCase() === 'discussion' ? openedAt.get(entry?.id) ?? null : null),
         })),
       };
     },

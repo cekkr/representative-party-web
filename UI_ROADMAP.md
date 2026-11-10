@@ -189,7 +189,13 @@ follow. Before an eligible member chooses, Ballot says what handing the ballot
 to a delegate would do: the holder, the intermediate delegate on a transitive
 chain, the matching category, and the delegate's window. It also says when no
 delegation covers the topic, so the hand-off would abstain, and when the
-delegate cannot hold a ballot in this group lane. Moderation and quorum-driven
+delegate cannot hold a ballot in this group lane. While a proposal is in discussion, Overview leads with a discussion timeline: when
+discussion opened and the constitution's discussion window with the days left, or
+that the opening predates recording. Moderators see a "Past their window" panel at
+the top of the `/petitions` rail. Each row links the proposal's Overview (discussion)
+or Ballot (voting), says when the window ended and in which lane, and names the
+next decision. The panel only lists; the stage form on the record does the work.
+Moderation and quorum-driven
 voting both record a frozen snapshot. Legacy ballots can identify that a
 snapshot is unavailable. Successful writes return to the applicable record
 view. Public lanes allow outsiders to browse, with membership required for
@@ -551,7 +557,7 @@ starting point for implementation.
 | [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Scope header, searchable feed with topic-subtree filters, scoped empty states, and focused contributions with evidence and gated actions. | Add reply relationships and use contribution links in authorized activity. |
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall with permalinks, adjacent follow filters, and native compose with audience and attachment controls. A [focused update](src/modules/social/templates/social-post.html) shows its parent and replies under the source audience. | Inline recovery for ordinary forms. |
-| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Ballot leads with a voting timeline and previews a delegated hand-off. Reads and writes use the stored lane. | Refine discussion filters and SSR form recovery. A binding close date once voting closes on schedule. |
+| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Ballot leads with a voting timeline and previews a delegated hand-off. Overview shows the discussion window, and moderators get a Past their window queue. Reads and writes use the stored lane. | Refine discussion filters and SSR form recovery. A binding close date once voting closes on schedule. |
 | [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Clearer activity and decision history within a group. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. Set, clear, and renew report their outcome above the panels; an unknown delegate keeps the typed handle. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Search-led, paginated collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Profile activity beyond proposals as those records gain lane-aware links. |
@@ -601,7 +607,7 @@ keys have historical names, while their labels identify the content.
 | Social | `social-wall`, `social-compose`, `social-controls`, `social-follows`. Focused update `social-replies`; both use the `social` page key. The header and opened update stay visible. Filters sit in the main column. |
 | Forum | Browse `forum-threads`, `forum-compose`. Focused article `forum-replies`. Both use the `forum` page key. The article and heading stay visible outside optional sections. |
 | Discussion | Browse `discussion-feed`, `discussion-compose`, `discussion-filters`, `discussion-topics`. The focused contribution uses the same `discussion` page key. Its heading, scope, and content stay visible outside optional panels. |
-| Proposals | Browse `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates`. Workspace `petition-overview`, `petitions-discussion`, `petition-history`, `petition-ballot`, `petition-details`. Both use the `petitions` page key. |
+| Proposals | Browse `petitions-active`, `petitions-discussion`, `petitions-compose`, `petitions-filters`, `petitions-delegates`, `petitions-due` (moderators only, controller-rendered). Workspace `petition-overview`, `petitions-discussion`, `petition-history`, `petition-ballot`, `petition-details`. Both use the `petitions` page key. |
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
 | People | Directory `delegate-directory` (search, now above the results), `delegate-directory-list` (results and pager). Profile views: Overview `delegate-profile-summary`, Delegations `delegate-profile-endorsements`, Votes `delegate-profile-delegations`, Activity `delegate-profile-votes`, Endorsements `delegate-profile-history`. The record header, section links, and Details rail stay outside optional panels. |
@@ -784,6 +790,20 @@ Ballot as a member whose waiting-list delegation forwards through
 375 px in light with no horizontal overflow.
 [Ballot regression](tests/ballot-timing.test.js) ·
 [Admin feedback regression](tests/settings-task-pages.test.js)
+
+### Proposal window verification
+
+Unit tests cover migration 30 recovering the discussion opening from the latest
+audit entry (and leaving it unknown without one), window measurement for both
+stages, an unrecorded opening, a window set to 0, and the queue's order and
+exclusions. The HTTP regression moves a Scenario A waiting-list proposal into
+discussion, reads the Overview timeline, checks that only the moderator sees the
+queue, and that returning to draft clears the timeline. A seeded Scenario A pass
+read the ALPI proposal's discussion timeline and the moderator's empty queue in
+dark at desktop width and at 375 px in light with no horizontal overflow. The
+populated queue is covered by the unit render, since a live store cannot age a
+window.
+[Proposal window regression](tests/proposal-windows.test.js)
 
 ### Form outcome verification
 

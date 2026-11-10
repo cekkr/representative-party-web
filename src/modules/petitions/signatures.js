@@ -41,6 +41,7 @@ export async function signPetition({ petition, person, state }) {
     const advanceStage = getQuorumAdvanceStage(state);
     if (advanceStage === 'vote') petition.freeze = buildFreezeSnapshot(petition, person);
     petition.status = advanceStage === 'vote' ? 'open' : 'discussion';
+    if (petition.status === 'discussion') petition.discussionOpenedAt = new Date().toISOString();
     await persistPetitions(state);
     const nextLabel = advanceStage === 'vote' ? 'vote' : 'discussion';
     await logTransaction(state, {

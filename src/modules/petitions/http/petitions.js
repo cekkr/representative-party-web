@@ -22,7 +22,7 @@ import { sendHtml, sendJson, sendRateLimit, sendRedirect } from '../../../shared
 import { readRequestBody } from '../../../shared/utils/request.js';
 import { escapeHtml, parseEvidenceLinks, sanitizeText } from '../../../shared/utils/text.js';
 import { parseBoolean } from '../../../shared/utils/parse.js';
-import { renderProposalCollection, renderProposalDiscussionFeed, renderProposalWorkspace } from '../../../interfaces/http/views/petitionView.js';
+import { renderProposalCollection, renderProposalDiscussionFeed, renderProposalsPastWindow, renderProposalWorkspace } from '../../../interfaces/http/views/petitionView.js';
 import { renderPager } from '../../../interfaces/http/views/shared.js';
 import { paginate } from '../../../shared/utils/pagination.js';
 import { getActorLabels, resolveHandleForHash, resolvePersonHandle } from '../../../interfaces/http/views/actorLabel.js';
@@ -148,6 +148,7 @@ export async function renderPetitions({ req, res, state, wantsPartial, url }) {
       quorumDefault: getGovernanceSettings(state).quorumDefault,
       discussionFeed: renderProposalDiscussionFeed(buildDiscussionFeedItems(comments, petitionLookup), state, pageBrowse),
       stageFilterOptions: renderStageFilterOptions(stageFilter),
+      petitionsDue: evaluateAction(state, person, 'moderate').allowed ? renderProposalsPastWindow(state, person) : '',
       composeOpen: query.searchParams.has('compose') && canCompose ? 'open' : '',
     },
     { wantsPartial, title: 'Proposals & Votes', state },
@@ -863,6 +864,13 @@ export async function updatePetitionStatus({ req, res, state }) {
   } else if (!willClose) {
     petition.closedAt = null;
     petition.closedBy = null;
+  }
+  // Discussion records when it opened, so the workspace can measure the
+  // constitution's discussion window. Returning to draft clears it.
+  if (status === 'discussion' && petition.status !== 'discussion') {
+    petition.discussionOpenedAt = new Date().toISOString();
+  } else if (status === 'draft') {
+    petition.discussionOpenedAt = null;
   }
   petition.status = status;
   petition.quorum = quorum;

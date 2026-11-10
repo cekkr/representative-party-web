@@ -23,11 +23,11 @@ import {
   tallyVotes,
 } from '../../../modules/delegation/delegatedBallots.js';
 import { resolveDelegation } from '../../../modules/delegation/delegation.js';
-import { getGovernanceSettings } from '../../../modules/governance/constitution.js';
 import { canPostToGroupLane } from '../../../modules/groups/groupScope.js';
 import { canonicalizeTopicKey } from '../../../modules/topics/topicMatch.js';
-import { proposalBrowseHref, proposalHref } from '../../../modules/petitions/proposalLinks.js';
+import { proposalBrowseHref, proposalHref, resolveProposalScope } from '../../../modules/petitions/proposalLinks.js';
 import { describePromotionTrail } from '../../../modules/groups/promotion.js';
+import { describeProposalWindow, listProposalsPastWindow } from '../../../modules/petitions/windows.js';
 
 const MAX_ARGUMENT_NODES = 60;
 const MAX_ARGUMENT_DEPTH = 4;
@@ -66,6 +66,37 @@ export function renderProposalCollection(proposals, { state, signatures, comment
     `;
   });
   return `<ul class="collection-grid">${cards.join('')}</ul>`;
+}
+
+// The moderator queue: proposals whose discussion or vote window has passed.
+// It only lists them — opening voting or closing it stays a moderator's action
+// on the record, through the same stage form and gates.
+export function renderProposalsPastWindow(state, person, { now = Date.now() } = {}) {
+  const { total, items } = listProposalsPastWindow(state, person, { now });
+  const rows = items.map(({ proposal, window }) => {
+    const view = window.stage === 'vote' ? 'ballot' : 'overview';
+    const what = window.stage === 'vote' ? 'Vote window' : 'Discussion window';
+    const next = window.stage === 'vote' ? 'close voting' : 'open voting or return the draft';
+    const over = window.daysOver ? `${pluralDays(window.daysOver)} ago` : 'today';
+    const lane = describeLaneScope(resolveProposalScope(state, person, proposal));
+    return `
+          <li class="due-row">
+            <a href="${escapeHtml(proposalHref(proposal, { view }))}" data-partial>${escapeHtml(proposal.title)}</a>
+            <p class="muted small">${what} ended ${renderTimeValue(window.dueAt)} (${over}) · ${escapeHtml(lane)}</p>
+            <p class="small">Next: ${next}.</p>
+          </li>`;
+  });
+  const body = rows.length
+    ? `<ul class="due-list">${rows.join('')}</ul>${total > items.length
+      ? `<p class="muted small">${total - items.length} more past their window.</p>` : ''}`
+    : '<p class="muted small">No proposal is past its discussion or vote window.</p>';
+  return `
+    <section class="panel stack" id="petitions-due" aria-labelledby="petitions-due-title" data-composer-section="petitions-due" data-section-label="Past their window">
+      <p class="eyebrow">Moderation</p>
+      <h2 id="petitions-due-title">Past their window</h2>
+      <p class="muted small">The constitution's windows are guidance. Nothing advances on its own; you decide on the record.</p>
+      ${body}
+    </section>`;
 }
 
 export function renderProposalWorkspace(proposal, options) {
@@ -160,6 +191,7 @@ export function renderProposalWorkspace(proposal, options) {
     content = `
       <section class="panel stack" id="proposal-overview" data-composer-section="petition-overview" data-section-label="Proposal overview">
         <h2>Overview</h2>
+        ${renderDiscussionTiming(state, proposal, stage)}
         ${renderProposalContent(proposal.freeze || proposal)}
         <p class="muted small">Signatures: ${signature.count}${proposal.quorum ? ` / ${proposal.quorum} required for quorum` : ''}</p>
         ${signature.signed ? '<p class="muted small">You already signed.</p>' : ''}
@@ -278,11 +310,38 @@ function renderBallotSelect(resolution, allowDelegation) {
             </select>`;
 }
 
-const DAY_MS = 1000 * 60 * 60 * 24;
-
 function renderTimeValue(iso) {
   const label = formatTimestamp(iso);
   return label ? `<time datetime="${escapeHtml(iso)}">${escapeHtml(label)}</time>` : '';
+}
+
+function pluralDays(count) {
+  return `${count} day${count === 1 ? '' : 's'}`;
+}
+
+// One window line: its length, the guidance date, and how far along it is.
+// `closer` names who acts when it passes, because nothing acts automatically.
+function renderWindowValue(window, closer) {
+  if (!window?.windowDays) return `None set. ${closer}`;
+  if (!window.known) return `${pluralDays(window.windowDays)}, measured from when this stage opened, which was not recorded. ${closer}`;
+  const remaining = window.elapsed
+    ? ` · window elapsed${window.daysOver ? ` ${pluralDays(window.daysOver)} ago` : ''}`
+    : ` · ${pluralDays(window.daysLeft)} left`;
+  return `${pluralDays(window.windowDays)}, until ${renderTimeValue(window.dueAt)}${remaining}. ${closer}`;
+}
+
+// Discussion has its own published window. Like the vote window it is
+// guidance: a moderator opens voting or returns the draft.
+function renderDiscussionTiming(state, proposal, stage, now = Date.now()) {
+  if (stage !== 'discussion') return '';
+  const window = describeProposalWindow(state, proposal, now);
+  const rows = [];
+  if (window?.openedAt) rows.push(['Discussion opened', renderTimeValue(window.openedAt)]);
+  rows.push(['Discussion window', renderWindowValue(window, 'A moderator opens voting.')]);
+  return `
+        <dl class="ballot-timing stage-timing" aria-label="Discussion timeline">
+          ${rows.map(([term, value]) => `<div><dt>${term}</dt><dd>${value}</dd></div>`).join('')}
+        </dl>`;
 }
 
 // When voting opened and closed, and the constitution's windows that apply to it.
@@ -301,16 +360,7 @@ function renderBallotTiming(state, proposal, stage, now = Date.now()) {
       ? `${renderTimeValue(proposal.closedAt)}${closedBy}`
       : 'Closed before closing times were recorded']);
   } else {
-    const windowDays = Number(getGovernanceSettings(state).voteWindowDays) || 0;
-    const openedMs = openedAt ? Date.parse(openedAt) : NaN;
-    if (windowDays > 0 && Number.isFinite(openedMs)) {
-      const guideIso = new Date(openedMs + windowDays * DAY_MS).toISOString();
-      const daysLeft = Math.ceil((openedMs + windowDays * DAY_MS - now) / DAY_MS);
-      const remaining = daysLeft > 0 ? ` · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left` : ' · window elapsed';
-      rows.push(['Vote window', `${windowDays} days, until ${renderTimeValue(guideIso)}${remaining}. A moderator closes voting.`]);
-    } else {
-      rows.push(['Vote window', 'None set. A moderator closes voting.']);
-    }
+    rows.push(['Vote window', renderWindowValue(describeProposalWindow(state, proposal, now), 'A moderator closes voting.')]);
   }
   const delegateDays = getDelegateVoteWindowDays(state);
   rows.push(['Delegate window', delegateDays
