@@ -15,7 +15,9 @@ import {
 } from '../../groups/groups.js';
 import { validateParent } from '../groupTree.js';
 import { readGroupScope } from '../groupScope.js';
+import { readGroupActivityFamily } from '../groupActivity.js';
 import {
+  GROUP_VIEWS,
   GROUPS_PAGE_SIZE,
   groupHref,
   groupWorkspaceData,
@@ -88,7 +90,7 @@ export async function renderGroups({ req, res, state, wantsPartial, url }) {
   if (groupId) {
     const group = groups.find(({ id }) => id === groupId);
     const requestedView = url.searchParams.get('view');
-    const view = ['members', 'decisions', 'settings'].includes(requestedView) ? requestedView : 'overview';
+    const view = GROUP_VIEWS.includes(requestedView) ? requestedView : 'overview';
     const manage = group && canManageGroup(state, person, group);
     if (!group || (view === 'settings' && !manage)) {
       const html = await renderPage('group-unavailable', { person, pageKey: 'groups' }, {
@@ -97,7 +99,12 @@ export async function renderGroups({ req, res, state, wantsPartial, url }) {
       return sendHtml(res, html, {}, 404);
     }
     const html = await renderPage('group-workspace', {
-      ...groupWorkspaceData(group, person, state, { view, manage, groups }),
+      ...groupWorkspaceData(group, person, state, {
+        view,
+        manage,
+        groups,
+        activity: { kind: readGroupActivityFamily(url.searchParams), page: parsePage(url.searchParams.get('page')) },
+      }),
       groupNotice: renderFlashNotice(req, res, 'groups', GROUP_NOTICES),
       person,
       pageKey: 'groups',
@@ -136,7 +143,7 @@ export async function createOrJoinGroup({ req, res, state }) {
   const person = getPerson(req, state);
   const body = await readRequestBody(req);
   const action = body.action || 'create';
-  const returnView = ['members', 'decisions'].includes(body.returnView) ? body.returnView : 'overview';
+  const returnView = ['members', 'decisions', 'activity'].includes(body.returnView) ? body.returnView : 'overview';
   const bodyGroupId = sanitizeText(body.groupId || '', 80);
   let back = bodyGroupId && findGroupById(state, bodyGroupId) ? groupHref(bodyGroupId, returnView) : '/groups';
   const deny = (status, payload, family) => refuseGroupForm(req, res, status, payload, back, family);

@@ -6,16 +6,24 @@ import { listElections, pickWinner } from '../groupElections.js';
 import { getGroupPolicy } from '../groupPolicy.js';
 import { canReadGroupLane } from '../groupScope.js';
 import { getGroupMemberRole, GROUP_ROLES, isGroupMember } from '../groups.js';
+import { countGroupActivity, listGroupActivity } from '../groupActivity.js';
+import { discussionHref } from '../../discussion/discussionLinks.js';
+import { proposalHref } from '../../petitions/proposalLinks.js';
+import { paginate } from '../../../shared/utils/pagination.js';
 import { escapeHtml } from '../../../shared/utils/text.js';
 import { formatTimestamp } from '../../../shared/utils/time.js';
-import { renderIssuerPill, renderPreviewPill } from '../../../interfaces/http/views/shared.js';
+import { renderIssuerPill, renderPager, renderPreviewPill } from '../../../interfaces/http/views/shared.js';
 import { renderActorLabel, resolveHandleForHash } from '../../../interfaces/http/views/actorLabel.js';
 
-export function groupHref(groupId, view = 'overview') {
+export function groupHref(groupId, view = 'overview', { kind = '', page = 1 } = {}) {
   const query = new URLSearchParams({ group: groupId });
   if (view !== 'overview') query.set('view', view);
+  if (view === 'activity' && kind) query.set('kind', kind);
+  if (view === 'activity' && page > 1) query.set('page', String(page));
   return `/groups?${query}`;
 }
+
+export const GROUP_VIEWS = ['overview', 'members', 'decisions', 'activity', 'settings'];
 
 function groupLink(group, className = '') {
   return `<a ${className ? `class="${className}" ` : ''}href="${escapeHtml(groupHref(group.id))}" data-partial>${escapeHtml(group.name || 'Group')}</a>`;
@@ -67,9 +75,9 @@ function memberCount(group) {
   return `${count} ${count === 1 ? 'member' : 'members'}`;
 }
 
-export function groupWorkspaceData(group, person, state, { view, manage, groups }) {
+export function groupWorkspaceData(group, person, state, { view, manage, groups, activity = {} }) {
   const role = getGroupMemberRole(group, person?.pidHash);
-  const views = [['overview', 'Overview'], ['members', 'Members'], ['decisions', 'Decisions']];
+  const views = [['overview', 'Overview'], ['members', 'Members'], ['decisions', 'Decisions'], ['activity', 'Activity']];
   if (manage) views.push(['settings', 'Settings']);
   const policy = getGroupPolicy(state, group.id);
   const visibleIds = new Set(groups.map(({ id }) => id));
@@ -91,12 +99,16 @@ export function groupWorkspaceData(group, person, state, { view, manage, groups 
       <button type="submit" class="${role ? 'ghost' : 'cta'}">${role ? 'Leave group' : 'Join group'}</button>
     </form>` : '';
 
+  // The roster gate: members and managers see who joined, as on Members.
+  const listActivity = () => listGroupActivity(state, person, group, { canSeeRoster: Boolean(role || manage) });
   const content = {
     overview: () => renderGroupOverview(group, {
       children: listChildGroups(state, group.id).filter(({ id }) => visibleIds.has(id)),
       laneLinks,
       privateLanes: lanes.length && !canReadLanes,
+      recent: renderRecentActivity(group, state, listActivity()),
     }),
+    activity: () => renderActivity(group, state, listActivity(), activity),
     members: () => renderRolePanel(group, state, { role, manage }),
     decisions: () => renderDecisions(group, person, state, manage),
     settings: () => renderSettings(group, policy),
@@ -117,7 +129,7 @@ export function groupWorkspaceData(group, person, state, { view, manage, groups 
   };
 }
 
-function renderGroupOverview(group, { children, laneLinks, privateLanes }) {
+function renderGroupOverview(group, { children, laneLinks, privateLanes, recent }) {
   return `
     <section class="panel stack" data-composer-section="group-overview" data-section-label="Group overview">
       <h2>Group work</h2>
@@ -127,6 +139,167 @@ function renderGroupOverview(group, { children, laneLinks, privateLanes }) {
       <h3>Categories</h3>
       <p>${group.topics?.length ? escapeHtml(group.topics.join(' · ')) : 'No categories declared.'}</p>
       ${children.length ? `<div><h3>Branches</h3><ul>${children.map((child) => `<li>${groupLink(child)}</li>`).join('')}</ul></div>` : ''}
+      ${recent}
+    </section>`;
+}
+
+// ---------------------------------------------------------------------------
+// Activity
+//
+// One row per event, leading with what happened, then the record and its time,
+// after the Citizen OS activity feed. The family filter is a set of GET links, so
+// a filtered view is a stable URL that survives reload and Back.
+
+export const GROUP_ACTIVITY_PAGE_SIZE = 20;
+
+const ACTIVITY_FILTERS = [
+  ['', 'All activity'],
+  ['lanes', 'Lanes'],
+  ['decisions', 'Decisions'],
+  ['membership', 'Membership'],
+];
+
+const ACTIVITY_KIND_LABELS = {
+  discussion: 'Discussion',
+  proposal: 'Proposal',
+  election: 'Election',
+};
+
+// Lifecycle events reuse the proposal stage tones; everything else stays neutral.
+const ACTIVITY_TONES = {
+  proposal_created: 'draft',
+  proposal_discussion_opened: 'discussion',
+  proposal_voting_opened: 'vote',
+  proposal_voting_closed: 'closed',
+  election_opened: 'vote',
+  election_closed: 'closed',
+};
+
+function activityRecordLink(group, record) {
+  if (!record) return '';
+  if (record.kind === 'election') {
+    const href = `${groupHref(group.id, 'decisions')}#election-${record.id}`;
+    return `<a href="${escapeHtml(href)}" data-partial>${escapeHtml(record.title)}</a>`;
+  }
+  const title = record.kind === 'discussion' ? excerpt(record.title, 90) : record.title || 'Untitled proposal';
+  const href = record.kind === 'discussion'
+    ? discussionHref({ groupId: record.groupId, post: record.id })
+    : proposalHref({ id: record.id, groupId: record.groupId });
+  return `<a href="${escapeHtml(href)}" data-partial>${escapeHtml(title)}</a>`;
+}
+
+function excerpt(text, limit) {
+  const value = String(text || '').replace(/\s+/g, ' ').trim();
+  return value.length > limit ? `${value.slice(0, limit - 1).trimEnd()}…` : value;
+}
+
+function describeActivity(event, group, state) {
+  const actor = event.actorHash ? renderActorLabel(state, event.actorHash, { showHash: false }) : '';
+  const record = event.record;
+  // A record the viewer can no longer open keeps its event but not its title or link.
+  if (record && record.kind !== 'election' && !record.readable) {
+    const noun = record.kind === 'discussion' ? 'A contribution' : 'A proposal';
+    const withheld = {
+      discussion_posted: `${noun} was posted in this group`,
+      proposal_created: `${noun} was drafted in this group`,
+      proposal_discussion_opened: `${noun} opened for discussion`,
+      proposal_voting_opened: `Voting opened on a proposal`,
+      proposal_voting_closed: `Voting closed on a proposal`,
+      moved_up: `${noun} moved up to ${event.targetName || 'the Circle'}`,
+      moved_in: `${noun} moved in from ${event.sourceName || 'a branch'}`,
+      promotion_requested: `A member asked to move ${noun.toLowerCase()} up`,
+      promotion_declined: `A request to move ${noun.toLowerCase()} up was declined`,
+    }[event.type] || `${noun} changed`;
+    return `${escapeHtml(withheld)}. <span class="muted">You cannot open it from here.</span>`;
+  }
+  const link = activityRecordLink(group, record);
+  const by = actor ? ` by ${actor}` : '';
+  switch (event.type) {
+    case 'group_created': return actor ? `${actor} created the group` : 'The group was created';
+    case 'member_joined': return `${actor} joined the group`;
+    case 'election_opened': return `An election opened for ${link}`;
+    case 'election_closed': {
+      const ballots = `${event.ballots} ${event.ballots === 1 ? 'ballot' : 'ballots'}`;
+      return event.winnerHash
+        ? `The ${link} election closed: ${renderActorLabel(state, event.winnerHash, { showHash: false })} won with ${ballots}`
+        : `The ${link} election closed without a winner after ${ballots}`;
+    }
+    case 'discussion_posted': return `${actor || 'A member'} posted ${link}`;
+    case 'proposal_created': return `${actor || 'A member'} drafted ${link}`;
+    case 'proposal_discussion_opened': return `${link} opened for discussion`;
+    case 'proposal_voting_opened': return `Voting opened on ${link}`;
+    case 'proposal_voting_closed': return `Voting closed on ${link}${by}`;
+    case 'moved_up': return `${link} moved up to ${escapeHtml(event.targetName || 'the Circle')}${by}`;
+    case 'moved_in': return `${link} moved in from ${escapeHtml(event.sourceName || 'a branch')}${by}`;
+    case 'promotion_requested': return `${actor || 'A member'} asked to move ${link} up to ${escapeHtml(event.targetName || 'the next level')}`;
+    case 'promotion_declined': return `${actor || 'A moderator'} declined the request to move ${link} up`;
+    default: return escapeHtml(event.type);
+  }
+}
+
+function activityKindLabel(event) {
+  if (event.record) return ACTIVITY_KIND_LABELS[event.record.kind] || 'Group';
+  return 'Membership';
+}
+
+function renderActivityRow(event, group, state) {
+  const tone = ACTIVITY_TONES[event.type] || 'neutral';
+  const time = formatTimestamp(event.at);
+  return `
+    <li class="activity-row activity-row--${tone}">
+      <p class="activity-row__what">${describeActivity(event, group, state)}</p>
+      <p class="activity-row__meta muted small">
+        <span>${escapeHtml(activityKindLabel(event))}</span>
+        ${time ? ` · <time datetime="${escapeHtml(event.at)}">${escapeHtml(time)}</time>` : ''}
+      </p>
+    </li>`;
+}
+
+function renderActivityList(events, group, state) {
+  return `<ul class="activity-list">${events.map((event) => renderActivityRow(event, group, state)).join('')}</ul>`;
+}
+
+function renderRecentActivity(group, state, events) {
+  if (!events.length) return '';
+  return `
+    <div class="stack">
+      <h3>Recent activity</h3>
+      ${renderActivityList(events.slice(0, 3), group, state)}
+      <a href="${escapeHtml(groupHref(group.id, 'activity'))}" data-partial>View all activity</a>
+    </div>`;
+}
+
+function renderActivity(group, state, events, { kind = '', page = 1 } = {}) {
+  const counts = countGroupActivity(events);
+  const selected = kind;
+  const filtered = selected ? events.filter((event) => event.family === selected) : events;
+  const pageInfo = paginate(filtered, { page, pageSize: GROUP_ACTIVITY_PAGE_SIZE });
+  // A family with nothing in it is not offered, but a selected one always stays
+  // visible so the member can see which filter emptied the list.
+  const filters = ACTIVITY_FILTERS.filter(([key]) => !key || counts[key] || key === selected);
+  const nav = events.length ? `<nav class="filter-links" aria-label="Filter group activity">
+      ${filters.map(([key, label]) => `<a class="filter-links__link" href="${escapeHtml(groupHref(group.id, 'activity', { kind: key }))}"${key === selected ? ' aria-current="page"' : ''} data-partial>${escapeHtml(label)} <span class="filter-links__count">${counts[key] || 0}</span></a>`).join('')}
+    </nav>` : '';
+  let body;
+  if (!events.length) {
+    body = '<p class="muted">Nothing has happened in this group yet. Elections, lane posts, and moves up a level will appear here.</p>';
+  } else if (!filtered.length) {
+    const label = ACTIVITY_FILTERS.find(([key]) => key === selected)?.[1] || 'matching';
+    body = `<p class="muted">No ${escapeHtml(label.toLowerCase())} activity in this group yet. <a href="${escapeHtml(groupHref(group.id, 'activity'))}" data-partial>Show all activity</a></p>`;
+  } else {
+    body = renderActivityList(pageInfo.items, group, state);
+  }
+  return `
+    <section class="panel stack" data-composer-section="group-activity" data-section-label="Group activity">
+      <h2>Activity</h2>
+      <p class="muted small">What happened in this group, newest first. Ballots stay private; only an election's opening, close, and winner are shown.</p>
+      ${nav}
+      ${body}
+      ${renderPager(pageInfo, {
+        baseHref: '/groups',
+        query: { group: group.id, view: 'activity', kind: selected },
+        label: 'events',
+      })}
     </section>`;
 }
 

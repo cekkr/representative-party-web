@@ -2227,13 +2227,15 @@ details.note pre {
   border-left: 3px solid hsl(var(--hairline-hsl) / 0.35);
 }
 
-.stance-filter {
+.stance-filter,
+.filter-links {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
 }
 
-.stance-filter__link {
+.stance-filter__link,
+.filter-links__link {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
@@ -2245,23 +2247,27 @@ details.note pre {
   text-decoration: none;
 }
 
-.stance-filter__link:hover {
+.stance-filter__link:hover,
+.filter-links__link:hover {
   border-color: var(--primary);
 }
 
-.stance-filter__link[aria-current="page"] {
+.stance-filter__link[aria-current="page"],
+.filter-links__link[aria-current="page"] {
   border-color: var(--primary);
   background: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.14);
   color: var(--primary-ink);
   font-weight: 700;
 }
 
-.stance-filter__count {
+.stance-filter__count,
+.filter-links__count {
   font-size: 0.8em;
   color: var(--muted);
 }
 
-.stance-filter__link[aria-current="page"] .stance-filter__count {
+.stance-filter__link[aria-current="page"] .stance-filter__count,
+.filter-links__link[aria-current="page"] .filter-links__count {
   color: inherit;
 }
 
@@ -4668,4 +4674,41 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
 
 .election-card .form-inline {
   margin-top: 0.5rem;
+}
+
+/* Group activity: one row per event, what happened first, then the record kind
+   and time. Lifecycle events reuse the stage tones on the leading edge; the
+   kind text is always present, so colour is never the only cue. */
+.activity-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity-row {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.6rem 0.9rem;
+  border: 1px solid hsl(var(--hairline-hsl) / 0.25);
+  border-left: 3px solid hsl(var(--hairline-hsl) / 0.45);
+  border-radius: var(--radius-sm);
+  overflow-wrap: anywhere;
+}
+
+.activity-row p {
+  margin: 0;
+}
+
+.activity-row--draft {
+  border-left-color: hsl(var(--warning-hsl) / 0.7);
+}
+
+.activity-row--discussion {
+  border-left-color: hsl(var(--info-hsl) / 0.7);
+}
+
+.activity-row--vote {
+  border-left-color: hsl(var(--success-hsl) / 0.7);
 }

@@ -172,14 +172,46 @@ async function run() {
   }
   console.log(`delegate ${delegations.length} edges`);
 
-  // --- A group that publishes an advisory cachet.
-  await form('/groups', {
+  // --- A group that publishes an advisory cachet, with a members-only lane and a
+  // ranked election, so its Activity view has real history to review.
+  const marco = { cookie: people['marco.deluca'].cookie };
+  const created = await form('/groups', {
     action: 'create',
     name: 'Public Healthcare Circle',
     topics: `${TOPIC.waitingLists}, ${TOPIC.minimumWage}`,
     description: 'Delegates and priorities on waiting times and healthcare work. Advisory only; it holds no decision rights.',
-  }, { cookie: people['marco.deluca'].cookie });
-  console.log('groups  1 group');
+  }, marco);
+  const groupId = new URL(created.headers.get('location') || '', BASE_URL).searchParams.get('group');
+  if (groupId) {
+    await form('/groups/policy', { groupId, laneDiscussion: 'on', lanePetitions: 'on', lanesVisibility: 'members' }, marco);
+    for (const handle of ['giulia.ferrero', 'sofia.bianchi', 'paolo.greco']) {
+      await form('/groups', { action: 'join', groupId }, { cookie: people[handle].cookie });
+    }
+    await form('/discussion', {
+      groupId,
+      topic: TOPIC.waitingLists,
+      content: 'Working note for the circle: at the Molinette, class B cardiology referrals wait 97 days against a 60-day maximum. Can we compare with the private-practice slots in the same department?',
+    }, { cookie: people['giulia.ferrero'].cookie });
+    await form('/groups', {
+      action: 'startElection', groupId, topic: TOPIC.waitingLists,
+      candidates: '@marco.deluca, @giulia.ferrero, @sofia.bianchi',
+    }, marco);
+    const decisions = await fetch(`${BASE_URL}/groups?group=${groupId}&view=decisions`, { headers: marco }).then((r) => r.text());
+    const electionId = decisions.match(/id="election-([^"]+)"/)?.[1];
+    if (electionId) {
+      const ballots = [
+        ['giulia.ferrero', '@marco.deluca', '@giulia.ferrero'],
+        ['sofia.bianchi', '@sofia.bianchi', '@marco.deluca'],
+        ['paolo.greco', '@giulia.ferrero', '@marco.deluca'],
+        ['marco.deluca', '@marco.deluca', '@sofia.bianchi'],
+      ];
+      for (const [voter, first, second] of ballots) {
+        await form('/groups', { action: 'voteElection', electionId, candidateHash: first, secondChoiceHash: second }, { cookie: people[voter].cookie });
+      }
+      await form('/groups', { action: 'closeElection', electionId }, marco);
+    }
+  }
+  console.log('groups  1 group with a members-only lane and a closed election');
 
   console.log('\nSeeded. Capture with: BASE_URL=%s node scripts/ui-screenshots.js', BASE_URL);
 }

@@ -297,7 +297,22 @@ example “Won on transfers after 2 rounds”), the closing date, and “You vot
 when the viewer has a ballot. A member changing their vote starts from the
 ranking they already cast.
 
-**Target.** Group activity history beyond elections. Keep
+Activity follows the Citizen OS activity feed for a group: one row per event,
+leading with what happened and its linked record, then the record kind and a
+semantic date. It lists elections opened and closed (with the winner and ballot
+count, never individual ballots), lane contributions and proposals with their
+discussion, voting, and closing, moves up a level, promotion requests and
+declines, and joins. A labelled filter of GET links (`?kind=lanes|decisions|membership`)
+shows a count per family, leaves out an empty family unless it is selected, and
+a filtered empty view links back to all activity. Rows page 20 at a time.
+Overview previews the three newest rows with a View all activity link. Joins
+follow the roster gate, lane events need the group's lane gate and are
+attributed to the group that held the item at the time, and an item that moved
+somewhere the viewer cannot open keeps its row with the title and link withheld.
+Proposal lifecycle rows reuse the stage colours on their leading edge.
+
+**Target.** Settings and role changes in Activity once they carry a durable
+timestamp, and a leave event once membership history is kept. Keep
 contextual promotion requests in the source lane. Group lineage describes
 structure. Membership and authority are checked independently for each group.
 
@@ -574,7 +589,7 @@ starting point for implementation.
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall with permalinks, adjacent follow filters, and native compose with audience and attachment controls. A [focused update](src/modules/social/templates/social-post.html) shows its parent and replies under the source audience. | Inline recovery for ordinary forms. |
 | [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and stage-banded cards, and scoped workspaces for Overview, Discussion, History, and Ballot. Discussion has a stance filter and stance-edged notes. Ballot leads with a voting timeline and previews a delegated hand-off. Overview shows the discussion window, and moderators get a Past their window queue. Reads and writes use the stored lane. | SSR form recovery. A binding close date once voting closes on schedule. |
-| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. Decisions separates open elections, current results per category, and earlier results. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Group activity history beyond elections. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, Activity, and gated Settings with canonical scoped lane links. Decisions separates open elections, current results per category, and earlier results. Activity lists elections, lane work, moves, requests, and joins under each source's gate with a family filter, and Overview previews it. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Settings and role changes in Activity once they carry a durable timestamp. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. Set, clear, and renew report their outcome above the panels; an unknown delegate keeps the typed handle. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Search-led, paginated collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Profile activity beyond proposals as those records gain lane-aware links. |
 | [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail with an outcome notice and the shared alert summary. | A focused change record once members ratify changes. |
@@ -627,7 +642,7 @@ keys have historical names, while their labels identify the content.
 | Organization | Live `organization-case-work`, `organization-case-queue`. Preview `coordination-workspace`, `pressure-inbox`, `pressure-map`, `operating-map`. |
 | Delegation | `delegation-overview`, `delegation-inbox`, `delegation-my-ballots`, `delegation-current`, `delegation-effective`, `delegation-set`, `delegation-recommendations` |
 | People | Directory `delegate-directory` (search, now above the results), `delegate-directory-list` (results and pager). Profile views: Overview `delegate-profile-summary`, Delegations `delegate-profile-endorsements`, Votes `delegate-profile-delegations`, Activity `delegate-profile-votes`, Endorsements `delegate-profile-history`. The record header, section links, and Details rail stay outside optional panels. |
-| Groups | Browse `groups-list` (search, results, and pager), `groups-categories`, `groups-create`. Workspace `group-overview`, `group-members`, `group-decisions`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
+| Groups | Browse `groups-list` (search, results, and pager), `groups-categories`, `groups-create`. Workspace `group-overview` (includes the Recent activity preview), `group-members`, `group-decisions`, `group-activity`, `group-settings`. All use the `groups` page key. Lineage, identity, membership, and section links stay outside optional panels. |
 | Governance | `governance-overview` (current rules), `governance-proposals` (open changes and decisions), `governance-propose`. The heading and section links stay visible. |
 | Notifications | `notifications-inbox`, `notifications-preferences` (controller-rendered) |
 | Profile | `profile-interface` (Public handle), `profile-summary` (Provider-local fields), `profile-fields` (Interface defaults). The record header, section links, and Session rail stay outside optional panels. |
@@ -641,7 +656,7 @@ keys have historical names, while their labels identify the content.
 | 1. Shell and visual foundations | Implemented the shared shell, semantic palette, responsive navigation, base panels and actions, and the Home and Discussion header pilot. | At 390 px and 800 × 600 px, find Discussion, Forum, and Notifications by keyboard with every civic module off. Jump to main and compose. Verify focus, saved settings, role/module gates, and the shared status facts in both themes. |
 | 2. Conversation and collections | Discussion and Forum have searchable collections and focused views linked from Home. Social has in-flow compose, audience, follow filters, and attributed media states. | Find the waiting-list evidence and the free-mandate article in Scenario A. Open a contribution and return to the same search. Reply in Forum and send a media-only Social update with ordinary HTML. Confirm direct attachment and reply access. |
 | 3. Proposal browse and workspace | Implemented the summary collection and four focused views behind the same full and partial read gate, with canonical POST destinations. | A deep link opens the ALPI proposal independently of list pagination. The exact frozen revision is discoverable from Ballot. A rebuttal leads to its claim, a no vote remains visible under its outcome policy, and a pending delegate can be overridden without counting it as an abstention. Test outsider read and mutation refusals against a members-only lane. |
-| 4. Groups, activity, and other records | Focused group sections and lane links, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People profiles, governance changes, and the case record use the header–sections–context pattern. People and Groups directories search and paginate. Discussion, group, and Social notifications open their records through the read gate. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
+| 4. Groups, activity, and other records | Focused group sections and lane links, group Activity, explicit promotion destinations, proposal activity, and delegation deep links are implemented. People profiles, governance changes, and the case record use the header–sections–context pattern. People and Groups directories search and paginate. Discussion, group, and Social notifications open their records through the read gate. | A promotion request shows the exact upper-level destination and the accepted item keeps its id and history. A permitted inbox link opens the right scope. On Scenario B, an ASL case retains the attributed source and durable acknowledgement; the preview is visibly separate. |
 | 5. Admin and customization polish | Profile, wallet handoff, the organization preview, and admin use the settings-section pattern with shared inline form feedback. Next: component palette operations once variants are established on real routes. | Admin anchors and privileged controls remain reachable. Existing member-hidden panels and saved deployment layouts survive a reload, including a new route with a compatible view key. |
 
 The proposal controller checks the stored group lane on deep reads, edits,
@@ -866,6 +881,26 @@ discussion with enhanced navigation in dark at desktop width (focus moved to
 the heading), and read the proposal collection and a populated Decisions view at
 375 px in light with no horizontal overflow.
 [Filter and Decisions regression](tests/deliberation-filters.test.js)
+
+### Group activity verification
+
+A unit test replays a proposal's promotion trail and checks that each event is
+attributed to the group that held it at the time (voting that opened after the
+move belongs to the parent), that an outsider sees the creation without its
+actor and no joins, and that a declined request is listed while an approval is
+read from the move. The HTTP regression drives a Scenario A branch with a
+members-only lane: a lane note, a proposal whose promotion request is declined,
+a ranked election, and a move of the note into the parent's members-only lane.
+It reads Activity in both HTML response modes as a member, who sees the move
+with the title withheld, and as the mover, who keeps the link. An outsider sees
+the creation and the election but no roster or lane work. It also checks the
+family filter and its filtered empty view, the Overview preview, and that
+leaving from Activity returns there. The Scenario A seed now gives Public
+Healthcare Circle a members-only lane note and a closed ranked election. A
+seeded pass read Activity as @giulia.ferrero in dark at 800 × 600, and Overview
+and an enhanced Decisions filter at 375 px in light with no horizontal overflow;
+focus moved to the heading and the URL kept the filter.
+[Group activity regression](tests/group-activity.test.js)
 
 ### Review checklist for presentation changes
 
