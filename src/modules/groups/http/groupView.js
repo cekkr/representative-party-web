@@ -312,7 +312,7 @@ function renderDecisions(group, person, state, manage) {
   const delegates = (group.delegates || []).map((delegate) => `
     <li>${escapeHtml(delegate.topic || 'general')} · ${renderActorLabel(state, delegate.delegateHash, { showHash: false })}
       <span class="muted small">Priority ${Number(delegate.priority) || 0}</span></li>`).join('');
-  const elections = renderElections(listElections(state, group.id), state, { canVote, manage });
+  const elections = renderElections(listElections(state, group.id), state, { canVote, manage, voterHash: person?.pidHash });
   return `
     <section class="panel stack" data-composer-section="group-decisions" data-section-label="Group decisions">
       <h2>Delegate elections</h2>
@@ -339,77 +339,98 @@ function renderDecisions(group, person, state, manage) {
     </section>`;
 }
 
-function renderElections(elections, state, { canVote, manage }) {
-  if (!elections.length) return '<p class="muted small">No elections.</p>';
-  return elections
-    .map((election) => {
-      const tally = election.votes || [];
-      const previewPill = renderPreviewPill(election);
-      const issuerPill = renderIssuerPill(election);
-      const topicLabel = escapeHtml(election.topic || 'general');
-      const statusLabel = escapeHtml(election.status || 'open');
-      const electionId = escapeHtml(election.id || '');
-      const candidates = (election.candidates || []).map((c) => ({
-        value: escapeHtml(String(c)),
-        label: `@${escapeHtml(resolveHandleForHash(state, c))}`,
-      }));
-      const winner = election.status === 'closed' ? pickWinner(election, state) : null;
-      const winnerMethod = winner?.method ? escapeHtml(winner.method) : '';
-      const winnerRounds = Number.isFinite(winner?.rounds) ? winner.rounds : null;
-      const winnerLabel = winner?.candidateHash
-        ? `Winner: ${renderActorLabel(state, winner.candidateHash, { showHash: false })}${winnerMethod ? ` (method ${winnerMethod}${winnerRounds ? `, rounds ${winnerRounds}` : ''})` : ''}`
-        : '';
-      const closedAt = formatTimestamp(election.closedAt);
-      return `
-        <div class="muted small">
-          <div class="discussion__meta">
-            <span class="pill ghost">Election</span>
-            <span class="pill">${topicLabel}</span>
-            ${previewPill}
-            ${issuerPill}
-            <span class="muted tiny">Status: ${statusLabel}</span>
-          </div>
-          ${
-            election.status === 'open' && canVote
-              ? `
-            <form class="form-inline" method="post" action="/groups" data-enhance="groups">
-              <input type="hidden" name="action" value="voteElection" />
-              <input type="hidden" name="electionId" value="${electionId}" />
-              <select name="candidateHash" aria-label="First choice">
-                ${candidates
-                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
-                  .join('')}
-              </select>
-              <select name="secondChoiceHash" aria-label="Second choice">
-                <option value="">Second choice (optional)</option>
-                ${candidates
-                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
-                  .join('')}
-              </select>
-              <select name="thirdChoiceHash" aria-label="Third choice">
-                <option value="">Third choice (optional)</option>
-                ${candidates
-                  .map((c) => `<option value="${c.value}">${c.label}</option>`)
-                  .join('')}
-              </select>
-              <button type="submit" class="ghost">Vote</button>
-            </form>
-          ` : ''
-          }
-          ${election.status === 'open' && manage ? `
-            <form class="form-inline" method="post" action="/groups" data-enhance="groups">
-              <input type="hidden" name="action" value="closeElection" />
-              <input type="hidden" name="electionId" value="${electionId}" />
-              <button type="submit" class="ghost">Close and pick winner</button>
-            </form>
-          `
-              : ''
-          }
-          <p>Votes: ${tally.length}</p>
-          ${winnerLabel ? `<p>${winnerLabel}</p>` : ''}
-          ${closedAt ? `<p class="muted tiny">Closed: ${closedAt}</p>` : ''}
-        </div>
-      `;
-    })
-    .join('\n');
+// Decisions reads like a ballot record: elections that still need a vote come
+// first, then the current result for each category, and earlier results for the
+// same category fold into a disclosure so a long history stays scannable.
+function renderElections(elections, state, { canVote, manage, voterHash }) {
+  if (!elections.length) return '<p class="muted small">No elections yet. Group admins can start one for a category the group covers.</p>';
+  const open = elections.filter((election) => election.status !== 'closed');
+  const closed = elections
+    .filter((election) => election.status === 'closed')
+    .sort((a, b) => String(b.closedAt || '').localeCompare(String(a.closedAt || '')));
+  const current = [];
+  const earlier = [];
+  const seenTopics = new Set();
+  for (const election of closed) {
+    const topic = String(election.topic || 'general').trim().toLowerCase();
+    if (seenTopics.has(topic)) earlier.push(election);
+    else {
+      seenTopics.add(topic);
+      current.push(election);
+    }
+  }
+  const card = (election) => renderElectionCard(election, state, { canVote, manage, voterHash });
+  return `
+    <h3>Open elections <span class="muted small">(${open.length})</span></h3>
+    ${open.length ? `<ul class="election-list">${open.map(card).join('')}</ul>` : '<p class="muted small">No election is open.</p>'}
+    <h3>Current results <span class="muted small">(${current.length})</span></h3>
+    ${current.length ? `<ul class="election-list">${current.map(card).join('')}</ul>` : '<p class="muted small">No election has closed yet.</p>'}
+    ${earlier.length ? `<details class="note">
+      <summary>Earlier results (${earlier.length})</summary>
+      <ul class="election-list">${earlier.map(card).join('')}</ul>
+    </details>` : ''}
+  `;
+}
+
+function describeWinMethod(winner) {
+  const rounds = Number.isFinite(winner?.rounds) ? winner.rounds : null;
+  switch (winner?.method) {
+    case 'majority': return 'First-preference majority';
+    case 'ranked': return rounds ? `Won on transfers after ${rounds} rounds` : 'Won on transfers';
+    case 'tie_break': return rounds ? `Tie broken after ${rounds} rounds` : 'Tie broken';
+    case 'fallback': return 'Last remaining candidate';
+    default: return '';
+  }
+}
+
+function renderElectionCard(election, state, { canVote, manage, voterHash }) {
+  const tally = election.votes || [];
+  const isOpen = election.status !== 'closed';
+  const topicLabel = escapeHtml(election.topic || 'general');
+  const electionId = escapeHtml(election.id || '');
+  const candidates = (election.candidates || []).map((c) => ({
+    value: escapeHtml(String(c)),
+    label: `@${escapeHtml(resolveHandleForHash(state, c))}`,
+  }));
+  const ownBallot = voterHash ? tally.find((vote) => vote.voterHash === voterHash) : null;
+  const winner = isOpen ? null : pickWinner(election, state);
+  const method = describeWinMethod(winner);
+  const closedAt = formatTimestamp(election.closedAt);
+  const candidateList = candidates.length
+    ? `<p class="small">Candidates: ${(election.candidates || []).map((c) => renderActorLabel(state, c, { showHash: false })).join(', ')}</p>`
+    : '';
+  // A member changing their vote starts from the ranking they already cast.
+  const options = (placeholder, current) => `${placeholder ? `<option value="">${placeholder}</option>` : ''}${candidates
+    .map((c) => `<option value="${c.value}"${current && escapeHtml(String(current)) === c.value ? ' selected' : ''}>${c.label}</option>`).join('')}`;
+  return `
+    <li>
+      <article class="discussion election-card election-card--${isOpen ? 'open' : 'closed'}"${electionId ? ` id="election-${electionId}"` : ''}>
+        <header class="discussion__meta">
+          <span class="pill stage stage--${isOpen ? 'vote' : 'closed'}">${isOpen ? 'Open' : 'Closed'}</span>
+          <h4 class="election-card__topic">${topicLabel}</h4>
+          ${renderPreviewPill(election)}
+          ${renderIssuerPill(election)}
+        </header>
+        ${isOpen ? candidateList : ''}
+        ${winner?.candidateHash ? `<p><strong>Winner:</strong> ${renderActorLabel(state, winner.candidateHash, { showHash: false })}</p>` : ''}
+        ${!isOpen && !winner?.candidateHash ? '<p class="muted small">Closed without a winner.</p>' : ''}
+        <p class="muted small">${tally.length} ${tally.length === 1 ? 'ballot' : 'ballots'}${method ? ` · ${escapeHtml(method)}` : ''}${closedAt ? ` · Closed <time datetime="${escapeHtml(election.closedAt)}">${escapeHtml(closedAt)}</time>` : ''}${ownBallot ? ' · You voted' : ''}</p>
+        ${isOpen && canVote ? `
+          <form class="form-inline" method="post" action="/groups" data-enhance="groups">
+            <input type="hidden" name="action" value="voteElection" />
+            <input type="hidden" name="electionId" value="${electionId}" />
+            <select name="candidateHash" aria-label="First choice">${options('', ownBallot?.candidateHash)}</select>
+            <select name="secondChoiceHash" aria-label="Second choice">${options('Second choice (optional)', ownBallot?.secondChoiceHash)}</select>
+            <select name="thirdChoiceHash" aria-label="Third choice">${options('Third choice (optional)', ownBallot?.thirdChoiceHash)}</select>
+            <button type="submit" class="ghost">${ownBallot ? 'Change vote' : 'Vote'}</button>
+          </form>` : ''}
+        ${isOpen && manage ? `
+          <form class="form-inline" method="post" action="/groups" data-enhance="groups">
+            <input type="hidden" name="action" value="closeElection" />
+            <input type="hidden" name="electionId" value="${electionId}" />
+            <button type="submit" class="ghost">Close and pick winner</button>
+          </form>` : ''}
+      </article>
+    </li>
+  `;
 }

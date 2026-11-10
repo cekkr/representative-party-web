@@ -11,7 +11,7 @@ import { createNotification, createNotificationWithOutbound } from '../../messag
 import { persistDiscussions, persistPetitions, persistVotes } from '../../../infra/persistence/storage.js';
 import { countSignatures, getQuorumAdvanceStage, hasSigned, signPetition } from '../signatures.js';
 import { buildFreezeSnapshot } from '../lifecycle.js';
-import { canReadProposal, proposalBrowseHref, proposalHref, readProposalBrowse, resolveProposalScope } from '../proposalLinks.js';
+import { canReadProposal, proposalBrowseHref, proposalHref, readProposalBrowse, readProposalStance, resolveProposalScope } from '../proposalLinks.js';
 import { resolveNotificationPreferences } from '../../messaging/outbound.js';
 import { extractMentions } from '../../social/posts.js';
 import { findSessionByHandle, findSessionByHash } from '../../identity/sessions.js';
@@ -170,7 +170,7 @@ async function renderFocusedProposal({ res, state, wantsPartial, person, query, 
   const requestedView = query.searchParams.get('view');
   const view = ['discussion', 'history', 'ballot'].includes(requestedView) ? requestedView : 'overview';
   if (!matchesGroupScope(proposal, readGroupScope(query.searchParams))) {
-    return sendRedirect(res, proposalHref(proposal, { ...browse, view }));
+    return sendRedirect(res, proposalHref(proposal, { ...browse, view, stance: readProposalStance(query.searchParams) }));
   }
 
   const canParticipate = canPostToGroupLane(state, person, scope.group, 'petitions');
@@ -183,6 +183,7 @@ async function renderFocusedProposal({ res, state, wantsPartial, person, query, 
     pageKey: 'petitions',
     ...renderProposalWorkspace(proposal, {
       state, person, scope, browse, view,
+      stance: view === 'discussion' ? readProposalStance(query.searchParams) : '',
       signatures: filterVisibleEntries(state.signatures, state, (entry) => entry.petitionId === id),
       comments: view === 'discussion'
         ? filterVisibleEntries(state.discussions, state, (entry) => entry.petitionId === id)

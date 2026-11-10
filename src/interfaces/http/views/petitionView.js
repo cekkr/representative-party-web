@@ -50,7 +50,7 @@ export function renderProposalCollection(proposals, { state, signatures, comment
     const signatureCount = signatureCounts.get(proposal.id)?.count || 0;
     return `
       <li>
-        <article class="discussion record-card" id="petition-${escapeHtml(proposal.id)}">
+        <article class="discussion record-card record-card--${normalizeStage(proposal.status)}" id="petition-${escapeHtml(proposal.id)}">
           <header>
             <div class="topic-meta">${renderProposalStage(proposal)}${renderPreviewPill(proposal)}${renderIssuerPill(proposal)}</div>
             <h3><a href="${escapeHtml(proposalHref(proposal, browse))}" data-partial>${escapeHtml(proposal.title)}</a></h3>
@@ -101,7 +101,7 @@ export function renderProposalsPastWindow(state, person, { now = Date.now() } = 
 
 export function renderProposalWorkspace(proposal, options) {
   const {
-    state, person, scope, browse, view, signatures, comments, votes,
+    state, person, scope, browse, view, stance = '', signatures, comments, votes,
     allowEditing, allowSigning, allowCommenting, allowVoting, canVote, canModerate,
   } = options;
   const revisions = Array.isArray(proposal.versions) ? proposal.versions : [];
@@ -135,7 +135,8 @@ export function renderProposalWorkspace(proposal, options) {
   let content;
   let action = '';
   if (view === 'discussion') {
-    content = renderDiscussionBlock(proposal, comments, state, { allowCommenting, formFields });
+    const stanceHref = (key) => escapeHtml(proposalHref(proposal, { ...browse, view: 'discussion', stance: key }));
+    content = renderDiscussionBlock(proposal, comments, state, { allowCommenting, formFields, stance, stanceHref });
     if (allowCommenting && stage !== 'closed') {
       action = '<a class="cta" href="#proposal-comment">Add a contribution</a>';
     }
@@ -639,14 +640,24 @@ function renderRevisionHistory(petition, state, href) {
   `;
 }
 
-function renderDiscussionBlock(petition, comments, state, { allowCommenting, formFields }) {
+function renderDiscussionBlock(petition, comments, state, { allowCommenting, formFields, stance = '', stanceHref }) {
   const count = comments.length;
   const disabled = petition.status === 'closed';
   // Stored newest-first; a deliberation reads oldest-first so a rebuttal follows the
   // objection it answers.
   const ordered = comments.slice().sort(sortByCreatedAt);
-  const discussionList = renderPetitionComments(ordered, state, { argumentTitles: indexArgumentTitles(comments) });
-  const stanceSummary = renderCommentStanceSummary(comments);
+  const shown = stance ? ordered.filter((comment) => normalizeCommentStance(comment?.stance) === stance) : ordered;
+  const shownIds = new Set(shown.map((comment) => comment.id));
+  const discussionList = shown.length || !stance
+    ? renderPetitionComments(shown, state, {
+      argumentTitles: indexArgumentTitles(comments),
+      // A rebuttal whose claim is filtered out still names it, and links to it in the
+      // unfiltered deliberation instead of to an anchor that is not on the page.
+      parentHref: (parentId) => (shownIds.has(parentId) || !stanceHref ? '' : stanceHref('')),
+    })
+    : `<p>No note on this proposal is marked ${escapeHtml(getCommentStanceLabel(stance))} yet. <a href="${stanceHref('')}" data-partial>Show all notes</a>.</p>`;
+  const stanceFilter = stanceHref ? renderStanceFilter(comments, stance, stanceHref) : '';
+  const stanceSummary = stanceFilter ? '' : renderCommentStanceSummary(comments);
   const argumentData = collectArgumentNodes(comments);
   const argumentMap = renderArgumentMap(argumentData, state);
   const argumentDatalistId = `argument-map-${petition.id}`;
@@ -654,6 +665,7 @@ function renderDiscussionBlock(petition, comments, state, { allowCommenting, for
   return `
     <section class="panel stack" id="petitions-discussion" data-composer-section="petitions-discussion" data-section-label="Proposal discussion">
       <h2>Discussion <span class="muted small">(${count})</span></h2>
+      ${stanceFilter}
       ${stanceSummary ? `<p class="muted small">${escapeHtml(stanceSummary)}</p>` : ''}
       <div class="discussion-list">
         ${discussionList}
@@ -723,14 +735,14 @@ function ownArgumentTitle(node) {
   return node?.argumentParentId && title === 'Argument note' ? '' : title;
 }
 
-function describeArgumentParent(parentId, titles) {
+function describeArgumentParent(parentId, titles, base = '') {
   const title = titles?.get(parentId);
   return title
-    ? `<a href="#proposal-note-${escapeHtml(parentId)}">Builds on “${escapeHtml(title)}”</a>`
+    ? `<a href="${base}#proposal-note-${escapeHtml(parentId)}"${base ? ' data-partial' : ''}>Builds on “${escapeHtml(title)}”</a>`
     : 'The original claim is unavailable.';
 }
 
-function renderPetitionComments(comments, state, { argumentTitles } = {}) {
+function renderPetitionComments(comments, state, { argumentTitles, parentHref = () => '' } = {}) {
   if (!comments.length) {
     return renderEmptyState('No discussion notes yet.', { size: 'small' });
   }
@@ -747,12 +759,12 @@ function renderPetitionComments(comments, state, { argumentTitles } = {}) {
         ? `<p class="muted small">Argument: ${escapeHtml(ownArgumentTitle(comment))}</p>`
         : '';
       const argumentParent = comment.argumentParentId
-        ? `<p class="muted small">${describeArgumentParent(comment.argumentParentId, argumentTitles)}</p>`
+        ? `<p class="muted small">${describeArgumentParent(comment.argumentParentId, argumentTitles, parentHref(comment.argumentParentId))}</p>`
         : '';
       const stanceKey = normalizeCommentStance(comment.stance);
       const coloredStance = `<span class="pill stance stance--${escapeHtml(stanceKey)}">${escapeHtml(stanceLabel)}</span>`;
       return `
-        <article class="discussion comment-card" id="proposal-note-${escapeHtml(comment.id)}">
+        <article class="discussion comment-card comment-card--${escapeHtml(stanceKey)}" id="proposal-note-${escapeHtml(comment.id)}">
           <div class="topic-head">
             ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
             <div class="topic-info">
@@ -803,7 +815,7 @@ export function renderProposalDiscussionFeed(items, state, browse) {
         : '';
       const createdAt = formatTimestamp(comment.createdAt);
       return `
-        <article class="discussion comment-card">
+        <article class="discussion comment-card comment-card--${escapeHtml(stanceKey)}">
           <div class="topic-head">
             ${renderActorAvatar(state, comment.authorHash || 'anonymous', { size: 'sm' })}
             <div class="topic-info">
@@ -865,6 +877,25 @@ function renderCommentStanceOptions(selected = 'comment') {
       return `<option value="${escapeHtml(entry.value)}" ${isSelected}>${escapeHtml(entry.label)}</option>`;
     })
     .join('');
+}
+
+// The Discussion filter: each link is a GET view of the same deliberation, so Back,
+// bookmarks, and JavaScript-off all work. Counts always describe every note.
+function renderStanceFilter(comments, selected, stanceHref) {
+  if (!comments.length) return '';
+  const counts = new Map();
+  for (const comment of comments) {
+    const key = normalizeCommentStance(comment?.stance);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  const links = [['', 'All notes', comments.length]];
+  for (const entry of listCommentStances()) {
+    const total = counts.get(entry.value) || 0;
+    if (total || entry.value === selected) links.push([entry.value, getCommentStanceLabel(entry.value), total]);
+  }
+  return `<nav class="stance-filter" aria-label="Filter notes by stance">
+    ${links.map(([key, label, total]) => `<a class="stance-filter__link${key ? ` stance-filter__link--${key}` : ''}" href="${stanceHref(key)}"${key === selected ? ' aria-current="page"' : ''} data-partial>${escapeHtml(label)} <span class="stance-filter__count">${total}</span></a>`).join('')}
+  </nav>`;
 }
 
 function renderCommentStanceSummary(comments) {

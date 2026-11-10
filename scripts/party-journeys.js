@@ -1104,8 +1104,8 @@ async function journeyElection(browser) {
   await settle(irene);
   await visit(irene, `/groups?group=${groupId}&view=decisions`);
   await expectText(irene, 'giulia.ferrero', 'the winner surfaces in Decisions');
-  await expectText(irene, 'rounds 2', 'the election was decided on a second-round transfer');
-  await shot(irene, 'party-election', 'A ranked delegate election, won on transfers: the first-preference leader (the economist, most delegated weight in the party) loses to the frontline nurse once eliminated ballots transfer — method ranked, rounds 2.', {
+  await expectText(irene, 'after 2 rounds', 'the election was decided on a second-round transfer');
+  await shot(irene, 'party-election', 'A ranked delegate election, won on transfers: the first-preference leader (the economist, most delegated weight in the party) loses to the frontline nurse once eliminated ballots transfer — won on transfers after 2 rounds.', {
     focus: '[data-composer-section="group-decisions"]',
   });
 }

@@ -2181,20 +2181,88 @@ details.note pre {
   text-transform: capitalize;
 }
 
+/* Lifecycle stages follow the reference mapping — draft amber, deliberation blue,
+   voting green, closed neutral — through the theme-aware status tokens, so the
+   cue does not drift with the member's accent and flips with the theme. The pill
+   text always names the stage; colour is the second cue. */
+.pill.stage--draft {
+  border-color: hsl(var(--warning-hsl) / 0.45);
+  background: hsl(var(--warning-hsl) / 0.1);
+  color: var(--warning);
+}
+
 .pill.stage--discussion {
-  border-color: hsl(var(--primary-h) var(--primary-s) 60% / 0.5);
-  background: hsl(var(--primary-h) var(--primary-s) 60% / 0.14);
-  color: var(--primary-ink);
+  border-color: hsl(var(--info-hsl) / 0.5);
+  background: hsl(var(--info-hsl) / 0.12);
+  color: var(--info);
 }
 
 .pill.stage--vote {
-  border-color: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.5);
-  background: hsl(calc(var(--primary-h) + 24) 70% 60% / 0.14);
-  color: var(--accent);
+  border-color: hsl(var(--success-hsl) / 0.5);
+  background: hsl(var(--success-hsl) / 0.12);
+  color: var(--success);
 }
 
 .pill.stage--closed {
+  border-color: hsl(var(--hairline-hsl) / 0.4);
+  background: transparent;
   color: var(--muted);
+}
+
+/* Stance cards keep one alignment so chronology and reply links stay readable
+   when they stack; a quiet leading edge echoes the labelled stance pill. */
+.comment-card--support {
+  border-left: 3px solid hsl(var(--success-hsl) / 0.7);
+}
+
+.comment-card--concern {
+  border-left: 3px solid hsl(var(--warning-hsl) / 0.7);
+}
+
+.comment-card--question {
+  border-left: 3px solid hsl(var(--info-hsl) / 0.7);
+}
+
+.comment-card--comment {
+  border-left: 3px solid hsl(var(--hairline-hsl) / 0.35);
+}
+
+.stance-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.stance-filter__link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 36px;
+  padding: 0.2rem 0.75rem;
+  border: 1px solid hsl(var(--hairline-hsl) / 0.35);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.stance-filter__link:hover {
+  border-color: var(--primary);
+}
+
+.stance-filter__link[aria-current="page"] {
+  border-color: var(--primary);
+  background: hsl(var(--primary-h) var(--primary-s) var(--primary-l) / 0.14);
+  color: var(--primary-ink);
+  font-weight: 700;
+}
+
+.stance-filter__count {
+  font-size: 0.8em;
+  color: var(--muted);
+}
+
+.stance-filter__link[aria-current="page"] .stance-filter__count {
+  color: inherit;
 }
 
 .reply-list {
@@ -4101,6 +4169,13 @@ code {
   overflow-wrap: anywhere;
 }
 
+/* A stage band on the card's top edge, like the reference topic card's state
+   band; the stage pill inside the card names it. */
+.record-card--draft { border-top: 3px solid hsl(var(--warning-hsl) / 0.6); }
+.record-card--discussion { border-top: 3px solid hsl(var(--info-hsl) / 0.7); }
+.record-card--vote { border-top: 3px solid hsl(var(--success-hsl) / 0.7); }
+.record-card--closed { border-top: 3px solid hsl(var(--hairline-hsl) / 0.35); }
+
 .record-card h3 {
   margin: 0.5rem 0 0.25rem;
 }
@@ -4565,4 +4640,32 @@ body:has(#group-create:is([data-member-hidden="true"], [hidden])) a[href="#group
 
 .ballot-delegation {
   margin: 0;
+}
+
+/* Group Decisions: open elections, current results per category, earlier results
+   folded away. Cards share the stage cue used by proposals. */
+.election-list {
+  display: grid;
+  gap: 0.6rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.election-card {
+  overflow-wrap: anywhere;
+}
+
+.election-card--open {
+  border-left: 3px solid hsl(var(--success-hsl) / 0.7);
+}
+
+.election-card__topic {
+  margin: 0;
+  font-size: 1rem;
+  text-transform: capitalize;
+}
+
+.election-card .form-inline {
+  margin-top: 0.5rem;
 }

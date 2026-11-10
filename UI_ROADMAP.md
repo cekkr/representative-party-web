@@ -180,7 +180,13 @@ readers. The collection retains each card's original `#petition-<id>` anchor.
 
 Overview contains the proposal outline, evidence, quorum progress, and eligible
 signing, revision, moderation, and promotion actions. Discussion contains
-oldest-first contributions, parent-claim links, and the argument map. History
+oldest-first contributions, parent-claim links, and the argument map. A
+labelled stance filter (`?stance=support|concern|question|comment`) above the
+notes is a set of GET links with `aria-current`; its counts always describe the
+whole deliberation, a stance with no notes is not offered, and a filtered view
+with no matches links back to all notes. A rebuttal whose claim is filtered out
+still names it and links to it in the unfiltered view. Each note carries a quiet
+leading edge matching its labelled stance. History
 links the exact frozen revision to its ballot. Ballot leads with a voting timeline: when voting opened or closed (and who
 closed it), the constitution's vote window with the days left, and the delegate
 window. The vote window is published guidance, so the timeline says a moderator
@@ -204,8 +210,7 @@ participation.
 [Workspace template](src/modules/petitions/templates/petition-workspace.html) ·
 [Proposal view](src/interfaces/http/views/petitionView.js)
 
-**Target.** Add richer discussion filters and field-level recovery for ordinary
-HTML forms. Show a binding close date in Ballot once a scheduled close exists.
+**Target.** Add field-level recovery for ordinary HTML forms. Show a binding close date in Ballot once a scheduled close exists.
 Keep these region contracts.
 
 | Region | Required order and contents |
@@ -284,7 +289,15 @@ Branch of lineage line. Both views page 20 groups at a time with Previous and
 Next links that carry the query, and zero matches offer a link back to every
 group.
 
-**Target.** Make the decision context easier to scan as more elections accumulate. Keep
+Decisions lists Open elections first, then Current results with the newest
+closed election for each category, and folds older results for the same category
+into an Earlier results disclosure. Each election is a card with a stage label,
+its category, the winner, ballot count, a plain-language count method (for
+example “Won on transfers after 2 rounds”), the closing date, and “You voted”
+when the viewer has a ballot. A member changing their vote starts from the
+ranking they already cast.
+
+**Target.** Group activity history beyond elections. Keep
 contextual promotion requests in the source lane. Group lineage describes
 structure. Membership and authority are checked independently for each group.
 
@@ -509,7 +522,10 @@ with the ordinary server-rendered link or form. [Browser enhancements](src/publi
 
 **Current.** The shared shell and pilot pages use the revised slate and blue
 tokens, a pale light canvas with white panels, stepped dark surfaces, 16 px
-panel corners, and solid and outlined action treatments. The context rail
+panel corners, and solid and outlined action treatments. Proposal stages use
+the status tokens rather than the member accent: draft amber, discussion blue,
+vote green, and closed neutral, on the stage pill, a top band on collection
+cards, and open election cards. The pill always names the stage. The context rail
 defaults to 288 px where the available width permits two columns. The existing
 theme, accent, and density preferences apply to the new foundations.
 
@@ -557,8 +573,8 @@ starting point for implementation.
 | [Discussion](src/modules/discussion/templates/discussion.html) `/discussion` | Scope header, searchable feed with topic-subtree filters, scoped empty states, and focused contributions with evidence and gated actions. | Add reply relationships and use contribution links in authorized activity. |
 | [Forum](src/modules/forum/templates/forum.html) `/forum` | Searchable article rows and category-aware compose rail. A [focused article](src/modules/forum/templates/forum-thread.html) shows attributed replies oldest-first with evidence and a reply form. Posting returns to the same article. | Apply the collection and reply patterns to other conversation surfaces where appropriate. |
 | [Social](src/modules/social/templates/social.html) `/social/feed` | Attributed wall with permalinks, adjacent follow filters, and native compose with audience and attachment controls. A [focused update](src/modules/social/templates/social-post.html) shows its parent and replies under the source audience. | Inline recovery for ordinary forms. |
-| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and scoped workspaces for Overview, Discussion, History, and Ballot. Ballot leads with a voting timeline and previews a delegated hand-off. Overview shows the discussion window, and moderators get a Past their window queue. Reads and writes use the stored lane. | Refine discussion filters and SSR form recovery. A binding close date once voting closes on schedule. |
-| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Clearer activity and decision history within a group. |
+| [Proposals](src/modules/petitions/templates/petitions.html) `/petitions` | Summary collection with a nearby stage filter and stage-banded cards, and scoped workspaces for Overview, Discussion, History, and Ballot. Discussion has a stance filter and stance-edged notes. Ballot leads with a voting timeline and previews a delegated hand-off. Overview shows the discussion window, and moderators get a Past their window queue. Reads and writes use the stored lane. | SSR form recovery. A binding close date once voting closes on schedule. |
+| [Groups](src/modules/groups/templates/groups.html) `/groups` | Searchable, paginated branch tree and category browse; focused Overview, Members, Decisions, and gated Settings with canonical scoped lane links. Decisions separates open elections, current results per category, and earlier results. Every write and browser-form refusal reports an outcome-toned notice under the section links. | Group activity history beyond elections. |
 | [Delegation](src/modules/delegation/templates/delegation.html) `/delegation` | Overview, incoming and personal ballot rows with topic, holder or owner, deadline and scoped Ballot links, plus preferences, effective chains, and recommendations. Set, clear, and renew report their outcome above the panels; an unknown delegate keeps the typed handle. | Refine topic labels and place recommendations and chain explanations in supporting sections. |
 | [People](src/modules/delegates/templates) `/delegates` | Search-led, paginated collection of person cards. Profile record header with one Delegate or Edit action, Overview, Delegations, Votes, Activity, and Endorsements views, and a Details rail. Activity respects proposal lanes. | Profile activity beyond proposals as those records gain lane-aware links. |
 | [Governance](src/modules/governance/templates/governance.html) `/governance` | Heading with Propose action, current-rule grid, proposals with Current rule and Proposed values, attributed decisions with Before and After values, and propose rail with an outcome notice and the shared alert summary. | A focused change record once members ratify changes. |
@@ -835,6 +851,21 @@ navigation, which left the selection in place under an inline alert, and
 then without it, which returned to the proposal with the notice under its
 header. An empty Discussion post at 375 px in light showed the notice under
 the heading with no horizontal overflow.
+
+### Stance filter, stage cues, and Decisions verification
+
+The regression filters a Scenario A waiting-list proposal by stance in both
+HTML response modes, checks that counts describe every note, that a rebuttal's
+filtered-out claim links to the full deliberation, the filtered empty view, that
+an unknown stance shows everything and other views drop the filter, and the
+draft band on the collection card. The Decisions regression closes two healthcare
+elections and opens an energy one, then checks the Open, Current, and Earlier
+order, the winner line and count method, “You voted”, and that Change vote
+preselects the cast ranking. A seeded Scenario A pass filtered the ALPI
+discussion with enhanced navigation in dark at desktop width (focus moved to
+the heading), and read the proposal collection and a populated Decisions view at
+375 px in light with no horizontal overflow.
+[Filter and Decisions regression](tests/deliberation-filters.test.js)
 
 ### Review checklist for presentation changes
 
