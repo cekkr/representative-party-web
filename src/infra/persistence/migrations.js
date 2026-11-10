@@ -5,7 +5,7 @@ import { normalizeModuleSettings } from '../../modules/circle/modules.js';
 import { normalizeProviderBlindSettings } from '../../modules/circle/ringRegistry.js';
 import { normalizeExtensionInstallations } from '../../modules/extensions/registry.js';
 
-export const LATEST_SCHEMA_VERSION = 30;
+export const LATEST_SCHEMA_VERSION = 31;
 
 const MIGRATIONS = [
   {
@@ -738,6 +738,54 @@ const MIGRATIONS = [
           discussionOpenedAt: entry?.discussionOpenedAt
             ?? (String(entry?.status || '').toLowerCase() === 'discussion' ? openedAt.get(entry?.id) ?? null : null),
         })),
+      };
+    },
+  },
+  {
+    version: 31,
+    description: 'Reconcile sessions of one verified identity: a ban on any holds on all, and a session without a chosen handle takes the newest one.',
+    up(data) {
+      // Re-verifying on another device used to start a session with no ban and a
+      // synthesized handle. Roles are left as they are: which of two differing
+      // roles is current cannot be recovered, and an admin can reassign it.
+      const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+      const synthesized = /^(user|person)-[0-9a-f]{1,8}$/i;
+      const chosen = (handle, pidHash) => {
+        const value = String(handle || '').trim().replace(/^@+/, '');
+        const short = String(pidHash || '').slice(0, 8).toLowerCase();
+        return Boolean(value) && !synthesized.test(value) &&
+          !['user', 'person'].some((prefix) => value.toLowerCase() === `${prefix}-${short}`);
+      };
+      const time = (session) => {
+        const value = session?.verifiedAt;
+        if (Number.isFinite(value)) return value;
+        const parsed = Date.parse(value || '');
+        return Number.isNaN(parsed) ? 0 : parsed;
+      };
+      const byHash = new Map();
+      for (const session of sessions) {
+        if (!session?.pidHash) continue;
+        const list = byHash.get(session.pidHash) || [];
+        list.push(session);
+        byHash.set(session.pidHash, list);
+      }
+      const standing = new Map();
+      for (const [hash, list] of byHash) {
+        if (list.length < 2) continue;
+        const newestChosen = [...list].sort((a, b) => time(b) - time(a)).find((session) => chosen(session.handle, hash));
+        standing.set(hash, { banned: list.some((session) => session.banned), handle: newestChosen?.handle || '' });
+      }
+      return {
+        ...data,
+        sessions: sessions.map((session) => {
+          const identity = session?.pidHash ? standing.get(session.pidHash) : null;
+          if (!identity) return session;
+          return {
+            ...session,
+            banned: Boolean(session.banned) || identity.banned,
+            handle: chosen(session.handle, session.pidHash) || !identity.handle ? session.handle : identity.handle,
+          };
+        }),
       };
     },
   },

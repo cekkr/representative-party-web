@@ -2,7 +2,7 @@ import { persistDelegations } from '../../infra/persistence/storage.js';
 import { logTransaction } from '../transactions/registry.js';
 import { filterVisibleEntries, stampLocalEntry } from '../federation/replication.js';
 import { recommendDelegationForPerson } from '../groups/groups.js';
-import { findSessionByHash } from '../identity/sessions.js';
+import { isIdentityBanned } from '../identity/sessions.js';
 import { getGovernanceSettings } from '../governance/constitution.js';
 import { buildTopicMatchKeys, topicMatchRank } from '../topics/topicMatch.js';
 
@@ -141,8 +141,7 @@ function followDelegationChain({ state, startOwnerHash, firstDelegateHash, topic
       cycle = true;
       break;
     }
-    const session = findSessionByHash(state, target);
-    if (session?.banned) {
+    if (isIdentityBanned(state, target)) {
       blockedBanned = true;
       break;
     }

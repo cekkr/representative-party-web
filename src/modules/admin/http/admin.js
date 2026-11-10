@@ -76,7 +76,7 @@ import { getPerson } from '../../identity/person.js';
 import { canAdministerProvider, isAdminBootstrapOpen } from '../../identity/privileges.js';
 import { renderAdminRequired, sendAdminRequiredJson } from '../../../interfaces/http/views/adminGate.js';
 import { DEFAULT_RATE_LIMITS, normalizeLimit } from '../../identity/rateLimit.js';
-import { invalidateSessionIndex } from '../../identity/sessions.js';
+import { applyIdentityStanding, invalidateSessionIndex } from '../../identity/sessions.js';
 import { summarizeOutboundDeliveries } from '../../messaging/outbound.js';
 import { getMetricsSnapshot, getOpsMetricsConfig } from '../../ops/metrics.js';
 import { listTransactions, logTransaction } from '../../transactions/registry.js';
@@ -1359,9 +1359,15 @@ async function updateSession(state, body) {
   }
   state.sessions.set(sessionId, next);
   invalidateSessionIndex(state);
+  // Role, ban, and handle belong to the verified identity, so every session of
+  // the same person takes them; a ban on one device holds on the others.
+  const siblings = next.pidHash
+    ? applyIdentityStanding(state, next.pidHash, { role: next.role, banned: next.banned, ...(handle ? { handle } : {}) })
+    : 1;
   await persistSessions(state);
+  const others = siblings > 1 ? ` Applied to all ${siblings} sessions of this verified person.` : '';
   return {
-    outcome: OUTCOME.APPLIED, flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).`,
+    outcome: OUTCOME.APPLIED, flash: `Session "${sessionId}" updated (${next.role}${next.banned ? ', banned' : ''}).${others}`,
     sessionForm: { sessionRole: role, sessionId, sessionHandle: next.handle, banned },
   };
 }

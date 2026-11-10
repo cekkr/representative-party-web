@@ -1,6 +1,6 @@
 import { sanitizeText } from '../../shared/utils/text.js';
 import { filterVisibleEntries } from '../federation/replication.js';
-import { findSessionByHash } from '../identity/sessions.js';
+import { findSessionByHash, isIdentityBanned } from '../identity/sessions.js';
 import { listGroups } from '../groups/groups.js';
 import { pickWinner } from '../groups/groupElections.js';
 
@@ -27,9 +27,11 @@ export function listPeopleDirectory(state, { query = '' } = {}) {
     if (!session || session.status !== 'verified' || !session.pidHash) continue;
     if (seen.has(session.pidHash)) continue;
     seen.add(session.pidHash);
+    // One card per person, drawn from the session that represents the identity.
+    const identity = findSessionByHash(state, session.pidHash) || session;
     const incoming = incomingByHash.get(session.pidHash) || { total: 0, owners: new Set() };
-    const role = session.role || 'user';
-    const handle = session.handle || '';
+    const role = identity.role || 'user';
+    const handle = identity.handle || '';
     if (normalizedQuery) {
       const haystack = `${handle} ${session.pidHash} ${role}`.toLowerCase();
       if (!haystack.includes(normalizedQuery)) continue;
@@ -38,7 +40,7 @@ export function listPeopleDirectory(state, { query = '' } = {}) {
       hash: session.pidHash,
       handle,
       role,
-      banned: Boolean(session.banned),
+      banned: isIdentityBanned(state, session.pidHash),
       incomingTotal: incoming.total,
       incomingUniqueOwners: incoming.owners.size,
       isDelegate: role === 'delegate' || incoming.total > 0,
@@ -61,7 +63,7 @@ export function buildDelegateProfile(state, delegateHash, { canReadPetition = nu
   const session = normalizedHash ? findSessionByHash(state, normalizedHash) : null;
   const handle = session?.handle || '';
   const role = session?.role || 'unknown';
-  const banned = Boolean(session?.banned);
+  const banned = isIdentityBanned(state, normalizedHash);
 
   const delegations = filterVisibleEntries(state.delegations || [], state);
   const incoming = delegations.filter((entry) => entry.delegateHash === normalizedHash);

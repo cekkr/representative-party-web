@@ -3,7 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { createActor } from '../../federation/activitypub.js';
 import { buildCredentialOffer, buildSessionCookie, blindHash } from '../../identity/auth.js';
 import { getPerson } from '../../identity/person.js';
-import { invalidateSessionIndex } from '../../identity/sessions.js';
+import {
+  applyIdentityStanding,
+  invalidateSessionIndex,
+  isChosenHandle,
+  resolveIdentityStanding,
+} from '../../identity/sessions.js';
 import { getCirclePolicyState, resolveDefaultActorRole } from '../../circle/policy.js';
 import { isModuleEnabled } from '../../circle/modules.js';
 import { deriveBaseUrl } from '../../../shared/utils/request.js';
@@ -116,11 +121,16 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   state.actors.set(pidHash, actor);
   await persistActors(state);
 
+  // A second device verifies into a new session of the same identity: it takes
+  // the identity's chosen handle, role, and any ban, so re-verifying never sheds
+  // a ban or a role and the member keeps their @handle.
   const defaultRole = resolveDefaultActorRole(state);
-  const role = session.role || defaultRole;
+  const standing = resolveIdentityStanding(state, pidHash, { excludeSessionId: sessionId });
+  const role = (standing.known && standing.role) || session.role || defaultRole;
   const handlePrefix = role === 'user' || role === 'person' ? role : defaultRole;
-  const handle = session.handle || `${handlePrefix}-${pidHash.slice(0, 8)}`;
-  const banned = Boolean(session.banned);
+  const handle = (isChosenHandle(session.handle, pidHash) && session.handle) || standing.handle ||
+    session.handle || `${handlePrefix}-${pidHash.slice(0, 8)}`;
+  const banned = Boolean(session.banned) || standing.banned;
 
   const verifiedSession = {
     ...session,
@@ -134,6 +144,7 @@ export async function completeAuth({ req, res, url, state, wantsPartial }) {
   };
   state.sessions.set(sessionId, verifiedSession);
   invalidateSessionIndex(state);
+  if (banned && standing.known && !standing.banned) applyIdentityStanding(state, pidHash, { banned: true });
   await persistSessions(state);
 
   const ledgerNote = alreadyKnown ? 'Ledger entry already present (peer sync).' : 'New entry added to the Uniqueness Ledger.';

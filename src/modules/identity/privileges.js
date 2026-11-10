@@ -1,3 +1,5 @@
+import { isIdentityBanned } from './sessions.js';
+
 // Centralize privilege resolution so posting/petition/vote checks share the same rules.
 export function getPrivilegesForPerson(person, _state) {
   if (!person) {
@@ -48,7 +50,7 @@ export function isAdminBootstrapOpen(state) {
   const sessions = state?.sessions;
   const values = typeof sessions?.values === 'function' ? sessions.values() : [];
   for (const session of values) {
-    if (session?.role === 'admin' && !session?.banned) return false;
+    if (session?.role === 'admin' && !session?.banned && !isIdentityBanned(state, session?.pidHash)) return false;
   }
   return true;
 }

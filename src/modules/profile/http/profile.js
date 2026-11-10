@@ -23,7 +23,7 @@ import {
   renderUiPreferencesForm,
 } from '../../../interfaces/http/views/profileView.js';
 import { normalizeInterfaceSettings } from '../../../interfaces/http/views/interfaceSettings.js';
-import { invalidateSessionIndex, validateHandleChoice } from '../../identity/sessions.js';
+import { applyIdentityStanding, invalidateSessionIndex, validateHandleChoice } from '../../identity/sessions.js';
 import { persistSessions } from '../../../infra/persistence/storage.js';
 import { logTransaction } from '../../transactions/registry.js';
 
@@ -44,7 +44,7 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
     if (!currentSession) {
       return sendJson(res, 404, { error: 'session_not_found', message: 'Session not found.' });
     }
-    const result = validateHandleChoice(state, body.handle, { sessionId: person.sessionId });
+    const result = validateHandleChoice(state, body.handle, { sessionId: person.sessionId, pidHash: person.pidHash });
     if (!result.ok) {
       return renderProfilePage({
         req,
@@ -60,6 +60,8 @@ export async function updateProfileAttributes({ req, res, state, wantsPartial })
     const next = { ...currentSession, handle: result.handle };
     state.sessions.set(person.sessionId, next);
     invalidateSessionIndex(state);
+    // The handle names the person on every device they verified.
+    applyIdentityStanding(state, person.pidHash, { handle: result.handle });
     await persistSessions(state);
     await logTransaction(state, {
       type: 'handle_set',
